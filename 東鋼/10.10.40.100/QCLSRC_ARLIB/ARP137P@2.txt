@@ -1,0 +1,163 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP137P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCJ                                  */
+     /*     4.FUNCTION     INEMST電子發票主檔傳輸P-->廠區     */
+     /*     5.DATE-WRITTEN  107/12/03 2018AR00031                   */
+     /*     6.UPDATE  DATE  108/05/10 S00WCJ (0805A)                */
+     /*                      抓系統USER                           */
+     /*                     112/03/07 2023AR00006 S00WCJ (1203A)    */
+     /*                      新增大業廠                           */
+     /*                                                             */
+     /***************************************************************/
+
+             PGM
+             DCL        VAR(&COUNTER) TYPE(*DEC) LEN(1 0)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&LOC)  TYPE(*CHAR) LEN(1)
+  /*0805A*/  DCL        VAR(&USER)    TYPE(*CHAR) LEN(10)
+
+             CHGJOB     LOGCLPGM(*YES)
+
+             MONMSG     MSGID(CPF0000)
+  /*0805A*/  RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+
+        IF   COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+ START:
+             CHGVAR     VAR(&LOC)     VALUE('P')
+             CHGDTAARA  DTAARA(*LDA (5 1))  VALUE(&LOC)
+             SBMJOB     JOB(ARP137P) JOBD(ARJOBD) JOBQ(QCTL) +
+                           RQSDTA('CALL ARLIB/ARP137P')
+             GOTO       CMDLBL(ENDCLPGM)
+ BATCH:
+  /*0805A*/  CHGDTAARA  DTAARA(*LDA (1001 10)) VALUE(&USER)
+             CHGVAR     VAR(&COUNTER) VALUE(0)
+ LOOP:
+             MONMSG     MSGID(CPF1002) EXEC(DO)
+             CHGVAR     VAR(&COUNTER) VALUE(&COUNTER  + 1)
+             IF   COND(&COUNTER *GE 5) THEN(GOTO CMDLBL(ENDCLPGM))
+             DLYJOB     DLY(60)
+             GOTO       CMDLBL(LOOP)
+             ENDDO
+        /*                                          */
+             RTVDTAARA  DTAARA(*LDA (5 1))  RTNVAR(&LOC)
+        /*  台北  DALIB/INEMST--> DALIB/INVMSTP    */
+             OVRDBF     FILE(INEMST) TOFILE(DALIB/INEMST) SHARE(*YES)
+      /*     OVRDBF     FILE(INEMST) TOFILE(S00WCJ/INEMST) SHARE(*YES) */
+             OVRDBF     FILE(INEMSTT) TOFILE(ARLIB/INEMSTT)
+      /*     OVRDBF     FILE(INEMSTT) TOFILE(S00WCJ/INEMSTT)  */
+
+             OPNQRYF    FILE(INEMST) OPTION(*ALL) +
+                          QRYSLT('(EMFLAG *NE " " *AND +
+                                   EMSTCL *NE " ")')
+
+             CALL       PGM(ARLIB/ARP137RA)
+             CLOF       OPNID(INEMST)
+             DLTOVR     FILE(*ALL)
+
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMK)
+             DLTF       FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(U01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMU)
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMH)
+
+/*1203A*/    DLTF       FILE(QTEMP/DDMN)
+/*1203A*/    MONMSG     MSGID(CPF0000)
+/*1203A*/    CRTDUPOBJ  OBJ(N01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMN)
+
+        /*  台北　送廠區資料*/
+
+ /*         台北 ARLIB/INEMSTT 送　新桃 DALIB/INEMST      */
+             IF         COND((&LOC *EQ 'P') *OR (&LOC *EQ ' ') *OR +
+                          (&LOC *EQ 'U')) THEN(DO)
+             CHGDTAARA  DTAARA(*LDA (6 1)) VALUE('U')
+      /*     CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(S00WCJ/INEMST) +
+                          LVLCHK(*NO)        */
+             CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(DALIB/INEMST) +
+                          LVLCHK(*NO)
+             OVRDBF     FILE(INEMSTT) TOFILE(ARLIB/INEMSTT) SHARE(*YES)
+        /*   OVRDBF     FILE(INEMSTT) TOFILE(S00WCJ/INEMSTT) SHARE(*YES) */
+
+             OPNQRYF    FILE(INEMSTT) OPTION(*ALL) +
+                          QRYSLT('EMAREA *EQ "U"') +
+                                KEYFLD((EMNO))
+
+             OVRDBF     FILE(INEMST) TOFILE(QTEMP/DDMU)
+             CALL       PGM(ARLIB/ARP137RC)
+             CLOF       OPNID(INEMSTT)
+             DLTOVR     FILE(*ALL)
+             ENDDO
+
+        /*  台北 ARLIB/INEMSTT 送　苗栗 DALIB/INEMST      */
+             IF         COND((&LOC *EQ 'P') *OR (&LOC *EQ ' ') *OR +
+                          (&LOC *EQ 'H')) THEN(DO)
+             CHGDTAARA  DTAARA(*LDA (6 1)) VALUE('H')
+    /*       CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(S00WCJ/INEMST) +
+                          LVLCHK(*NO)       */
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(DALIB/INEMST) +
+                          LVLCHK(*NO)
+             OVRDBF     FILE(INEMSTT) TOFILE(ARLIB/INEMSTT) SHARE(*YES)
+     /*      OVRDBF     FILE(INEMSTT) TOFILE(S00WCJ/INEMSTT) SHARE(*YES) */
+             OPNQRYF    FILE(INEMSTT) OPTION(*ALL) +
+                          QRYSLT('EMAREA *EQ "H"')       +
+                                KEYFLD((EMNO))
+             OVRDBF     FILE(INEMST) TOFILE(QTEMP/DDMH)
+             CALL       PGM(ARLIB/ARP137RC)
+             CLOF       OPNID(INEMSTT)
+             DLTOVR     FILE(*ALL)
+             ENDDO
+
+
+        /*  台北 ARLIB/INEMSTT 送　高雄 DALIB/INEMST      */
+             IF         COND((&LOC *EQ 'P') *OR (&LOC *EQ ' ') *OR +
+                          (&LOC *EQ 'K')) THEN(DO)
+             CHGDTAARA  DTAARA(*LDA (6 1)) VALUE('K')
+      /*     CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(S00WCJ/INEMST) +
+                          LVLCHK(*NO)    */
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(DALIB/INEMST) +
+                          LVLCHK(*NO)
+             OVRDBF     FILE(INEMSTT) TOFILE(ARLIB/INEMSTT) SHARE(*YES)
+      /*     OVRDBF     FILE(INEMSTT) TOFILE(S00WCJ/INEMSTT) SHARE(*YES) */
+             OPNQRYF    FILE(INEMSTT) OPTION(*ALL) +
+                          QRYSLT('EMAREA *EQ "K"') +
+                                KEYFLD((EMNO))
+             OVRDBF     FILE(INEMST) TOFILE(QTEMP/DDMK)
+             CALL       PGM(ARLIB/ARP137RC)
+             CLOF       OPNID(INEMSTT)
+             DLTOVR     FILE(*ALL)
+             ENDDO
+
+
+    /*1203A 台北 ARLIB/INEMSTT 送　大業 DALIB/INEMST      */
+/*1203A*/    IF         COND((&LOC *EQ 'P') *OR (&LOC *EQ ' ') *OR +
+                          (&LOC *EQ 'N')) THEN(DO)
+/*1203A*/    CHGDTAARA  DTAARA(*LDA (6 1)) VALUE('N')
+      /*     CHGDDMF    FILE(QTEMP/DDMN) RMTFILE(S00WCJ/INEMST) +
+                          LVLCHK(*NO)    */
+/*1203A*/    CHGDDMF    FILE(QTEMP/DDMN) RMTFILE(DALIB/INEMST) +
+                          LVLCHK(*NO)
+/*1203A*/    OVRDBF     FILE(INEMSTT) TOFILE(ARLIB/INEMSTT) SHARE(*YES)
+      /*     OVRDBF     FILE(INEMSTT) TOFILE(S00WCJ/INEMSTT) SHARE(*YES) */
+/*1203A*/    OPNQRYF    FILE(INEMSTT) OPTION(*ALL) +
+                          QRYSLT('EMAREA *EQ "N"') +
+                                KEYFLD((EMNO))
+/*1203A*/    OVRDBF     FILE(INEMST) TOFILE(QTEMP/DDMN)
+/*1203A*/    CALL       PGM(ARLIB/ARP137RC)
+/*1203A*/    CLOF       OPNID(INEMSTT)
+/*1203A*/    DLTOVR     FILE(*ALL)
+/*1203A*/    ENDDO
+
+ ENDCLPGM:   ENDPGM
+

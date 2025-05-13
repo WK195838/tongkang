@@ -1,0 +1,59 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR069PA                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02LYW                                  */
+     /*     4.FUNCTION     訂單別出貨及發票明細表FOR DOWNLOAD     */
+     /*     5.DATE-WRITTEN  91/07/15                                */
+     /*                                                             */
+     /***************************************************************/
+           PGM
+           DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+
+             RTVJOBA  TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+           SBMJOB     JOB(ARR069PA) JOBD(ARJOBD)  +
+                      RQSDTA('CALL ARR069PA')
+           RETURN
+
+ BATCH:
+           CLRPFM     FILE(ARLIB/ARR069F1)
+           MONMSG     MSGID(CPF0000)
+
+ STEP1:                 /* 從銷貨找發票資料 */
+           OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+           OPNQRYF    FILE(TRNDTL) +
+                      QRYSLT(   +
+                       '(TXDATE *GE 860101) *AND    +
+                        (TXDATE *LE 911231) *AND    +
+                        (TXCODE *NE "AR06") *AND    +
+                        (CHAR *NE "#" )') +
+                      MAPFLD((CHAR '%SST(TXIVNO 1 1)' *CHAR 1)  +
+                             (ACDT TXACDT *CHAR 8) +
+                             (TXPCNO '%SST(ACDT 1 4)') +
+                             (TXVUNO '%SST(ACDT 5 2)') +
+                             (TXRESV '%SST(TXORNO 1 6)')) +
+                      KEYFLD((TXPCNO) (TXVUNO) (TXCUNO) (TXRESV) (TXACDT))
+           CALL       PGM(ARR069RA)
+           CLOF       OPNID(TRNDTL)
+           DLTOVR     FILE(*ALL)
+           OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+           OPNQRYF    FILE(TRNDTL) +
+                      QRYSLT(   +
+                       '(TXDATE *GE 870101) *AND    +
+                        (TXDATE *LE 911231) *AND    +
+                        (TXCODE *EQ "AR06") *AND    +
+                        (TXACNT *NE "4") *AND    +
+                        (TXFL01 *NE " ") *AND    +
+                        (CHAR *NE "*") *AND    +
+                        (CHAR *NE "#" )') +
+                      MAPFLD((CHAR '%SST(TXIVNO 1 1)' *CHAR 1)  +
+                             (TXVUNO '%SST(TXORNO 1 6)')) +
+                      KEYFLD((TXRESV) (TXCUNO) (TXVUNO) (TXACDT))
+           CALL       PGM(ARR069RB)
+           CLOF       OPNID(TRNDTL)
+           DLTOVR     FILE(*ALL)
+           ENDPGM
+

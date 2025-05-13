@@ -1,0 +1,246 @@
+     /*******************************************************************/
+     /*                                                                 */
+     /*               >>   PROGRAM INTRODUCTION   <<                    */
+     /*                                                                 */
+     /*            1.PROGRAM-ID    ARP109P                              */
+     /*            2.PROGRAM-TYPE  CLP                                  */
+     /*            3.AUTHOR        S02CSF                               */
+     /*            4.FUNCTION     電子商務--出貨／發票資料下載處理  */
+     /*            5.DATE-WRITTEN  93/06/18                             */
+     /*            6.DATE-MODIFY   99/01/07 2009AR406 S00WCJ (9901A)    */
+     /*                            99/08/17 2010AR517 S00WCJ (9908A) */
+     /*                           103/03/18 2014AR810 S00WCJ (0303A) */
+     /*                            T03下線                         */
+     /*                                                                 */
+     /*******************************************************************/
+            PGM
+            DCL        VAR(&COND)   TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&INT)    TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&DSPID)  TYPE(*CHAR)  LEN(10)
+    /*9908A DCL        VAR(&W#YMD)  TYPE(*CHAR)  LEN(6)  */
+   /*9908A*/DCL        VAR(&W#YMD)  TYPE(*CHAR)  LEN(8)
+            DCL        VAR(&D#DATE) TYPE(*DEC)   LEN(8 0)
+    /*9908A DCL        VAR(&W#DATE) TYPE(*CHAR)  LEN(6)  */
+   /*9908A*/DCL        VAR(&W#DATE) TYPE(*CHAR)  LEN(8)
+            DCL        VAR(&W#RDAT) TYPE(*CHAR)  LEN(8)
+            DCL        VAR(&P#PDAT) TYPE(*CHAR)  LEN(8)
+            DCL        VAR(&P#RDAT) TYPE(*CHAR)  LEN(8)
+            DCL        VAR(&P#OMOD) TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&P#MODE) TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&P#DAYS) TYPE(*CHAR)  LEN(4)
+            DCL        VAR(&P#ERR)  TYPE(*CHAR)  LEN(1)
+
+            RTVJOBA    JOB(&DSPID)   TYPE(&INT)
+            IF         COND(&INT  *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+            SBMJOB     CMD(CALL PGM(ARP109P)) JOB(ARP109P) +
+                       JOBD(ARJOBD)
+            RETURN
+
+ BATCH:
+    /*9908A  START */
+         /* RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&W#YMD)  */
+
+            RTVJOBA    CYMDDATE(&W#YMD)
+            CHGVAR     VAR(&W#YMD)  VALUE('0' *CAT &W#YMD)
+    /*9908A  END */
+        /*  CHGVAR     VAR(&W#YMD)   VALUE('970304')  */
+
+        /* STEP 0 : 先將銷貨資發票資料上傳　 */
+
+            CALL       PGM(ARLIB/ARP023P)              /*銷貨資料*/
+            CALL       PGM(ARLIB/ARP020PH)             /*苗栗發票*/
+            CALL       PGM(ARLIB/ARP020PK)             /*高雄發票*/
+ /*0303A    CALL       PGM(ARLIB/ARP020PT)        */   /*桃園發票*/
+    /*9901A*/ CALL     PGM(ARLIB/ARP020PU)             /*新桃發票*/
+
+        /* STEP 1 : 刪除半年前ＬＯＧ檔資料　 */
+
+    /*9908A  START*/
+        /*  RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&W#DATE) */
+
+            RTVJOBA    CYMDDATE(&W#DATE)
+            CHGVAR     VAR(&W#DATE)   VALUE('0' *CAT &W#DATE)
+    /*9908A   END */
+            CHGVAR     VAR(&D#DATE)  VALUE(&W#DATE)
+            CHGVAR     VAR(&D#DATE)  VALUE(&D#DATE + 19110000)
+            CHGVAR     VAR(&P#PDAT)  VALUE(&D#DATE) /*來源日期*/
+            CHGVAR     VAR(&P#MODE)  VALUE('2') /*中國年*/
+            CHGVAR     VAR(&P#DAYS)  VALUE('0180') /*天數*/
+            CHGVAR     VAR(&P#OMOD)  VALUE('1') /* 1:往前, 2:往後  */
+            CALL       PGM(UTS104R) PARM(&P#PDAT  &P#MODE  &P#OMOD  &P#DAYS +
+                                          &P#RDAT &P#ERR)
+            IF         COND(&P#ERR *EQ '0') THEN(DO)
+            CHGVAR     VAR(&W#RDAT)  VALUE(&P#RDAT)
+
+                      /*刪除銷貨下載ＬＯＧ檔 */
+            OVRDBF     FILE(TNDLOG) TOFILE(ARLIB/TNDLOG) SHARE(*YES)
+            OPNQRYF    FILE(TNDLOG) OPTION(*ALL)  QRYSLT('   +
+                       (DATE   *LE "' || &W#RDAT || '")')    +
+                       MAPFLD((DATE  TWDATE  *CHAR 8 ))      +
+                       KEYFLD((TWDATE))
+            CALL       PGM(ARLIB/ARP109R4)
+            CLOF       OPNID(TNDLOG)
+            DLTOVR     FILE(*ALL)
+
+                      /*刪除發票主檔下載ＬＯＧ檔 */
+            OVRDBF     FILE(INMLOG) TOFILE(ARLIB/INMLOG) SHARE(*YES)
+            OPNQRYF    FILE(INMLOG) OPTION(*ALL)  QRYSLT('   +
+                       (INDT   *LE "' || &W#RDAT || '")')    +
+                       MAPFLD((INDT  IMINDT  *CHAR 8 ))      +
+                       KEYFLD((IMINDT))
+            CALL       PGM(ARLIB/ARP109R5)
+            CLOF       OPNID(INMLOG)
+            DLTOVR     FILE(*ALL)
+
+                      /*刪除發票明細下載ＬＯＧ檔 */
+            OVRDBF     FILE(INDLOG) TOFILE(ARLIB/INDLOG) SHARE(*YES)
+            OPNQRYF    FILE(INDLOG) OPTION(*ALL)  QRYSLT('   +
+                       (ACDT   *LE "' || &W#RDAT || '")')    +
+                       MAPFLD((ACDT  IDACDT  *CHAR 8 ))      +
+                       KEYFLD((IDACDT))
+            CALL       PGM(ARLIB/ARP109R7)
+            CLOF       OPNID(INDLOG)
+            DLTOVR     FILE(*ALL)
+
+                      /*刪除銷退折讓下載ＬＯＧ檔 */
+            OVRDBF     FILE(DISLOG) TOFILE(ARLIB/DISLOG) SHARE(*YES)
+            OPNQRYF    FILE(DISLOG) OPTION(*ALL)  QRYSLT('   +
+                       (INDT   *LE "' || &W#RDAT || '")')    +
+                       MAPFLD((INDT  ISINDT  *CHAR 8 ))      +
+                       KEYFLD((ISINDT))
+            CALL       PGM(ARLIB/ARP109R9)
+            CLOF       OPNID(DISLOG)
+            DLTOVR     FILE(*ALL)
+
+                      /* REORGANIZE */
+  /*        RGZPFM     FILE(ARLIB/TNDLOG)     */
+  /*        MONMSG     MSGID(CPF0000)         */
+  /*        RGZPFM     FILE(ARLIB/INMLOG)     */
+  /*        MONMSG     MSGID(CPF0000)         */
+  /*        RGZPFM     FILE(ARLIB/INDLOG)     */
+  /*        MONMSG     MSGID(CPF0000)         */
+  /*        RGZPFM     FILE(ARLIB/DISLOG)     */
+  /*        MONMSG     MSGID(CPF0000)         */
+            ENDDO
+
+
+        /* STEP 1 : 處理發票新增與修改部分　 */
+
+            OVRDBF     FILE(INVDTL) TOFILE(DALIB/INVDTL)
+            OVRDBF     FILE(INVMST) TOFILE(DALIB/INVMST) SHARE(*YES)
+    /*9908A  START*/
+         /* OPNQRYF    FILE(INVMST) OPTION(*ALL)  QRYSLT('      +
+                       (INFLAG *NE " ")          *AND           +
+                       (INFLAG *NE " ")          *AND           +
+                       (INFLAG *NE "D")          *AND           +
+                       (TXDT   *EQ "' || &W#YMD || '")')        +
+                       MAPFLD((TXD1  INTXDT       *CHAR 8 )     +
+                              (TXDT  '%SST(TXD1 3 6)' *CHAR 6)) +
+                       KEYFLD((INCUNO) (INNO)) */
+
+            OPNQRYF    FILE(INVMST) OPTION(*ALL)  QRYSLT('      +
+                       (INFLAG *NE " ")          *AND           +
+                       (INFLAG *NE " ")          *AND           +
+                       (INFLAG *NE "D")          *AND           +
+                       (TXD1   *EQ "' || &W#YMD || '")')        +
+                       MAPFLD((TXD1  INTXDT       *CHAR 8 ))    +
+                       KEYFLD((INCUNO) (INNO))
+    /*9908A  END */
+            CALL       PGM(ARLIB/ARP109R1)
+            CLOF       OPNID(INVMST)
+            DLTOVR     FILE(*ALL)
+
+        /* STEP 2 : 處理銷貨新增與修改部分　 */
+
+            OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+    /*9908A  START*/
+         /* OPNQRYF    FILE(TRNDTL) OPTION(*ALL)  QRYSLT('      +
+                       ((TXFLAG *NE " ")           *OR          +
+                        (RESV   *EQ "*")           *OR          +
+                        (TXDY   *EQ "' || &W#YMD || '")) *AND   +
+                       (TXCODE *EQ "SA04")         *AND         +
+                       (TXIVNO *NE  " ")')                      +
+                       MAPFLD((RESV  '%SST(TXRESV 10 1)' *CHAR 1)  +
+                              (TXDT  TXTXDT       *CHAR 8 )     +
+                              (TXDY  '%SST(TXDT 3 6)' *CHAR 6)) +
+                       KEYFLD((TXCUNO) (TXNO))  */
+
+            OPNQRYF    FILE(TRNDTL) OPTION(*ALL)  QRYSLT('      +
+                       ((TXFLAG *NE " ")           *OR          +
+                        (RESV   *EQ "*")           *OR          +
+                        (TXDT   *EQ "' || &W#YMD || '")) *AND   +
+                       (TXCODE *EQ "SA04")         *AND         +
+                       (TXIVNO *NE  " ")')                      +
+                       MAPFLD((RESV  '%SST(TXRESV 10 1)' *CHAR 1)  +
+                              (TXDT  TXTXDT       *CHAR 8 ))    +
+                       KEYFLD((TXCUNO) (TXNO))
+    /*9908A  END */
+            CALL       PGM(ARLIB/ARP109R2)
+            CLOF       OPNID(TRNDTL)
+            DLTOVR     FILE(*ALL)
+
+        /* STEP 3 : 處理發票作廢部分　 */
+
+            OVRDBF     FILE(INVMST) TOFILE(DALIB/INVMST) SHARE(*YES)
+    /*9908A  START */
+         /* OPNQRYF    FILE(INVMST) OPTION(*ALL)  QRYSLT('      +
+                       (INFLAG *EQ "D")          *AND           +
+                       (DEDT   *EQ "' || &W#YMD || '")')        +
+                       MAPFLD((DEDX  INDEDT       *CHAR 8 )     +
+                              (DEDT  '%SST(DEDX 3 6)' *CHAR 6)) +
+                       KEYFLD((INCUNO) (INNO))      */
+
+            OPNQRYF    FILE(INVMST) OPTION(*ALL)  QRYSLT('      +
+                       (INFLAG *EQ "D")          *AND           +
+                       (DEDX   *EQ "' || &W#YMD || '")')        +
+                       MAPFLD((DEDX  INDEDT       *CHAR 8 ))    +
+                       KEYFLD((INCUNO) (INNO))
+    /*9908A  END */
+            CALL       PGM(ARLIB/ARP109R3)
+            CLOF       OPNID(INVMST)
+            DLTOVR     FILE(*ALL)
+
+        /* STEP 5 : 處理折讓新增與修改部份 */
+
+            OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+    /*9908A  START */
+        /*  OPNQRYF    FILE(TRNDTL) OPTION(*ALL)  QRYSLT('      +
+                       ((TXFLAG *NE " ")           *OR          +
+                        (RESV   *EQ "*")           *OR          +
+                        (TXDY   *EQ "' || &W#YMD || '")) *AND   +
+                       (TXCODE *EQ "AR06")         *AND         +
+                       (TXIVNO *NE  " ")')                      +
+                       MAPFLD((RESV  '%SST(TXRESV 10 1)' *CHAR 1)  +
+                              (TXDT  TXTXDT       *CHAR 8 )     +
+                              (TXDY  '%SST(TXDT 3 6)' *CHAR 6)) +
+                       KEYFLD((TXCUNO) (TXNO)) */
+
+            OPNQRYF    FILE(TRNDTL) OPTION(*ALL)  QRYSLT('      +
+                       ((TXFLAG *NE " ")           *OR          +
+                        (RESV   *EQ "*")           *OR          +
+                        (TXDT   *EQ "' || &W#YMD || '")) *AND   +
+                       (TXCODE *EQ "AR06")         *AND         +
+                       (TXIVNO *NE  " ")')                      +
+                       MAPFLD((RESV  '%SST(TXRESV 10 1)' *CHAR 1)  +
+                              (TXDT  TXTXDT       *CHAR 8 ))    +
+                       KEYFLD((TXCUNO) (TXNO))
+    /*9908A  END */
+            CALL       PGM(ARLIB/ARP109R8)
+            CLOF       OPNID(TRNDTL)
+            DLTOVR     FILE(*ALL)
+
+        /* STEP 6 : 處理序號不同步 */
+
+            OVRDBF     FILE(ARCBDW) TOFILE(DALIB/ARCBDW) SHARE(*YES)
+            OPNQRYF    FILE(ARCBDW) OPTION(*ALL)  QRYSLT('      +
+                       (ADFLE3 *EQ "Y")          *AND           +
+                       (ADFLE4 *EQ "Y")          *AND           +
+                       (ADFLE5 *EQ "Y")          *AND           +
+                       (ADFLE6 *EQ "Y")')
+            CALL       PGM(ARLIB/ARP109R6)
+            CLOF       OPNID(ARCBDW)
+            DLTOVR     FILE(*ALL)
+
+            ENDPGM
+

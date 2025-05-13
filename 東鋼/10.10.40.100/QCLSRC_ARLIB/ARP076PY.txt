@@ -1,0 +1,361 @@
+     /****************************************************************/
+     /**                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                 */
+     /*                                                              */
+     /*            1.PROGRAM-ID    ARP076P                           */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S02HYS                            */
+     /*            4.FUNCTION     銷貨帳款兌現天數處理程式         */
+     /*            5.DATE-WRITTEN  90/07/19                          */
+     /*            6.DATE-MODIFY   80/07/19                          */
+     /*                                                              */
+     /****************************************************************/
+             PGM
+             DCL        VAR(&D#DAT1)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&D#DAT2)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&D#DAT3)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&D#DAT4)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&D#DAT11)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&D#DAT22)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&D#DAT33)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&D#DAT44)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DAT1)     TYPE(*DEC)  LEN(2)
+             DCL        VAR(&DAT2)     TYPE(*DEC)  LEN(2)
+             DCL        VAR(&DAT3)     TYPE(*DEC)  LEN(2)
+             DCL        VAR(&DAT4)     TYPE(*DEC)  LEN(2)
+
+             DCL        VAR(&Y1) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&Y2) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&MA) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&MB) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&M2) TYPE(*DEC) LEN(2 0)
+             DCL        VAR(&MC) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&MD) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&M4) TYPE(*DEC) LEN(2 0)
+             DCL        VAR(&NM1) TYPE(*DEC) LEN(2 0)
+             DCL        VAR(&NM2) TYPE(*DEC) LEN(2 0)
+             DCL        VAR(&MBR)     TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MBRA)     TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MBRB)     TYPE(*CHAR) LEN(10)
+             DCL        VAR(&FILE) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&FILEB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&FILEC) TYPE(*CHAR) LEN(10)
+
+             DCL        VAR(&JOBTYPE)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)     TYPE(*CHAR) LEN(10)
+             DCL        VAR(&DSPID)    TYPE(*CHAR) LEN(10)
+             DCLF       FILE(ARP076S)
+
+             /* INITIAL VALUE */
+             RTVJOBA    JOB(&DSPID) OUTQ(&OUTQ) TYPE(&JOBTYPE)
+             IF         COND(&JOBTYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+             RTVDTAARA  DTAARA(*LDA (1001 10))  RTNVAR(&S#USER)
+             CHGDTAARA  DTAARA(*LDA (90 10))  VALUE(&DSPID)
+             CHGVAR     VAR(&S#DAT1) VALUE(890101)
+             CHGVAR     VAR(&S#DAT2) VALUE(891231)
+             CHGVAR     VAR(&S#DAT3) VALUE(900101)
+             CHGVAR     VAR(&S#DAT4) VALUE(901231)
+ START:      SNDRCVF    RCDFMT(ARP0761)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             IF         COND(&IN12 *EQ '1') THEN(RETURN)
+             /* INITIAL INDICATOR */
+             CLRPFM  DALIB/ARCADT
+             CHGVAR     VAR(&IN33) VALUE('0')
+             CHGVAR     VAR(&IN34) VALUE('0')
+
+             /* Check日期一*/
+             IF         COND(&S#DAT1 *EQ 0) THEN(DO)
+               CHGVAR     VAR(&S#ERR) VALUE('起始日期不可空白！')
+               CHGVAR     VAR(&IN33)  VALUE('1')
+               GOTO       CMDLBL(START)
+               ENDDO
+             IF         COND(&S#DAT2 *EQ 0) THEN(DO)
+               CHGVAR     VAR(&S#ERR) VALUE('截止日期不可空白！')
+               CHGVAR     VAR(&IN33)  VALUE('1')
+               GOTO       CMDLBL(START)
+               ENDDO
+             /* Check起迄日期*/
+             IF     COND(&S#DAT1 *GT &S#DAT2) THEN(DO)
+               CHGVAR  VAR(&S#ERR) +
+                        VALUE('起始日期不可大於截止日期！')
+               CHGVAR  VAR(&IN33)  VALUE('1')
+               GOTO    CMDLBL(START)
+               ENDDO
+             CHGVAR   VAR(&D#DAT1) VALUE(&S#DAT1)
+             CHGVAR   VAR(&D#DAT2) VALUE(&S#DAT2)
+             CHGVAR   VAR(&D#DAT3) VALUE(&S#DAT3)
+             CHGVAR   VAR(&D#DAT4) VALUE(&S#DAT4)
+               CHGVAR   VAR(&DAT1) VALUE(%SST(&D#DAT1 1 2))
+               CHGVAR   VAR(&DAT2) VALUE(%SST(&D#DAT2 1 2))
+             IF     COND(&DAT1 *NE &DAT2) THEN(DO)
+               CHGVAR  VAR(&S#ERR) +
+                        VALUE('不得跨年！')
+               CHGVAR  VAR(&IN33)  VALUE('1')
+               GOTO    CMDLBL(START)
+               ENDDO
+
+             /* Check日期二*/
+             IF         COND(&S#DAT3 *EQ 0) THEN(DO)
+               CHGVAR     VAR(&S#ERR) VALUE('起始日期不可空白！')
+               CHGVAR     VAR(&IN34)  VALUE('1')
+               GOTO       CMDLBL(START)
+               ENDDO
+             IF         COND(&S#DAT4 *EQ 0) THEN(DO)
+               CHGVAR     VAR(&S#ERR) VALUE('截止日期不可空白！')
+               CHGVAR     VAR(&IN34)  VALUE('1')
+               GOTO       CMDLBL(START)
+               ENDDO
+             /* Check起迄日期*/
+             IF     COND(&S#DAT3 *GT &S#DAT4) THEN(DO)
+               CHGVAR  VAR(&S#ERR) +
+                        VALUE('起始日期不可大於截止日期！')
+               CHGVAR  VAR(&IN34)  VALUE('1')
+               GOTO    CMDLBL(START)
+               ENDDO
+               CHGVAR   VAR(&DAT3) VALUE(%SST(&D#DAT3 1 2))
+               CHGVAR   VAR(&DAT4) VALUE(%SST(&D#DAT4 1 2))
+             IF     COND(&DAT3 *NE &DAT4) THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('不得跨年！')
+               CHGVAR  VAR(&IN34)  VALUE('1')
+               GOTO    CMDLBL(START)
+               ENDDO
+             IF     COND(&DAT1 *EQ &DAT3) THEN(DO)
+               CHGVAR  VAR(&S#ERR) +
+                        VALUE('年度不得相同！')
+               CHGVAR  VAR(&IN34)  VALUE('1')
+               GOTO    CMDLBL(START)
+               ENDDO
+             CHGVAR   VAR(&D#DAT1) VALUE(&S#DAT1)
+             CHGVAR   VAR(&D#DAT2) VALUE(&S#DAT2)
+             CHGVAR   VAR(&D#DAT3) VALUE(&S#DAT3)
+             CHGVAR   VAR(&D#DAT4) VALUE(&S#DAT4)
+
+             /*資料寫入*LDA */
+             CHGDTAARA  DTAARA(*LDA (301 6))  VALUE(&D#DAT1)
+             CHGDTAARA  DTAARA(*LDA (307 6))  VALUE(&D#DAT2)
+             CHGDTAARA  DTAARA(*LDA (313 6))  VALUE(&D#DAT3)
+             CHGDTAARA  DTAARA(*LDA (319 6))  VALUE(&D#DAT4)
+             SBMJOB     CMD(CALL PGM(ARP076PY)) JOB(ARP076PX) +
+                        JOBD(ARJOBD) OUTQ(&OUTQ)
+            SNDBRKMSG  MSG('<<開始處理，請稍待...>>')                +
+                          TOMSGQ(%SST(*LDA 90 10)) MSGTYPE(*INFO)
+             RETURN      /*   INTERACTIVE JOB */
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (301 6))  RTNVAR(&D#DAT1)
+             RTVDTAARA  DTAARA(*LDA (307 6))  RTNVAR(&D#DAT2)
+             RTVDTAARA  DTAARA(*LDA (313 6))  RTNVAR(&D#DAT3)
+             RTVDTAARA  DTAARA(*LDA (319 6))  RTNVAR(&D#DAT4)
+
+             RTVDTAARA  DTAARA(*LDA (301 2)) RTNVAR(&Y1)
+             RTVDTAARA  DTAARA(*LDA (303 2)) RTNVAR(&MA)
+             RTVDTAARA  DTAARA(*LDA (309 2)) RTNVAR(&MB)
+             RTVDTAARA  DTAARA(*LDA (313 2)) RTNVAR(&Y2)
+             RTVDTAARA  DTAARA(*LDA (315 2)) RTNVAR(&MC)
+             RTVDTAARA  DTAARA(*LDA (321 2)) RTNVAR(&MD)
+             CHGVAR   VAR(&D#DAT11) VALUE('00' *CAT &D#DAT1)
+             CHGVAR   VAR(&D#DAT22) VALUE('00' *CAT &D#DAT2)
+             CHGVAR   VAR(&D#DAT33) VALUE('00' *CAT &D#DAT3)
+             CHGVAR   VAR(&D#DAT44) VALUE('00' *CAT &D#DAT4)
+
+
+
+     /*處理*/
+             OVRDBF   FILE(WTSBMP)   TOFILE(DALIB/WTSBMP)
+             OVRDBF   FILE(ARCADT)   TOFILE(DALIB/ARCADT)
+             OVRDBF   FILE(INVMST)   TOFILE(DALIB/INVMST)
+             OVRDBF   FILE(RCVDTL)   TOFILE(DALIB/RCVDTL)
+             OVRDBF   FILE(TRNDTL)   TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF  FILE(TRNDTL) QRYSLT('+
+                      (CHAR1 *GE "' || &D#DAT11 || '") *AND +
+                      (CHAR1 *LE "' || &D#DAT22 || '") *AND +
+                      (%SST(TXIVNO 1 1) *NE "*") *AND +
+                      (%SST(TXIVNO 1 1) *NE "#") *AND +
+                      (%SST(TXIVNO 1 6) *NE "000000") *AND +
+                      (TXCODE *EQ "SA04")')    +
+                        KEYFLD((*FILE)) +
+                        MAPFLD((CHAR1 TXDATE *CHAR 8))
+             CALL       ARLIB/ARP076RX
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+     /*處理*/
+             OVRDBF   FILE(WTSBMP)   TOFILE(DALIB/WTSBMP)
+             OVRDBF   FILE(ARCADT)   TOFILE(DALIB/ARCADT)
+             OVRDBF   FILE(INVMST)   TOFILE(DALIB/INVMST)
+             OVRDBF   FILE(RCVDTL)   TOFILE(DALIB/RCVDTL)
+             OVRDBF   FILE(TRNDTL)   TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF  FILE(TRNDTL) QRYSLT('+
+                      (CHAR2 *GE "' || &D#DAT33 || '") *AND +
+                      (CHAR2 *LE "' || &D#DAT44 || '") *AND +
+                      (%SST(TXIVNO 1 1) *NE "*") *AND +
+                      (%SST(TXIVNO 1 1) *NE "#") *AND +
+                      (%SST(TXIVNO 1 6) *NE "000000") *AND +
+                      (TXCODE *EQ "SA04")')    +
+                        KEYFLD(*FILE) +
+                        MAPFLD((CHAR2 TXDATE *CHAR 8))
+             CALL       ARLIB/ARP076RX
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+     /*帳齡計算處理*/
+             CHGVAR     VAR(&FILEB) VALUE('ACBL' || &Y1)
+             CHGVAR     VAR(&FILE) VALUE('ACVR' || &Y1)
+             CHGVAR     VAR(&FILEC) VALUE('ACVR' || &Y2)
+             CHGVAR     VAR(&MBR) VALUE('BL' || &MA)
+             CHGVAR     VAR(&M2) VALUE(12)
+             CHGVAR     VAR(&M4) VALUE(12)
+             CHGVAR     VAR(&NM1) VALUE(&MA)
+             CHGVAR     VAR(&NM2) VALUE(01)
+             CLRPFM     FILE(DALIB/ACNRAR)
+             CRTPF      FILE(QTEMP/ACXR) SRCFILE(ACLIB/QDDSSRC) +
+                          SRCMBR(ACBL) OPTION(*NOSRC *NOLIST) +
+                          SIZE(*NOMAX) LVLCHK(*NO) AUT(*ALL)
+
+             CPYF       FROMFILE(DALIB/&FILEB) TOFILE(QTEMP/ACXR) +
+                          FROMMBR(&MBR) MBROPT(*ADD) INCREL((*IF +
+                          ACNO *EQ '1131') (*OR ACNO *EQ '1112') +
+                          (*OR ACNO *EQ '1114') (*OR ACNO *EQ +
+                          '2129') (*OR ACNO *EQ '1138')) FMTOPT(*NOCHK)
+ AGAIN1:     IF         COND(&NM1 *LE &M2) THEN(DO)
+             CHGVAR     VAR(&MA) VALUE(&NM1)
+             CHGVAR     VAR(&MBRA) VALUE('VR' || &MA)
+             CPYF       FROMFILE(DALIB/&FILE) TOFILE(QTEMP/ACXR) +
+                          FROMMBR(&MBRA) MBROPT(*ADD) INCREL((*IF +
+                          ACNO *EQ '1131') (*AND ACVRNO *GE 'H001') +
+                          (*AND ACVRNO *LE 'H999') (*OR ACNO *EQ +
+                          '1112') (*AND ACVRNO *GE 'H001') (*AND +
+                          ACVRNO *LE 'H999') (*OR ACNO *EQ '1114') +
+                          (*AND ACVRNO *GE 'H001') (*AND ACVRNO *LE +
+                          'H999') (*OR ACNO *EQ '2129') (*AND +
+                          ACVRNO *GE 'H001') (*AND ACVRNO *LE +
+                          'H999') (*OR ACNO *EQ '1138') (*AND +
+                          ACVRNO *GE 'H001') (*AND ACVRNO *LE +
+                          'H999')) FMTOPT(*NOCHK)
+             CHGVAR     VAR(&NM1) VALUE(&NM1 + 1)
+             GOTO       CMDLBL(AGAIN1)
+                        ENDDO
+
+             IF     COND(&Y1 *NE &Y2) THEN(DO)
+ AGAIN2:     IF         COND(&NM2 *LE &M4) THEN(DO)
+             CHGVAR     VAR(&MA) VALUE(&NM2)
+             CHGVAR     VAR(&MBRB) VALUE('VR' || &MA)
+             CPYF       FROMFILE(DALIB/&FILEC) TOFILE(QTEMP/ACXR) +
+                          FROMMBR(&MBRB) MBROPT(*ADD) INCREL((*IF +
+                          ACNO *EQ '1131') (*AND ACVRNO *GE 'H001') +
+                          (*AND ACVRNO *LE 'H999') (*OR ACNO *EQ +
+                          '1112') (*AND ACVRNO *GE 'H001') (*AND +
+                          ACVRNO *LE 'H999') (*OR ACVRNO *EQ +
+                          '1114') (*AND ACVRNO *GE 'H001') (*AND +
+                          ACVRNO *LE 'H999') (*OR ACNO *EQ '2129') +
+                          (*AND ACVRNO *GE 'H001') (*AND ACVRNO *LE +
+                          'H999') (*OR ACNO *EQ '1138') (*AND +
+                          ACVRNO *GE 'H001') (*AND ACVRNO *LE +
+                          'H999')) FMTOPT(*NOCHK)
+             CHGVAR     VAR(&NM2) VALUE(&NM2 + 1)
+             GOTO       CMDLBL(AGAIN2)
+                        ENDDO
+             ENDDO
+
+             OVRDBF     FILE(ACXR) TOFILE(QTEMP/ACXR) SHARE(*YES)
+             OPNQRYF    FILE((ACXR)) OPTION(*ALL) QRYSLT('acvrno *ge +
+                          "H001" *and acvrno *le "H999" *and acno +
+                          *eq "1131"') KEYFLD((ACCARD) (ACBKNO) +
+                          (ACRLNO) (ACDUE) (ACCSNM))
+             CALL       PGM(ACP235R)
+             CLOF       OPNID(ACXR)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(ACXR) TOFILE(QTEMP/ACXR) SHARE(*YES)
+             OPNQRYF    FILE((ACXR)) OPTION(*ALL) QRYSLT('(acvrno +
+                          *ge "H001" *and acvrno *le "H999" *and +
+                          acno *eq "1112") *or (acvrno *ge "H001" +
+                          *and acvrno *le "H999" *and acno *eq +
+                          "1114") *or (acvrno *ge "H001" *and +
+                          acvrno *le "H999" *and acno *eq "2129") +
+                          *OR (ACVRNO *GE "H001" *AND ACVRNO *LE +
+                          "H999" *AND ACNO *EQ "1138")') +
+                          KEYFLD((ACCARD) (ACBKNO) (ACRLNO) (ACDUE) +
+                          (ACCSNM) (ACDSC2))
+             CALL       PGM(ACP235RA)
+             CLOF       OPNID(ACXR)
+             DLTOVR     FILE(*ALL)
+
+             DLTF       FILE(QTEMP/ACXR)
+
+             OVRDBF     FILE(ARCADT) TOFILE(DALIB/ARCADT) SHARE(*YES)
+             OPNQRYF    FILE((ARCADT)) OPTION(*ALL) QRYSLT('arRVDT +
+                          *gt 0') KEYFLD(*FILE)
+             CALL       PGM(ACP235R1)
+             CLOF       ARCADT
+             DLTOVR     *ALL
+
+             CLRPFM     FILE(DALIB/ARRECV)
+             OVRDBF     FILE(ACNRAR) TOFILE(DALIB/ACNRAR) SHARE(*YES)
+             OPNQRYF    FILE((ACNRAR)) OPTION(*ALL) KEYFLD((A5NO))
+             CALL       PGM(ACP237R)
+             CLOF       OPNID(ACNRAR)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(ACNRAR) TOFILE(DALIB/ACNRAR)
+             CALL       PGM(ACP237R1)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(ACNRAR) TOFILE(DALIB/ACNRAR) SHARE(*YES)
+             OPNQRYF    FILE((ACNRAR)) OPTION(*ALL) KEYFLD((A5NO))
+             CALL       PGM(ACP237R2)
+             CLOF       OPNID(ACNRAR)
+             DLTOVR     FILE(*ALL)
+
+     /*  繳款入帳（平均兌現天數）   */
+             CLRPFM     FILE(DALIB/ACARCV)
+             CLRPFM     FILE(DALIB/ACARCS)
+             OVRDBF     FILE(ACNRAR) TOFILE(DALIB/ACNRAR) SHARE(*YES)
+             OPNQRYF    FILE((ACNRAR)) OPTION(*ALL) KEYFLD((A5NO) +
+                          (A5RLNO))
+             CALL       PGM(ACP238R)
+             CLOF       OPNID(ACNRAR)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(ACARCV) TOFILE(DALIB/ACARCV) SHARE(*YES)
+             OPNQRYF    FILE((ACARCV)) OPTION(*ALL) KEYFLD((A6NO) +
+                          (A6RLNO))
+             CALL       PGM(ACP238R1)
+             CLOF       OPNID(ACARCV)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(ACARCV) TOFILE(DALIB/ACARCV) SHARE(*YES)
+             OPNQRYF    FILE((ACARCV)) OPTION(*ALL) KEYFLD((A6NO) +
+                          (A6RLNO))
+             CALL       PGM(ACP238R2)
+             CLOF       OPNID(ACARCV)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(ACARCV) TOFILE(DALIB/ACARCV) SHARE(*YES)
+             OPNQRYF    FILE((ACARCV)) OPTION(*ALL) KEYFLD((A6NO) +
+                          (A6RLNO))
+             CALL       PGM(ACP238R3)
+             CLOF       OPNID(ACARCV)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(ACARCV) TOFILE(DALIB/ACARCV) SHARE(*YES)
+             OPNQRYF    FILE((ACARCV)) OPTION(*ALL) KEYFLD((A6NO) +
+                          (A6RLNO))
+             CALL       PGM(ACP238R4)
+             CLOF       OPNID(ACARCV)
+             DLTOVR     FILE(*ALL)
+
+     /*彙總*/
+             CLRPFM     FILE(ARCATL)
+             MONMSG     MSGID(CPF0000)
+             OVRDBF     FILE(ARCADT) TOFILE(DALIB/ARCADT) SHARE(*YES)
+             OPNQRYF    FILE((ARCADT)) QRYSLT('+
+                            (ARCHCK *NE "4")') +
+                        KEYFLD((ARCUNO) (ARDAT3))
+             CALL       PGM(ARP076RY)
+             CLOF       OPNID(ARCADT)
+             DLTOVR     FILE(*ALL)
+
+             SNDBRKMSG  MSG('<<處理已完成。>>') +
+                          TOMSGQ(%SST(*LDA 90 10)) MSGTYPE(*INFO)
+ENDCLPGM:    ENDPGM
+

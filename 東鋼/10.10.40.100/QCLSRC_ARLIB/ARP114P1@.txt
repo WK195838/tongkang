@@ -1,0 +1,119 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP114P1                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CSF                                  */
+     /*     4.FUNCTION     發票作廢記錄明細檔傳輸作業－台北送廠區 */
+     /*     5.DATE-WRITTEN  94/01/06                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&USER)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&FLAG1) TYPE(*CHAR) LEN(3) VALUE('   ')
+
+
+             RTVJOBA    TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+             SBMJOB     JOB(ARP114P1) JOBD(ARJOBD) JOBQ(QSYS/QCTL) +
+                        RQSDTA('CALL ARLIB/ARP114P1') LOGCLPGM(*YES)
+             SNDBRKMSG  MSG('<<發票作廢記錄明細檔傳輸作業已開始處理+
+                         ,請稍待.........>>') +
+                        TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             RETURN
+
+
+ BATCH:
+
+ STEP0:        /*  建立　DDMF  */
+             DLTF       FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMT)
+
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMK)
+
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMH)
+
+
+ STEP1:        /*  台北發票記錄明細檔寫入傳輸檔DELDTLX   */
+             CLRPFM     DELDTLX
+             MONMSG     MSGID(CPF0000)
+             OVRDBF     FILE(DELDTLX) TOFILE(ARLIB/DELDTLX)
+             OVRDBF     FILE(DELDTL)  TOFILE(DALIB/DELDTL) SHARE(*YES)
+             OPNQRYF    FILE((DELDTL)) OPTION(*ALL) QRYSLT('    +
+                        (DLFLAG *NE " ")')                      +
+                        KEYFLD((DLIVNO) (DLWTNO) (DLITEM))
+             CALL       PGM(ARLIB/ARP114R1)
+             CLOF       OPNID(DELDTL)
+
+ STEP2:        /*  台北ARLIB/DELDTLX 送　桃園ARLIB/DELDTL   */
+
+             CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(ARLIB/DELDTLX) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(ARLIB/DELDTLX) TOFILE(QTEMP/DDMT) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP3)
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP114P2) PARM(''T'')') +
+                        DDMFILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP3)
+
+             CLRPFM     FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(%SST(&FLAG1 1 1)) VALUE(' ')
+
+ STEP3:        /*  台北　抓　苗栗  ARLIB/DELDTLX  */
+
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(ARLIB/DELDTLX) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(ARLIB/DELDTLX) TOFILE(QTEMP/DDMH) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP4)
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP114P2) PARM(''H'')') +
+                        DDMFILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP4)
+
+             CLRPFM     FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(%SST(&FLAG1 1 1)) VALUE(' ')
+
+ STEP4:        /*  台北　抓　高雄  ARLIB/DELDTLX  */
+
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(ARLIB/DELDTLX) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(ARLIB/DELDTLX) TOFILE(QTEMP/DDMK) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP5)
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP114P2) PARM(''K'')') +
+                        DDMFILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP5)
+
+             CLRPFM     FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(%SST(&FLAG1 1 1)) VALUE(' ')
+
+ /* -------------------------------------------------------------- */
+
+ STEP5:       /* 未成功廠區之訊息 */
+
+             DLTOVR     FILE(*ALL)
+             IF         COND(&FLAG1 *NE '   ') THEN(DO)
+             SNDMSG     TOUSR(&USER) MSG(+
+                        '發票作廢記錄明細檔資料下傳失敗"' || &FLAG1 || '"')
+             ENDDO
+             ELSE (DO)
+             SNDMSG     TOUSR(&USER) MSG(+
+                        '發票作廢記錄明細檔資料下傳成功')
+             ENDDO
+
+
+             ENDPGM
+

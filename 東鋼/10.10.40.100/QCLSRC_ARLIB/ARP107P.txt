@@ -1,0 +1,44 @@
+     /****************************************************************/
+     /*                                                              */
+     /*               >>   PROGRAM INTRODUCTION   <<                 */
+     /*                                                              */
+     /*            1.PROGRAM-ID    ARP107P                           */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S02CSF                            */
+     /*            4.FUNCTION     抓取發票檔裡承購客戶的發票　　　 */
+     /*            5.DATE-WRITTEN  93/03/01                          */
+     /*            6.DATE-MODIFY                                     */
+     /*                                                              */
+     /****************************************************************/
+            PGM
+            DCL        VAR(&INT)    TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&DSPID)  TYPE(*CHAR)  LEN(10)
+            DCL        VAR(&W#AREA) TYPE(*CHAR)  LEN(1)
+
+            RTVJOBA    JOB(&DSPID)   TYPE(&INT)
+            IF         COND(&INT  *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+    /*      SBMJOB     CMD(CALL PGM(ARLIB/ARP107P)) JOB(ARP107P) +
+                       JOBD(ARJOBD)  */
+    /*      RETURN    */
+
+ BATCH:
+            RTVDTAARA  DTAARA(*LDA  (1021 1))  RTNVAR(&W#AREA)
+
+            OVRDBF     FILE(INVMST) TOFILE(DALIB/INVMST) +
+                       SHARE(*YES)
+            OPNQRYF    FILE(INVMST) OPTION(*ALL)  QRYSLT(' +
+                       (INTYPE *NE "9"     )            *AND +
+                       (INNBAL *NE  0      )            *AND +
+                       (INAPNO *NE "      ")            *AND +
+                       (APNO   *EQ "' || &W#AREA || '") *AND +
+                       (ININDT *GE  930101 )            *AND +
+                       (INDECD *EQ " "     )')               +
+                       KEYFLD((INCUNO))                      +
+                       MAPFLD((APNO '%SST(INAPNO 1 1)' *CHAR 1))
+            CALL       PGM(ARLIB/ARP107R)
+            CLOF       OPNID(INVMST)
+            DLTOVR     FILE(*ALL)
+
+            ENDPGM
+

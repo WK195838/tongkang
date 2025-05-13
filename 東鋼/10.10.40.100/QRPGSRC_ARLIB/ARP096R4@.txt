@@ -1,0 +1,415 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP096R4
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     反傾銷內銷正式檔案處理
+     H*            5.DATE-WRITTEN  91/11/11
+     H*            6.DATE-UPDATE
+     H*            P.S.1.此為產生內銷之所有詳細資料,所有異常處理皆
+     H*                  可在此進行,尤其是運費與在庫日計算,目前將
+     H*                  折讓在此程式中處理,亦可將其獨立處理之
+     H*                2.有部分相關檔案並無輸入程式,而是由DFU直接
+     H*                  進行異動,(如合成CONTROL NUMBER之相關檔案
+     H*                  )
+     H*                3.運費之計算
+     H*                  在預警系統中是以內外銷別+年月+廠區別+
+     H*                  規別別之單位運費為準,若在實際狀況中,必須
+     H*                  改為以每張磅單之實際單位運費為準
+     H*                4.銷貨數量
+     H*                  淨銷售量=銷售-退貨
+     H*                  程式中分列為兩欄位(依發票明細所記錄之銷退)
+     H*                  但實際狀況應將出貨與銷退磅單做連結,以利舉
+     H*                  証
+     H*****************************************************************
+     H        1   Y                                     1
+     FARP096F3IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FARMETL  IF  E           K        DISK
+     FARTYPE  IF  E           K        DISK
+     FARTFIT  IF  E           K        DISK
+     FWTMASPL2IF  E           K        DISK
+     FRCVDTL  IF  E           K        DISK
+     F*IPIVY   IF  E           K        DISK
+     FARCURL  IF  E           K        DISK
+     FARP096F1IF  E           K        DISK
+     FHIPRODL6IF  E           K        DISK
+     FDISDTLL1IF  E           K        DISK
+     FDISMST  IF  E           K        DISK
+     FARP096FXO   E           K        DISK
+     E                    T#MSG   1   1 16
+     E                    TXARY       1  8
+     IAR096F3     01
+     I            DS
+     I                                        1   5 W#SPE1
+     I                                        1   3 W#SPEH
+     I            DS
+     I                                        1   5 W#SPE2
+     I                                        1   3 W#SPEB
+     I            DS
+     I                                        1   5 W#H
+     I                                        2   4 AEHTD
+     I            DS
+     I                                        1   5 W#B
+     I                                        2   4 AEBW
+     I            DS
+     I                                        1   7 SIZEH
+     I                                        1   3 D#PUBH
+     I                                        4   4 D#MARK
+     I                                        5   7 D#PUBB
+     I            DS
+     I                                        1   7 W#COMH
+     I                                        1   1 FORMH
+     I                                        2   4 SHAPEH
+     I                                        5   6 STRGH
+     I                                        7   7 COATH
+     I            DS
+     I                                        1   8 W#TXNO
+     I                                        1   1 S5AREA
+     I                                        4   80S5VRNO
+     I            DS
+     I                                        1   8 W#WTNO
+     I                                        1   1 W6AREA
+     I                                        2   3 W6VNO1
+     I                                        4   80W6VNO2
+     I            DS
+     I                                        1   9 D#ODNO
+     I                                        1   1 D#AREA
+     I                                        2   6 D#ODN1
+     I                                        8   9 D#ODN2
+     I            DS
+     I                                        1   5 D#DEST
+     I                                        1   1 D#DEAR
+     I                                        2   4 D#DEPL
+     I            DS
+     I                                        1  10 D#IVNO
+     I                                        1   2 D#IVN1
+     I                                        3  10 D#IVN2
+     I            DS
+     I                                        1   7 D#SIZE
+     I                                        1   30D#SPE1
+     I                                        5   70D#SPE2
+     I           UDS
+     I*日期區間
+     I                                      301 304 D#STYM
+     I                                      305 308 D#EDTM
+     I* VCOM
+     I                                      309 3155D#BVOM
+     I                                      316 3225D#CVOM
+     I* TCOM
+     I                                      323 3295D#BTOM
+     I                                      330 3365D#CTOM
+     I*短期借款利率
+     I                                      337 3435D#BRAT
+     I                                      344 3505D#CRAT
+     I* PACKING COST
+     I                                      351 3575D#BPCK
+     I                                      358 3645D#CPCK
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*FILE => ARMETL  鋼種對照檔
+     C           K#METL    KLIST
+     C                     KFLD           ALSTND           鋼種
+     C*FILE => ARTYPE 尺寸對照檔
+     C           K#TYPE    KLIST
+     C                     KFLD           AEHTD             H/T/D
+     C                     KFLD           AEBW              B/W
+     C*FILE => ARTFIT 運費檔
+     C           K#TFIT    KLIST
+     C                     KFLD           ATSALC           內外銷別
+     C                     KFLD           ATCOUN           國別
+     C                     KFLD           ATYYMM           年月
+     C                     KFLD           ATFACT           廠區
+     C                     KFLD           ATNAME           產品類別
+     C                     KFLD           ATSTND           規範
+     C                     KFLD           ATQULT           鋼種
+     C                     KFLD           ATSPE1            H/T/D
+     C                     KFLD           ATSPE2            B/W
+     C                     KFLD           ATSPE3            T1
+     C                     KFLD           ATSPE4            T2
+     C*FILE => WTMASP 磅單主檔
+     C           K#WTMA    KLIST
+     C                     KFLD           W6AREA           廠區
+     C                     KFLD           W6VNO1           進出別
+     C                     KFLD           W6VNO2           磅單序號
+     C*FILE => RCVDTL 繳款檔
+     C           K#RCDL    KLIST
+     C                     KFLD           RVNO             繳款單號
+     C                     KFLD           RVITEM           單據項次
+     C*FILE => HIPRODL6
+     C           K#PROD    KLIST
+     C                     KFLD           F4SPE1
+     C                     KFLD           F4SPE2
+     C                     KFLD           F4NAME
+     C                     KFLD           F4STND
+     C                     KFLD           F4QULT
+     C*FILE => ARP096F1
+     C           K#INVD    KLIST
+     C                     KFLD           A1IVNO
+     C                     KFLD           A1IVIT
+     C*FILE => DISDTLL1進倉履約折讓明細檔
+     C           K#DTL1    KLIST
+     C                     KFLD           DSINNO
+     C                     KFLD           DSORNO
+     C                     KFLD           DSYYMM
+     C                     KFLD           DSCONT
+     C                     KFLD           DSPROD
+     C*FILE => DISMSTL1進倉履約折讓主檔
+     C           K#MST1    KLIST
+     C                     KFLD           DMYYMM
+     C                     KFLD           DMCONT
+     C                     KFLD           DMCUNO
+     C                     KFLD           DMORNO
+     C                     KFLD           DMAREA
+     C*FILE => INVDTL  發票明細檔
+     C           K#VDTL    KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*FILE => IPIVY
+     C*          K#IVY     KLIST
+     C*                    KFLD           IYMETL
+     C*                    KFLD           IYSEC1
+     C*                    KFLD           IYSEC2
+     C*                    KFLD           IYPROD
+     C*                    KFLD           IYSPEC
+     C*                    KFLD           IYTHK1
+     C*                    KFLD           IYTHK2
+     C*                    KFLD           IYTRSB
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C           D#STYM    CAT  '01'      W#YM1   6
+     C                     MOVE W#YM1     W#SYMD  60
+     C*                                                    起始日期
+     C           D#EDYM    CAT  '31'      W#YM1
+     C                     MOVE W#YM1     W#EYMD  60       終止日期
+     C*
+     C                     MOVE *ON       *IN99
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*檢核發票日期(此處以發票日期為準)
+     C           A3IVNO    IFEQ *BLANK
+     C           A3IVDT    ORLT W#SYMD
+     C           A3IVDT    ORGT W#EYMD
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C*寫入ARP096FX
+     C                     CLEARAR096FX
+     C**********取得3.2   3.3   3.5  4.2   4.3
+     C                     ADD  1         W#OBSH  60
+     C                     Z-ADDW#OBSH    OBSH
+     C*          A1QULT    IFEQ 'A359'
+     C*                    MOVELT#MSG,1   SPECH2
+     C*                    ELSE
+     C                     MOVELA1QULT    SPECH2            4.1
+     C*                    ENDIF
+     C*合成SIZEA
+     C                     MOVE A3SPE1    W#H
+     C                     MOVE A3SPE2    W#B
+     C*
+     C                     MOVE AEHTD     D#PUBH
+     C                     MOVE 'X'       D#MARK
+     C                     MOVE AEBW      D#PUBB
+     C                     MOVE A3LENG    LETH
+     C**********取得2.2
+     C           A3QCCD    IFLE 'C'
+     C                     MOVE '1'       PRIMEH
+     C                     ELSE
+     C                     MOVE '2'       PRIMEH
+     C                     ENDIF
+     C*
+     C**********取得3.2
+     C           K#TYPE    CHAINRARTYPE              41
+     C           *IN41     IFEQ *OFF
+     C                     MOVE AETYP     SHAPEH            3.2
+     C                     ELSE                             IN41
+     C                     MOVE *BLANK    SHAPEH            3.2
+     C                     ENDIF
+     C**********取得3.3   3.5  4.1
+     C           A3QULT    CHAINRARMETL              42
+     C  N42                MOVE ALSE33    STRGH             3.3
+     C   42                MOVE *BLANK    STRGH             3.3
+     C*
+     C                     MOVE '1'       FORMH             3.1
+     C*合成CONTROL NUMBER 2.0
+     C                     MOVE '3'       COATH             3.4
+     C                     MOVE W#COMH    COMH              2.0
+     C*發票相關資訊 10.0   12.0
+     C           A3IVDT    ADD  19110000  SLIVDH            10
+     C                     Z-ADDSLIVDH    SALDTH
+     C                     MOVE A3IVNO    INVOCH            12
+     C*磅單資訊     1.0
+     C                     MOVE A3NAME    PRODH             1.0
+     C*
+     C                     MOVE A3CUNO    CUIDH             6.0
+     C                     MOVE A3WTNO    WTNO
+     C*判斷關係企業與否7.0
+     C           A3CUNO    CHAINRARCURL              40
+     C  N40                MOVE ACSREL    CURLH             7.0
+     C  N40                MOVE ACSCAT    CUCTH             8.0
+     C  N40                MOVE ACNNEL    CHNLH             9.0
+     C   40                MOVE *BLANK    CURLH             7.0
+     C   40                MOVE *BLANK    CUCTH             8.0
+     C   40                MOVE *BLANK    CHNLH             9.0
+     C*
+     C           A3ENTD    ADD  19110000  SHPDTH            13.0
+     C           A3IVNO    CHAININREC                40
+     C                     Z-ADDA3STDW    QTYH              3.7
+     C                     MOVE '2'       QTUMH             17.2
+     C*取得REBATE1~REBATE5
+     C                     EXSR RBTSR
+     C*
+     C           CUCTH     IFEQ '3'
+     C           CHNLH     ANDEQ'3'
+     C                     Z-ADD3         LOTH
+     C                     ENDIF
+     C           CUCTH     IFEQ '5'
+     C           CHNLH     ANDEQ'3'
+     C                     Z-ADD6         LOTH
+     C                     ENDIF
+     C                     Z-ADD0         LOTDJH            21.1
+     C***計算運費
+     C*
+     C                     Z-ADD0         INTRVH            31.0
+     C*計算WARRANTY
+     C*
+     C                     Z-ADD0         TECHH             34.0
+     C                     Z-ADD0         DRSCH             36.0
+     C*取得COM與PACKING COST
+     C                     MOVELB1ODNO    ODNO             出單號碼
+     C*單價
+     C                     Z-ADDA3UPRC    GSUPH     H       18.0
+     C* INDIRECT SELLING EXPENCE
+     C           GSUPH     MULT 0.0037291 INDIRH    H       37.0
+     C*計算CREDIT EXPENSES
+     C*計算加權平均現金入帳日
+     C*
+     C*計算差異日
+     C*扣除退貨重量
+     C                     EXSR RETRSR
+     C*
+     C                     MOVE B1QCCD    QCCD             出貨等級
+     C                     Z-ADDB1ORIT    ORIT             訂單項次
+     C*取得單重
+     C                     MOVE B1SPE1    F4SPE1
+     C                     MOVE B1SPE2    F4SPE2
+     C                     MOVE *BLANK    F4NAME
+     C                     MOVE *BLANK    F4STND
+     C                     MOVE *BLANK    F4QULT
+     C           K#PROD    SETLLRHIPROD
+     C                     READ RHIPROD                  40
+     C  N40      B1SPE1    IFEQ F4SPE1
+     C           B1SPE2    ANDEQF4SPE2
+     C                     Z-ADDF4SPGR    WEIGTH
+     C                     ELSE
+     C*
+     C                     ENDIF
+     C*
+     C                     EXSR ICCSR
+     C*SPECIAL FOR I.C.C
+     C           DTLEND    ENDSR
+     C*****************************************************************
+     C           RBTSR     BEGSR
+     C*****************************************************************
+     C* REBATE 1(銷貨折讓)
+     C                     EXSR RBT1SR
+     C* BILLING ADJUSTMENTS(價差折讓)
+     C                     EXSR BILLSR
+     C* REBATE 2(共同基金)
+     C                     EXSR RBT2SR
+     C* REBATE 3(特別補助)
+     C                     EXSR RBT3SR
+     C* REBATE 4(特別提撥)
+     C                     EXSR RBT4SR
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           RBT1SR    BEGSR
+     C*****************************************************************
+     C* REBATE 1(銷貨折讓)
+     C                     Z-ADD0         W#VQTY 120       總出貨量
+     C                     Z-ADD0         W#TAMT 120       折讓總金額
+     C*此處銷貨折讓單價之計算是以發票明細該產品之總折讓金額除以該產品
+     C*之總銷貨數量(不含稅),如有必需重新分配之狀況,建議另外架檔
+     C*案處理之
+     C                     MOVELINVOCH    IVNO
+     C                     MOVE *BLANK    IVACNT
+     C                     Z-ADD0         IVITEM
+     C           K#VDTL    SETLLIVREC
+     C                     MOVE *OFF      *IN60
+     C           *IN60     DOWEQ*OFF
+     C*
+     C                     READ IVREC               N    60
+     C           *IN60     IFEQ *ON
+     C           IVNO      ORNE INVOCH
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           IVACNT    IFNE '1'                        出貨
+     C           IVACNT    ORNE '3'                        折讓
+     C           IVPDCD    ORNE A3NAME                     產品類別
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           IVACNT    IFEQ '1'
+     C                     ADD  IVQTY     W#VQTY           總出貨量
+     C                     ELSE
+     C                     Z-SUBIVAMT     W#VAMT 120
+     C                     ADD  W#VAMT    W#TAMT           折讓總金額
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C           W#TAMT    DIV  W#VQTY    REBAT1            REBATE 1
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           BILLSR    BEGSR
+     C*****************************************************************
+     C                     ENDSR
+     C*****************************************************************
+     C           RBT2SR    BEGSR
+     C*****************************************************************
+     C*共同基金(若為經銷商則直接設定該值為0.086)
+     C           CURLH     IFEQ '3'                        經銷商
+     C                     Z-ADD0.086     REBAT2
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           RBT3SR    BEGSR
+     C*****************************************************************
+     C           CUIDH     IFEQ 'DH008'                    經銷商
+     C           CUIDH     OREQ 'DH021'                    經銷商
+     C                     Z-ADD0.190     REBAT3
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           RBT4SR    BEGSR
+     C*****************************************************************
+     C*發生於部分訂單中,須由營業部提供此值的邏輯(訂單號碼)
+     C*                    Z-ADD0.0952    REBAT4
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           ICCSR     BEGSR
+     C*****************************************************************
+     C*計算INVENTORY CARRYING COSTS
+     C                     ENDSR
+** T#MSG
+A36,A572G50,A992
+

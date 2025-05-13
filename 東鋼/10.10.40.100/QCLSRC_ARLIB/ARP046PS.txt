@@ -1,0 +1,76 @@
+             PGM
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&WHOAMI) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&DATEX) TYPE(*CHAR) LEN(6)   /*輸入日期*/
+             DCL        VAR(&DATEE) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&ENDD)  TYPE(*CHAR) LEN(2)
+             DCL        VAR(&AREA)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DTARA) TYPE(*CHAR) LEN(11)
+             DCL        VAR(&Y)     TYPE(*CHAR) LEN(2)
+             DCL        VAR(&M)     TYPE(*CHAR) LEN(2)
+             DCL        VAR(&IN03)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&CNTT)  TYPE(*CHAR) LEN(6) /* 改銷貨數 */
+             DCL        VAR(&CNTA)  TYPE(*CHAR) LEN(6) /* 刪傳票數 */
+
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&DTARA) VALUE('ACCTLDTA' *CAT &AREA)
+
+             RTVJOBA    TYPE(&INT) USER(&WHOAMI)
+             IF         COND(&INT *EQ '0')  THEN(GOTO BATCH)
+
+             RTVDTAARA  DTAARA(DALIB/&DTARA (7 6)) RTNVAR(&DATEX)
+
+                        /* 傳進已代開日期回還原起日 止日     */
+             CALL       PGM(ARP046RS) PARM(&IN03 &DATEX &ENDD)
+
+             IF         COND(&IN03 *EQ '0') THEN(DO)
+             CHGVAR     VAR(&DATEE)  VALUE(&DATEX)
+             CHGVAR     VAR(%SST(&DATEE 5 2))  VALUE(&ENDD)
+             CHGDTAARA  DTAARA(*LDA (1 6)) VALUE(&DATEX)
+             CHGDTAARA  DTAARA(*LDA (7 6)) VALUE(&DATEE)
+             SBMJOB     JOB(ARP046PS) JOBD(ARJOBD)  +
+                        RQSDTA('CALL ARP046PS')
+             ENDDO
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&DATEX)
+             RTVDTAARA  DTAARA(*LDA (7 6)) RTNVAR(&DATEE)
+             CHGVAR     VAR(&Y)   VALUE(%SST(&DATEX 1 2))
+             CHGVAR     VAR(&M)   VALUE(%SST(&DATEX 3 2))
+
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL)
+             CPYF       FROMFILE(TRNDTL) TOFILE(QTEMP/TRNDTLW) +
+                        MBROPT(*ADD) CRTFILE(*YES) INCREL((*IF +
+                          TXVUNO *NE '       ') (*AND TXCODE *EQ +
+                          'SA04') (*AND TXACNT *LE '3') (*AND +
+                          TXFLAG *NE 'D') (*AND TXACDT *LE &DATEE) +
+                          (*AND TXACDT *GE &DATEX) +
+                          (*AND TXTXAR *EQ &AREA))
+             OVRDBF     FILE(TRNDTLW) TOFILE(QTEMP/TRNDTLW) +
+                        SHARE(*YES)   LVLCHK(*NO)
+             OPNQRYF    FILE((TRNDTLW))                     +
+                        QRYSLT('%SST(TXPDNM 1 1) *EQ "2"')  +
+                        KEYFLD(*FILE)
+
+             OVRDBF     FILE(ACTRAN) TOFILE('AC' || &AREA || +
+                          'R' || &Y) MBR('VR' || &M) LVLCHK(*NO)
+             CPYF       FROMFILE(ACTRAN) TOFILE(QTEMP/ACTRANW) +
+                        MBROPT(*ADD) CRTFILE(*YES) +
+                        INCREL((*IF ACVRNO *GE 'C000' ) +
+                               (*AND ACVRNO *LE 'C999' ) +
+                               (*AND ACYMD *LE &DATEE) +
+                               (*AND ACYMD *GE &DATEX) )
+             OVRDBF     FILE(ACTRANW) TOFILE(QTEMP/ACTRANW) LVLCHK(*NO)
+
+                        /* 還原銷貨明細並刪除已代開傳票 */
+             CALL       PGM(ARP046R) PARM(&CNTT &CNTA)
+
+             DLTOVR     FILE(*ALL)
+             CHGDTAARA  DTAARA(DALIB/&DTARA (7 6)) VALUE(&DATEX)
+             SNDMSG     MSG('銷貨代開傳票還原作業已完成，合計改+
+                             銷貨明細' || &CNTT || '筆，刪傳票' +
+                              || &CNTA || '筆。' || &DATEX) +
+                        TOUSR(&WHOAMI)
+             ENDPGM
+

@@ -1,0 +1,451 @@
+     H        1   Y                                     1                 BR003
+     FRCVDTL  UP  E           K        DISK
+     FBANKAC  IF  E           K        DISK
+     FBANKID  IF  E           K        DISK
+     FARCANDR IF  E           K        DISK
+     FQPRINT2 O   F     198     OV     PRINTER
+     FQPRINT1 O   F     198     OF     PRINTER
+     E*                   ARR    12  12  2 0
+      *************************************************************
+     E                    TAB1    1   6  1   TABR1  10
+     I*************************************************************
+     IRVREC       01
+     I                                              RVSBIDL3
+     I                                              RVSANOL2
+     I                                              RVPBIDL1
+     IAADS        DS
+     I              '票據未兌現明細表'  C         CON3                       X
+     I              '東和鋼鐵企業股份有-C         CON4                       X
+     I              '限公司'
+     I              'も票據兌現明細表も'C         CON5                       X
+     I            DS
+     I                                        1  10 WSANO
+     I                                        1   1 SANO1
+     I                                        2   2 SANO2
+     I                                        3  10 SANO3
+     I            DS
+     I                                        1  10 RVSBID
+     I                                        1   3 BAID1
+     I                                        4   7 BAID2
+     I            DS
+9008 I                                        1   80WNTDT
+LYW  I                                        1   40NTDTYY
+ .   I                                        5   60NTDTMM
+ .   I                                        7   80NTDTDD
+     I            DS
+     I                                        1   80CDATE
+     I                                        1   4 WYY
+     I                                        5   6 WMM
+     I                                        7   8 WDD
+     I            DS
+     I                                        1   80D#NTDT
+     I                                        1   40D#Y
+     I                                        5   60D#M
+     I                                        7   80D#D
+     I           UDS
+9008 I                                        1   60YMD
+     I                                     10211021 TXAR
+     C*----------------------------------------------------
+     C           ACKEY     KLIST
+     C                     KFLD           ACTYPE
+     C                     KFLD           ACCURR
+     C                     KFLD           ACACNO
+     C           BKKEY     KLIST
+     C                     KFLD           BAID1
+     C                     KFLD           BAID2
+     C*
+     C           CAKEY     KLIST
+     C                     KFLD           D#Y
+     C                     KFLD           D#M
+     C                     KFLD           D#D
+     C*
+     C  N99                EXSR INZ#01
+     C  N99                SETON                     99
+     C*  L4                EXSR DL#L4
+     C                     SETOF                     434445
+     C*          RVDATE    COMP UDATE                45  45
+     C*          *IN45     IFEQ '0'
+     C                     EXSR DP#01
+     C           *IN43     IFEQ '0'
+     C           *IN44     ANDEQ'1'
+     C                     ADD  1         CONL3
+     C                     ADD  RVRAMT    AMTL3
+     C*                    EXSR WR#DT
+     C                     EXSR UP#RV
+     C                     ENDIF
+     C*                    ENDIF
+     C*
+     CSR         INZ#01    BEGSR
+     C                     MOVE *ALL'='   ALS   190
+     C                     MOVE *ALL'-'   ALQ   180
+     C                     Z-ADD0         CONL3   50
+     C                     Z-ADD0         AMTL3  110
+     C*
+     C*          1911      ADD  UYEAR     SAVEYY  40
+     C*          SAVEYY    DIV  400       TEST    50
+     C*                    MVR            MVR400  30
+     C*          SAVEYY    DIV  100       TEST    50
+     C*                    MVR            MVR100  30
+     C*          SAVEYY    DIV  4         TEST    50
+     C*                    MVR            MVR4    10
+     C*          MVR400    IFEQ 0
+     C*          MVR100    ORNE 0
+     C*          MVR4      ANDEQ0
+     C*                    Z-ADD29        ARR,2
+     C*                    ELSE
+     C*                    Z-ADD28        ARR,2
+     C*                    ENDIF
+     C***
+     C                     ENDSR
+     C***
+     C**----------------------------------------------**
+     C* DETAIL PROCESS L4                             **
+     C**----------------------------------------------**
+     C*R         DL#L4     BEGSR
+     C*                    MOVE '*'       DAY
+     C*                    SETOF                     45
+     C*          RVDUDT    IFNE 0
+     C*          DUDTYY    ADD  1911      WKYY    40
+     C*                    MOVE WKYY      WYY
+     C*                    MOVE DUDTMM    WMM
+     C*                    MOVE DUDTDD    WDD
+     C*                    CALL 'CKDAT5'
+     C*                    PARM           CDATE
+     C*                    PARM           DAY     1
+     C*                    ENDIF
+     C*          DAY       IFEQ '7'
+     C*          RVDUDT    ANDEQUDATE
+     C*                    SETON                     45
+     C*                    ENDIF
+     C*R                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS                                **
+     C**----------------------------------------------**
+     CSR         DP#01     BEGSR
+     C                     MOVE *BLANK    CHAR10 10
+     C           RVNTTP    LOKUPTAB1      TABR1          51
+     C   51                MOVELTABR1     CHAR10
+     C  N51                MOVEL'其他'  CHAR10
+      *
+     C           RVPLAC    COMP 'D'                      51
+     C   51                MOVEL'本埠'  CHAR6X  6
+     C  N51                MOVEL'外埠'  CHAR6X
+      *
+     C           BKKEY     CHAINBANKID               31
+     C   31                MOVE *BLANK    BABNAM
+      *
+     C                     EXSR CK#DT
+     CSR         DP#01Z    ENDSR
+     C***
+     CSR         CK#DT     BEGSR
+     C*                    SETOF                     4344
+     C           RVSANO    IFNE *BLANK
+     C                     MOVELRVSANO    WSANO
+     C                     MOVELRVSBID    WSBID  10
+     C                     ELSE
+     C                     MOVELRVTANO    WSANO
+     C                     MOVELRVTBID    WSBID
+     C                     ENDIF
+     C                     MOVELSANO1     ACTYPE
+     C                     MOVELSANO2     ACCURR
+     C                     MOVELSANO3     ACACNO
+     C           ACKEY     CHAINBANKAC               31
+     C   31                SETON                     43
+     C*
+     C           *IN43     IFEQ '0'
+9710 C                     Z-ADDRVDUDT    WDUDT   80
+     C                     MOVEL' '       MARK    1
+     C           RVPLAC    IFEQ 'E'
+     C           RVNTTP    ANDNE'I'
+     C           RVDUDT    SUB  5         WDAT
+     C           WDAT      IFGE RVPRDT
+     C                     Z-ADDUDATE     WDUDT
+     C                     ELSE
+9710 C                     Z-ADD99999999  WDUDT
+     C                     MOVEL'*'       MARK
+     C                     SETON                     43
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           RVDATE    IFGE UDATE
+     C           RVNTTP    ANDNE'I'
+9710 C                     Z-ADD99999999  WDUDT
+     C                     MOVEL'#'       MARK
+     C                     ENDIF
+     C                     ENDIF
+     C   43                Z-ADD0         RVNTDT
+     C*
+     C           *IN43     IFEQ '0'
+9710 C           WDUDT     ANDNE99999999
+     C                     Z-ADD0         WNTDT
+     C           RVNTTP    IFNE 'I'
+9710 C           RVDUDT    SUB  1         WDAT    80
+     C           WDAT      IFLE RVDATE
+     C           RVDATE    ADD  1         WNTDT
+     C                     ELSE
+     C           RVDUDT    SUB  2         WDAT
+     C           WDAT      IFGE RVPRDT
+9710 C                     Z-ADDRVDUDT    WNTDT   80
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C           RVNTTP    IFEQ 'I'
+     C                     Z-ADDRVDUDT    WNTDT
+     C                     ENDIF
+     C                     EXSR CK#DY1
+     C           DAY       IFEQ '7'
+     C           WNTDT     IFGE UDATE
+9710 C                     Z-ADD99999999  WDUDT
+     C                     ELSE
+     C                     Z-ADDUDATE     WNTDT
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           UDATE     IFGE WDUDT
+     C                     SETON                     44
+     C                     ENDIF
+     CSR         CK#DTZ    ENDSR
+     C****
+     C*R         WR#DT     BEGSR
+     C*                    Z-ADD0         WNTDT
+     C*          RVNTTP    IFNE 'I'
+     C*          RVDUDT    SUB  1         WDAT    60
+     C*          WDAT      IFLE RVDATE
+     C*          RVDATE    ADD  1         WNTDT
+     C*                    ELSE
+     C*          RVDUDT    SUB  2         WDAT
+     C*          WDAT      IFGE RVPRDT
+     C*                    Z-ADDRVDUDT    WNTDT   60
+     C*                    ENDIF
+     C*                    ENDIF
+     C*                    ENDIF
+     C*          RVNTTP    IFEQ 'I'
+     C*                    Z-ADDRVDUDT    WNTDT
+     C*                    ENDIF
+     C*          DAY       IFEQ '7'
+     C*                    Z-ADDUDATE     WNTDT
+     C*                    ENDIF
+     C*                    EXSR CK#DY1
+     C*          DAY       IFEQ '7'
+     C*                    ADD  1         WNTDT
+     C*                    ENDIF
+     C*                    EXSR CK#DY2
+     C*                    ENDIF
+     C*R                   ENDSR
+     C****
+     CSR         UP#RV     BEGSR
+     C                     MOVEL'C'       RVFLAG
+      *
+     C                     Z-ADDWNTDT     D#NTDT
+     C           CAKEY     CHAINARCANDR              61
+     C           *IN61     IFEQ '1'
+     C                     MOVEL'1'       RVNTCD
+     C                     ELSE
+     C                     MOVEL' '       RVNTCD
+     C                     ENDIF
+     C                     MOVELWSANO     RVSANO
+     C                     MOVELWSBID     RVSBID
+     C                     Z-ADDWNTDT     RVNTDT
+     C                     MOVELTXAR      RVTXAR
+     C                     Z-ADDUDATE     RVTXDT
+     C                     EXCPTCGR#
+     CSR         UP#RVZ    ENDSR
+     C****
+     CSR         CK#DY1    BEGSR
+     C                     MOVE '*'       DAY
+     C           WNTDT     IFNE 0
+     C           NTDTYY    ADD  1911      WKYY    40
+     C                     MOVE WKYY      WYY
+     C                     MOVE NTDTMM    WMM
+     C                     MOVE NTDTDD    WDD
+     C*                    MOVE CDATE     CDATEX  80
+     C*                    CALL 'CKDAT5'
+     C*                    PARM           CDATEX
+     C*                    PARM           DAY     1
+     C                     MOVE *ALL'0'   P#PDAT
+     C                     MOVE CDATE     P#PDAT
+     C                     CALL 'UTS105R'
+     C                     PARM           P#PDAT  8
+     C                     PARM '2'       P#MODE  1
+     C                     PARM ' '       DAY     1
+     C                     PARM ' '       P#ERR   1
+     C                     ENDIF
+     CSR                   ENDSR
+     C****
+     C*R         CK#DY2    BEGSR
+     C*          NTDTDD    IFGT ARR,MM
+     C*                    ADD  1         NTDTMM
+     C*          NTDTMM    IFGT 12
+     C*                    Z-ADD1         NTDTMM
+     C*                    ADD  1         NTDTYY
+     C*                    ENDIF
+     C*                    ENDIF
+     C*R                   ENDSR
+     ORVREC   E        01      CGR#
+     O                         RVFLAG
+     O                         RVNTCD
+     O                         RVSBID
+     O                         RVSANO
+     O                         RVNTDT
+     O                         RVTXAR
+     O                         RVTXDT
+     OQPRINT2 H  1 4   1P
+     O       OR        OVN1P
+     O                                   17 '報表編號: AR034'
+     O                         CON4      95                                    X
+     O                                  182 '製表日期'
+     O                                  183 ':'
+     O                         UDATE Y +  1
+     O        H  1     1P
+     O       OR        OVN1P
+     O                         CON3      93                                    X
+     O                                  182 '頁　　次'
+     O                                  183 ':'
+     O                         PAGE1 Z +  1
+     O        H  1     1P
+     O       OR        OVN1P
+     O                                   20 '===================='
+     O                                   40 '===================='
+     O                                   60 '===================='
+     O                                   80 '===================='
+     O                                  100 '===================='
+     O                                  120 '===================='
+     O                                  140 '===================='
+     O                                  160 '===================='
+     O                                  180 '===================='
+     O                                  190 '=========='
+     O        H  1     1P
+     O       OR        OVN1P
+     O                                   11 '付款銀行'
+     O                                   25 '付款帳號'
+     O                                   34 '票款別'
+     O                                   46 '票據號碼'
+     O                                   66 '到期日'
+     O                                   74 '付款地'
+     O                                   82 '款項別'
+     O                                   92 '客戶編號'
+     O                                  103 '客戶名稱'
+     O                                  115 '繳款單號'
+     O                                  130 '金　額'
+     O                                  145 '兌現日期'
+     O                                  160 '兌現銀行'
+     O                                  183 '兌現帳號'
+     O        H  1     1P
+     O       OR        OVN1P
+     O                                   20 '===================='
+     O                                   40 '===================='
+     O                                   60 '===================='
+     O                                   80 '===================='
+     O                                  100 '===================='
+     O                                  120 '===================='
+     O                                  140 '===================='
+     O                                  160 '===================='
+     O                                  180 '===================='
+     O                                  190 '=========='
+     O        D  1     01 43
+     O                         RVPBID    15
+     O                         RVPANO    26
+     O                         CHAR10    36
+     O                         RVNTNO    57
+     O                         RVDUDT    65
+     O                         CHAR6X    73
+     O                         RVUSTP    79
+     O                         RVCUNO    89
+     O                         RVCUNM   103
+     O                         RVNO     112
+     O                         RVRAMTJ  130
+     O                         RVNTDT   145 '    /  /  '
+     O                         RVSBID   162
+     O                         BABNAM  +  1
+     O                         RVSANO   184
+     O                         ACBNAM  +  1
+     O                         MARK     198
+     OQPRINT1 H  1 4   1P
+     O       OR        OFN1P
+     O                                   17 '報表編號: AR034'
+     O                         CON4      95                                    X
+     O                                  182 '製表日期'
+     O                                  183 ':'
+     O                         UDATE Y +  1
+     O        H  1     1P
+     O       OR        OFN1P
+     O                         CON5      93                                    X
+     O                                  182 '頁　　次'
+     O                                  183 ':'
+     O                         PAGE2 Z +  1
+     O        H  1     1P
+     O       OR        OFN1P
+     O                                   20 '===================='
+     O                                   40 '===================='
+     O                                   60 '===================='
+     O                                   80 '===================='
+     O                                  100 '===================='
+     O                                  120 '===================='
+     O                                  140 '===================='
+     O                                  160 '===================='
+     O                                  180 '===================='
+     O                                  190 '=========='
+     O        H  1     1P
+     O       OR        OFN1P
+     O                                   11 '付款銀行'
+     O                                   25 '付款帳號'
+     O                                   34 '票款別'
+     O                                   46 '票據號碼'
+     O                                   66 '到期日'
+     O                                   74 '付款地'
+     O                                   82 '款項別'
+     O                                   92 '客戶編號'
+     O                                  103 '客戶名稱'
+     O                                  115 '繳款單號'
+     O                                  130 '金　額'
+     O                                  145 '兌現日期'
+     O                                  160 '兌現銀行'
+     O                                  183 '兌現帳號'
+     O        H  1     1P
+     O       OR        OFN1P
+     O                                   20 '===================='
+     O                                   40 '===================='
+     O                                   60 '===================='
+     O                                   80 '===================='
+     O                                  100 '===================='
+     O                                  120 '===================='
+     O                                  140 '===================='
+     O                                  160 '===================='
+     O                                  180 '===================='
+     O                                  190 '=========='
+     O        D  1     01 44N43
+     O                         RVPBID    15
+     O                         RVPANO    26
+     O                         CHAR10    36
+     O                         RVNTNO    57
+     O                         RVDUDT    65
+     O                         CHAR6X    73
+     O                         RVUSTP    79
+     O                         RVCUNO    89
+     O                         RVCUNM   103
+     O                         RVNO     112
+     O                         RVRAMTJ  130
+     O                         RVNTDT   144 '    /  /  '
+     O                         RVSBID   162
+     O                         BABNAM  +  1
+     O                         RVSANO   184
+     O                         ACBNAM  +  1
+     O        T  1     LR
+     O                         ALQ      190
+     O        T  1     LR
+     O                                   79 '支票小計：　共'
+     O                         CONL3 J   89
+     O                                   94 '張'
+     O                                  114 '總金額:'
+     O                         AMTL3 J  130
+     O        T  1     LR
+     O                         ALQ      190
+** ECK
+A支票
+B背書支票
+C本票
+D背書本票
+E銀行本票
+I信用狀　
+

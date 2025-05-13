@@ -1,0 +1,273 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR125R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LBU
+     H*            4.FUNCTION     廠區別隨車折扣明細表-大類
+     H*            5.DATE-WRITTEN  95/04/26
+     H*            6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR125F IP  E           K        DISK
+     FARR125T1O   E             66     PRINTER
+     F*****************************************************************
+     IRAR125F
+     I                                              ARCODEL2
+     I                                              ARAREAL1
+     I*================================================================
+     I           UDS
+     I                                        1   80T#BGDT
+     I                                       11  180T#ENDT
+     I                                     10011010 T#USID
+     I                                     10111020 D#DEVM
+     I*
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C  N99                MOVE *ON       *IN99
+     C                     MOVE *ON       *IN66
+     C*
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C                     MOVE *ALL'='   T#LIN3
+     C                     MOVE *ALL'-'   T#LIN4
+     C                     MOVE *ALL'-'   T#LIN5
+     C                     MOVE *ALL'-'   T#LIN6
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C   66                WRITEAR125T1H
+     C   66                WRITEAR125T1L
+     C   66                SETOF                     66
+     C                     CLEARAR125T1S
+     C                     MOVE *BLANK    W#FL01  1
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR125T1D
+     C*
+     C                     SELEC
+     C           ARAREA    WHEQ 'P'
+     C                     MOVEL'台　北'T#AREA
+     C           ARAREA    WHEQ 'M'
+     C                     MOVEL'台　中'T#AREA
+     C           ARAREA    WHEQ 'T'
+     C                     MOVEL'桃　園'T#AREA
+     C           ARAREA    WHEQ 'H'
+     C                     MOVEL'苗　栗'T#AREA
+     C           ARAREA    WHEQ 'K'
+     C                     MOVEL'高　雄'T#AREA
+     C                     ENDSL
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*內銷
+     C           ARCUTY    IFEQ 'D'
+     C           ARCUTY    OREQ 'G'
+     C                     ADD  ARQTY     T#QTYD           銷折數量
+     C                     ADD  ARAMT     T#AMTD           銷折金額
+     C                     ENDIF
+     C*外銷
+     C           ARCUTY    IFEQ 'E'
+     C                     ADD  ARQTY     T#QTYE           銷折數量
+     C                     ADD  ARAMT     T#AMTE           銷折金額
+     C                     ENDIF
+     C*內外銷
+     C                     ADD  ARQTY     T#QTY
+     C                     ADD  ARAMT     T#AMT
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*若該筆皆為０則不印
+     C*
+     C           T#QTY     IFEQ 0
+     C                     GOTO ESL1
+     C                     ENDIF
+     C*
+     C*內銷平均單價
+     C*
+     C           T#QTYD    IFEQ 0
+     C                     Z-ADD0         T#UPRD
+     C                     ELSE
+     C           T#AMTD    DIV  T#QTYD    T#UPRD    H
+     C                     ENDIF
+     C*
+     C*外銷平均單價
+     C*
+     C           T#QTYE    IFEQ 0
+     C                     Z-ADD0         T#UPRE
+     C                     ELSE
+     C           T#AMTE    DIV  T#QTYE    T#UPRE    H
+     C                     ENDIF
+     C*
+     C*內外銷平均單價
+     C*
+     C           T#AMT     DIV  T#QTY     T#UPR     H
+     C*
+     C                     SELEC
+     C           ARCODE    WHEQ 'A'
+     C                     MOVEL'鋼　筋'T#TYPE
+     C           ARCODE    WHEQ 'B'
+     C                     MOVEL'Ｈ型鋼'T#TYPE
+     C           ARCODE    WHEQ 'C'
+     C                     MOVEL'鋼　板'T#TYPE
+     C           ARCODE    WHEQ 'D'
+     C                     MOVEL'槽　鋼'T#TYPE
+     C           ARCODE    WHEQ 'E'
+     C                     MOVEL'Ｉ型鋼'T#TYPE
+     C           ARCODE    WHEQ 'F'
+     C                     MOVEL'BH型鋼'T#TYPE
+     C           ARCODE    WHEQ 'G'
+     C                     MOVEL'扁鋼胚'T#TYPE
+     C           ARCODE    WHEQ 'H'
+     C                     MOVEL'鋼　胚'T#TYPE
+     C                     ENDSL
+     C*
+     C*品明相同則不印
+     C*
+     C           ARCODE    IFNE W#FL01
+     C                     MOVE *OFF      *IN30
+     C                     MOVELARCODE    W#FL01
+     C                     ELSE
+     C                     MOVE *ON       *IN30
+     C                     ENDIF
+     C*
+     C   66                WRITEAR125T1H
+     C   66                WRITEAR125T1L
+     C   66                SETOF                     66
+     C                     WRITEAR125T1D
+     C*
+     C*內銷小計
+     C*
+     C                     ADD  T#QTYD    T#QYSD           銷折數量
+     C                     ADD  T#AMTD    T#ATSD           銷折金額
+     C*
+     C*外銷小計
+     C*
+     C                     ADD  T#QTYE    T#QYSE
+     C                     ADD  T#AMTE    T#ATSE
+     C*
+     C*內外銷小計
+     C*
+     C                     ADD  T#QTY     T#QTYS
+     C                     ADD  T#AMT     T#AMTS
+     C*
+     C           ESL1      ENDSR
+     C*****************************************************************
+     CSR         L2SR      BEGSR
+     C*****************************************************************
+     C                     MOVEL'小　計'T#AREA
+     C*
+     C*內銷小計平均單價
+     C*
+     C           T#QYSD    IFEQ 0
+     C                     Z-ADD0         T#PRSD
+     C                     ELSE
+     C           T#ATSD    DIV  T#QYSD    T#PRSD    H
+     C                     ENDIF
+     C*
+     C*外銷小計平均單價
+     C*
+     C           T#QYSE    IFEQ 0
+     C                     Z-ADD0         T#PRSE
+     C                     ELSE
+     C           T#ATSE    DIV  T#QYSE    T#PRSE    H
+     C                     ENDIF
+     C*
+     C*內外銷小計平均單價
+     C*
+     C           T#QTYS    IFEQ 0
+     C                     Z-ADD0         T#UPRS
+     C                     ELSE
+     C           T#AMTS    DIV  T#QTYS    T#UPRS    H
+     C                     ENDIF
+     C*
+     C   66                WRITEAR125T1H
+     C   66                WRITEAR125T1L
+     C   66                SETOF                     66
+     C                     WRITEAR125T1I
+     C                     WRITEAR125T1S
+     C*
+     C*內銷總計
+     C*
+     C                     ADD  T#QYSD    T#QYTD           銷折數量
+     C                     ADD  T#ATSD    T#ATTD           銷折金額
+     C*
+     C*外銷總計
+     C*
+     C                     ADD  T#QYSE    T#QYTE
+     C                     ADD  T#ATSE    T#ATTE
+     C*
+     C*內外銷總計
+     C*
+     C                     ADD  T#QTYS    T#QTYT
+     C                     ADD  T#AMTS    T#AMTT
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C                     MOVEL'總　計'T#AREA
+     C*
+     C*內銷總計平均單價
+     C*
+     C           T#QYTD    IFEQ 0
+     C                     Z-ADD0         T#PRTD
+     C                     ELSE
+     C           T#ATTD    DIV  T#QYTD    T#PRTD    H
+     C                     ENDIF
+     C*
+     C*外銷總計平均單價
+     C*
+     C           T#QYTE    IFEQ 0
+     C                     Z-ADD0         T#PRTE
+     C                     ELSE
+     C           T#ATTE    DIV  T#QYTE    T#PRTE    H
+     C                     ENDIF
+     C*
+     C*內外銷總計平均單價
+     C*
+     C           T#QTYT    IFEQ 0
+     C                     Z-ADD0         T#UPRT
+     C                     ELSE
+     C           T#AMTT    DIV  T#QTYT    T#UPRT    H
+     C                     ENDIF
+     C*
+     C   66                WRITEAR125T1H
+     C   66                WRITEAR125T1L
+     C   66                SETOF                     66
+     C                     WRITEAR125T1T
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         MSGSR     BEGSR
+     C*****************************************************************
+     C                     WRITEAR125T1H
+     C                     WRITEAR125T1M
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+

@@ -1,0 +1,324 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR069R3
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     訂單別出貨及發票明細表（報表）
+     H*            5.DATE-WRITTEN  86/10/26
+     H*            6.UPDATE  DATE  102/09/11 S00WCJ (0209A)
+     H*                             原產品大類合計說明以TAB表示，改
+     H*                             為CHAIN HIPROD之說明
+     H*                           104/07/03 2015AR938 S00WCJ (0407A)
+     H*                             增加選擇磅單欄位
+     H*                           104/10/01 2015AR953 S00WCJ (0409A)
+     H*                             產品代碼3碼擴5碼
+     H*                           108/10/08 S00WCJ (0810A)
+     H*                            增加磅單項次欄位
+     H*
+     H*             說明：950314新增數量為零時，於發票號碼欄位處
+     H*                    顯示？號，之前數量為零時，則不顯示該筆
+     H*                    資料，但怕有時USER會沒對到該筆資料
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR069F IP  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+0209AFHIPROD  IF  E           K        DISK
+     FARR069T O   E             66     PRINTER
+     F*****************************************************************
+0409AE                    ARY1     1000 27
+9605 E                    ARY2      500 65
+     E*****************************************************************
+     IWFREC
+     I                                              WFORNOL2
+     I                                              WFDATEL1
+     I*---------------------------------------------------------------
+     I           UDS
+     I*                                       1   6 R#ORNO
+     I                                      407 4140R#YMDS
+     I                                      415 4220R#YMDE
+0407AI                                      461 461 R#OPT
+     I*                                      18  23 R#CUNO
+     I*
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I*
+8906 I            DS
+ .   I                                        1   9 D#TAB
+ .   I                                        1   3 D#TAB1
+ .   I                                        4   9 D#TAB2
+     I            DS
+0409AI                                        1  27 W#ARY1
+0409AI                                        1   5 D#PDNM
+0409AI                                        6  10 D#SPE1
+0409AI                                       11  180D#QTY
+0409AI                                       19  26 D#QULT
+0409AI                                       27  27 D#STND
+0209AI            DS
+0209AI                                        1  40 D#XNAM
+0209AI                                        1   8 D#XNA1
+0209AI                                        9  40 D#XNA2
+9605 I            DS
+ .   I                                        1  65 W#ARY2
+ .   I                                        1   2 D#IVN1
+ .   I                                        3  10 D#IVN2
+ .   I                                       11  210D#IVAM
+ .   I                                       22  320D#AR06
+ .   I                                       33  430D#PRRV
+ .   I                                       44  540D#IVTX
+ .   I                                       55  650D#IVAR
+ .   I            DS
+ .   I                                        1  10 WFIVNO
+ .   I                                        1   2 W#IVN1
+9605 I                                        3  10 W#IVN2
+0209AC***************************************************************
+0209AC*          KEY       LIST
+0209AC***************************************************************
+0209AC           KEY01     KLIST
+0209AC                     KFLD           F4NAME
+0209AC                     KFLD           D#STND
+0209AC*
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C                     Z-ADD0         W#NUM   50
+0407AC           R#OPT     IFNE *BLANKS
+0407AC                     MOVEL*ON       *IN58
+0407AC                     ELSE
+0407AC                     MOVEL*OFF      *IN58
+0407AC                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2清除函式
+     C*********************************
+     CSR         L2CLR     BEGSR
+     C                     SETON                     66    首頁表頭
+     C                     Z-ADD0         W#PN    30       品名種類數
+     C                     Z-ADD0         I       30       索引指標
+9605 C                     Z-ADD0         J       30       索引指標
+     C                     MOVEA*ALL'9'   ARY1             清陣列
+9605 C                     MOVEA*ALL'9'   ARY2             清陣列
+     C*
+     C                     Z-ADD0         R#SQTY           清合計值
+9605 C*                    Z-ADD0         R#TQTY
+ .   C                     Z-ADD0         R#YQTY           清類別合計
+9605 C                     CLEARAR069T1T
+     C*
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     Z-ADD0         R#SQTY           清合計值
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     CLEARAR069T1D
+     C                     Z-ADDWFDATE    R#DATE           日期
+     C                     MOVELWFWTNO    R#WTNO           磅單
+     C                     MOVELWFPDNM    R#PDNM           品名
+     C                     MOVELWFQULT    R#QULT           材質
+0810AC           WFVRTM    IFNE 0
+0810AC                     MOVELWFVRTM    R#VRTM           磅次
+0810AC                     ENDIF
+     C                     MOVELWFSPE1    R#SPE1           徑度
+     C                     Z-ADDWFQTY     R#QTY            數量
+     C                     MOVELWFIVNO    R#IVNO           發票號碼
+     C                     Z-ADDWFIVAM    R#IVAM           出貨金額
+     C                     Z-ADDWFAR06    R#AR06           折退金額
+     C                     Z-ADDWFPRRV    R#PRRV           預收金額
+     C                     Z-ADDWFIVTX    R#IVTX           稅額
+     C                     Z-ADDWFIVAR    R#IVAR           發票餘額
+     C                     MOVELWFAPNO    R#APNO           繳款單號
+     C*
+9502 C*          R#QTY     IFNE 0
+ .   C*
+ .   C           R#QTY     IFEQ 0
+ .   C                     MOVEL'?'       R#ERR            數量為零
+ .   C                     ENDIF
+9502 C*
+     C                     MOVE WFORNO    R#ORNO
+     C                     MOVE WFCUNO    R#CUNO
+     C           *IN66     IFEQ '1'                        印出
+     C           R#CUNO    CHAINCBCUST               69    設客戶名稱
+     C                     MOVEL*BLANK    R#CUNM
+     C                     MOVELCBCUNM    R#CUNM
+     C                     WRITEAR069T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     ADD  1         W#NUM
+     C                     WRITEAR069T1D
+     C*
+     C                     ADD  R#QTY     R#SQTY           小計
+     C                     ADD  R#QTY     R#TQTY           合計
+     C*
+     C                     Z-ADD1         I                設定陣列
+     C           I         DOWLEW#PN
+     C                     MOVE ARY1,I    W#ARY1
+     C           WFPDNM    IFEQ D#PDNM
+     C           WFSPE1    ANDEQD#SPE1
+8906 C           WFQULT    ANDEQD#QULT
+     C                     LEAVE
+     C                     ENDIF
+     C                     ADD  1         I
+     C                     ENDDO
+     C*
+     C           I         IFGT W#PN                       找不到
+     C                     ADD  1         W#PN             新增
+     C                     Z-ADDW#PN      I
+     C                     MOVE *ALL'0'   W#ARY1
+     C                     MOVELWFPDNM    D#PDNM
+     C                     MOVELWFSPE1    D#SPE1
+8906 C                     MOVELWFQULT    D#QULT
+0209AC                     MOVELWFSTND    D#STND
+     C                     ENDIF
+     C*
+     C                     ADD  WFQTY     D#QTY
+     C                     MOVE W#ARY1    ARY1,I
+9502 C*                    ENDIF
+     C*
+     C                     Z-ADD1         J                設定陣列
+     C                     SORTAARY2
+     C           1         DO   500       J
+     C                     MOVE ARY2,J    W#ARY2
+     C*
+     C           W#IVN1    IFEQ D#IVN1
+     C           W#IVN2    ANDEQD#IVN2
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           D#IVN1    IFEQ '99'
+     C                     CLEARARY2,J
+     C                     MOVELW#IVN1    D#IVN1           發票
+     C                     MOVELW#IVN2    D#IVN2           發票
+     C                     Z-ADDR#IVAM    D#IVAM           出貨金額
+     C                     Z-ADDR#AR06    D#AR06           銷退折讓
+     C                     Z-ADDR#PRRV    D#PRRV           預收款
+     C                     Z-ADDR#IVTX    D#IVTX           稅額
+     C                     Z-ADDR#IVAR    D#IVAR           發票餘額
+     C                     MOVE W#ARY2    ARY2,J
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  印日期小計
+     C*********************************
+     CSR         L1SR      BEGSR
+ 9207C*          R#SQTY    IFNE 0
+&9503C*
+     C           *IN66     IFEQ '1'
+     C                     WRITEAR069T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR069T1S
+ 9503C*                    ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2 函式  印合計
+     C*********************************
+     CSR         L2SR      BEGSR
+     C*
+     C                     Z-ADD1         J
+     C                     SORTAARY2
+     C           1         DO   500       J
+     C                     MOVE ARY2,J    W#ARY2
+     C*
+     C           D#IVN1    IFNE '99'
+     C           D#IVN1    ANDNE'  '
+     C                     ADD  D#IVAM    R#TVAM           出貨金額
+     C                     ADD  D#AR06    R#TR06           銷退折讓
+     C                     ADD  D#PRRV    R#TRRV           預收款
+     C                     ADD  D#IVTX    R#TVTX           稅額
+     C                     ADD  D#IVAR    R#TVAR           發票餘額
+     C                     ENDIF
+     C                     ENDDO
+     C*                                                    印陣列
+     C   66                WRITEAR069T1H
+     C   66                SETOF                     66
+     C                     WRITEAR069T1T
+     C*                                                    印陣列
+     C                     SORTAARY1
+     C                     Z-ADD0         I
+     C*
+     C                     DO   W#PN
+     C                     ADD  1         I
+     C                     MOVE ARY1,I    W#ARY1
+     C                     CLEARAR069T1X
+     C                     MOVELD#PDNM    R#XPDN
+     C                     MOVELD#SPE1    R#XSPE
+     C                     Z-ADDD#QTY     R#XQTY
+     C*
+     C                     MOVE *BLANK    D#TAB
+8906 C                     MOVELD#PDNM    D#TAB1
+8906 C                     MOVELD#QULT    D#TAB2
+0409AC                     MOVELD#PDNM    F4NAME
+0209AC           KEY01     CHAINHIPROD               50
+     C                     MOVEL*BLANK    R#XNAM
+0209AC           *IN50     IFEQ *OFF
+0209AC                     MOVELF4QULT    D#XNA1
+0209AC                     MOVELF4CHIN    D#XNA2
+0209AC                     MOVELD#XNAM    R#XNAM
+0209AC                     ENDIF
+     C*
+9605 C                     ADD  R#XQTY    R#YQTY
+     C*
+     C   66                WRITEAR069T1H
+     C   66                SETOF                     66
+     C                     WRITEAR069T1X
+     C                     ENDDO
+9605 C*
+ .   C   66                WRITEAR069T1H
+ .   C   66                SETOF                     66
+ .   C                     WRITEAR069T1Y
+9605 C*
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  印合計
+     C*********************************
+     CSR         LRSR      BEGSR
+     C           W#NUM     IFEQ 0
+     C                     EXSR MSGSR
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     WRITEAR069T1H
+     C                     WRITEAR069T1M
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  子函式集
+     C*********************************
+

@@ -1,0 +1,128 @@
+        /******************************************************/
+        /*                                                    */
+        /*        >>   PROGRAM INTRODUCTION  <<               */
+        /*        1.PROGRAM-ID     ARR105P                    */
+        /*        2.PROGRAM-TYPE   CLP                        */
+        /*        3.AUTHOR         S02CSF                     */
+        /*        4.FUNCTION      應收帳款承購狀況彙總表　　*/
+        /*        5.DATE-WRITTEN   92/01/24                   */
+        /*        6.DATE-MODIFY                               */
+        /*                                                    */
+        /******************************************************/
+            PGM
+            DCLF       FILE(ARR105S)
+            DCL        VAR(&TYPE)    TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&S#DEVN)  TYPE(*CHAR)  LEN(10)
+            DCL        VAR(&S#USER)  TYPE(*CHAR)  LEN(10)
+            DCL        VAR(&C_CUN1)  TYPE(*CHAR)  LEN(5) /*客戶代號暫存*/
+            DCL        VAR(&C_CUN2)  TYPE(*CHAR)  LEN(5) /*客戶代號暫存*/
+            DCL        VAR(&C_BKI1)  TYPE(*CHAR)  LEN(3) /*銀行代號暫存*/
+            DCL        VAR(&C_BKI2)  TYPE(*CHAR)  LEN(3) /*銀行代號暫存*/
+            DCL        VAR(&USID)    TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&C_DAT1)  TYPE(*CHAR)  LEN(8)
+
+            RTVJOBA    JOB(&S#DEVN) USER(&S#USER) TYPE(&TYPE)
+            IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+            RTVDTAARA  DTAARA(*LDA (1011 10))   RTNVAR(&S#DEVN)
+            RTVDTAARA  DTAARA(*LDA (1001 10))   RTNVAR(&S#USER)
+        /*  RTVSYSVAL  SYSVAL(QDATE)  RTNVAR(&S#DAT1) */
+
+   START:   SNDRCVF
+
+            IF         COND(&IN03 *EQ '1') THEN(RETURN)
+            IF         COND(&IN12 *EQ '1') THEN(RETURN)
+            CHGVAR     VAR(&S#ERR)     VALUE(' ')
+            CHGVAR     VAR(&IN50)      VALUE('0')
+
+        /*    CHECK客戶代號    */
+            IF         COND(&S#CUNO *EQ '     ') THEN(DO)
+            CHGVAR     VAR(&C_CUN1)    VALUE('     ')
+            CHGVAR     VAR(&C_CUN2)    VALUE('99999')
+            ENDDO
+            ELSE (DO)
+            CHGVAR     VAR(&C_CUN1)    VALUE(&S#CUNO)
+            CHGVAR     VAR(&C_CUN2)    VALUE(&S#CUNO)
+            ENDDO
+
+        /*    CHECK 銀行代號     */
+            IF         COND(&S#BKID *EQ '   ') THEN(DO)
+            CHGVAR     VAR(&C_BKI1)    VALUE('   ')
+            CHGVAR     VAR(&C_BKI2)    VALUE('999')
+            ENDDO
+            ELSE (DO)
+            CHGVAR     VAR(&C_BKI1)    VALUE(&S#BKID)
+            CHGVAR     VAR(&C_BKI2)    VALUE(&S#BKID)
+            ENDDO
+
+        /*    CHECK 統計日期     */
+            IF         COND(&S#DAT1 *EQ  0)    THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('統計截止日期不可空白')
+            CHGVAR     VAR(&IN50)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+            CHGVAR     VAR(&C_DAT1)    VALUE(&S#DAT1)
+            CHGDTAARA  DTAARA(*LDA  (300  5))  VALUE(&C_CUN1)
+            CHGDTAARA  DTAARA(*LDA  (305  5))  VALUE(&C_CUN2)
+            CHGDTAARA  DTAARA(*LDA  (310  3))  VALUE(&C_BKI1)
+            CHGDTAARA  DTAARA(*LDA  (313  3))  VALUE(&C_BKI2)
+            CHGDTAARA  DTAARA(*LDA  (316  5))  VALUE(&S#CUNO)
+            CHGDTAARA  DTAARA(*LDA  (321  3))  VALUE(&S#BKID)
+            CHGDTAARA  DTAARA(*LDA  (324  8))  VALUE(&C_DAT1)
+
+            SBMJOB     JOB(ARR105P) JOBD(ARJOBD) +
+                       RQSDTA('CALL ARR105P')
+      /*    SNDBRKMSG  MSG('<<應收帳款承購狀況彙總表+
+                           ,已開始處理,請稍待...>>')    +
+                           TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO) */
+            RETURN
+   BATCH:
+
+            RTVDTAARA  DTAARA(*LDA (300 5))    RTNVAR(&C_CUN1)
+            RTVDTAARA  DTAARA(*LDA (305 5))    RTNVAR(&C_CUN2)
+            RTVDTAARA  DTAARA(*LDA (310 3))    RTNVAR(&C_BKI1)
+            RTVDTAARA  DTAARA(*LDA (313 3))    RTNVAR(&C_BKI2)
+            RTVDTAARA  DTAARA(*LDA (316 5))    RTNVAR(&S#CUNO)
+            RTVDTAARA  DTAARA(*LDA (321 3))    RTNVAR(&S#BKID)
+            RTVDTAARA  DTAARA(*LDA (324 8))    RTNVAR(&C_DAT1)
+            RTVDTAARA  DTAARA(*LDA (1001 1))   RTNVAR(&USID)
+
+
+
+            IF         COND(&USID  *EQ 'B') THEN(DO)
+            OVRPRTF    FILE(ARR105TB) TOFILE(ARR105TB) PAGESIZE(*N 198) +
+                       CPI(15) HOLD(*YES) USRDTA('承購彙總')
+            OVRDBF     FILE(ARCUDT) TOFILE(ARCUDT) SHARE(*YES)
+            OPNQRYF    FILE(ARCUDT)  OPTION(*ALL) QRYSLT(' +
+                       (  CUNO    *GE "' || &C_CUN1 || '") *AND +
+                       (  CUNO    *LE "' || &C_CUN2 || '") *AND +
+                       (ACBKID    *GE "' || &C_BKI1 || '") *AND +
+                       (ACBKID    *LE "' || &C_BKI2 || '")') +
+                       KEYFLD((ACBKID) (ACCUNO))  +
+                       MAPFLD((CUNO  '%SST(ACCUNO 1 5)' *CHAR 5))
+            CALL       PGM(ARR105RB)
+            CLOF       OPNID(ARCUDT)
+            DLTOVR     FILE(*ALL)
+            ENDDO
+            ELSE (DO)
+            OVRPRTF    FILE(ARR105T) TOFILE(ARR105T) PAGESIZE(*N 198)   +
+                       CPI(15) HOLD(*YES) USRDTA('承購彙總')
+            OVRDBF     FILE(ARCUDT) TOFILE(ARCUDT) SHARE(*YES)
+            OPNQRYF    FILE(ARCUDT)  OPTION(*ALL) QRYSLT(' +
+                       (  CUNO    *GE "' || &C_CUN1 || '") *AND +
+                       (  CUNO    *LE "' || &C_CUN2 || '") *AND +
+                       (ACBKID    *GE "' || &C_BKI1 || '") *AND +
+                       (ACBKID    *LE "' || &C_BKI2 || '")') +
+                       KEYFLD((ACBKID) (ACCUNO))  +
+                       MAPFLD((CUNO  '%SST(ACCUNO 1 5)' *CHAR 5))
+            CALL       PGM(ARR105R)
+            CLOF       OPNID(ARCUDT)
+            DLTOVR     FILE(*ALL)
+            ENDDO
+
+     /*     SNDBRKMSG  MSG('<<應收帳款承購狀況彙總表+
+                          ,已處理完成,請列印...>>')    +
+                          TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO) */
+   END:      ENDPGM
+

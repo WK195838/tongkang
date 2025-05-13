@@ -1,0 +1,520 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP117R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LBU
+     H*            4.FUNCTION     新桃工程自用發票開立作業
+     H*            5.DATE-WRITTEN  98/02/25
+     H*            6.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FUENDTLN IP  E           K        DISK
+     FUENDTL  UF  E           K        DISK
+     FGENSEQ  UF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FHIPROD  IF  E           K        DISK
+     FINVMST  O   E           K        DISK
+     FINVDTL  O   E           K        DISK
+     F*----------------------------------------------------------------
+     FARP117T O   E             66     PRINTER
+     F*****************************************************************
+     ITNREC
+     I                                              TNNO  L3
+     I                                              TNPDNML2
+     I                                              TNUPRCL1
+     I*================================================================
+     I           UDS
+     I                                        1  10 U#GEPR
+     I                                       11  180U#INDT
+     I                                       31  380U#IVNO
+     I                                     10011010 U#USID
+     I                                     10111020 U#DEVI
+     I                                     10211021 U#AREA
+     I*
+     I            DS
+     I                                        1   6 TNORN5
+     I                                        1   1 S1OREA
+     I                                        2   60S1ORNO
+     I*
+     I            DS
+     I                                        1  24 X#DATA
+     I                                        1   1 X#KEY
+     I                                        2   4 X#PDCD
+     I                                        5  153X#UPRC
+     I                                       16  240X#QTY
+     I*
+     I            DS
+     I                                        1  32 Y#DATA
+     I                                        1   1 Y#KEY
+     I                                        2   9 Y#NO
+     I                                       10  12 Y#PDCD
+     I                                       13  233Y#UPRC
+     I                                       24  320Y#QTY
+     I*
+     I            DS
+     I                                        1   2 W#OEOF
+     I                                        1   1 D#OE
+     I                                        2   2 D#OF
+     I*
+     I            DS
+     I                                        1  140W#SYST
+     I                                        1   60D#ST
+     I                                        7  100D#SY
+     I                                       11  140D#SMD
+     I*
+     I            DS
+     I                                        1  10 W#DSPN
+     I                                        9  10 D#DSIT
+     I*
+     I            DS
+     I                                        1  11 TNNO
+     I                                        1   6 D#PJN1
+     I                                        7  10 D#PJN2
+     I                                       11  11 D#AREA
+     C*****************************************************************
+     C*        KEY   LIST
+     C*****************************************************************
+     C           K#UV      KLIST
+     C                     KFLD           UVYM
+     C                     KFLD           UVAREA
+     C                     KFLD           UVCUNO
+     C                     KFLD           UVTRCD
+     C                     KFLD           UVPDNM
+     C                     KFLD           UVPJNO
+     C*
+     C           K#GE      KLIST
+     C                     KFLD           GEKIND
+     C                     KFLD           GEPRIN
+     C*
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L3                EXSR L3CLR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CL3 99                EXSR L3SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C*
+     C                     MOVEL''      W#OEOF
+     C                     SETON                     66    首頁表頭
+     C                     Z-ADD0         U#IVNO           發票張數
+     C                     Z-ADD0         W#DSIT  20
+     C*
+     C                     EXSR SR0010                     發票號碼
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L3清除函式     (換了磅單／發票主檔)
+     C*********************************
+     CSR         L3CLR     BEGSR
+     C*
+     C                     MOVEL*BLANK    W#PDCD  3        品名（暫）
+     C                     Z-ADD0         W#UPRC 113       單價（暫）
+     C                     Z-ADD0         W#ITEM  10       發票明細項次暫存
+     C                     Z-ADD0         W#IVIT  20       銷貨項次
+     C                     Z-ADD0         W#NOIT  20       發票總項次
+     C*
+     C                     MOVEL*BLANK    W#ORNO  6        訂單（暫）
+     C                     Z-ADD0         W#ACDT  80       日期（暫）
+     C                     Z-ADD0         W#TAX  110       稅額
+     C*
+     C                     EXSR SR1100                     初始發票
+     C                     EXSR SR0020                     發票號加一
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L2清除函式     (換了品名)
+     C*********************************
+     CSR         L2CLR     BEGSR
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L1清除函式     (換了單價／發票明細)
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C*
+     C                     Z-ADD0         W#IVQT  70       數量
+     C                     Z-ADD0         W#AMT  110       金額
+     C                     Z-ADD0         W#RESV  50
+     C*
+     C           W#ITEM    IFEQ 6
+     C                     EXSR L2SR
+     C                     EXSR L3SR
+     C                     EXSR L3CLR
+     C                     EXSR L2CLR
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  DETAIL TIME 函式 (銷貨明細寫回發票號碼)
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C*
+     C                     ADD  1         W#NOIT
+     C                     Z-ADDTNYM      UVYM             年月
+     C                     MOVELD#AREA    UVAREA           廠區
+     C                     MOVELTNOBNO    UVCUNO           目標客戶
+     C                     MOVELTNTRCD    UVTRCD           異動代號
+     C                     MOVELTNPDNM    UVPDNM           品名
+     C                     MOVELTNPJNO    UVPJNO           專案號碼
+     C           K#UV      CHAINUVREC                69
+     C                     MOVEL'C'       UVFLAG
+     C                     MOVELINNO      UVNO             發票號碼
+     C                     Z-ADDW#NOIT    UVNOIT           發票項次
+     C                     MOVELU#USID    UVNOUS           開立人員
+     C                     Z-ADDU#INDT    UVNODD           開立日期
+     C                     TIME           UVNODT           開立時間
+     C                     UPDATUVREC                      改銷貨明細
+     C*
+     C                     ADD  TNQTY     W#IVQT           累計數量
+     C                     ADD  TNAMT     W#AMT            累計金額
+     C                     ADD  TNTAX     W#TAX            累計稅額
+     C*
+ 9210C           W#ACDT    IFEQ 0
+  .  C                     Z-ADDTNACDT    W#ACDT
+  .  C                     MOVELTNORNO    W#ORNO
+  .  C                     ELSE
+  .  C           TNACDT    IFGE W#ACDT
+  .  C           TNQTY     ANDGT0
+  .  C                     MOVELTNORNO    W#ORNO
+  .  C                     ENDIF
+ 9210C                     ENDIF
+     C*
+     C                     EXSR PR1000                     印出借方
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L1 函式  換了單價（發票明細）
+     C*********************************
+     CSR         L1SR      BEGSR
+     C*
+     C           W#IVQT    IFEQ 0                          數量零不計
+     C                     GOTO ESL1
+     C                     ENDIF
+     C*
+     C                     EXSR SR1200                     初始明細
+     C*
+     C                     MOVELTNPJNO    IVAPNO           憑証編號
+     C                     MOVELTNPDNM    IVPDCD           品名
+     C                     Z-ADDW#IVQT    IVQTY            數量
+     C                     Z-ADDTNUPRC    IVUPRC           單價
+     C                     Z-ADDW#AMT     IVAMT            金額
+     C*          IVQTY     MULT IVUPRC    IVAMT     H      金額
+     C*
+     C           INKIND    IFEQ '2'                        二聯式
+     C           IVAMT     MULT 1.05      IVAMT     H
+     C           IVAMT     DIV  IVQTY     IVUPRC    H
+     C                     ENDIF
+     C*
+     C           IVAMT     IFNE 0
+     C                     WRITEIVREC                      寫出明細
+     C                     ADD  IVAMT     INAAMT           出貨金額
+     C                     ADD  1         W#ITEM
+     C                     ENDIF
+     C*
+     C*
+     CSR         ESL1      ENDSR
+     C*********************************
+     C*  L2 函式  換了品名
+     C*********************************
+     CSR         L2SR      BEGSR
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L3 函式  換了磅單（發票主檔）
+     C*********************************
+     CSR         L3SR      BEGSR
+     C*
+     C                     MOVELTNCUNO    INCUNO           客戶編號
+     C                     MOVELTNCUNM    INCUNM           客戶名稱
+     C                     MOVELW#ORNO    INORNO           訂單號碼
+     C*
+     C                     EXSR SR2000                     稅額
+     C*
+     C           INAAMT    ADD  INATAX    INNBAL           彙總餘額
+     C                     ADD  INBAMT    INNBAL
+     C                     ADD  INCAMT    INNBAL
+     C                     ADD  INCTAX    INNBAL
+     C                     ADD  INDAMT    INNBAL
+     C                     ADD  INDTAX    INNBAL
+     C                     ADD  INEAMT    INNBAL
+     C                     ADD  INFAMT    INNBAL
+     C*
+     C           INAAMT    IFNE 0
+     C                     WRITEINREC                      寫發票主檔
+     C                     ADD  1         U#IVNO           計錄張數
+     C                     EXSR PR2000                     印出貸方
+     C*
+     C                     ELSE
+     C                     EXSR SR0030                     發票號減一
+     C                     EXSR PR3000                     印出空行
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  LR 函式  印核覆
+     C*********************************
+     CSR         LRSR      BEGSR
+     C*
+     C                     EXSR SR0040                     發票號存檔
+     C                     EXSR PR4000                     印發票張數
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C*  子函式集
+     C*****************************************************************
+     C*================================================================
+     C* 獲得發票號碼
+     C*================================================================
+     CSR         SR0010    BEGSR
+     C*
+     C                     MOVEL'01'      GEKIND           二聯發票
+     C                     MOVELU#GEPR    GEPRIN
+     C           K#GE      CHAINGEREC               N69
+     C                     MOVELGEPRE     W#PRE2  2
+     C                     Z-ADDGECUNO    W#CUN2  80
+     C                     Z-ADDGEENNO    W#ENN2  80
+     C*
+     C                     MOVEL'02'      GEKIND           三聯發票
+     C                     MOVELU#GEPR    GEPRIN
+     C           K#GE      CHAINGEREC               N69
+     C                     MOVELGEPRE     W#PRE3  2
+     C                     Z-ADDGECUNO    W#CUN3  80
+     C                     Z-ADDGEENNO    W#ENN3  80
+     C*
+     CSR                   ENDSR
+     C*-------------------------------
+     C* 發票號碼增加一號（並設至主檔）
+     C*-------------------------------
+     CSR         SR0020    BEGSR
+     C*
+     C           INKIND    IFEQ '2'                        二聯式
+     C           W#CUN2    IFEQ W#ENN2
+     C                     EXSR SR0040                     存檔
+     C                     CALL 'ARP056P'
+     C                     SETON                     LR
+     C                     RETRN                           結束程式
+     C                     ENDIF
+     C                     ADD  1         W#CUN2
+     C                     MOVELW#PRE2    INNO
+     C                     MOVE W#CUN2    INNO
+     C                     ENDIF
+     C*
+     C           INKIND    IFEQ '3'                        三聯式
+     C           W#CUN3    IFEQ W#ENN3
+     C                     EXSR SR0040                     存檔
+     C                     CALL 'ARP056P'
+     C                     SETON                     LR
+     C                     RETRN                           結束程式
+     C                     ENDIF
+     C                     ADD  1         W#CUN3
+     C                     MOVELW#PRE3    INNO
+     C                     MOVE W#CUN3    INNO
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*-------------------------------
+     C* 發票號碼減回一號
+     C*-------------------------------
+     CSR         SR0030    BEGSR
+     C           INKIND    IFEQ '2'                        二聯式
+     C                     SUB  1         W#CUN2
+     C                     ENDIF
+     C*
+     C           INKIND    IFEQ '3'                        三聯式
+     C                     SUB  1         W#CUN3
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*-------------------------------
+     C* 發票號碼存檔
+     C*-------------------------------
+     CSR         SR0040    BEGSR
+     C*
+     C                     MOVEL'01'      GEKIND
+     C                     MOVELU#GEPR    GEPRIN
+     C           K#GE      CHAINGEREC                69
+     C                     Z-ADDW#CUN2    GECUNO
+     C                     UPDATGEREC
+     C*
+     C                     MOVEL'02'      GEKIND
+     C                     MOVELU#GEPR    GEPRIN
+     C           K#GE      CHAINGEREC                69
+     C                     Z-ADDW#CUN3    GECUNO
+     C                     UPDATGEREC
+     C*
+     CSR                   ENDSR
+     C*================================================================
+     C* 初始發票主檔
+     C*================================================================
+     CSR         SR1100    BEGSR
+     C*
+     C                     CLEARINREC
+     C                     MOVEL'A'       INFLAG           處理代碼
+     C                     MOVEL'9'       INTYPE           發票類別
+     C                     MOVELTNCUNO    INCUNO           客戶編號
+     C                     MOVELTNCUNM    INCUNM           客戶名稱
+     C                     Z-ADDU#INDT    ININDT           發票日期
+     C                     MOVELTNRVID    INRVID           收款業務
+     C                     MOVELTNSALE    INSALE           發貨業務
+     C                     MOVELTNSATP    INSATP           銷售別
+     C                     MOVELU#AREA    INAREA           開立廠區
+     C                     MOVEL'1'       INTXTP           課稅別
+     C                     MOVELU#AREA    INTXAR           異動廠區　
+     C                     Z-ADDUDATE     INTXDT           異動日期
+     C*
+     C           INCUNO    CHAINCBREC                69
+     C  N69                MOVELCBIVCO    INKIND           發票聯式
+     C   69                MOVELTNIVTP    INKIND
+     C*
+     CSR                   ENDSR
+     C*-------------------------------
+     C* 初始發票明細
+     C*-------------------------------
+     CSR         SR1200    BEGSR
+     C*
+     C                     CLEARIVREC
+     C                     MOVEL'A'       IVFLAG           處理代碼
+     C                     MOVELINNO      IVNO             發票號碼
+     C                     MOVEL'9'       IVACNT           類別
+     C                     ADD  1         W#IVIT
+     C                     Z-ADDW#IVIT    IVITEM           項次
+     C                     Z-ADDININDT    IVACDT           入帳日期
+     C                     MOVELTNORNO    IVORNO           訂單號碼
+     C                     MOVEL'Y'       IVFL02           過發票碼
+     C                     MOVEL'Z'       IVFL03           類別碼
+     C                     MOVELU#AREA    IVTXAR           異動廠區
+     C                     Z-ADDUDATE     IVTXDT           異動日期
+     C*
+     CSR                   ENDSR
+     C*-------------------------------
+     C* 發票稅額寫入
+     C*-------------------------------
+     CSR         SR2000    BEGSR
+     C*
+     C           INKIND    IFEQ '2'                        二聯式
+     C                     GOTO ES2000                     已計稅額
+     C                     ENDIF
+     C*
+     C           INAAMT    IFEQ 0                          無出貨？
+     C                     GOTO ES2000
+     C                     ENDIF
+     C*
+     C*          INAAMT    ADD  INBAMT    W#AMT
+     C*          W#AMT     MULT 0.05      W#AMT     H
+     C*
+     C                     CLEARIVREC
+     C                     MOVEL'A'       IVFLAG
+     C                     MOVELINNO      IVNO
+     C                     MOVEL'5'       IVACNT           稅額
+     C                     Z-ADD1         IVITEM           項次01
+     C                     Z-ADDININDT    IVACDT
+     C                     MOVELINORNO    IVORNO
+     C                     Z-ADDW#TAX     IVAMT
+     C                     MOVEL'Y'       IVFL02
+     C                     MOVEL'Z'       IVFL03
+     C                     MOVELU#AREA    IVTXAR
+     C                     Z-ADDUDATE     IVTXDT
+     C*
+     C                     WRITEIVREC
+     C                     ADD  IVAMT     INATAX           稅額
+     C*
+     CSR         ES2000    ENDSR
+     C*================================================================
+     C* 列印借方（各項銷貨明細）
+     C*================================================================
+     CSR         PR1000    BEGSR
+     C*
+     C   66                WRITEAR117T1H
+     C   66                SETOF                     66
+     C*
+     C                     Z-ADDU#INDT    R#DATE
+     C                     MOVELTNTRCD    R#TRCD
+     C                     MOVELTNPJNO    R#PJNO
+     C                     Z-ADDTNITEM    R#TXIT
+     C                     MOVELTNPDNM    R#PDCD
+     C*
+     C           R#PDCD    CHAINRHIPROD              69
+     C   69                MOVEL*BLANK    R#PDNM
+     C  N69                MOVELF4CHIN    R#PDNM
+     C  N69                MOVE D#OF      R#PDNM
+     C                     Z-ADDTNQTY     R#QTY
+     C                     Z-ADDTNUPRC    R#UPRC
+     C                     Z-ADDTNAMT     R#TXAM
+     C*
+     C                     WRITEAR117T1D
+     C*
+     CSR                   ENDSR
+     C*================================================================
+     C* 列印貸方（發票內容）
+     C*================================================================
+     CSR         PR2000    BEGSR
+     C*
+     C   66                WRITEAR117T1H
+     C   66                SETOF                     66
+     C*
+     C                     MOVELINCUNO    R#CUNO
+     C                     MOVELINCUNM    R#CUNM
+     C                     MOVELINKIND    R#KIND
+     C                     Z-ADDINAAMT    R#AAMT
+     C                     Z-ADDINBAMT    R#BAMT
+     C                     Z-ADDINATAX    R#ATAX
+     C                     Z-ADDINNBAL    R#NBAL
+     C                     MOVELINNO      R#INNO
+     C                     MOVELINRVID    R#RVID
+     C*
+     C                     WRITEAR117T1C
+     C*
+     CSR                   ENDSR
+     C*================================================================
+     C* 列印空行
+     C*================================================================
+     CSR         PR3000    BEGSR
+     C*
+     C           *IN66     IFEQ '1'
+     C                     WRITEAR117T1H
+     C                     SETOF                     66
+     C*
+     C                     ELSE
+     C                     WRITEAR117T1L
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*================================================================
+     C* 列印張數
+     C*================================================================
+     CSR         PR4000    BEGSR
+     C*
+     C           U#IVNO    IFEQ 0
+     C                     GOTO EP4000
+     C                     ENDIF
+     C*
+     C   66                WRITEAR117T1H
+     C   66                SETOF                     66
+     C*
+     C                     Z-ADDU#IVNO    R#IVNO
+     C                     WRITEAR117T1T
+     C*
+     CSR         EP4000    ENDSR
+     C*****************************************************************
+

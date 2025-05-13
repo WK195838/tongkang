@@ -1,0 +1,152 @@
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E                    DISK
+     FINVMST  IF  E           K        DISK
+     FARSTWF  O   E           K        DISK                      A
+     E*****************************************************************
+     ITXREC
+     I                                              TXRESVL2
+     I                                              TXNO  L1
+     I            DS
+     I                                        1  10 TXIVNO
+     I                                        1   1 WIVNO
+9104 I                                        1   6 W#INV1
+9104 I                                        7  10 W#INV2
+     I           UDS
+     I                                        1   80YMD
+     I                                        1   60YM
+     I                                        7   80DD
+     C*****************************************************************
+     C*          KEY   LIST
+     C*****************************************************************
+     C*FILE==>ARSTWF
+     C           ASKEY     KLIST
+     C                     KFLD           ASIVNO
+     C*****************************************************************
+     C  N90                EXSR INISR
+     C   L1                EXSR D#L1
+     C                     EXSR D#PR
+     CL1                   EXSR T#L1
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+9104 C                     MOVE YM        W#YMC   4
+     C                     Z-ADD31        DD
+     C                     SETON                     90
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           D#L1      BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         AAMT   110
+     C                     Z-ADD0         BAMT   110
+     C                     Z-ADD0         CAMT   110
+     C                     Z-ADD0         DAMT   110
+     C                     Z-ADD0         EAMT   110
+     C                     Z-ADD0         FAMT   110
+     C                     Z-ADD0         GAMT   110
+     C                     Z-ADD0         HAMT   110
+ 9208C                     Z-ADD0         W#CNT   20
+     C*
+     C           D#L1Z     ENDSR
+     C*****************************************************************
+     C           D#PR      BEGSR
+     C*****************************************************************
+TEST C           TXNO      IFEQ 'T1165289'
+ .   C                     Z-ADD0         W#TEST  10
+ .   C                     ENDIF
+     C*---------------------------
+     C*當月做正負沖銷者不予處理-
+     C*---------------------------
+     C                     SELEC
+     C           WIVNO     WHEQ '#'
+     C                     GOTO D#PRZ
+CLJ  C           WIVNO     WHEQ '*'
+     C           TXCODE    ANDEQ'AR05'
+     C                     GOTO D#PRZ
+9208 C           W#INV1    WHEQ '000000'
+  .  C           W#INV2    ANDEQ'0000'
+  .  C                     GOTO D#PRZ
+     C                     ENDSL
+     C*
+     C           TXFL02    IFNE ' '
+     C           TXIVNO    CHAININVMST               97
+     C*
+     C  N97      ININDT    IFGT YMD
+     C                     ADD  TXAMT     AAMT
+     C                     ENDIF
+     C*
+     C*-------------------------------------------------------
+     C*若為跨月正負沖銷者須納入計算，EX:T1113685為例,    -
+     C*若在算六月的應收帳款時,該筆磅單之應收金額=507042  -
+     C*若在算七月的應收帳款時,該筆磅單之應收金額=503630  -
+     C*-------------------------------------------------------
+9207 C   97      W#INV1    IFEQ '000000'
+9207 C           W#INV2    ANDLEW#YMC
+9207 C                     ADD  TXAMT     AAMT
+9207 C                     ENDIF
+     C*
+     C                     ELSE
+     C                     ADD  TXAMT     AAMT
+     C                     ENDIF
+     C*
+9208 C                     ADD  1         W#CNT
+     C*
+     C           D#PRZ     ENDSR
+     C*****************************************************************
+     CSR         T#L1      BEGSR
+     C*****************************************************************
+     C                     Z-ADDAAMT      FAMT
+     C                     Z-ADDAAMT      HAMT
+     C*
+     C           HAMT      IFEQ 0
+     C                     GOTO T#L1Z
+     C                     ENDIF
+     C*--------------------------------------------------
+     C*此段用來判斷一些正數已被移出的磅單             -
+     C* EX:M1134513,T11154806->只有一筆負數的銷貨金額 -
+     C*--------------------------------------------------
+     C           HAMT      IFLT 0
+     C           W#CNT     ANDLE1
+     C                     GOTO T#L1Z
+     C                     ENDIF
+     C*
+     C           TXNO      IFEQ 'T1189468'
+     C           TXNO      OREQ 'T1189878'
+     C           TXNO      OREQ 'T1189972'
+     C           TXNO      OREQ 'T1193216'
+     C           TXNO      OREQ 'T1193449'
+     C           TXNO      OREQ 'T1193450'
+     C           TXNO      OREQ 'T1193451'
+     C           TXNO      OREQ 'T1195837'
+     C           TXNO      OREQ 'T1198131'
+     C           TXNO      OREQ 'T1198147'
+     C           TXNO      OREQ 'T1100973'
+     C           TXNO      OREQ 'T1100332'
+     C           TXNO      OREQ 'T1198354'
+     C           TXNO      OREQ 'K1103748'
+     C                     GOTO T#L1Z
+     C                     ENDIF
+     C*
+     C                     MOVELTXORNO    W#ORNO  6
+     C           W#ORNO    IFEQ 'M01112'
+     C                     GOTO T#L1Z
+     C                     ENDIF
+     C***
+     C                     CLEARASREC
+     C                     MOVELTXCUNO    ASCUNO           客戶編號
+     C                     MOVELTXCUNM    ASCUNM           客戶名稱
+     C                     MOVELTXORNO    ASORNO           訂單編號
+     C                     MOVELTXRVID    ASRVID           業務員
+     C                     MOVELTXNO      ASIVNO           發票號碼
+     C                     Z-ADDAAMT      ASAAMT           貨款
+     C                     Z-ADDBAMT      ASBAMT           扣預收貨款
+     C                     Z-ADDCAMT      ASCAMT           銷貨稅額
+     C                     Z-ADDDAMT      ASDAMT           發票金額
+     C                     Z-ADDEAMT      ASEAMT           折讓金額
+     C                     Z-ADDFAMT      ASFAMT           應收貨款
+     C                     Z-ADDGAMT      ASGAMT           已收金額
+     C                     Z-ADDHAMT      ASHAMT           應收帳款
+     C                     WRITEASREC
+     C*
+     CSR         T#L1Z     ENDSR
+

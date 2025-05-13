@@ -1,0 +1,103 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP088R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     承購發票訂單別彙總作業
+     H*            5.DATE-WRITTEN  90/12/18
+     H*
+     H*****************************************************************
+     H            Y                                     1                 BR100
+     FARINVM  IP  E           K        DISK
+     FARCUDT  UF  E           K        DISK
+     FARORDE  O   E                    DISK
+     IRARINVM     01
+     I                                              AMCUNOL2
+     I                                              AMORNOL1
+     C  N99                MOVE *ON       *IN99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AAMX 120
+     C                     Z-ADD0         W#CAMX 120
+     C                     Z-ADD0         W#DAMX 120
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AAMT 120
+     C                     Z-ADD0         W#BAMT 120
+     C                     Z-ADD0         W#CAMT 120
+     C                     Z-ADD0         W#DAT1  80
+     C                     Z-ADD0         W#DAT2  80
+     C                     MOVE 'Y'       W#CODE  1
+     C                     ENDSR
+     C*****************************************************************
+     CSR         DTLSR     BEGSR
+     C*****************************************************************
+     C           AMAPCD    IFNE *BLANK                     承購確認
+     C           AMCLOC    ANDEQ*BLANK                     未結案
+     C                     ADD  AMDAMT    W#AAMX           發票金額
+     C                     ADD  AMEAMT    W#CAMX           融資金額
+     C                     ADD  AMFAMT    W#DAMX           沖銷金額
+     C                     ENDIF
+     C*
+     C                     ADD  AMDAMT    W#AAMT           發票金額
+     C                     ADD  AMEAMT    W#BAMT           融資金額
+     C                     ADD  AMFAMT    W#CAMT           沖銷金額
+     C*承購起日
+     C           W#DAT1    IFEQ 0                          第一筆
+     C                     Z-ADDAMAPD1    W#DAT1
+     C                     ELSE
+     C           AMAPD1    IFLT W#DAT1                     其餘
+     C                     Z-ADDAMAPD1    W#DAT1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           W#CODE    IFNE *BLANK
+     C           AMCLOC    IFEQ *BLANK                     未結案
+     C                     MOVE *BLANK    W#CODE
+     C                     Z-ADD0         W#DAT2
+     C                     ENDIF
+     C           AMCLOD    IFGE W#DAT2
+     C                     Z-ADDAMCLOD    W#DAT2
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         L1SR      BEGSR
+     C*****************************************************************
+     C                     CLEARRARORDE
+     C                     MOVE AMCUNO    ARCUNO           客戶代號
+     C                     MOVE AMORNO    ARORNO           訂單號碼
+     C                     Z-ADDW#AAMT    ARAAMT           承購金額
+     C                     Z-ADDW#BAMT    ARBAMT           預支金額
+     C                     Z-ADDW#CAMT    ARCAMT           沖銷金額
+     C                     Z-ADDW#DAT1    ARDAT1           承購起日
+     C                     Z-ADDW#DAT2    ARDAT2           結案日期
+     C                     MOVE W#CODE    ARCLOC           結案碼
+     C                     WRITERARORDE
+     C                     ENDSR
+     C*****************************************************************
+     CSR         L2SR      BEGSR
+     C*****************************************************************
+     C                     MOVE *BLANK    W#CUNO  6
+     C                     MOVELAMCUNO    W#CUN1  5
+     C                     MOVELW#CUN1    W#CUNO
+     C           W#CUNO    CHAINRARCUDT              40
+     C                     Z-ADDW#AAMX    ACAAM1           已承購
+     C                     Z-ADDW#CAMX    ACCAMT           已預支
+     C                     Z-ADDW#DAMX    ACDAMT           已沖銷
+     C                     UPDATRARCUDT
+     C                     ENDSR
+     C*
+

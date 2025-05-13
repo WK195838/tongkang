@@ -1,0 +1,142 @@
+     H*****************************************************************
+     H*
+     H*            1.PROGRAM-ID    ARP036R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        HSIAO
+     H*            4.FUNCTION
+     H*            5.DATE-WRITTEN  85/04/25
+     H*            6.UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FINVMST  IP  E           K        DISK
+     FARSAID  IF  E           K        DISK
+     FSAMAST  IF  E           K        DISK
+CLJ  FINVDTL  IF  E           K        DISK
+     FINVCUT  UF  E           K        DISK                      A
+     IINREC       01
+     I            DS
+9008 I                                        1   6 XXORNO
+LYW  I                                        1   1 AREA
+ .   I                                        2   6 ORNO
+     I            DS
+     I                                        1  20 CURESV
+     I                                        1   1 CHAREA
+CLJ  I            DS
+     I                                        1   3 IVPDCD
+---  I                                        1   1 D#IVPD
+     I           UDS
+     I                                       11  140STRDT
+     I                                       15  180ENDDT
+9008 I                                       19  240W#DATE
+     I                                     10011010 W#USER
+     I                                     10211021 U#LOC
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*FILE => SAMAST
+     C           KEY01     KLIST
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+9009 C                     KFLD           ORTM    30
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C  N99                EXSR SR0000
+     C  N99                SETON                     99
+     C                     SETOF                     88
+     C           U#LOC     IFEQ 'P'
+     C           INTYPE    ANDNE'2'
+     C           INTYPE    ANDNE'9'
+     C           INTYPE    ANDNE'3'
+     C                     SETON                     88
+     C                     ENDIF
+     C   01N88   INPRTC    IFEQ *BLANK
+     C           INDECD    ANDNE'D'
+     C                     EXSR SR1000
+     C                     EXSR SR2000
+     C                     ENDIF
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*\清除 INVCUT
+     C                     MOVEL*BLANK    CUNO
+     C           CUNO      SETLLRINVCUT              53
+     C           *IN53     DOWEQ'0'
+     C                     READ RINVCUT                  53*EOF
+     C   53                LEAVE
+     C           CHAREA    IFEQ U#LOC
+     C                     DELETRINVCUT                53
+     C                     ENDIF
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*\找出業務員廠區　　　
+     C                     MOVELINORNO    XXORNO
+     C                     MOVELAREA      S1OREA
+     C                     TESTN          ORNO       55
+     C  N55                Z-ADD0         S1ORNO
+     C   55                MOVELORNO      S1ORNO
+     C                     Z-ADD1         ORTM
+     C                     MOVEL*BLANK    WSALE   2
+     C                     MOVEL'*'       W#AREA  1
+     C           KEY01     CHAINRSAMAST              54
+     C           *IN54     IFEQ '0'
+     C                     MOVELS1SND     WSALE
+     C           WSALE     CHAINRARSAID              55
+     C           *IN55     IFEQ '0'
+     C                     MOVELSALOCA    W#AREA
+     C                     ENDIF
+     C                     ENDIF
+     C           INTYPE    IFEQ '9'
+     C           INTYPE    OREQ '2'
+     C           INTYPE    OREQ '3'
+     C                     MOVELINAREA    W#AREA
+     C                     ENDIF
+     C*
+CLJ  C*         高雄型鋼註記成苗栗廠
+     C           K#IV      KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C*
+     C           INTYPE    IFEQ '1'                        出貨類
+     C                     MOVELINNO      IVNO
+     C                     MOVEL'1'       IVACNT
+     C           K#IV      CHAINIVREC                69
+     C           *IN69     IFEQ '0'
+     C           D#IVPD    IFEQ '3'                        型鋼類
+     C                     MOVEL'H'       W#AREA
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+---  C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*\ WRITE DATA TO INVCUT
+     C*
+     C           INNO      CHAINRINVCUT              58
+     C           *IN58     IFEQ '1'
+     C                     CLEARRINVCUT
+     C                     MOVEL'A'       CUFLAG
+     C                     MOVELW#AREA    CUAREA
+     C                     MOVELINNO      CUNO
+     C                     MOVELINTYPE    CUTYPE
+     C                     MOVELINKIND    CUKIND
+     C                     MOVELINAREA    CUINEA
+     C                     Z-ADDININDT    CUINDT
+     C                     MOVELINORNO    CUORNO
+     C                     MOVELINCUNO    CUCUNO
+     C                     MOVELINCUNM    CUCUNM
+     C                     MOVELWSALE     CURVID
+     C                     MOVE UDATE     CUUPDD           *異動日期
+     C                     TIME           CUUPDT           *異動時間
+     C                     MOVELW#USER    CUUPDR           *異動人員
+     C                     MOVELU#LOC     CURESV           *異動廠區
+     C                     WRITERINVCUT
+     C                     ENDIF
+     C                     ENDSR
+

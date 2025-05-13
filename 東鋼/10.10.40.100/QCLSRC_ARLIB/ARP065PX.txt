@@ -1,0 +1,190 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP065P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     發票每日開立作業                       */
+     /*     5.DATE-WRITTEN  88/01/20                                */
+     /*                                                             */
+     /*  <說明:>                                                  */
+     /*            本作業每日由業務助理進行。開立的銷貨明細為：   */
+     /*                                                             */
+     /*             1.不在訂單控制檔內的訂單項次（隨車）          */
+     /*             2.開立方式為隨車(00)                          */
+     /*             3.開立方式為一訂一張(01)                      */
+     /*                                                             */
+     /*            輸入之發票日期可為上月之最後一日               */
+     /*                                                           */
+     /*            若有加工費或廠組費發生時，自動產生調整單       */
+     /*                                                             */
+     /*      *LDA   1 --> 開立廠區及年月(GEPRIN)                  */
+     /*            11 --> 發票日期                                */
+     /*            31 --> 隨車發票張數                            */
+     /*            41 --> 隨訂發票張數                            */
+     /*            51 --> 調整發票張數                            */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&USER)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+
+             DCL        VAR(&W#DATE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#RTNV) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#IVNO) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#MSGT) TYPE(*CHAR) LEN(200)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+INPUT:
+             CALL       PGM(ARP065RSX) PARM(&IN03)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             SBMJOB     CMD(CALL PGM(ARP065P)) JOB(ARP065P) +
+                          JOBD(ARJOBD) OUTQ(&OUTQ) INLLIBL(*JOBD)
+             RETURN
+
+
+BATCH:
+             RTVDTAARA  DTAARA(*LDA (1  1)) RTNVAR(&W#AREA)
+             RTVDTAARA  DTAARA(*LDA (11 8)) RTNVAR(&W#DATE)
+
+
+STEP1:       /* 複製暫存資料 */
+
+             DLTF       FILE(QTEMP/TRNDTLN)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(TRNDTLN) FROMLIB(ARLIB) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+             OVRDBF     FILE(TRNDTLN) TOFILE(QTEMP/TRNDTLN)
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('TXCODE *EQ "SA04" *AND +
+                                TXDATE *LE ' || &W#DATE || ' *AND +
+                                TXTXAR *EQ "' || &W#AREA || '" *AND +
+                                %SST(TXCUNO 1 1) *NE "E" *AND +
+                                TXFLAG *NE "D" *AND +
+                                TXFL02 *EQ " " *AND +
+                                TXIVNO *EQ " "')
+             CALL       ARP065R1
+             CLOF       TRNDTL
+             DLTOVR     *ALL
+
+
+STEP2:       /* 開立隨車發票 */
+
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL)
+             OVRDBF     FILE(TRNDTLN) TOFILE(QTEMP/TRNDTLN) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTLN) +
+                        QRYSLT('TNMTHD *EQ "00"') +
+                        KEYFLD((TNNO) (TNPDNM) (TNUPRC))
+             OVRPRTF    FILE(ARP065T) TOFILE(ARP065T) PAGESIZE(*N +
+                          198) CPI(15) HOLD(*YES) USRDTA('每日隨車')
+             CALL       ARP065R2
+             CLOF       TRNDTLN
+             DLTOVR     *ALL
+
+
+STEP3:       /* 開立隨訂發票(01) */
+
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL)
+             OVRDBF     FILE(TRNDTLN) TOFILE(QTEMP/TRNDTLN) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTLN) +
+                        QRYSLT('TNMTHD *EQ "01"') +
+                        KEYFLD((TNORN5) (TNPDNM) (TNUPRC))
+             OVRPRTF    FILE(ARP065T) TOFILE(ARP065T) PAGESIZE(*N +
+                          198) CPI(15) HOLD(*YES) USRDTA('每日隨訂')
+             CALL       ARP065R3
+             CLOF       TRNDTLN
+             DLTOVR     *ALL
+
+
+STEP4:       /* 開立調整發票 */
+
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        OPTION(*ALL) +
+                        QRYSLT('TXCODE *EQ "AR05" *AND +
+                                TXDATE *LE ' || &W#DATE || ' *AND +
+                                TXTXAR *EQ "' || &W#AREA || '" *AND +
+                                %SST(TXCUNO 1 1) *NE "E" *AND +
+                                TXFLAG *NE "D" *AND +
+                                TXFL02 *EQ " " *AND +
+                                TXIVNO *EQ " " *AND +
+                                CHAR *NE "D"') +
+                        MAPFLD((CHAR '%SST(TXRESV 15 1)' *CHAR 1)) +
+                        KEYFLD((TXNO) (TXPDNM) (TXUPRC))
+             OVRPRTF    FILE(ARP065T) TOFILE(ARP065T) PAGESIZE(*N +
+                          198) CPI(15) HOLD(*YES) USRDTA('每日調整')
+             CALL       ARP065R4
+             CLOF       TRNDTL
+             DLTOVR     *ALL
+
+STEP4A:      /* 處理TRNDTL中一正一負 */
+
+             OVRDBF     FILE(TRNDTL)  TOFILE(DALIB/TRNDTL)
+             OVRDBF     FILE(TRNDTLX) TOFILE(DALIB/TRNDTLX)
+        /*   CPYF       FROMFILE(DALIB/TRNDTL) TOFILE(DALIB/TRNDTLX) +
+                          MBROPT(*REPLACE) INCREL((*IF TXAMT *LE 0) +
+                          (*AND TXCODE *EQ 'SA04') (*AND TXIVNO *NE +
+                          '0000000000') (*AND TXIVNO *NE '#         +
+                          ') (*AND TXDATE *GE 880101) (*AND TXIVNO +
+                          *NE '          ')) FMTOPT(*NOCHK) */
+             CPYF       FROMFILE(DALIB/TRNDTL) TOFILE(DALIB/TRNDTLX) +
+                          MBROPT(*REPLACE) INCREL((*IF TXAMT *LE 0) +
+                          (*AND TXCODE *EQ 'SA04') (*AND TXIVNO *NE +
+                          '#         ') (*AND TXDATE *GE 880101) +
+                          (*AND TXIVNO *NE '          ')) +
+                          FMTOPT(*NOCHK)
+             CALL       PGM(ARP065R5)
+             DLTOVR     FILE(*ALL)
+
+STEP5:       /* 送出作業結束訊息 */
+
+             RTVDTAARA  DTAARA(*LDA (31 8)) RTNVAR(&W#IVNO)
+             CHGVAR     VAR(&W#MSGT) +
+                        VALUE('每日發票開立作業處理完畢！隨車發票開+
+                              立' || &W#IVNO || '張，隨訂開立')
+             RTVDTAARA  DTAARA(*LDA (41 8)) RTNVAR(&W#IVNO)
+             CHGVAR     VAR(&W#MSGT) +
+                        VALUE(&W#MSGT *TCAT &W#IVNO || '張，調整發+
+                              票開立')
+             RTVDTAARA  DTAARA(*LDA (51 8)) RTNVAR(&W#IVNO)
+             CHGVAR     VAR(&W#MSGT) +
+                        VALUE(&W#MSGT *TCAT &W#IVNO || '張。')
+
+             SNDMSG     MSG(&W#MSGT) TOUSR(&USER)
+
+
+STEP6:       /* 檢核發票字軌可用號數 */
+
+             CALL       PGM(ARP002RV)    /* 票軌剩十分之一警告 */
+
+             RTVDTAARA  DTAARA(*LDA (1 1)) RTNVAR(&W#RTNV)
+             IF         COND(&W#RTNV *EQ 'T') THEN(DO)
+             RTVDTAARA  DTAARA(*LDA (3 8)) RTNVAR(&W#IVNO)
+             SNDMSG     MSG('請注意！二聯式發票可用票軌數目只剩+
+                             十分之一，約' || &W#IVNO || '張；+
+                             必要時請通知財會單位申請。') +
+                        TOUSR(&USER)
+             ENDDO
+
+             RTVDTAARA  DTAARA(*LDA (2 1))  RTNVAR(&W#RTNV)
+             IF         COND(&W#RTNV *EQ 'T') THEN(DO)
+             RTVDTAARA  DTAARA(*LDA (11 8)) RTNVAR(&W#IVNO)
+             SNDMSG     MSG('請注意！三聯式發票可用票軌數目只剩+
+                             十分之一，約' || &W#IVNO || '張；+
+                             必要時請通知財會單位申請。') +
+                        TOUSR(&USER)
+             ENDDO
+
+
+             ENDPGM
+

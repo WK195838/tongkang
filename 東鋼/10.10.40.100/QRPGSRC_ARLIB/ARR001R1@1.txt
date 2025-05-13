@@ -1,0 +1,248 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR001R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     請款單列印作業（前期處理）
+     H*            5.DATE-WRITTEN  88/10/12
+     H*
+     H*  <說明> 將請款單每張發票的內容寫入暫時檔內。
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMSTL1IF  E           K        DISK
+     FTRNDTLL2IF  E           K        DISK
+     FTRNDTLL3IF  E           K        DISK
+     F            TXREC                             KRENAMETXRECW
+     FINVDTL  IF  E           K        DISK
+     FARR001F O   E           K        DISK
+     E*************************************************************
+     E                    ARY1      300 23
+     I*************************************************************
+     I            DS
+     I                                        1  23 A#DATA
+     I                                        1   8 A#WTNO
+     I                                        9  150A#QTY
+     I                                       16  230A#AMT
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10211021 U#AREA
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#CUNO  6
+     C                     PARM           P#APNO  6
+     C**************************************************************
+     C           K#IN      KLIST
+     C                     KFLD           INCUNO
+     C                     KFLD           INAPNO
+     C*
+     C           K#IV      KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C                     MOVELP#CUNO    INCUNO
+     C                     MOVELP#APNO    INAPNO
+     C*
+     C           K#IN      SETLLINREC
+     C           1         DOWEQ1
+     C           K#IN      READEINREC                    69
+     C*
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           INDECD    IFEQ 'D'
+     C           INFLAG    OREQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     CLEARARREC
+     C                     MOVELINNO      ARINNO           發票號碼
+     C                     Z-ADDININDT    ARINDT           發票日期
+     C                     MOVELINORNO    ARORNO           訂單號碼
+     C                     Z-ADDINAAMT    ARAAMT           出貨金額
+     C                     Z-ADDINCAMT    ARBAMT           折退
+     C                     Z-ADDINBAMT    ARCAMT           扣預收
+     C                     ADD  INDAMT    ARCAMT           扣預沖回
+     C                     Z-ADDINATAX    ARDAMT           出貨稅額
+     C                     ADD  INCTAX    ARDAMT           折退稅額
+     C                     ADD  INDTAX    ARDAMT           扣預沖回稅
+     C*
+     C                     EXSR SR1000                     找未確折退
+     C*
+     C           INEAMT    ADD  INFAMT    AREAMT           繳款┼退票
+     C                     ADD  ARAAMT    AREAMT
+     C                     ADD  ARBAMT    AREAMT
+     C                     ADD  ARCAMT    AREAMT
+     C                     ADD  ARDAMT    AREAMT           請款金額
+     C*
+     C                     EXSR SR2000                     找磅單
+     C                     EXSR SR3000                     寫入記錄
+     C                     ENDDO
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+     C*
+     C**************************************************************
+     C*--------------------------------------------
+     C*   找出未確認的折讓單（計入請款內容）
+     C*--------------------------------------------
+     CSR         SR1000    BEGSR
+     C           INNO      SETLLTXRECW
+     C           1         DOWEQ1
+     C           INNO      READETXRECW                   69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           TXFLAG    IFEQ 'D'                        已作廢
+     C           TXFL01    OREQ 'Y'                        已確認
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           INTYPE    IFEQ '2'                        預收
+     C                     SUB  TXAMT     ARBAMT
+     C                     ELSE
+     C           TXACNT    IFEQ '4'                        扣預收
+     C                     SUB  TXAMT     ARCAMT
+     C                     ELSE
+     C                     SUB  TXAMT     ARBAMT           折退
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     SUB  TXTAX     ARDAMT           稅額
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*--------------------------------------------
+     C*   找出磅單（陣列）
+     C*--------------------------------------------
+     CSR         SR2000    BEGSR
+     C                     MOVEL*ALL'9'   ARY1
+     C                     Z-ADD0         ARY1L   30
+     C*
+     C           INNO      SETLLTXREC
+     C           1         DOWEQ1
+     C           INNO      READETXREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           TXFLAG    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVEL'F'       W#RTNV  1
+     C           1         DO   ARY1L     I       30
+     C                     MOVELARY1,I    A#DATA
+     C           TXNO      IFEQ A#WTNO
+     C                     ADD  TXQTY     A#QTY
+     C                     ADD  TXAMT     A#AMT
+     C                     MOVELA#DATA    ARY1,I
+     C                     MOVEL'T'       W#RTNV
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           W#RTNV    IFEQ 'F'
+     C                     ADD  1         ARY1L
+     C                     Z-ADDARY1L     I
+     C                     MOVELTXNO      A#WTNO
+     C                     Z-ADDTXQTY     A#QTY
+     C                     Z-ADDTXAMT     A#AMT
+     C                     MOVELA#DATA    ARY1,I
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C*          ---------------------------------
+     C*
+{    C           ARY1L     IFEQ 0                          跨廠出貨
+     C                     MOVELINNO      IVNO
+     C                     MOVEL'1'       IVACNT
+     C           K#IV      SETLLIVREC
+ {   C           1         DOWEQ1
+     C           K#IV      READEIVREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           IVDECD    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVEL'F'       W#RTNV  1
+  {  C           1         DO   ARY1L     I       30
+     C                     MOVELARY1,I    A#DATA
+     C           IVAPNO    IFEQ A#WTNO
+     C                     ADD  IVQTY     A#QTY
+     C                     ADD  IVAMT     A#AMT
+     C                     MOVELA#DATA    ARY1,I
+     C                     MOVEL'T'       W#RTNV
+     C                     LEAVE
+     C                     ENDIF
+  }  C                     ENDDO
+     C*
+  {  C           W#RTNV    IFEQ 'F'
+     C                     ADD  1         ARY1L
+     C                     Z-ADDARY1L     I
+     C                     MOVELIVAPNO    A#WTNO
+     C                     Z-ADDIVQTY     A#QTY
+     C                     Z-ADDIVAMT     A#AMT
+     C                     MOVELA#DATA    ARY1,I
+  }  C                     ENDIF
+ }   C                     ENDDO
+}    C                     ENDIF                           跨廠出貨
+     CSR                   ENDSR
+     C*
+     C*--------------------------------------------
+     C*   寫入記錄
+     C*--------------------------------------------
+     CSR         SR3000    BEGSR
+     C                     Z-ADD0         W#QTY   70       磅單數量
+     C                     Z-ADD0         W#AMT   80       磅單金額
+     C           1         DO   ARY1L     I
+     C                     MOVELARY1,I    A#DATA
+     C                     ADD  A#QTY     W#QTY
+     C                     ADD  A#AMT     W#AMT
+     C                     ENDDO
+     C*
+     C                     Z-ADDW#QTY     ARQTY            總數量
+     C*
+     C           W#AMT     IFNE ARAAMT                     金額不符時
+     C           ARY1L     ANDGT1                          多張磅單
+     C                     SUB  ARAAMT    W#AMT
+     C                     Z-ADDARY1L     I                調整最後一
+     C                     MOVELARY1,I    A#DATA           筆使其相同
+     C                     SUB  W#AMT     A#AMT
+     C                     MOVELARY1,I    A#DATA
+     C                     ENDIF
+     C*
+     C           ARY1L     IFEQ 1                          只有一磅單
+     C                     MOVELARY1,1    A#DATA
+     C                     MOVELA#WTNO    ARWTNO
+     C                     WRITEARREC                      存檔
+     C                     GOTO ES3000
+     C                     ENDIF
+     C*
+     C                     WRITEARREC                      發票計存檔
+     C*
+     C           1         DO   ARY1L     I                多張磅單時
+     C                     MOVELARY1,I    A#DATA
+     C                     CLEARARREC
+     C                     MOVELINNO      ARINNO
+     C                     Z-ADDININDT    ARINDT
+     C                     MOVELINORNO    ARORNO
+     C                     MOVELA#WTNO    ARWTNO
+     C                     Z-ADDA#QTY     ARQTY
+     C                     Z-ADDA#AMT     ARAAMT
+     C                     WRITEARREC
+     C                     ENDDO
+     CSR         ES3000    ENDSR
+     C*
+     C*****************************************************************
+

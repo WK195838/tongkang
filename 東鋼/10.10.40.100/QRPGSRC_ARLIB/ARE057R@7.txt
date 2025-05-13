@@ -1,0 +1,924 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARE057R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     新版發票作廢作業（可整批作廢）
+     H*          5.DATE-WRITTEN  93/12/30
+     H*          6.DATE-MODIFY   99/01/12 2010AR417 S00WCJ (9901A)
+     H*                          99/08/24 2010AR517 S00WCJ (9908A)
+     H*                         103/01/19 2014AR769 S00WCJ (0301A)
+     H*                          寫入ARDSDT作廢碼
+     H*                         106/12/01 2017AR1112 S00WCJ (0612A)
+     H*                          寫入電子發票介面檔
+     H*                         106/12/21 S00WCJ (0612B)
+     H*                          帳號H173由於部門代號不為F故無法
+     H*                          作廢發票，修改使H173可執行
+     H*                         107/03/08 S00WJC (0703A)
+     H*                          帳號H173無法作廢M廠發票
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARE057S CF  E                    WORKSTN
+     F                                        RRN1  KSFILE AR057F2
+     F                                        RRN2  KSFILE AR057F3
+     FDELDTL  UF  E           K        DISK
+     FDELMST  UF  E           K        DISK
+     FINVMST  UF  E           K        DISK
+     FINVDTL  UF  E           K        DISK
+     FTRNDTLL2UF  E           K        DISK
+     FDELMSTL1IF  E           K        DISK
+     F            RDELMST                           KRENAMERDELMY
+     FARBTAX  UF  E           K        DISK                      A
+     FARINVM  UF  E           K        DISK
+     FCPRBAL  UF  E           K        DISK
+     FCAMBALT IF  E           K        DISK                      A
+0301AFARDSDTL3UF  E           K        DISK
+0612AFINEDIN  O   E           K        DISK
+0612AFINEDING O   E           K        DISK
+0612AF            RINEDIN                           KRENAMEINEDG
+0612AFCBCUST  IF  E           K        DISK
+     E*****************************************************************
+0612AE                    TAB1    5   5  1   TAB2    6   *公司代號
+     E                    ERR     1   9 70               *錯誤訊息
+     E*****************************************************************
+     IRDELMY
+     I              DMFLAG                          F#FLAG
+     I              DMINNO                          F#INNO
+     I              DMINDT                          F#INDT
+     I              DMAREA                          F#AREA
+     I              DMDECD                          F#DECD
+     I              DMDEDT                          F#DEDT
+     I              DMCUN1                          F#CUN1
+     I              DMCUM1                          F#CUM1
+     I              DMORN1                          F#ORN1
+     I              DMDEPT                          F#DEPT
+     I              DMDLNO                          F#DLNO
+     I              DMRVID                          F#RVID
+     I              DMAAMT                          F#AAMT
+     I              DMATAX                          F#ATAX
+     I              DMBAMT                          F#BAMT
+     I              DMNBAL                          F#NBAL
+     I              DMCUN2                          F#CUN2
+     I              DMCUM2                          F#CUM2
+     I              DMORN2                          F#ORN2
+     I              DMAPUS                          F#APUS
+     I              DMAPDT                          F#APDT
+     I              DMAPTM                          F#APTM
+     I              DMUPUS                          F#UPUS
+     I              DMUPDT                          F#UPDT
+     I              DMUPTM                          F#UPTM
+     I              DMRESV                          F#RESV
+     I*
+     I           UDS
+     I                                     10011001 U#DEPT
+0703AI                                     10021004 U#DEP1
+     I                                     10011010 U#USID
+     I                                     10111020 S#DEVN
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1   80D#ACDT
+     I                                        1   40D#YY
+     I                                        5   60D#MM
+     I                                        7   80D#DD
+     I            DS
+     I                                        1   80D#VUNO
+     I                                        1   40D#YY1
+     I                                        5   60D#MM1
+     I                                        7   80D#DD1
+     I                                        1   60D#YYMM
+     I            DS
+     I                                        1  11 D#WTNO
+     I                                        1   8 D#WTN1
+     I                                        9   9 D#DASH
+     I                                       10  110D#ITEM
+9701 I            DS
+ .   I                                        1  10 W#DSPN
+9701 I                                        9  10 D#DSIT
+0612AI            DS
+0612AI                                        1   60W#DETM
+0612AI                                        1   2 D#H
+0612AI                                        3   4 D#M
+0612AI                                        5   6 D#S
+0612AI            DS
+0612AI                                        1   8 DNDETM
+0612AI                                        1   2 D1HH
+0612AI                                        3   3 D1C1
+0612AI                                        4   5 D1MM
+0612AI                                        6   6 D1C2
+0612AI                                        7   8 D1SS
+0612AI*0307A      DS
+0612AI*0307A                                  1  40 DNCLRN
+0612AI*0307A                                  1   1 BOE
+0612AI*0307A                                  2  38 D#CLRN
+0612AI*0307A                                 40  40 BOF
+     C**************************************************************
+     C*          KEY     LIST
+     C**************************************************************
+     C*FILE==>DELMSTL1(發票作廢記錄主檔)
+     C           K#DLMY    KLIST
+     C                     KFLD           F#DLNO
+     C                     KFLD           F#INNO
+     C*FILE==>DELDTL(發票作廢記錄明細檔)
+     C           K#DELD    KLIST
+     C                     KFLD           DLIVNO
+     C                     KFLD           DLWTNO
+     C                     KFLD           DLITEM
+     C*FIL3==>ARBTAX(專案退稅明細檔)
+     C           K#BTAX    KLIST
+     C                     KFLD           AXAREA
+     C                     KFLD           AXORNO
+     C                     KFLD           AXYYMM
+     C                     KFLD           AXITEM
+     C*FILE==>INVDTL(發票明細檔)
+     C           K#INVD    KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*FILE==>CAMBALT(客戶授信管控異動記錄檔)
+     C           K#CAMT    KLIST
+     C                     KFLD           CTDATE
+     C                     KFLD           CTTIME
+     C                     KFLD           CTAREA
+     C                     KFLD           CTDSPN
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000           畫面二
+     C           W#PRID    CASEQ'03'      SR3000            READC
+     C           W#PRID    CASEQ'04'      SR4000           畫面三
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVE *ALL'='   S#LIN3
+     C                     MOVE *ALL'='   S#LIN4
+     C                     MOVE *ALL'='   S#LIN5
+     C                     MOVEL'01'      W#PRID  2
+     C                     MOVE *OFF      *IN99
+9701 C                     Z-ADD0         W#DSIT  20
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*----------------------------------------------------------------
+     C                     MOVE *ON       *IN38             MODE
+     C*
+     C           W#PRID    DOWEQ'01'
+     C*
+     C                     WRITEAR057H
+     C                     EXFMTAR057F1
+     C*
+     C                     MOVEA'00'      *IN,30
+     C                     MOVEL*BLANK    S#ERR1
+     C*-----------
+     C*IN03 IN12 -
+     C*-----------
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C* CHECK SCREEN
+     C                     EXSR SR1100
+     C*
+     C  N99                MOVE '02'      W#PRID
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*----------------------------------------------------------------
+     C                     SETOF                     99
+     C*----------------
+     C*CHECK功能代碼-
+     C*----------------
+     C           S#CODE    IFEQ *BLANK
+     C                     SETON                     3099
+     C                     MOVELERR,1     S#ERR1
+     C                     ENDIF
+     C*
+     C  N99      S#CODE    IFNE '1'
+     C           S#CODE    ANDNE'2'
+     C                     SETON                     3099
+     C                     MOVELERR,2     S#ERR1
+     C                     ENDIF
+     C*------------------------
+     C*CHECK發票作廢申請單號-
+     C*------------------------
+     C  N99      S#DLNO    IFEQ *BLANK
+     C                     SETON                     3199
+     C                     MOVELERR,3     S#ERR1
+     C                     ENDIF
+     C*
+     C           *IN99     IFEQ *OFF
+     C                     MOVELS#DLNO    F#DLNO
+     C           F#DLNO    CHAINRDELMY               40
+     C           F#DLNO    IFNE S#DLNO
+     C                     MOVE *ON       *IN40
+     C                     ENDIF
+     C*
+0612BC           U#USID    IFEQ 'H173'
+0703AC                     MOVEL'F'       U#DEPT
+0612BC                     ENDIF
+     C*
+     C                     SELEC
+     C           S#CODE    WHEQ '1'
+     C           *IN40     ANDEQ*ON
+     C                     SETON                     3199
+     C                     MOVELERR,4     S#ERR1
+     C           S#CODE    WHEQ '1'
+     C           F#DECD    ANDEQ'D'
+     C                     SETON                     3199
+     C                     MOVELERR,5     S#ERR1
+     C           S#CODE    WHEQ '1'
+     C           F#DEPT    ANDNEU#DEPT
+9601 C           F#DEPT    ANDNEU#AREA
+9901AC                     SETON                     3199
+9901AC                     MOVELERR,7     S#ERR1
+     C           S#CODE    WHEQ '1'
+     C           F#AREA    ANDNEU#AREA
+     C                     SETON                     3199
+     C                     MOVELERR,9     S#ERR1
+     C           S#CODE    WHEQ '2'
+     C           *IN40     ANDEQ*ON
+     C                     SETON                     3199
+     C                     MOVELERR,4     S#ERR1
+     C                     ENDSL
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*----------------------------------------------------------------
+     C*W#PRID='01'--->ARE057S-2 畫面
+     C*
+     C                     Z-ADD1         S#NBR1
+     C                     Z-ADD0         RRN1    50
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN73            SFLCLR
+     C                     WRITEAR057F2C
+     C                     MOVE *OFF      *IN73
+     C*
+     C                     SELEC
+     C           S#CODE    WHEQ '1'
+     C                     MOVE '作廢'  S#MODE
+     C                     MOVEA'00'      *IN,37            PROTECT,MOD
+     C*                    MOVEA'10'      *IN,75            PRINT,SAVE
+     C           S#CODE    WHEQ '2'
+     C                     MOVE '查詢'  S#MODE
+     C                     MOVEA'10'      *IN,37            PROTECT,MOD
+     C*                    MOVEA'11'      *IN,75            PRINT,SAVE
+     C                     ENDSL
+     C*
+     C*讀入資料
+     C                     MOVELS#DLNO    F#DLNO           作廢單號
+     C                     MOVEL*BLANK    F#INNO           發票號碼
+     C                     EXSR SR2100
+     C*
+     C           RRN1      IFEQ 0                          SFLDSP OFF
+     C                     MOVE *ON       *IN72
+     C                     MOVELERR,6     S#ERR2
+     C                     ELSE
+     C                     MOVE *OFF      *IN72
+     C                     ENDIF
+     C*顯示畫面
+     C           W#PRID    DOWEQ'02'
+     C*
+     C                     WRITEAR057H
+     C                     WRITEAR057F2M
+     C                     EXFMTAR057F2C
+     C                     MOVEL*BLANK    S#ERR2
+     C*結束作業
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*回上頁
+     C           *IN12     IFEQ *ON
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*存檔
+     C  N37      *IN10     IFEQ *ON
+     C                     EXSR SR2200
+     C                     MOVEL'01'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*READC
+     C                     MOVEL'03'      W#PRID
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C*讀入ＤＥＬＭＳＴ
+     C           K#DLMY    SETLLRDELMY
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ RDELMY                   41
+     C   41                LEAVE
+     C*
+     C           F#DLNO    IFNE S#DLNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*客戶編號不符，訂單編號不符，作廢碼不為空白
+     C           F#FLAG    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           F#INNO    CHAINRDELMST              42
+     C                     MOVELDMAREA    S#AREA
+     C                     MOVEL*BLANK    S#OPT
+     C                     MOVELF#CUN1    S#CUNO           客戶編號
+     C                     MOVELF#ORN1    S#ORNO           訂單號碼
+     C                     Z-ADDF#INDT    S#INDT           發票日期
+     C                     Z-ADDF#APDT    S#APDT           申請日期
+     C                     MOVELF#INNO    S#INNO           發票號碼
+     C                     Z-ADDF#AAMT    S#AMT1           出貨金額
+     C                     Z-ADDF#ATAX    S#TAX1           出貨稅額
+     C                     Z-ADDF#BAMT    S#BAM1           扣預收金額
+     C                     Z-ADDF#NBAL    S#AAMT           未收餘額
+     C                     MOVELF#DECD    S#DECD           作廢碼
+     C*
+     C*
+     C                     ADD  1         RRN1
+     C                     WRITEAR057F2
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2200    BEGSR
+     C*****************************************************************
+     C                     Z-ADD1         RRN1
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C           RRN1      CHAINAR057F2              90
+     C   90                LEAVE
+     C*
+     C*異動DELMST的資料
+     C                     EXSR SR2210
+     C*異動DELDTL的資料
+     C                     EXSR SR2220
+     C*異動INVMST的資料
+     C                     EXSR SR2230
+0612AC*寫入發票作廢介面檔
+0612AC                     EXSR SR2300
+     C*異動INVDTL的資料
+     C                     EXSR SR2240
+     C*異動TRNDTL的資料
+     C                     EXSR SR2250
+     C*判斷是否做專案退稅
+     C                     EXSR SR2260
+     C*判斷是否為承購發票
+     C                     EXSR SR2270
+     C*判斷是否需更新預收餘額
+     C                     EXSR SR2280
+     C*
+0301AC*異動ARDSDT的資料
+0301AC                     EXSR SR2290
+     C*
+     C                     ADD  1         RRN1
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2210    BEGSR
+     C*****************************************************************
+     C*異動DELMST的資料
+     C*
+     C           S#INNO    CHAINRDELMST              42
+     C                     MOVEL'C'       DMFLAG           處理代碼
+     C                     MOVEL'D'       DMDECD           作廢碼
+9908AC*                    MOVE UDATE     DMDEDT           作廢日期
+9908AC           *DATE     SUB  19000000  DMDEDT           作廢日期
+     C  N42                UPDATRDELMST
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2220    BEGSR
+     C*****************************************************************
+     C*異動DELDTL的資料
+     C*
+     C                     MOVELS#INNO    DLIVNO
+     C                     MOVEL*BLANK    DLWTNO
+     C                     Z-ADD0         DLITEM
+     C           K#DELD    SETLLRDELDTL              43
+     C                     MOVE *OFF      *IN43
+     C           *IN43     DOWEQ*OFF
+     C                     READ RDELDTL                  43
+     C   43                LEAVE
+     C*
+     C           DLIVNO    IFNE S#INNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVEL'C'       DLFLAG           處理代號
+     C                     MOVEL'D'       DLDECD           作廢碼
+9908AC*                    MOVE UDATE     DLDEDT           作廢日期
+9908AC           *DATE     SUB  19000000  DLDEDT           作廢日期
+     C  N43                UPDATRDELDTL
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2230    BEGSR
+     C*****************************************************************
+     C*異動INVMST的資料
+     C*
+     C           S#INNO    CHAININREC                47
+     C                     MOVEL'C'       INFLAG
+     C                     MOVEL'D'       INDECD
+9908AC*                    Z-ADDUDATE     INDEDT
+9908AC           *DATE     SUB  19000000  INDEDT
+     C                     MOVELU#AREA    INTXAR
+9908AC*                    Z-ADDUDATE     INTXDT
+9908AC           *DATE     SUB  19000000  INTXDT
+     C  N47                UPDATINREC
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2240    BEGSR
+     C*****************************************************************
+     C*異動INVDTL的資料
+     C                     MOVE *BLANK    W#APNO  8
+     C                     MOVELS#INNO    IVNO
+     C                     MOVEL*BLANK    IVACNT
+     C                     Z-ADD0         IVITEM
+     C           K#INVD    SETLLIVREC
+     C                     MOVE *OFF      *IN48
+     C           *IN48     DOWEQ*OFF
+     C                     READ IVREC                    48
+     C   48                LEAVE
+     C*
+     C           IVNO      IFNE S#INNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           IVACNT    IFEQ '1'
+     C                     MOVELIVAPNO    W#APNO
+     C                     ENDIF
+     C*
+     C                     MOVE 'C'       IVFLAG
+     C                     MOVE 'D'       IVDECD
+9908AC*                    Z-ADDUDATE     IVDEDT
+9908AC           *DATE     SUB  19000000  IVDEDT
+9908AC*                    Z-ADDUDATE     IVTXDT
+9908AC           *DATE     SUB  19000000  IVTXDT
+     C                     MOVELU#AREA    IVTXAR
+     C                     UPDATIVREC
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2250    BEGSR
+     C*****************************************************************
+     C*異動TRNDTL的資料
+     C*
+     C                     MOVELS#INNO    TXIVNO
+     C           S#INNO    SETLLTXREC                49
+     C  N49      S#INNO    READETXREC                    49
+     C           *IN49     DOWEQ'0'
+     C                     MOVEL'C'       TXFLAG
+     C                     MOVEL' '       TXFL02
+     C           U#DEPT    IFNE 'B'
+     C                     MOVEL'*'       TXIVNO
+     C                     ELSE
+     C                     MOVE *BLANK    TXIVNO
+     C                     ENDIF
+     C                     MOVELU#AREA    TXTXAR
+9908AC*                    Z-ADDUDATE     TXTXDT
+9908AC           *DATE     SUB  19000000  TXTXDT
+     C                     UPDATTXREC
+     C           S#INNO    READETXREC                    49
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2260    BEGSR
+     C*****************************************************************
+     C*判斷是否做專案退稅
+     C*
+     C*報稅日期
+     C                     Z-ADDS#INDT    D#ACDT
+     C                     SELEC
+     C           D#MM      WHEQ 1
+     C           D#MM      OREQ 2
+     C                     Z-ADD3         D#MM
+     C           D#MM      WHEQ 3
+     C           D#MM      OREQ 4
+     C                     Z-ADD5         D#MM
+     C           D#MM      WHEQ 5
+     C           D#MM      OREQ 6
+     C                     Z-ADD7         D#MM
+     C           D#MM      WHEQ 7
+     C           D#MM      OREQ 8
+     C                     Z-ADD9         D#MM
+     C           D#MM      WHEQ 9
+     C           D#MM      OREQ 10
+     C                     Z-ADD11        D#MM
+     C           D#MM      WHEQ 11
+     C           D#MM      OREQ 12
+     C                     Z-ADD1         D#MM
+     C                     ADD  1         D#YY
+     C*
+     C                     ENDSL
+     C*                    Z-ADD5         D#DD
+     C*                    Z-ADD13        D#DD
+     C                     Z-ADD7         D#DD
+     C*
+9908AC*                    MOVE UDATE     W#UDAT  60       作廢當日
+9908AC           *DATE     SUB  19000000  W#UDAT  80       作廢當日
+     C*
+     C           W#UDAT    IFGT D#ACDT
+     0*判斷該張發票之歸屬年月
+     C*若該張發票的作廢日小於當月15號，則歸屬年月為上個月
+     C*若該張發票的作廢日大於當月15號，則歸屬年月為這個月
+9908AC*                    Z-ADDUDATE     D#VUNO
+9908AC           *DATE     SUB  19000000  D#VUNO
+     C*          D#DD1     IFLT 5
+     C*          D#DD1     IFLT 13
+     C           D#DD1     IFLT 7
+     C           D#MM1     IFEQ 1
+     C                     SUB  1         D#YY1
+     C                     Z-ADD12        D#MM1
+     C                     ELSE
+     C                     SUB  1         D#MM1
+     C                     ENDIF
+     C                     ENDIF
+     0*
+     C*取得正確的資料項次
+     C                     MOVELS#AREA    AXAREA
+     C                     MOVELS#ORNO    AXORNO
+     C*                    MOVELD#YYMM    W#YYMM  4
+     C                     Z-ADDD#YYMM    AXYYMM           歸屬年月
+     C                     Z-ADD999       AXITEM
+     C*
+     C           K#BTAX    SETGTRARBTAX                    移至檔尾
+     C                     READPRARBTAX             N    44
+     C           *IN44     IFEQ *ON
+     C           AXAREA    ORNE S#AREA
+     C           AXORNO    ORNE S#ORNO
+     C           AXYYMM    ORNE D#YYMM
+     C                     Z-ADD1         W#AXTM  30       新資料項次
+     C                     ELSE
+     C           AXITEM    ADD  1         W#AXTM           該訂單項次
+     C                     ENDIF
+     C*開始寫入
+     C                     MOVELS#AREA    AXAREA
+     C                     MOVELS#ORNO    AXORNO
+     C*                    MOVELD#YYMM    W#YYMM  4
+     C                     Z-ADDD#YYMM    AXYYMM           歸屬年月
+     C                     Z-ADDW#AXTM    AXITEM
+     C*
+     C           K#BTAX    CHAINRARBTAX              44
+     C                     CLEARRARBTAX
+     C                     MOVEL'Y'       AXTRFL           傳輸碼
+     C                     MOVEL'C'       AXFLAG           處理代碼
+     C                     MOVELS#AREA    AXAREA           作廢廠區
+     C*                    MOVELD#YYMM    W#YYMM  4
+     C                     Z-ADDD#YYMM    AXYYMM           歸屬年月
+     C                     MOVELINCUNO    AXCUNO           客戶編號
+     C                     MOVELINCUNM    AXCUNM           客戶名稱
+     C                     MOVELS#ORNO    AXORNO           訂單號碼
+     C                     Z-ADDW#AXTM    AXITEM           資料項次
+     C                     MOVELS#INNO    AXIVNO           作廢發票
+     C                     Z-ADDININDT    AXDLDT           開立日期
+     C                     Z-ADDINATAX    AXATTX           銷項稅額
+     C*
+     C           S#INNO    CHAINTXREC               N45    一定找到
+     C*
+     C           TXCODE    IFEQ 'SA04'
+     C                     MOVE '1'       AXCODE           單據別
+     C                     ELSE
+     C                     MOVE '2'       AXCODE
+     C                     ENDIF
+     C*
+     C                     MOVELTXNO      AXVNNO           單據號碼
+     C                     MOVELD#ACDT    W#ACDT  6
+     C                     MOVE W#ACDT    AXVUNO           資料年月
+0703AC           U#DEP1    IFEQ '173'
+0703AC                     MOVEL'H'       U#DEPT
+0703AC                     ENDIF
+     C                     MOVELU#USID    AXADDM           建立人員
+9908AC*                    MOVE UDATE     AXADDD           建立日期
+9908AC           *DATE     SUB  19000000  AXADDD           建立日期
+     C                     TIME           AXADDT           建立時間
+     C                     MOVELU#USID    AXUPDM           異動人員
+9908AC*                    MOVE UDATE     AXUPDD           異動日期
+9908AC           *DATE     SUB  19000000  AXUPDD           異動日期
+     C                     TIME           AXUPDT           異動時間
+     C*
+     C   44                WRITERARBTAX
+     C  N44                UPDATRARBTAX
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2270    BEGSR
+     C*****************************************************************
+     C*判斷是否為承購發票
+     C*
+     C           S#INNO    CHAINRARINVM              46
+     C           *IN46     IFEQ *OFF
+     C*          AMDLC1    ANDEQ*BLANK                     承購下載碼
+     C*          AMBLCB    ANDEQ*BLANK                     承購下載批號
+     C*          AMDLM1    ANDEQ*BLANK                     承購下載人員
+     C*          AMAPCD    ANDEQ*BLANK                     承購確認碼
+     C*          AMDLD1    ANDEQ0                          承購下載日期
+     C                     MOVEL'C'       AMFLAG
+     C                     MOVEL'D'       AMDELT           作廢碼
+9908AC*                    MOVE UDATE     AMDELD           作廢日期
+9908AC           *DATE     SUB  19000000  AMDELD           作廢日期
+0703AC           U#DEP1    IFEQ '173'
+0703AC                     MOVEL'H'       U#DEPT
+0703AC                     ENDIF
+     C                     MOVELU#USID    AMUPDM           異動人員
+9908AC*                    MOVE UDATE     AMUPDD           異動時間
+9908AC           *DATE     SUB  19000000  AMUPDD           異動時間
+     C                     TIME           AMUPDT           異動時間
+     C                     UPDATRARINVM
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2280    BEGSR
+     C*****************************************************************
+     C*判斷是否需更新預收餘額
+     C**** 更新預收餘額
+     C           S#BAM1    IFNE 0
+     C           S#ORNO    CHAINCPREC                40
+     C   40                GOTO ES2280
+     C*
+     C*          INTYPE    IFEQ '1'                        銷貨類
+     C*                    ADD  WSAMT     CPBAMT
+     C*                    SUB  WSAMT     CPNBAL
+     C           INBAMT    IFNE 0                          有扣預收
+     C                     Z-ADDINBAMT    W#XAMT 110       扣預沖回
+     C                     EXSR SR9000
+     C                     ENDIF
+     C*                    ENDIF
+     C*
+     C*          INTYPE    IFEQ '2'                        預收類
+     C*                    SUB  WSAMT     CPAAMT
+     C*                    SUB  WSAMT     CPNBAL
+     C*                    ENDIF
+     C                     UPDATCPREC
+     C                     ENDIF
+     C*
+     C           ES2280    ENDSR
+0301AC*****************************************************************
+0301AC           SR2290    BEGSR
+0301AC*****************************************************************
+0301AC*異動INVMST的資料
+0301AC*
+0301AC           S#INNO    SETLLRARDSDT
+0301AC                     MOVEL*OFF      *IN47
+0301AC           *IN47     DOWEQ*OFF
+0301AC           S#INNO    READERARDSDT                  47
+0301AC   47                LEAVE
+0301AC                     MOVEL'C'       ASFLAG
+0301AC                     MOVEL'D'       ASDECD
+0301AC           *DATE     SUB  19000000  ASDEDT
+0703AC           U#DEP1    IFEQ '173'
+0703AC                     MOVEL'H'       U#DEPT
+0703AC                     ENDIF
+0301AC                     MOVELU#USID    ASUPDM           異動人員
+0301AC           *DATE     SUB  19000000  ASUPDD
+0301AC                     TIME           ASUPDT
+0301AC  N47                UPDATRARDSDT
+0301AC                     ENDDO
+0301AC*
+0301AC                     ENDSR
+0612AC*****************************************************************
+0612AC           SR2300    BEGSR
+0612AC*****************************************************************
+0612AC*
+0612AC           INAREA    LOKUPTAB1      TAB2           50*EQ
+0612AC   50                MOVELTAB2      W1CUNO  6
+0612AC                     CLEARRINEDIN
+0612AC                     MOVEL'A0501'   DNMSTE
+0612AC                     MOVELS#INNO    DNNO
+0612AC           ININDT    ADD  19110000  W#INDT  80
+0612AC                     MOVELW#INDT    DNINDT
+0612AC           INCUNO    CHAINCBCUST              N97
+0612AC                     MOVELCBMUID    DNBYID
+0612AC           W1CUNO    CHAINCBCUST              N97
+0612AC                     MOVELCBMUID    DNSLID
+0612AC           INDEDT    ADD  19110000  W#DEDT  80
+0612AC                     MOVELW#DEDT    DNDEDT
+0612AC                     TIME           W#DETM
+0612AC                     MOVELD#H       D1HH
+0612AC                     MOVEL':'       D1C1
+0612AC                     MOVELD#M       D1MM
+0612AC                     MOVEL':'       D1C2
+0612AC                     MOVELD#S       D1SS
+     C*
+0612AC*0703A               MOVEL''      BOE
+0612AC*0703A               MOVELDMDESP    D#CLRN
+0612AC*0703A               MOVE ''      BOF
+0703AC                     MOVELDMDESP    DNCLRN
+0612AC*
+0612AC           *DATE     SUB  19000000  DNXPDD
+0703AC           U#DEP1    IFEQ '173'
+0703AC                     MOVEL'H'       U#DEPT
+0703AC                     ENDIF
+0612AC                     TIME           DNXPDT
+0612AC                     MOVELU#USID    DNXUSR
+0612AC*
+0612AC                     WRITERINEDIN
+0612AC                     MOVEL'ARE057R' DNAPNM
+0612AC                     WRITEINEDG
+0612AC                     ENDSR
+     C*****************************************************************
+     C           SR9000    BEGSR
+     C*****************************************************************
+9701 C                     MOVELS#DEVN    W#DSPN           更改終端機
+ .   C           W#DSIT    IFEQ 99
+ .   C                     Z-ADD0         W#DSIT
+ .   C                     ELSE
+ .   C                     ADD  1         W#DSIT
+ .   C                     ENDIF
+ .   C                     MOVE W#DSIT    D#DSIT
+9701 C*
+     C                     CLEARCTREC
+9908AC*                    Z-ADDUDATE     CTDATE           日期
+9908AC           *DATE     SUB  19000000  CTDATE           日期
+     C*                    TIME           W#SYST
+     C*                    Z-ADDD#ST      CTTIME           時間
+     C                     TIME           CTTIME
+     C                     MOVELU#AREA    CTAREA           廠區
+9701 C*                    MOVELS#DEVN    CTDSPN           終端機
+9701 C                     MOVELW#DSPN    CTDSPN           終端機
+0703AC           U#DEP1    IFEQ '173'
+0703AC                     MOVEL'H'       U#DEPT
+0703AC                     ENDIF
+     C                     MOVELU#USID    CTUSER           使用者
+     C                     MOVELINCUNO    CTCUNO           客戶
+     C                     MOVEL'AR01'    CTTXID           異動代號
+     C                     MOVELINORNO    CTAPNO           單據編號
+     C                     Z-ADDW#XAMT    CTXAMT           異動金額
+     C                     MOVELINNO      CTRESV           保留碼
+     C                     WRITECTREC
+     C*
+     C           'CCLIB/CC'CAT  'P300P':0 W#PGMN 13         CCP300P
+     C                     CALL W#PGMN                     呼叫介面
+     C*
+     C           K#CAMT    CHAINCTREC                69
+     C           CTRTFL    IFEQ 'Y'
+     C                     Z-ADDCTXAMT    W#XAMT           應扣額
+     C                     ELSE
+     C                     Z-ADD0         W#XAMT
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*READC-->AR057F2
+     C                     Z-ADD1         RRN1
+     C                     MOVE *OFF      *IN99
+     C*
+     C           W#PRID    DOWEQ'03'
+     C*
+     C                     READCAR057F2                  43
+     C   43                MOVE '02'      W#PRID
+     C   43                MOVE *ON       *IN99
+     C   43                LEAVE
+     C*
+     C           S#OPT     IFEQ *BLANK
+     C                     ITER
+     C                     ENDIF
+     C*
+     C  N99                MOVE '04'      W#PRID
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4000    BEGSR
+     C*****************************************************************
+     C*W#PRID='04'--->ARE057S-3 畫面
+     C*
+     C                     Z-ADD1         S#NBR2
+     C                     Z-ADD0         RRN2    50
+     C                     MOVE *OFF      *IN38            S#MODE燈號
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN83            SFLCLR
+     C                     WRITEAR057F3C
+     C                     MOVE *OFF      *IN83
+     C*
+     C                     SELEC
+     C           S#CODE    WHEQ '1'
+     C                     MOVE '作廢'  S#MODE
+     C                     MOVE *OFF      *IN38             MOD
+     C           S#CODE    WHEQ '2'
+     C                     MOVE '查詢'  S#MODE
+     C                     MOVE *OFF      *IN38             MOD
+     C                     ENDSL
+     C*
+     C                     EXSR SR4100                     讀檔頭
+     C                     EXSR SR4200                     讀SFL
+     C*
+     C           RRN2      IFEQ 0                          SFLDSP OFF
+     C                     MOVE *ON       *IN82
+     C                     MOVELERR,8     S#ERR3
+     C                     ELSE
+     C                     MOVE *OFF      *IN82
+     C                     ENDIF
+     C*顯示畫面
+     C           W#PRID    DOWEQ'04'
+     C*
+     C                     WRITEAR057H
+     C                     WRITEAR057F3M
+     C                     EXFMTAR057F3C
+     C                     MOVEL*BLANK    S#ERR2
+     C*結束作業
+     C           *IN03     IFEQ *ON
+     C                     MOVEL'00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*回上頁
+     C           *IN12     IFEQ *ON
+     C                     MOVE '02'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C           SR4100    BEGSR
+     C*****************************************************************
+     C           S#INNO    CHAINRDELMST              42
+     C                     MOVELDMCUN2    S#CUNN
+     C                     MOVELDMCUM2    S#CUMM
+     C                     MOVELDMORN2    S#ORNN
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C           SR4200    BEGSR
+     C*****************************************************************
+     C                     MOVELS#INNO    DLIVNO
+     C                     MOVEL*BLANK    DLWTNO
+     C                     Z-ADD0         DLITEM
+     C           K#DELD    SETLLRDELDTL
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ RDELDTL                  41
+     C   41                LEAVE
+     C*
+     C           DLIVNO    IFNE S#INNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     CLEARAR057F3
+     C                     MOVELDLWTNO    D#WTN1
+     C                     MOVEL'-'       D#DASH
+     C                     Z-ADDDLITEM    D#ITEM
+     C                     MOVELD#WTNO    S#WTNO           磅單編號
+     C                     MOVELDLPDN1    S#PDN1           品名
+     C                     Z-ADDDLQTY1    S#QTY1           舊數量
+     C                     Z-ADDDLPRC1    S#PRC1           舊單價
+     C                     Z-ADDDLAMT1    S#AMT1           舊金額
+     C                     Z-ADDDLQTY2    S#QTY2           新數量
+     C                     Z-ADDDLPRC2    S#PRC2           新單價
+     C                     Z-ADDDLAMT2    S#AMT2           新金額
+     C                     Z-ADDDLTAX2    S#TAX2           新稅額
+     C                     Z-ADDDLAAMT    S#AAMT           新應收
+     C                     Z-ADDDLQTY3    S#QTY3           差異數量
+     C                     Z-ADDDLPRC3    S#PRC3           差異單價
+     C                     Z-ADDDLAMT3    S#AMT3           差異金額
+     C                     ADD  1         RRN2
+     C                     WRITEAR057F3
+     C*
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+**  TAB1 TAB2
+PMM001 MMM007 HMM005 KMM003 UMM006
+**  ERR
+01-請輸入功能代碼！
+02-功能代碼必須為１，２！
+03-請輸入發票作廢申請單號！
+04-該張發票作廢申請單號不存在！
+05-該張發票作廢申請單已作廢，請查核！
+06-無符合條件之資料！
+07-作廢部門不符！
+08-無出貨資料！
+09-作廢廠區不符！
+

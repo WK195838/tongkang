@@ -1,0 +1,125 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP069P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     銷貨帳款每日應收統計結論傳輸         */
+     /*     5.DATE-WRITTEN  88/07/29                                */
+     /*     6.UPDATE  DATE  99/01/01 2009AR406 S00WCJ (9901A)       */
+     /*                                                             */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&USER)    TYPE(*CHAR) LEN(10)
+             DCL        VAR(&INT)     TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DATA)    TYPE(*CHAR) LEN(28)
+    /*9901A*/DCL        VAR(&FLAG1)   TYPE(*CHAR) LEN(3)  VALUE('XXX')
+    /*9901A*/DCL        VAR(&FLAG2)   TYPE(*CHAR) LEN(3)  VALUE('XXX')
+
+
+             RTVJOBA    USER(&USER) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             SBMJOB     CMD(CALL PGM(ARP069P)) JOB(ARP069P) +
+                        JOBD(CCJOBD)
+             RETURN
+             ENDDO
+
+
+ STEP1:      /* 建立 DDMF  */
+
+             DLTF       FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMT)
+    /*9901A  START */
+             DLTF       FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(U01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMU)
+    /*9901A  END */
+
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMK)
+
+
+ STEP2:      /*複製ARSTTX 至桃高兩廠*/
+
+             RTVDTAARA  DTAARA(ARLIB/ARXCTLDTA) RTNVAR(&DATA)
+
+   TY1:      /*複製銷貨帳款明細檔－桃園廠*/
+             CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(DALIB/ARSTTX) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(DALIB/ARSTTX) TOFILE(QTEMP/DDMT) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO TY2)
+             CHGVAR  VAR(%SST(&FLAG1 1 1)) VALUE(' ')
+
+
+   TY2:      /*啟動廠區結案處理－桃園廠*/
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP069PA) PARM('''  || +
+                            &DATA || ''')') +
+                        DDMFILE(QTEMP/DDMT)
+    /*9901A*/MONMSG     MSGID(CPF0000)  EXEC(GOTO NU1)
+             CHGVAR  VAR(%SST(&FLAG2 1 1)) VALUE(' ')
+
+    /*9901A  START */
+   NU1:      /*複製銷貨帳款明細檔－新桃廠*/
+             CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(DALIB/ARSTTX) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(DALIB/ARSTTX) TOFILE(QTEMP/DDMU) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO NU2)
+             CHGVAR  VAR(%SST(&FLAG1 3 1)) VALUE(' ')
+
+
+   NU2:      /*啟動廠區結案處理－新桃廠*/
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP069PA) PARM('''  || +
+                            &DATA || ''')') +
+                        DDMFILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO KS1)
+             CHGVAR  VAR(%SST(&FLAG2 3 1)) VALUE(' ')
+
+    /*9901A  END */
+
+   KS1:      /*複製銷貨帳款明細檔－高雄廠*/
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(DALIB/ARSTTX) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(DALIB/ARSTTX) TOFILE(QTEMP/DDMK) +
+                        MBROPT(*REPLACE) FMTOPT(*NOCHK)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO KS2)
+
+             CHGVAR  VAR(%SST(&FLAG1 2 1)) VALUE(' ')
+
+
+   KS2:      /*啟動廠區結案處理－高雄廠*/
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP069PA) PARM('''  || +
+                            &DATA || ''')') +
+                        DDMFILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP3)
+             CHGVAR  VAR(%SST(&FLAG2 2 1)) VALUE(' ')
+
+
+ STEP3:      /* 異動訊息 */
+
+             IF         COND(&FLAG1 *NE '  ') THEN(+
+                        SNDMSG     TOUSR(&USER) MSG(+
+           '銷貨帳款結論傳輸廠區失敗（桃高&新桃）"' || &FLAG1 || '"'))
+
+             IF         COND(&FLAG2 *NE '  ') THEN(+
+                        SNDMSG     TOUSR(&USER) MSG(+
+           '銷貨帳款結論廠區處理失敗（桃高&新桃）"' || &FLAG2 || '"'))
+
+
+ STEP4:      /* 清除已不存在於銷貨帳款明細檔內的說明記錄 */
+
+             CALL       PGM(ARP069R)
+      /*     RGZPFM     FILE(DALIB/ARSTRM)   */
+      /*     MONMSG     CPF0000              */
+
+
+             ENDPGM
+

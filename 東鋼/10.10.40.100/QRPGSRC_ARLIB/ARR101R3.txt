@@ -1,0 +1,244 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR101R3
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     應收帳款承購(E-FACTORING)發票異常檢核表
+     H*            5.DATE-WRITTEN  92/02/18
+     H*            6.DATE-MODIFY
+     H*                            99/09/03  2010AR517  S00WCJ (9909A)
+     H*
+     H*            *逾期繳款
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR101F IP  E           K        DISK
+     FARR101T O   E             69     PRINTER
+     E                    TABA1   1   6  3   TABA2  12
+     E                    TABB1   1   3  3   TABB2  12
+     E*****************************************************************
+     IRAR101F
+     I                                              AFCUNOL2
+     I                                              AFORNOL1
+     I           UDS
+     I                                     10011010 U#USID
+     I                                      300 3020T#DAY1
+     I*                                     302 3030T#DAY2
+     I                                      303 3050T#DAY3
+     I                                      308 308 U#AREA
+     I*****************************************************************
+9909AC           *DATE     SUB  19000000  U#SYSD  80
+     C  N99                EXSR INISR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN69
+     C*
+     C                     MOVEL*ALL'='   T#LIN1
+     C                     MOVEL*ALL'='   T#LIN2
+     C                     MOVEL*ALL'-'   T#LIN3
+     C*
+     C                     SELEC
+     C           U#AREA    WHEQ ' '
+     C                     MOVE '全部'  T#AREA
+     C           U#AREA    WHEQ 'P'
+     C                     MOVE '台北'  T#AREA
+     C           U#AREA    WHEQ 'T'
+     C                     MOVE '桃園'  T#AREA
+     C           U#AREA    WHEQ 'K'
+     C                     MOVE '高雄'  T#AREA
+     C           U#AREA    WHEQ 'H'
+     C                     MOVE '苗栗'  T#AREA
+     C                     ENDSL
+     C*
+     C                     SETON                     505170
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#DAMS
+     C                     Z-ADD0         W#FAMS
+     C                     Z-ADD0         W#ABAS
+     C*
+     C                     MOVEL*BLANK    W#CUNO  6
+     C                     MOVEL*BLANK    W#CUNM 10
+     C                     MOVEL*BLANK    W#ORNO  6
+     C                     Z-ADD0         W#DUDT  60
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR101T1D
+     C*
+     C           AFDUDT    IFNE 0
+9909AC           AFDUDT    ANDLEU#SYSD
+     C*預計兌現日若空白則省略不印
+     C           AFDUDT    IFEQ 0
+     C                     MOVE *ON       *IN57
+     C                     ELSE
+     C                     Z-ADDAFDUDT    T#DUDT           預計兌現日
+     C                     MOVE *OFF      *IN57
+     C                     ENDIF
+     C*
+     C                     MOVELAFCUNO    T#CUNO           客戶代號
+     C                     MOVELAFCUNM    T#CUNM           客戶名稱
+     C                     MOVELAFORNO    T#ORNO           訂單號碼
+     C                     MOVELAFINNO    T#INNO           發票號碼
+     C                     Z-ADDAFINDT    T#INDT           發票日期
+     C                     MOVELAFAPN1    T#APN1           承購單號
+     C                     MOVELAFAPN2    T#APN2           請款單號
+     C           AFCODE    IFEQ 'B'
+     C                     MOVEL'未請款'T#CODE           狀態
+     C                     ENDIF
+     C           AFCODE    IFEQ 'C'
+     C                     MOVEL'未繳款'T#CODE
+     C                     ENDIF
+     C*
+     C*請款日期若空白則省略不印
+     C           AFAPD2    IFEQ 0
+     C                     MOVE *ON       *IN55
+     C                     ELSE
+     C                     MOVE *OFF      *IN55
+     C                     Z-ADDAFAPD2    T#APD2           請款日期
+     C                     ENDIF
+     C*
+     C                     Z-ADDAFDAMT    T#DAMT           發票金額
+     C                     Z-ADDAFFAMT    T#FAMT           繳款金額
+     C                     Z-ADDAFABAL    T#ABAL           未繳金額
+     C                     Z-ADDAFDATS    T#DATS           天數
+     C                     MOVELAFFL01    T#FL01           營業確認碼
+     C*
+     C*客戶代號相同則省略不印
+     C           T#CUNO    IFEQ W#CUNO
+     C                     MOVE *ON       *IN52
+     C                     ELSE
+     C                     MOVELT#CUNO    W#CUNO
+     C                     MOVE *OFF      *IN52
+     C                     ENDIF
+     C*
+     C*客戶名稱相同則省略不印
+     C           T#CUNM    IFEQ W#CUNM
+     C                     MOVE *ON       *IN53
+     C                     ELSE
+     C                     MOVELT#CUNM    W#CUNM
+     C                     MOVE *OFF      *IN53
+     C                     ENDIF
+     C*
+     C*訂單號碼相同則省略不印
+     C           T#ORNO    IFEQ W#ORNO
+     C                     MOVE *ON       *IN54
+     C                     ELSE
+     C                     MOVELT#ORNO    W#ORNO
+     C                     MOVE *OFF      *IN54
+     C                     ENDIF
+ 9111C*票款別
+ 9111C           AFNTTP    LOKUPTABA1     TABA2          60
+ 9111C   60                MOVE TABA2     T#NTTP
+ 9111C*兌現碼
+ 1128C           AFNTTP    IFNE 'G'
+ 9111C           AFNTCD    LOKUPTABB1     TABB2          61
+ 9111C   61                MOVE TABB2     T#NTCD
+ 1128C                     ENDIF
+ 9111C*
+ 9111C                     MOVELAFRCNO    T#RCNO           繳款單號
+ 9111C*
+ 9111C*兌現日若空白則省略不印
+ 9111C           AFDUDE    IFEQ 0
+ 9111C                     MOVE *ON       *IN56
+ 9111C                     ELSE
+ 9111C                     MOVE *OFF      *IN56
+ 9111C                     Z-ADDAFDUDE    T#DUDE           兌現日
+ 9111C                     ENDIF
+     C*
+     C   69                WRITEAR101T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR101T1D
+     C*客戶小計
+     C                     ADD  AFDAMT    W#DAMS 140       發票金額
+     C                     ADD  AFFAMT    W#FAMS 140       繳款金額
+     C                     ADD  AFABAL    W#ABAS 140       未繳金額
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C                     Z-ADDW#DAMS    T#DAMS
+     C                     Z-ADDW#FAMS    T#FAMS
+     C                     Z-ADDW#ABAS    T#ABAS
+     C           T#DAMS    IFNE 0
+     C           T#FAMS    ORNE 0
+     C           T#ABAS    ORNE 0
+     C*
+     C   69                WRITEAR101T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR101T1S
+     C                     ENDIF
+     C*總計
+     C                     ADD  T#DAMS    W#DAMA 140
+     C                     ADD  T#FAMS    W#FAMA 140
+     C                     ADD  T#ABAS    W#ABAA 140
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C                     Z-ADDW#DAMA    T#DAMA
+     C                     Z-ADDW#FAMA    T#FAMA
+     C                     Z-ADDW#ABAA    T#ABAA
+     C*
+     C           T#DAMA    IFNE 0
+     C           T#FAMA    ORNE 0
+     C           T#ABAA    ORNE 0
+     C*
+     C   69                WRITEAR101T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR101T1A
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*
+     C   69                WRITEAR101T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR101T1M
+     C*
+     C                     ENDSR
+**  TABA1 TABA2
+A        支票
+G        現金
+H        現金
+I      信用狀
+J    　　現金
+A+J支票與現金
+**  TABB1 TABB2
+Y    全兌現
+  N　未兌現
+Y+N部分兌現
+

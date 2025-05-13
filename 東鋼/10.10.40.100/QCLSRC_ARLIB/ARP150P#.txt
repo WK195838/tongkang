@@ -1,0 +1,226 @@
+    /****************************************************************/
+    /*                                                              */
+    /*        >>   PROGRAM INTRODUCTION  <<                         */
+    /*        1.PROGRAM-ID     ARP150P                              */
+    /*        2.PROGRAM-TYPE   CLP                                  */
+    /*        3.AUTHOR         S00WCJ                               */
+    /*        4.FUNCTION      型鋼折讓單資料上傳處理作業          */
+    /*        5.DATE-WRITTEN   108/04/30 2019AR00025                */
+    /*        6.DATE-MODIFY    108/05/17 S00WCJ (0805A)             */
+    /*                         由於WEB程式上送資料無法正確傳送操*/
+    /*                         作之USER帳號，改以上送檔案後寫入 */
+    /*                         檔案之傳送人員為MAIL及訊息之發送 */
+    /*                         對象                               */
+    /*                         108/08/02 S00WCJ (0808A)             */
+    /*                         印表機指定PPB0004H                 */
+    /*                         109/08/04 S00WCJ (0908A)             */
+    /*                         指定印表機只會針對產生之報表，若為 */
+    /*                          SEND報表則以系統預設值，以CHGSPLFA */
+    /*                         修改SEND對象之OUTQ               */
+    /*                         113/02/27 2024AR00009 S00WCJ (1302A) */
+    /*                          增加CALL ARR142P                  */
+    /*                         113/11/29 S00WCJ                     */
+    /*                          更改維護者帳號為S00CCH            */
+    /*                                                              */
+    /****************************************************************/
+
+     PGM
+             DCL        VAR(&AR#P)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&JOB)     TYPE(*CHAR) LEN(10)
+             DCL        VAR(&USER)    TYPE(*CHAR) LEN(10)
+             DCL        VAR(&NBR)     TYPE(*CHAR) LEN(6)
+             DCL        VAR(&CURUSER) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TUSER)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TADDR)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TEMAIL)  TYPE(*CHAR) LEN(50)
+             DCL        VAR(&W#ER)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&SYQD)     TYPE(*CHAR) LEN(6)
+             DCL        VAR(&SYQD1)    TYPE(*CHAR) LEN(8)
+             DCL        VAR(&FILE)     TYPE(*CHAR) LEN(7)
+             DCL        VAR(&FILE1)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&FILE2)   TYPE(*CHAR) LEN(9)
+/*0808A*/    DCL        VAR(&PRINT)   TYPE(*CHAR)  LEN(10)
+
+             CHGJOB     LOGCLPGM(*YES)
+
+
+             RTVJOBA    JOB(&JOB) USER(&USER) NBR(&NBR) +
+                          CURUSER(&CURUSER)
+
+/*            因K02 *DATE及UDATE都會抓到QSYSWRK的開機日期*/
+/*            改抓QDATE使用P/U/K同步                       */
+
+            RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&SYQD)
+            CHGVAR     VAR(&SYQD1) VALUE('01' *CAT &SYQD)
+            CHGDTAARA  DTAARA(*LDA (801 8)) VALUE(&SYQD1)
+            CHGDTAARA  DTAARA(*LDA (1021 1)) VALUE('H')
+
+
+             ADDLIBLE   LIB(DALIB)
+             MONMSG   MSGID(CPF2103)
+             ADDLIBLE   LIB(ARLIB)
+             MONMSG   MSGID(CPF2103)
+
+
+             CHGVAR     VAR(&AR#P)  VALUE(' ')
+             CHGDTAARA  DTAARA(*LDA (1  1)) VALUE(&AR#P)
+             CHGDTAARA  DTAARA(*LDA (2 10)) VALUE(&CURUSER)
+             CHGVAR     VAR(&W#ER)  VALUE(' ')
+             CHGDTAARA  DTAARA(*LDA (12 1)) VALUE(&W#ER)
+             CHGDTAARA  DTAARA(*LDA (13 10)) VALUE(&USER)
+
+
+/*0808A*/    CHGVAR     VAR(&PRINT)  VALUE('PPB0004H')
+
+/*0808A*/      OVRPRTF    FILE(ARP150T1) PAGESIZE(*N 198) +
+                          CPI(15) HOLD(*YES) USRDTA('上送清單') +
+                          IGCDTA(*YES) SAVE(*YES) OUTQ(&PRINT)  +
+                          COPIES(1)
+
+/*0808A*/      OVRPRTF    FILE(ARP150T) PAGESIZE(*N 198) +
+                          CPI(15) HOLD(*YES) USRDTA('錯誤清單') +
+                          IGCDTA(*YES) SAVE(*YES) OUTQ(&PRINT) +
+                          COPIES(1)
+
+               OVRDBF     FILE(TRNDA6)  TOFILE(TRNDA6) SHARE(*YES)
+               OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL)
+               OVRDBF     FILE(TRNDTS) TOFILE(TRNDTS)
+
+/*篩選A6CTRL執行碼為空*/
+             OPNQRYF    FILE((TRNDA6)) OPTION(*ALL) QRYSLT('A6CTRL +
+                          *EQ " "                       +
+                            ')  +
+                          KEYFLD((A6INAR) (A6CUNO) (A6ORNO) (A6DATE))
+
+               CALL       PGM(ARP150R)
+               CLOF       OPNID(TRNDA6)
+               DLTOVR   FILE(*ALL)
+
+             RTVDTAARA  DTAARA(*LDA (1 1)) RTNVAR(&AR#P)
+             RTVDTAARA  DTAARA(*LDA (12 1)) RTNVAR(&W#ER)
+/*0805A*/    RTVDTAARA  DTAARA(*LDA (31 10)) RTNVAR(&TUSER)
+             /*發送者（產生者）&CURUSER */
+/*0805A      CHGVAR     VAR(&TUSER) VALUE(&CURUSER)   */
+             CHGVAR     VAR(&TEMAIL) VALUE(' ')  /*發送者E-MAIL無法掌控*/
+             /*發送者E-MAIL如有需要時要各別設定加入*/
+ /*上送者E-MAIL設定*/
+ /*S00NOTES帳號MAIL指定給S00WCJ */
+             IF         COND(&TUSER *EQ 'S04LHI') THEN(+
+             CHGVAR     VAR(&TEMAIL) VALUE('s04lhi@tunghosteel.com'))
+             IF         COND(&TUSER *EQ 'S00NOTES') THEN(+
+             CHGVAR     VAR(&TEMAIL) VALUE('s00cch@tunghosteel.com'))
+             IF         COND(&TUSER *EQ 'B05FLY') THEN(+
+             CHGVAR     VAR(&TEMAIL) VALUE('0620@tunghosteel.com  '))
+             IF         COND(&TUSER *EQ 'B05CHM') THEN(+
+             CHGVAR     VAR(&TEMAIL) VALUE('ming@tunghosteel.com  '))
+             IF         COND(&TUSER *EQ 'B05KUO') THEN(+
+             CHGVAR     VAR(&TEMAIL) VALUE('shauna@tunghosteel.com'))
+             IF         COND(&TUSER *EQ 'B05TJP') THEN(+
+             CHGVAR     VAR(&TEMAIL) VALUE('pei@tunghosteel.com   '))
+             IF         COND(&TUSER *EQ 'B05TMH') THEN(+
+             CHGVAR     VAR(&TEMAIL) VALUE('mhtu@tunghosteel.com  '))
+             IF         COND(&TUSER *EQ 'B05ANN') THEN(+
+             CHGVAR     VAR(&TEMAIL) VALUE('b05lys@tunghosteel.com'))
+             IF         COND(&TUSER *EQ 'B05PHL') THEN(+
+             CHGVAR     VAR(&TEMAIL) VALUE('b05phl@tunghosteel.com'))
+             IF         COND(&TUSER *EQ 'B05TWW') THEN(+
+             CHGVAR     VAR(&TEMAIL) VALUE('b05tww@tunghosteel.com'))
+             IF         COND(&TUSER *EQ 'S00CCH') THEN(+
+             CHGVAR     VAR(&TEMAIL) VALUE('s00cch@tunghosteel.com'))
+/*通知人員*/
+             /*有錯誤資料才通知*/
+  /*         IF         COND(&AR#P *NE ' ' *AND &W#ER *EQ 'Y') THEN(DO) */
+             IF         COND(&AR#P *NE ' ') THEN(DO)
+
+             /*將報表傳送給需要的使用者STR */
+             RTVNETA    SYSNAME(&TADDR)
+
+             /*送發送者E-MAIL*/
+ /*0505A 加送報表名稱*/
+             CHGVAR     VAR(&FILE) VALUE('ARP150T')
+             CHGVAR     VAR(&FILE1) VALUE('ARP150T1')
+             CHGVAR     VAR(&FILE2) VALUE('(TRNDA6)')
+
+ /*0607A*/   CALL       PGM(ARP291P1) PARM(&USER &CURUSER +
+                          &TUSER &TADDR &TEMAIL &FILE &FILE1 &FILE2)
+
+/*0908A*/ IF   COND(&TUSER *EQ 'B05CHM') THEN(DO)
+
+/*0908A*/      CHGSPLFA   FILE(ARP150T) JOB(&TUSER/QPRTJOB) +
+                          SPLNBR(*LAST) OUTQ(&PRINT)
+/*0908A*/      CHGSPLFA   FILE(ARP150T1) JOB(&TUSER/QPRTJOB) +
+                          SPLNBR(*LAST) OUTQ(&PRINT)
+/*0908A*/  ENDDO
+
+             /*接收者&TUSER -接收者為發送者則不再傳送一次*/
+             CHGVAR     VAR(&TUSER) VALUE('S02LCS')
+             CHGVAR     VAR(&TEMAIL) VALUE('eric@tunghosteel.com')
+ /*0607A */  IF         COND(&TUSER *NE &CURUSER) THEN(+
+             CALL       PGM(ARP291P1) PARM(&USER &CURUSER +
+                          &TUSER &TADDR &TEMAIL &FILE &FILE1 &FILE2))
+
+             CHGVAR     VAR(&TUSER) VALUE('S00CCH')
+             CHGVAR     VAR(&TEMAIL) VALUE('s00cch@tunghosteel.com')
+ /*0607A*/   IF         COND(&TUSER *NE &CURUSER) THEN(+
+             CALL       PGM(ARP291P1) PARM(&USER &CURUSER +
+                          &TUSER &TADDR &TEMAIL &FILE &FILE1 &FILE2))
+
+ /*送給PC端系統管理者*/
+             CHGVAR     VAR(&TUSER) VALUE('S04LHI')
+             CHGVAR     VAR(&TEMAIL) VALUE('s04lhi@tunghosteel.com')
+ /*0607A*/   IF         COND(&TUSER *NE &CURUSER) THEN(+
+             CALL       PGM(ARP291P1) PARM(&USER &CURUSER +
+                          &TUSER &TADDR &TEMAIL &FILE &FILE1 &FILE2))
+
+ /*          CHGVAR     VAR(&TUSER) VALUE('S02LJC')     */
+ /*          CHGVAR     VAR(&TEMAIL) VALUE('ljc@tunghosteel.com')  */
+ /*          IF         COND(&TUSER *NE &CURUSER) THEN(+
+             CALL       PGM(ARP291P1) PARM(&USER &CURUSER +
+                          &TUSER &TADDR &TEMAIL &FILE &FILE1 &FILE2)) */
+
+ /*          CHGVAR     VAR(&TUSER) VALUE('S02LCH')    */
+ /*          CHGVAR     VAR(&TEMAIL) VALUE('s02lch@tunghosteel.com') */
+ /*          IF         COND(&TUSER *NE &CURUSER) THEN(+
+             CALL       PGM(ARP291P1) PARM(&USER &CURUSER +
+                          &TUSER &TADDR &TEMAIL &FILE &FILE1 &FILE2)) */
+
+             CHGVAR     VAR(&TUSER) VALUE('S02KCY')
+             CHGVAR     VAR(&TEMAIL) VALUE('ian@tunghosteel.com')
+             IF         COND(&TUSER *NE &CURUSER) THEN(+
+             CALL       PGM(ARP291P1) PARM(&USER &CURUSER +
+                          &TUSER &TADDR &TEMAIL &FILE &FILE1 &FILE2))
+
+             /*將報表傳送給需要的使用者END */
+
+             ENDDO
+
+             /*無錯誤資料報表產生者不需要保留則刪除STR */
+ /*          IF         COND(&AR#P *NE ' ' *AND &W#ER *EQ ' ') THEN(DO)*/
+             /*由AS400登入執行*/
+
+ /*          IF         COND(&CURUSER *EQ &USER) THEN(DO)   */
+ /*            DLTSPLF FILE(ARP150T1) JOB(*) SPLNBR(*LAST)  */
+ /*            MONMSG     MSGID(CPF0000)                    */
+ /*            DLTSPLF FILE(ARP150T) JOB(*) SPLNBR(*LAST)   */
+ /*            MONMSG     MSGID(CPF0000)                    */
+ /*          ENDDO                                          */
+             /*由PC登入執行*/
+ /*          ELSE       CMD(DO)                             */
+ /*            DLTSPLF    FILE(ARP150T) JOB(&CURUSER/QPRTJOB) +
+                          SPLNBR(*LAST)                     */
+ /*            MONMSG     MSGID(CPF0000)                    */
+ /*            DLTSPLF    FILE(ARP150T1) JOB(&CURUSER/QPRTJOB) +
+                          SPLNBR(*LAST)                     */
+ /*            MONMSG     MSGID(CPF0000)                    */
+ /*          ENDDO                                          */
+ /*          ENDDO                                       */
+             /*報表產生者不需要保留則刪除END */
+
+               DLTOVR     FILE(*ALL)
+
+ /*1302A*/   CHGDTAARA  DTAARA(*LDA (517 10)) VALUE(&JOB)
+ /*1302A*/   CALL  PGM(ARR142P)
+
+
+ENDCLPGM:    ENDPGM
+

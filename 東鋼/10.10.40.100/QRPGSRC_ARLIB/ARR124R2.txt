@@ -1,0 +1,117 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR124R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LBU
+     H*            4.FUNCTION     客戶暫收款餘額核對清單-以財會核對營業
+     H*            5.DATE-WRITTEN  95/03/29
+     H*            6.UPDATE  DATE  99/12/08  2010AR561  S00WCJ (9912A)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FAR2159X IP  E           K        DISK
+     FAR2159D IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FINVMSTL2IF  E           K        DISK
+     FARR124F O   E                    DISK
+     F*****************************************************************
+     IRAR2159X    01
+     I*
+     I            DS
+     I                                        1  10 AXORNO
+     I                                        1   1 D#AREA
+     I                                        1   6 D#ORNO
+     I*
+     I            DS
+     I                                        1   6 INRCNO
+     I                                        1   1 D#LOCA
+     I*
+     C*****************************************************************
+     C*          KEY       LIST
+     C*****************************************************************
+     C* FILE => AR2159D (客戶暫收統計檔-分訂單)
+     C*
+     C           K#2159    KLIST
+     C                     KFLD           K#CUNO  6        客戶編號
+     C                     KFLD           K#AREA  1        出納廠區
+     C                     KFLD           K#ORNO  6        訂單編號
+     C*
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AMT  110
+     C*
+     C*以財會暫收檔訂單碼讀取發票檔中之
+     C*出納廠區值，如讀取不到，則出納廠
+     C*區值給予財會暫收檔訂單碼第二碼。
+     C*
+     C                     MOVE *OFF      *IN52
+     C           D#ORNO    CHAININVMSTL2            N52
+     C           *IN52     IFEQ *OFF
+     C           D#LOCA    ANDNE*BLANK
+9912AC           D#LOCA    ANDEQ'T'
+9912AC*                    MOVELINRCNO    K#AREA
+9912AC                     MOVEL'U'       K#AREA
+     C                     ELSE
+     C                     MOVELD#AREA    K#AREA           出納廠區
+9912AC           D#AREA    IFEQ 'T'
+9912AC                     MOVEL'U'       K#AREA
+9912AC                     ENDIF
+     C                     ENDIF
+     C*
+     C*給定AR2159D檔KEY值
+     C*
+     C                     MOVELAXCUNO    K#CUNO           客戶代號
+     C                     MOVELAXORNO    K#ORNO           訂單編號
+     C*
+     C                     MOVE *OFF      *IN50
+     C           K#2159    CHAINAR2159D              50
+     C*
+     C           ADAMT1    ADD  ADAMT3    W#AMT            已兌＋未兌
+     C                     ADD  ADAMT4    W#AMT            財切傳票額
+     C                     SUB  ADAMT2    W#AMT            繳貨款金額
+     C*
+     C*財會暫收讀營業暫收金額不符之兩種情況，
+     C*（１）讀取不到營業暫收額，燈號５０亮
+     C*（２）讀取到營業暫收額，兩邊金額不符
+     C*
+     C           W#AMT     IFNE AXAMT
+     C                     MOVELADCUNO    W1CUNO           客戶代號
+     C                     MOVELADORNO    W1ORNO           訂單編號
+     C                     Z-ADDW#AMT     W1AMT1           營暫收餘額
+     C                     Z-ADDAXAMT     W1AMT2           財暫收餘額
+     C  N50                MOVEL'3'       W1MODE           營＆財資料
+     C   50                MOVEL'2'       W1MODE           財會資料
+     C*
+     C                     MOVEL*OFF      *IN51
+     C           W1CUNO    CHAINCBCUST               51
+     C  N51                MOVELCBCUNM    W1CUNM           客戶簡稱
+     C   51                MOVEL*ALL'*'   W1CUNM
+     C                     WRITERARR124F
+     C*
+     C*財會暫收讀營業暫收金額相同之兩種情況，
+     C*（１）讀取到營業暫收額，兩邊金額相同
+     C*（２）讀不到營業暫收額，但財會額為零
+     C*
+     C                     ELSE
+     C                     MOVELAXCUNO    W1CUNO           客戶代號
+     C                     MOVELAXCUNM    W1CUNM           客戶簡稱
+     C                     MOVELAXORNO    W1ORNO           訂單編號
+     C   50                Z-ADD0         W1AMT1           營暫收餘額
+     C  N50                Z-ADDW#AMT     W1AMT1           營暫收餘額
+     C                     Z-ADDAXAMT     W1AMT2           財暫收餘額
+     C                     MOVEL'2'       W1MODE           財會資料
+     C                     WRITERARR124F
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+

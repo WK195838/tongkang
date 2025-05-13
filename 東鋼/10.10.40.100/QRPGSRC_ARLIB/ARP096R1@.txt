@@ -1,0 +1,200 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP096R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            5.DATE-WRITTEN  91/11/06
+     H*            6.DATE-UPDATE
+     H*            P.S.1.因為發票有可能有多重繳款(出現在兩張以上
+     H*                  之繳款書)故必須先依發票繳款項次算出該項
+     H*                  次之繳款書之加權兌現日
+     H*                2.繳款書加權兌現日之計算邏輯
+     H*                  信用狀：押匯日(繳款類別I)
+     H*                  票據：到期日(繳款類別A,B,C,D,E)
+     H*                  現金：繳款書日(繳款類別F,G,H.J含2159)
+     H*                3.兌現帳齡：
+     H*                  自發票開立日至繳款書加權兌現日
+     H*****************************************************************
+     H        1   Y                                     1
+     FTRNDTL  IP  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FRCVDTL  IF  E           K        DISK
+     FARP096F1UF  E           K        DISK                      A
+     ITXREC       01
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C*RCVDTL
+     C           K#RCDL    KLIST
+     C                     KFLD           RVNO
+     C                     KFLD           RVITEM
+     C*INVDTL
+     C           K#INVD    KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*ARP096F1
+     C           K#ARF1    KLIST
+     C                     KFLD           A1IVNO
+     C                     KFLD           A1IVIT
+     C*
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*
+     C                     MOVELTXIVNO    IVNO
+     C                     MOVE '6'       IVACNT
+     C                     Z-ADD0         IVITEM
+     C           K#INVD    SETLLIVREC
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ IVREC                    40
+     C*
+     C           *IN40     IFEQ *ON
+     C           TXIVNO    ORNE IVNO                       發票號碼
+     C           IVACNT    ORNE '6'                        繳款項次
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     EXSR SR1000                     開始計算
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C                     CLEARAR096F1
+     C*
+     C                     MOVE IVNO      A1IVNO           發票號碼
+     C           A1IVNO    CHAININREC               N40
+     C  N40                Z-ADDININDT    A1IVDT           開立日期
+     C                     Z-ADDIVITEM    A1IVIT           項次
+     C*若以存在表示已計算過,無重複計算之必要
+     C           K#ARF1    CHAINAR096F1             N40
+     C   40                GOTO EN1000
+     C*
+     C                     MOVELIVAPNO    A1RCNO           繳款單號
+     C*計算繳款書加權兌現日 START---------
+     C                     Z-ADD0         W#AMT
+     C                     Z-ADD0         W#AMDY
+     C*
+     C                     MOVE A1RCNO    RVNO
+     C                     Z-ADD0         RVITEM
+     C           K#RCDL    SETLLRVREC
+     C                     MOVE *OFF      *IN91
+     C                     MOVE *ON       *IN90            判斷燈號
+     C           *IN91     DOWEQ*OFF
+     C                     READ RVREC                    91
+     C*
+     C           A1RCNO    IFNE RVNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           RVACTP    IFEQ 'C'                        貸方
+     C           RVWRNO    ORNE *BLANK                     貨款
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     Z-ADDRVDATE    A1RCDT           繳款書日
+     C                     EXSR SR1100
+     C                     MOVE *OFF      *IN90            至少一筆
+     C*
+     C                     ENDDO
+     C*
+     C  N90      W#AMDY    DIV  W#AMT     W#DAYS  40H      加權帳齡
+     C*
+     C                     MOVE A1RCDT    P#PDAT           繳款書日
+     C                     MOVE '1'       P#MODE           民國年
+     C                     MOVE '2'       P#OMOD           向後
+     C                     MOVE W#DAYS    P#DAYS           加權帳齡
+     C                     CALL 'UTS104R'
+     C                     PARM           P#PDAT  8
+     C                     PARM           P#MODE  1
+     C                     PARM           P#OMOD  1
+     C                     PARM           P#DAYS  4
+     C                     PARM           P#RDAT  8
+     C                     PARM           P#ERR   1
+     C                     MOVE P#RDAT    A1DATE
+     C*計算繳款書加權兌現日 END  ---------
+     C                     Z-ADDIVAMT     A1AMT            發票金額
+     C*計算兌現帳齡 START
+     C                     MOVE A1IVDT    P#PDAT
+     C                     MOVE '1'       P#MODE           西元年
+     C                     MOVE A1DATE    P#RDAT
+     C  N90                CALL 'UTS103R'
+     C                     PARM           P#PDAT
+     C                     PARM           P#RDAT
+     C                     PARM           P#MODE
+     C                     PARM           P#DIF   50
+     C                     PARM           P#ERR
+     C  N90      P#ERR     IFEQ '0'
+     C                     Z-ADDP#DIF     A1DAY2
+     C                     ELSE
+     C                     Z-ADD0         A1DAY2
+     C                     ENDIF
+     C*計算兌現帳齡 END
+     C                     WRITEAR096F1
+     C*
+     C           EN1000    ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*判斷票據別
+     C                     ADD  RVRAMT    W#AMT  110       總金額
+     C*
+     C           RVACNO    IFEQ '2159'
+     C                     Z-ADDRVDATE    W#DAT2  80
+     C                     ELSE
+     C                     SELEC
+     C           RVNTTP    WHEQ 'A'                        支票
+     C           RVNTTP    OREQ 'B'                        背書支票
+     C           RVNTTP    OREQ 'C'                        本票
+     C           RVNTTP    OREQ 'D'                        背書本票
+     C           RVNTTP    OREQ 'E'                        銀行本票
+     C           RVNTTP    OREQ 'I'                        信用狀
+     C                     Z-ADDRVDUDT    W#DAT2
+     C           RVNTTP    WHEQ 'F'                        匯票
+     C           RVNTTP    OREQ 'G'                        匯款　　
+     C           RVNTTP    OREQ 'H'                        現金
+     C           RVNTTP    OREQ 'J'                        銀行存款
+     C                     Z-ADDRVDATE    W#DAT2
+     C                     ENDSL
+     C                     ENDIF
+     C                     EXSR SR1110
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1110    BEGSR
+     C*****************************************************************
+     C                     MOVE *ALL'0'   P#PDAT
+     C                     MOVE A1IVDT    P#PDAT
+     C                     MOVE '1'       P#MODE           民國年
+     C                     MOVE W#DAT2    P#RDAT
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT
+     C                     PARM           P#RDAT
+     C                     PARM           P#MODE
+     C                     PARM           P#DIF   50
+     C                     PARM           P#ERR
+     C           P#ERR     IFNE '0'
+     C                     Z-ADD0         P#DIF
+     C                     ENDIF
+     C           RVRAMT    MULT P#DIF     W#RVDY 130
+     C                     ADD  W#RVDY    W#AMDY 130
+     C*
+     C                     ENDSR
+

@@ -1,0 +1,385 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP121R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     獎勵金製票代開
+     H*            5.DATE-WRITTEN  101/02/21 2012AR641
+     H*            6.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARRDTLL1UP  E           K        DISK
+     FGLSEQ   UF  E           K        DISK                      A
+     FGLTRAN  O   E                    DISK
+     FARP121T O   E             69     PRINTER
+     E                    ARY     1   9 14
+     E                    RLNO    1   4 14
+     I*****************************************************************
+     IRARRDTL
+     I                                              TLKINDL2
+     I                                              TLPDNML1
+     I*------------------------------------------------------
+     I            DS
+     I                                        1   8 D#VRNO
+     I                                        1   1 KIND
+     I                                        2   8 VRNOX
+     I                                        2   50MMDD
+     I                                        6   80NO3
+     I           UDS
+     I                                        1   60U#YYMM
+     I                                        1   40U#YY
+     I                                      801 8080U#DATE
+     I                                     10011010 U#USID
+     I                                     10211021 AREA
+     C*****************************************************************
+     C*         KEY  LIST
+     C*****************************************************************
+     C           KEY01     KLIST
+     C                     KFLD           SQAREA
+     C                     KFLD           SQKIND
+     C                     KFLD           SQYMD
+     C*
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+9910AC           *DATE     SUB  19000000  U#DATE  80
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR SR1000
+     CL2 99                EXSR SR2000
+     C*LR 99                EXSR SR4000
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C                     MOVE *OFF      *IN98            項次燈號
+     C*
+     C                     Z-ADDU#DATE    R#DATE           入帳日期
+     C                     MOVE *ALL'-'   T#LINE
+     C                     MOVE *ON       *IN69
+     C                     MOVE *OFF      *IN71
+     C                     EXSR FDNO
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L1清除函式
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     Z-ADD0         W#AMTB
+     CSR                   ENDSR
+     C****************************************************************
+     C           FDNO      BEGSR
+     C****************************************************************
+     C*初始製票編號
+     C                     MOVELAREA      SQAREA
+     C                     MOVE '3'       SQKIND
+     C                     MOVE '3'       KIND
+     C                     Z-ADDU#DATE    SQYMD
+     C           KEY01     CHAINGLSEQ                96
+     C*
+     C   96                Z-ADD1         SQNO
+     C                     MOVE U#DATE    MMDD
+     C                     Z-ADDSQNO      NO3
+     C                     ADD  2         SQNO
+     C   96                WRITERGLSEQ
+     C  N96                UPDATRGLSEQ
+     C                     Z-ADD0         W#VRIT
+     C                     ENDSR
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     ADD  TLAMT     W#AMTB 120       獎勵金金額
+     C                     MOVELD#VRNO    TLGLNO
+     C                     MOVELU#USID    TLUPDM           異動人員
+     C                     MOVE U#DATE    TLUPDD           異動日期
+     C                     TIME           TLUPDT           異動時間
+     C                     UPDATRARRDTL
+     CSR         ESDTL     ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C*
+     C   69                WRITEAR121TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR121TM
+     C*
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  子函式集
+     C*********************************
+     CSR         SR1000    BEGSR
+     C* N98                ADD  1         D#VRN2
+     C* N98                MOVE D#VRNO    W#VRND  6        借方號碼
+     C* N98                ADD  1         D#VRN2
+     C* N98                MOVE D#VRNO    W#VRNC  6        貸方號碼
+     C* N98                MOVE *ON       *IN98            項次燈號
+     C                     MOVE D#VRNO    W#VRND  8
+     C                     ADD  1         W#VRIT  30
+     C*
+     C                     EXSR SR1100                     寫入借方
+     C                     EXSR WTRSR                      報表
+     C*
+     C*
+     C                     ADD  W#AMTB    W#AMTC 120       加總至貸方
+     C*
+     C*
+     CSR                   ENDSR
+     C****************************************************************
+     CSR         SR1100    BEGSR
+     C****************************************************************
+     C*寫入借方
+     C                     CLEARRGLTRAN
+     C                     MOVEL'A'       GLFLAG           處理代碼
+     C                     MOVELAREA      GLDM03
+     C                     MOVE AREA      GLCARD           廠別
+     C                     MOVELAREA      GLAREA           廠區
+     C                     Z-ADDU#YY      GLYY             年月
+     C                     Z-ADDU#DATE    GLYMD            製票日期
+     C                     MOVELW#VRND    GLTRNO           製票號碼
+     C                     Z-ADDW#VRIT    GLITEM           項目
+     C                     MOVE 'D'       GLDC             借貸
+     C                     MOVEL'410101'  GLNO             會計科目
+     C                     MOVEL'M'       GLTYCO           方式要件
+     C           TLKIND    IFEQ '1'
+     C                     MOVELRLNO,1    GLRLNO           相關號碼
+     C                     ENDIF
+     C           TLKIND    IFEQ '2'
+     C                     MOVELRLNO,2    GLRLNO           相關號碼
+     C                     ENDIF
+     C           TLKIND    IFEQ '3'
+     C                     MOVELRLNO,3    GLRLNO           相關號碼
+     C                     ENDIF
+     C*
+     C                     MOVEL'A'       GLKIND           類別
+     C                     MOVEL'A'       GLSEPT
+     C                     Z-ADDW#AMTB    GLAMT
+     C*
+     C           AREA      IFEQ 'H'
+     C                     MOVEL'H800'    GLDPNO           部門
+     C                     ENDIF
+     C           AREA      IFEQ 'K'
+     C                     MOVEL'K800'    GLDPNO           部門
+     C                     ENDIF
+     C                     MOVELTLPDNM    GLDSC1           摘要一
+     C*
+     C                     MOVELU#USID    GLENTM           建檔人員
+9910AC                     MOVE U#DATE    GLENTD           建檔日期
+     C                     TIME           GLENTT           建檔時間
+     C                     MOVELU#USID    GLUPDM           異動人員
+9910AC                     MOVE U#DATE    GLUPDD           異動日期
+     C                     TIME           GLUPDT           異動時間
+     C                     WRITERGLTRAN
+     C*
+     CSR                   ENDSR
+     C****************************************************************
+     CSR         SR2000    BEGSR
+     C****************************************************************
+     C                     ADD  1         W#VRIT
+     C*寫入貸方
+     C                     EXSR SR2100
+     C                     EXSR WTRSR                      報表
+     C*
+     C*往來
+     C*
+     C                     ADD  1         NO3
+     C                     Z-ADD0         W#VRIT
+     C*
+     C                     ADD  1         W#VRIT
+     C                     EXSR SR3000
+     C                     EXSR WTRSR
+     C*
+     C                     ADD  1         W#VRIT
+     C                     EXSR SR3100
+     C                     EXSR WTRSR
+     C**
+     C*重新編號
+     C  NLR                EXSR FDNO
+     C*
+     C                     ENDSR
+     C****************************************************************
+     C           SR2100    BEGSR
+     C****************************************************************
+     C                     CLEARRGLTRAN
+     C                     MOVEL'A'       GLFLAG           處理代號
+     C                     MOVELAREA      GLDM03
+     C                     MOVE AREA      GLCARD           廠別
+     C                     MOVELAREA      GLAREA           廠區
+     C                     Z-ADDU#YY      GLYY             年度
+     C                     Z-ADDU#DATE    GLYMD            製票日期
+     C                     MOVELD#VRNO    GLTRNO           傳票號碼
+     C                     Z-ADDW#VRIT    GLITEM           項目
+     C                     MOVEL'C'       GLDC             借貸
+     C                     MOVEL'339901'  GLNO             會計科目
+     C                     MOVEL'A'       GLTYCO           方式要件
+     C                     MOVEL'A'       GLKIND           類別
+     C                     MOVEL'A'       GLSEPT
+     C*
+     C                     Z-ADDW#AMTC    GLAMT            金額
+     C*
+     C                     MOVELU#USID    GLENTM           建檔人員
+9910AC                     MOVE U#DATE    GLENTD           建檔日期
+     C                     TIME           GLENTT           建檔時間
+     C                     MOVELU#USID    GLUPDM           異動人員
+9910AC                     MOVE U#DATE    GLUPDD           異動日期
+     C                     TIME           GLUPDT           異動時間
+     C                     WRITERGLTRAN
+     C*
+     CSR                   ENDSR
+     C****************************************************************
+     CSR         SR3000    BEGSR
+     C****************************************************************
+     C*
+     C                     CLEARRGLTRAN
+     C                     MOVEL'A'       GLFLAG           處理代碼
+     C                     MOVELAREA      GLDM03
+     C                     MOVE 'P'       GLCARD           廠別
+     C                     MOVELAREA      GLAREA           廠區
+     C                     Z-ADDU#YY      GLYY             年月
+     C                     Z-ADDU#DATE    GLYMD            製票日期
+     C                     MOVELD#VRNO    GLTRNO           製票號碼
+     C                     Z-ADDW#VRIT    GLITEM           項目
+     C                     MOVEL'D'       GLDC             借貸
+     C*
+     C                     SELEC
+     C           AREA      WHEQ 'H'
+     C                     MOVEL'339904'  GLNO             會計科目
+     C           AREA      WHEQ 'K'
+     C                     MOVEL'339902'  GLNO             會計科目
+     C                     ENDSL
+     C*
+     C                     MOVEL'A'       GLTYCO           方式要件
+     C                     MOVEL'A'       GLKIND           類別
+     C                     MOVEL'A'       GLSEPT
+     C*
+     C                     Z-ADDW#AMTC    GLAMT            金額
+     C*
+     C                     MOVELU#USID    GLENTM           建檔人員
+9910AC                     MOVE U#DATE    GLENTD           建檔日期
+     C                     TIME           GLENTT           建檔時間
+     C                     MOVELU#USID    GLUPDM           異動人員
+9910AC                     MOVE U#DATE    GLUPDD           異動日期
+     C                     TIME           GLUPDT           異動時間
+     C                     WRITERGLTRAN
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         SR3100    BEGSR
+     C****************************************************************
+     C*寫入貸方總計
+     C                     CLEARRGLTRAN
+     C                     MOVEL'A'       GLFLAG           處理代號
+     C                     MOVELAREA      GLDM03
+     C                     MOVE 'P'       GLCARD           廠別
+     C                     MOVELAREA      GLAREA           廠區
+     C                     Z-ADDU#YY      GLYY             年度
+     C                     Z-ADDU#DATE    GLYMD            製票日期
+     C                     MOVELD#VRNO    GLTRNO           製票號碼
+     C                     Z-ADDW#VRIT    GLITEM           項目
+     C                     MOVE 'C'       GLDC             借貸
+     C*
+     C                     MOVEL'210909'  GLNO             會計科目
+     C*
+     C                     MOVEL'D'       GLTYCO           方式要件
+     C                     SELEC
+     C           TLKIND    WHEQ '1'
+     C                     MOVELRLNO,1    GLRLNO           相關號碼
+     C           TLKIND    WHEQ '2'
+     C                     MOVELRLNO,2    GLRLNO           相關號碼
+     C           TLKIND    WHEQ '3'
+     C                     MOVELRLNO,3    GLRLNO
+     C                     ENDSL
+     C*
+     C                     MOVEL'A'       GLKIND           類別
+     C                     MOVEL'A'       GLSEPT
+     C*
+     C                     Z-ADDW#AMTC    GLAMT            金額
+     C*
+     C                     MOVELU#USID    GLENTM           建檔人員
+9910AC                     MOVE U#DATE    GLENTD           建檔日期
+     C                     TIME           GLENTT           建檔時間
+     C                     MOVELU#USID    GLUPDM           異動人員
+9910AC                     MOVE U#DATE    GLUPDD           異動日期
+     C                     TIME           GLUPDT           異動時間
+     C                     WRITERGLTRAN
+     C                     Z-ADD0         W#AMTC
+     C*
+     CSR                   ENDSR
+     C****************************************************************
+     CSR         WTRSR     BEGSR
+     C****************************************************************
+     C*
+     C                     CLEARAR121T1
+     C*
+     C                     MOVELGLDC      T#DC             借貸別
+     C                     MOVELGLNO      T#NO             會計科目
+     C*
+     C                     SELEC
+     C           T#NO      WHEQ '410101'
+     C                     MOVELARY,1     T#NONM           科目名稱
+     C           T#NO      WHEQ '339901'
+     C                     MOVELARY,3     T#NONM
+     C           T#NO      WHEQ '339904'
+     C                     MOVELARY,5     T#NONM
+     C           T#NO      WHEQ '339902'
+     C                     MOVELARY,7     T#NONM
+     C           T#NO      WHEQ '210909'
+     C                     MOVELARY,2     T#NONM
+     C                     ENDSL
+     C*
+     C           GLDC      IFEQ 'D'
+     C                     Z-ADDGLAMT     T#DAMT
+     C                     ELSE
+     C                     Z-ADDGLAMT     T#CAMT
+     C                     ENDIF
+     C                     MOVELGLTYCO    T#TYCO           方式要件
+     C                     MOVELGLDSC1    T#DSC2           品名
+     C                     MOVELGLRLNO    T#RLNO
+     C                     MOVELGLDPNO    T#DPNO
+     C*
+     C                     MOVELGLTRNO    T#VRNO           製票號碼
+     C                     MOVELGLITEM    T#ITEM           項次
+     C*
+     C   69                WRITEAR121TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR121T1
+     CSR                   ENDSR
+     C****************************************************************
+     C           SR4000    BEGSR
+     C*****************************************************************
+     C*製票編號退回一號
+     C                     MOVELAREA      SQAREA
+     C                     MOVEL'3'       SQKIND
+     C                     Z-ADDU#DATE    SQYMD
+     C           KEY01     CHAINGLSEQ                96
+     C                     MOVE U#DATE    MMDD
+     C                     Z-ADDSQNO      NO3
+     C                     SUB  1         SQNO
+     C  N96                UPDATRGLSEQ
+     C                     ENDSR
+     C****************************************************************
+**  ARY
+銷貨收入
+暫估其他
+總公司往來
+桃園往來
+苗栗廠往來
+台中往來
+高雄廠往來
+外銷銷貨收入
+新桃往來
+**  RLNO
+價格補助
+獎勵金一
+特別補助
+

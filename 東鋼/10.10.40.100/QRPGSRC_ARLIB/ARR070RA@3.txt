@@ -1,0 +1,392 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR070R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     已確認未過入財會營業繳款明細表
+     H*            5.DATE-WRITTEN  87/05/26
+     H*            6.UPDATE  DATE  98/05/18 2009AR311 S00WCJ (9805A)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FSARCVF  UP  E           K        DISK
+     FSARVIN  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FARSAID  IF  E           K        DISK
+9107 FBCNAME  IF  E           K        DISK
+     FARR070T O   E             66     PRINTER
+     F*****************************************************************
+     E                    NAME    1   4 13
+     I*----------------------------------------------------------------
+     ISRREC
+     I                                              SRRVIDL3
+     I                                              SRRVDTL2
+     I                                              SRRVNOL1
+     I*------------------------------------------------------
+9107 I            DS
+9107 I                                        1  10 R#CHNM
+9107 I                                       10  10 D#NOF
+9107 I            DS
+9107 I                                       11  12 W#OEOF
+9107 I                                       11  11 D#OE
+9107 I                                       12  12 D#OF
+9201 I            DS
+9201 I                                        1   8 D#ORNO
+9201 I                                        1   1 D#ORN1
+9201 I                                        2   7 D#ORN2
+9201 I                                        8   8 D#ORN3
+     I            DS
+     I                                        1   6 SRCUNO
+     I                                        1   1 D#CUN1
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L3                EXSR L3CLR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CL3 99                EXSR L3SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C*
+ 9201C                     MOVE *ON       *IN70
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L3清除函式換業務
+     C*********************************
+     CSR         L3CLR     BEGSR
+     C*
+     C                     Z-ADD0         R#PGNO
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L2清除函式換日期
+     C*********************************
+     CSR         L2CLR     BEGSR
+     C*
+     C                     CLEARAR070T1T
+     C                     SETON                     66    強迫換頁
+     C*
+     C                     Z-ADDSRRVDT    R#RVDT           繳款開立
+     C                     MOVELSRDPNO    R#DPNO           繳款部門
+     C                     MOVELSRRVID    R#RVID           收款業務
+     C           SRRVID    CHAINARSAID               69
+     C   69                MOVEL*BLANK    R#RVNM
+     C  N69                MOVELSANAME    R#RVNM
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L1清除函式換繳款單
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C*
+     C                     CLEARAR070T1S
+     C*
+     C           D#CUN1    IFEQ 'E'
+     C           SRCURY    IFNE *BLANK
+     C           SRCURY    ANDNE'NTD'
+     C                     MOVELSRCURY    W#CURY  3
+     C                     ENDIF
+     C*
+     C           W#CURY    CAT  NAME,1    R#SNM1
+     C           W#CURY    CAT  NAME,2    R#SNM2
+     C           W#CURY    CAT  NAME,3    R#SNM3
+     C           W#CURY    CAT  NAME,4    R#SNM4
+     C           W#CURY    CAT  NAME,1    R#TNM1
+     C           W#CURY    CAT  NAME,2    R#TNM2
+     C           W#CURY    CAT  NAME,3    R#TNM3
+     C           W#CURY    CAT  NAME,4    R#TNM4
+     C                     MOVEL*ON       *IN40
+     C                     ELSE
+     C                     MOVEL*BLANK    R#SNM1
+     C                     MOVEL*BLANK    R#SNM2
+     C                     MOVEL*BLANK    R#SNM3
+     C                     MOVEL*BLANK    R#SNM4
+     C                     MOVEL*BLANK    R#TNM1
+     C                     MOVEL*BLANK    R#TNM2
+     C                     MOVEL*BLANK    R#TNM3
+     C                     MOVEL*BLANK    R#TNM4
+     C                     MOVEL*OFF      *IN40
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C*
+     C                     CLEARAR070T1D
+     C*
+     C           SRRVNO    IFEQ 'H62666'
+     C                     MOVEL'X'       W#TEMP  1
+     C                     ENDIF
+     C*
+     C                     Z-ADDSRCFDT    R#CFDT           繳款確認
+     C           *INL1     IFEQ '1'                        只印首筆
+     C                     MOVELSRRVNO    R#RVNO
+     C                     MOVELSRCUNO    R#CUNO
+     C           SRCUNO    CHAINCBCUST               69
+     C   69                MOVEL*BLANK    R#CUNM
+     C  N69                MOVELCBCUNM    R#CUNM
+     C                     ENDIF
+     C*
+     C                     MOVELSRUSTP    R#USTP
+     C                     MOVELSRNTTP    R#NTTP
+ 9201C*當會計科目=2159時，需帶出訂單編號
+  .  C           SRACNO    IFEQ '2159'
+  .  C                     MOVEL'('       D#ORN1
+  .  C                     MOVELSRRLNO    D#ORN2
+  .  C                     MOVEL')'       D#ORN3
+  .  C                     MOVELD#ORNO    R#ORNO
+  .  C                     MOVE *OFF      *IN70
+  .  C                     ELSE
+  .  C                     MOVEL*BLANK    R#ORNO           訂單編號
+  .  C                     MOVE *ON       *IN70
+ 9201C                     ENDIF
+ 9410C*
+     C                     MOVELSRCUNO    W#CUNO  1
+     C           W#CUNO    IFEQ 'E'
+     C           SRACNO    IFEQ '7119'
+     C           SRACNO    OREQ '7142'
+     C           SRACNO    OREQ '2159'
+  .  C                     MOVEL'('       D#ORN1
+  .  C                     MOVELSRRLNO    D#ORN2
+  .  C                     MOVEL')'       D#ORN3
+  .  C                     MOVELD#ORNO    R#ORNO
+  .  C                     MOVE *OFF      *IN70
+     C                     ELSE
+  .  C                     MOVEL*BLANK    R#ORNO           訂單編號
+  .  C                     MOVE *ON       *IN70
+     C                     ENDIF
+     C                     ENDIF
+     C*
+ 9410C*
+     C                     MOVELSRACNO    R#ACNO
+9107 C*
+9707 C                     MOVELSRACNO    W#ACNO  9
+9707 C           W#ACNO    CHAINRACNAME              69
+9107 C*
+9107 C           SRACNO    IFEQ ACNO
+9107 C                     MOVE ''      W#OEOF
+9107 C                     MOVELACCHNM    R#CHNM
+9107 C                     MOVE ''      D#NOF
+9107 C                     ENDIF
+9107 C*
+     C                     MOVELSRACTP    R#ACTP
+     C                     MOVELSRPBID    R#PBID
+     C                     MOVELSRPANO    R#PANO
+     C                     MOVELSRNTNO    R#NTNO
+     C                     Z-ADDSRDUDT    R#DUDT
+     C                     MOVELSRPLAC    R#PLAC
+     C                     Z-ADDSRRAMT    R#RAMT
+     C*910516新增外銷處理START    ---------------
+     C*幣值轉換
+     C           SRMKTP    IFEQ '1'
+     C           SRRVNO    ANDNE'P64642'
+     C                     SELEC
+     C           SRACNO    WHEQ '1114'                     外幣繳款
+     C           SRACNO    OREQ '2159'                     外幣繳款
+     C           SRCURY    ANDNE'NTD'
+     C           SRACNO    OREQ '1138'                     外幣繳款
+9805AC           SRACNO    OREQ '1111'                     外幣繳款
+     C           SRRAMT    MULT SREXC1    R#RAMT    H
+     C           SRACNO    WHEQ '7119'                     出口費用
+     C           SRACNO    OREQ '7142'                     郵電費用
+     C           SRACNO    OREQ '8211'                     出押息
+     C*出口費用如為台幣,須先依銀行匯率轉成美金,再依財會匯率轉成台
+     C*幣;如為美金則直接以財會匯率轉換
+     C           SRCURY    IFEQ 'NTD'                      台幣
+     C           SRCURY    OREQ *BLANK                     台幣
+     C           SRRAMT    DIV  SREXC2    W#RAMT 143H
+     C           W#RAMT    MULT SREXC1    R#RAMT    H
+     C                     ELSE
+     C           SRRAMT    MULT SREXC1    R#RAMT    H
+     C                     ENDIF
+     C                     ENDSL
+     C                     ENDIF
+     C*910516新增外銷處理 END     ---------------
+     C*
+     C           *IN66     IFEQ '1'
+     C                     ADD  1         R#PGNO
+     C                     WRITEAR070T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR070T1D                   繳款明細
+     C*
+     C           R#ACTP    IFEQ 'D'                        借方
+     C                     ADD  R#RAMT    R#SRNA           小計繳款
+     C                     ELSE                            貸方
+     C                     SUB  R#RAMT    R#SRNA
+     C                     ENDIF
+     C*
+     C                     MOVEL'Y'       SRFL03           已列印
+     C                     UPDATSRREC                      存回
+     C*
+     C           SRCURY    IFEQ 'USD'
+     C           SRACTP    ANDEQ'D'
+     C                     ADD  SRRAMT    R#SRPA           押匯金額
+     C*
+     C                     SELEC
+     C           SRACNO    WHEQ '1114'                     外幣存款
+     C           SRACNO    OREQ '1138'                     其它應收
+     C                     ADD  SRRAMT    R#SRAA           入帳金額
+     C           SRACNO    WHEQ '7119'                     出口費用
+     C                     ADD  SRRAMT    R#SREA           費用金額
+     C           SRACNO    WHEQ '8211'                     出口費用
+     C                     ADD  SRRAMT    R#SRBA           利息費用
+     C                     ENDSL
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L1 函式  繳款單號更改
+     C*********************************
+     CSR         L1SR      BEGSR
+     C*
+     C                     WRITEAR070T1L                   換行
+     C                     CLEARAR070T1E
+     C                     Z-ADD0         W#CNTN  10
+     C           SRRVNO    CHAINSIREC                69
+     C*
+     C           *IN69     DOWEQ'0'
+     C                     ADD  1         W#CNTN
+     C                     EXSR SR1000                     搬移變數
+     C           W#CNTN    IFEQ 3
+     C           *IN66     IFEQ '1'
+     C                     ADD  1         R#PGNO
+     C                     WRITEAR070T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR070T1E                   沖銷明細
+     C                     ADD  R#INX1    R#SRXA
+     C                     ADD  R#INX2    R#SRXA
+     C                     ADD  R#INX3    R#SRXA
+     C                     CLEARAR070T1E
+     C                     Z-ADD0         W#CNTN
+     C                     ENDIF
+     C           SRRVNO    READESIREC                    69
+     C                     ENDDO
+     C*
+     C           W#CNTN    IFNE 0
+     C           *IN66     IFEQ '1'
+     C                     ADD  1         R#PGNO
+     C                     WRITEAR070T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR070T1E                   沖銷明細
+     C                     ADD  R#INX1    R#SRXA
+     C                     ADD  R#INX2    R#SRXA
+     C                     ADD  R#INX3    R#SRXA
+     C                     ENDIF
+     C*
+     C           *IN66     IFEQ '1'                        寫出小計
+     C                     ADD  1         R#PGNO
+     C                     WRITEAR070T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR070T1S
+     C*
+     C                     ADD  R#SRNA    R#TRNA           合計
+     C                     ADD  R#SRXA    R#TRXA
+     C                     ADD  R#SRPA    R#TRPA
+     C                     ADD  R#SRAA    R#TRAA
+     C                     ADD  R#SREA    R#TREA
+     C                     ADD  R#SRBA    R#TRBA
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L2 函式
+     C*********************************
+     CSR         L2SR      BEGSR
+     C*
+     C           *IN66     IFEQ '1'
+     C                     ADD  1         R#PGNO
+     C                     WRITEAR070T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR070T1T                   寫出合計
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L3 函式 換業務員(印核覆)
+     C*********************************
+     CSR         L3SR      BEGSR
+     C*
+     C                     WRITEAR070T1X
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  LR 函式  (NOTHING)
+     C*********************************
+     CSR         LRSR      BEGSR
+     C*
+     C*                    WRITEAR070T1X
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C*
+     C                     WRITEAR070T1H
+     C                     WRITEAR070T1M
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C*  子函式集
+     C*****************************************************************
+     C*********************************
+     C*  列印沖銷發票內容之搬移變數
+     C*********************************
+     CSR         SR1000    BEGSR
+     C*
+     C                     SELEC
+     C           W#CNTN    WHEQ 1
+     C                     MOVELSIINNO    R#INN1
+     C           SIINNO    CHAININREC                69
+     C   69                MOVEL*BLANK    R#APN1
+     C  N69                MOVELINAPNO    R#APN1
+9101 C                     MOVELININDT    R#IND1
+     C                     Z-ADDSIINXA    R#INX1
+     C*
+     C           W#CNTN    WHEQ 2
+     C                     MOVELSIINNO    R#INN2
+     C           SIINNO    CHAININREC                69
+     C   69                MOVEL*BLANK    R#APN2
+     C  N69                MOVELINAPNO    R#APN2
+9101 C                     MOVELININDT    R#IND2
+     C                     Z-ADDSIINXA    R#INX2
+     C*
+     C           W#CNTN    WHEQ 3
+     C                     MOVELSIINNO    R#INN3
+     C           SIINNO    CHAININREC                69
+     C   69                MOVEL*BLANK    R#APN3
+     C  N69                MOVELINAPNO    R#APN3
+9101 C                     MOVELININDT    R#IND3
+     C                     Z-ADDSIINXA    R#INX3
+     C                     ENDSL
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+** NAME
+押匯額：
+入帳額：
+費用額：
+利息額：
+

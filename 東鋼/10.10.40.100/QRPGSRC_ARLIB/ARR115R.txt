@@ -1,0 +1,185 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR115R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     銷貨調整通知單
+     H*          5.DATE-WRITTEN  93/01/16
+     H*          6.DATE-MODIFY   106/04/06 2017AR1062 S00WCJ(0604A)
+     H*                           增加產品品名列印
+     H*                          108/08/21  2019AR00057 S00WCJ (0808A)
+     H*                           配合磅單過至項次修改
+     H*                          111/04/22  2022AR00022 S00WCJ (1104A)
+     H*                           簽核欄位由每頁列印改為同一張調整單
+     H*                           最後一頁才列印
+     H*
+     H*          *IN50燈號用來判斷是否列印合計部份，因有時一張調整單
+     H*         項次會超過１２筆，此時就會拆成兩張銷貨調整通知單，第
+     H*         一張銷貨調整單的合計部份不印，第二張再印總金額即可。
+     H*****************************************************************
+     H        1   Y                                     1
+     FTRNDTL  IP  E           K        DISK
+     FARR115T O   E             66     PRINTER
+     E                    TABA1   9   9  2 0 TABA2   4   *第一聯說明
+     E*****************************************************************
+     ITXREC
+     I                                              TXNO  L1
+0604AI            DS
+0604AI                                        1  30 TXRESV
+0604AI                                        1   5 D#PDNO
+0808AI                                       13  14 D#VRTM
+0808AI                                       19  21 D#PDS1
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10111020 S#DEVN
+     I                                      300 307 U#DAT1
+     I                                      308 315 U#DAT2
+     I                                      316 316 U#AREA
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN66
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN66
+     C*
+     C                     MOVEL*ALL'-'   T#LIN1
+     C                     MOVEL*ALL'-'   T#LIN2
+     C                     MOVEL*ALL'-'   T#LIN3
+     C                     MOVEL*ALL'-'   T#LIN4
+     C                     MOVEL*ALL'-'   T#LIN5
+     C  N50                CLEARAR115T1T
+     C                     SETOF                     50
+     C*HEAD
+     C                     MOVELTXCODE    T#CODE           單據代號
+     C                     MOVEL'N'       T#FLAG           處理代號
+     C                     MOVELU#AREA    T#AREA           廠別
+     C                     MOVELTXORNO    T#ORNO           訂單編號
+     C                     MOVELTXCUNO    T#CUNO           客戶代號
+     C                     MOVELTXCUNM    T#CUNM           客戶名稱
+     C                     MOVELTXDATE    T#DATE           單據日期
+     C                     MOVELTXVUNO    T#VUNO           磅單編號
+     C                     MOVELTXNO      T#NO             本單編號
+     C*
+     C                     Z-ADD0         W#ITEM  20
+1104AC                     Z-ADD0         W#ITE1  20       項次
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*若調整單項次超過12筆，則換頁
+1104AC*調整單不印簽核欄位改為一頁列印18筆
+     C*
+1104AC           W#ITEM    IFGE 18
+1104AC*                    MOVE *ON       *IN50
+     C                     EXSR L1SR
+1104AC                     Z-ADD0         W#ITEM
+1104AC*                    EXSR L1CLR
+     C                     ENDIF
+     C*
+     C                     CLEARAR115T1D
+     C                     ADD  1         W#ITEM           項次
+1104AC                     ADD  1         W#ITE1
+1104AC                     Z-ADDW#ITE1    T#ITEM           項次
+     C                     MOVEL*ALL'-'   T#LIN6
+     C*
+     C                     MOVELTXACNT    T#ACNT           調整別
+     C                     MOVELTXPDNM    T#PDNM           品名
+     C                     Z-ADDTXQTY     T#QTY            數量
+     C                     Z-ADDTXUPRC    T#PRC            單價
+     C                     Z-ADDTXAMT     T#AMT            金額
+     C                     MOVELTXPCNO    T#PCNO           磅單編號
+0604AC                     MOVELD#PDNO    T#PDNO           產品品名
+0808AC                     MOVELD#VRTM    T#VRTM           磅次
+0808AC                     MOVELD#PDS1    T#PDS1           徑度
+     C*聯式說明
+     C           W#ITEM    LOKUPTABA1     TABA2          60
+     C   60                MOVE TABA2     T#WORD
+     C*
+     C   66                WRITEAR115T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR115T1D
+     C*合計
+     C                     ADD  T#QTY     T#QTYT
+     C                     ADD  T#AMT     T#AMTT
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*若調整項次未到12筆，則強迫寫至12筆
+1104AC*
+1104AC                     MOVEL*BLANKS   W#PRYN  1
+1104AC*
+     C           W#ITEM    IFLT 12
+     C           W#ITEM    DOUEQ12
+     C                     CLEARAR115T1D
+     C                     ADD  1         W#ITEM           項次
+1104AC*                    Z-ADDW#ITEM    T#ITEM           項次
+     C                     MOVEL*ALL'-'   T#LIN6
+     C*聯式說明
+     C           W#ITEM    LOKUPTABA1     TABA2          60
+     C   60                MOVE TABA2     T#WORD
+     C                     WRITEAR115T1D
+     C                     ENDDO
+1104AC                     ELSE
+1104AC           W#ITEM    IFGT 12
+1104AC                     MOVEL*ON       *IN50
+1104AC                     MOVEL*ALL'-'   T#LIN7
+1104AC                     MOVELTXIVNO    T#INNO
+1104AC                     WRITEAR115T1T
+1104AC                     MOVEL*OFF      *IN50
+1104AC                     MOVEL*ON       *IN66
+1104AC                     MOVEL'Y'       W#PRYN
+1104AC                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVEL*ALL'-'   T#LIN7
+     C                     MOVEL*ALL'-'   T#LIN8
+     C                     MOVEL*ALL'-'   T#LIN9
+     C                     MOVEL*ALL'-'   T#LINA
+     C                     MOVEL*ALL'-'   T#LINB
+     C                     MOVELTXIVNO    T#INNO
+     C*
+     C   66                WRITEAR115T1H
+     C                     MOVE *OFF      *IN66
+1104AC           W#PRYN    IFNE 'Y'
+1104AC           *INLR     OREQ *ON
+1104AC           *INL1     OREQ *ON
+     C                     WRITEAR115T1T
+1104AC                     ENDIF
+     C*
+     C   66                WRITEAR115T1H
+     C                     MOVE *OFF      *IN66
+1104AC   L1                WRITEAR115T1N
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*
+     C   66                WRITEAR115T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR115T1M
+     C*
+     C                     ENDSR
+     C*****************************************************************
+**  TABA1 TABA2
+01一02、03業04務05部06門07↓08會09計
+

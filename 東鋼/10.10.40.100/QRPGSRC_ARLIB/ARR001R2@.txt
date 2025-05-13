@@ -1,0 +1,191 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR001R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ（原作者不可考）
+     H*            4.FUNCTION     請款單列印作業（出表）
+     H*            5.DATE-WRITTEN  88/10/12
+     H*
+     H*  <說明> 本程式從原請款單列印作業 ARR001R複製再加以修改。
+     H*           本程式將原來之全手動改成RPG CYCLE 的寫法，並且
+     H*           依訂單別不同而換頁，同一張發票可有多筆磅單。
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR001F IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FARR001T O   E             66     PRINTER
+     I*************************************************************
+     IARREC
+     I                                              ARORNOL2
+     I                                              ARINNOL1
+     I*------------------------------------------------------------
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C**************************************************************
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C                     Z-ADD40        N#TCNT  30       頁內總筆數
+     C                     Z-ADD0         W#LCNT  30       已印筆數
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2清除函式（換訂單）
+     C*********************************
+     CSR         L2CLR     BEGSR
+     C           ARINNO    CHAININREC                69
+     C                     MOVELINCUNO    R#CUNO
+     C                     MOVELINORNO    R#ORNO
+     C                     Z-ADDINAPDT    R#APDT
+     C                     MOVELINCUNM    R#CUNM
+     C                     MOVELINRVID    R#RVID
+     C                     MOVELINAPNO    R#APNO
+     C*
+     C           W#LCNT    IFEQ 0
+     C                     WRITEAR001T1H                   印出表頭
+     C                     Z-ADD0         W#LCNT  30       已印筆數
+     C                     ELSE
+     C                     EXSR PR0001                     接下一頁
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式（換發票）
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     SETON                     51
+     C                     ADD  ARQTY     R#QTYT           合計
+     C                     ADD  ARAAMT    R#TAAM
+     C                     ADD  ARBAMT    R#TBAM
+     C                     ADD  ARCAMT    R#TCAM
+     C                     ADD  ARDAMT    R#TDAM
+     C                     ADD  AREAMT    R#TEAM
+     C                     ADD  1         R#NUMS
+     C*
+     C           *INL2     IFEQ '1'                        第一筆不用
+     C                     GOTO L1ECL
+     C                     ENDIF
+     C*
+     C           W#LCNT    IFLT N#TCNT
+     C                     WRITEAR001T1L
+     C                     ADD  1         W#LCNT           已印一筆
+     C                     ELSE
+     C                     EXSR PR0001                     接下一頁
+     C                     ENDIF
+     CSR         L1ECL     ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME
+     C*********************************
+     CSR         DTLSR     BEGSR
+0302 C*          ARQTY     IFNE 0
+0302 C           ARAAMT    IFNE 0
+     C                     Z-ADDARINDT    R#INDT
+     C                     MOVELARINNO    R#INNO
+     C                     MOVELARWTNO    R#WTNO
+     C                     Z-ADDARQTY     R#QTY
+     C                     Z-ADDARAAMT    R#AAMT
+     C                     Z-ADDARBAMT    R#BAMT
+     C                     Z-ADDARCAMT    R#CAMT
+     C                     Z-ADDARDAMT    R#DAMT
+     C                     Z-ADDAREAMT    R#EAMT
+     C*
+     C           W#LCNT    IFGE N#TCNT
+     C                     EXSR PR0001                     接下一頁
+     C                     ENDIF
+     C*
+     C                     WRITEAR001T1D
+     C                     ADD  1         W#LCNT
+     C*
+     C                     SETOF                     51
+0302 C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1 函式
+     C*********************************
+     CSR         L1SR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2 函式
+     C*********************************
+     CSR         L2SR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  印核覆
+     C*********************************
+     CSR         LRSR      BEGSR
+     C           N#TCNT    SUB  3         W#TMP1  30
+     C           N#TCNT    ADD  1         W#TMP2  30
+     C*
+     C           W#LCNT    IFGT W#TMP1
+     C                     EXSR PR0001
+     C                     ENDIF
+     C*
+     C           W#LCNT    IFNE 0
+     C                     WRITEAR001T1M
+     C                     ADD  1         W#LCNT
+     C                     ENDIF
+     C*
+     C                     WRITEAR001T1T
+     C                     ADD  3         W#LCNT
+     C*
+     C           W#TMP2    SUB  W#LCNT    W#TMP1
+     C           1         DO   W#TMP1    I       20
+     C                     WRITEAR001T1L
+     C                     ENDDO
+     C*
+     C                     WRITEAR001T1Y
+     C                     WRITEAR001T1Z
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+     C*  子函式集
+     C*****************************************************************
+     C*--------------------------------------------
+     C*    接下一頁（印表尾再印表頭）
+     C*--------------------------------------------
+     CSR         PR0001    BEGSR
+     C           N#TCNT    ADD  2         W#TMP3  30
+     C*
+     C           W#TMP3    SUB  W#LCNT    W#TMP4  30
+     C           1         DO   W#TMP4    I       20
+     C                     WRITEAR001T1L
+     C                     ENDDO
+     C*
+     C                     WRITEAR001T1X
+     C                     WRITEAR001T1Z
+     C*
+     C                     WRITEAR001T1H
+     C                     Z-ADD0         W#LCNT
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+

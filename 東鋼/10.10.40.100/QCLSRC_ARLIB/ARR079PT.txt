@@ -1,0 +1,73 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR079P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     應收帳款帳齡分析表（經管會用）         */
+     /*     5.DATE-WRITTEN  88/07/17                                */
+     /*                                                             */
+     /*  <說明:>                                                  */
+     /*            依客戶訂單別小計一筆明細。                     */
+     /*            預設分成６０日、９０日、１２０日、１５０日以上 */
+     /*            等四個區間分別彙總。                           */
+     /*                                                             */
+     /*   *LDA    ==> 1 -- 4 , 5 -- 8, 9 -- 12, 13 -- 16, 17        */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&USER)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+
+             DCL        VAR(&W#SQLS) TYPE(*CHAR) LEN(50)
+             DCL        VAR(&W#DAY1) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&W#TYPE) TYPE(*CHAR) LEN(1)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+INPUT:
+             CALL       PGM(ARR079RS) PARM(&IN03)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+  /*         SBMJOB     JOB(ARR079PT) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARR079PT')  */
+             CHGDTAARA  DTAARA(*LDA (801 70)) +
+             VALUE('應收帳款帳齡分析表（經管會用）已匯入佇列中。')
+  /*         RETURN                              */
+
+BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 4)) RTNVAR(&W#DAY1)
+             RTVDTAARA  DTAARA(*LDA (17 1)) RTNVAR(&W#TYPE)
+             CHGVAR     VAR(&W#SQLS) VALUE(' ')
+
+             IF         COND(&W#TYPE *EQ '1') THEN(DO)
+             CHGVAR     VAR(&W#SQLS) VALUE(+
+                        'AXSTCD *EQ %VALUES("1" "2" "3") *AND')
+             ENDDO
+
+             IF         COND(&W#TYPE *EQ '2') THEN(DO)
+             CHGVAR     VAR(&W#SQLS) VALUE(+
+                        'AXSTCD *EQ %VALUES("4" "*") *AND')
+             ENDDO
+
+             OVRPRTF    FILE(ARR079T) TOFILE(ARR079T) PAGESIZE(*N +
+                          198) CPI(15) HOLD(*YES) USRDTA('經管應收')
+             OVRDBF     FILE(ARSTTX) TOFILE(DALIB/ARSTTX) SHARE(*YES)
+             OPNQRYF    FILE(ARSTTX) +
+                        QRYSLT(&W#SQLS *BCAT  +
+                              'AXINDU *GE ' || &W#DAY1 || ' *AND +
+                               AXCUNO *NE "DK743"  *AND +
+                               AXTXCD *NE "    "') +
+                        KEYFLD((AXDEPT) (AXRVID) (AXCUNO) (AXORNO) +
+                               (AXINNO))
+             CALL       ARR079R
+             CLOF       OPNID(ARSTTX)
+             DLTOVR     *ALL
+
+             ENDPGM
+

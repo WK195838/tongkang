@@ -1,0 +1,87 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR119P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02CSF                                    */
+        /*        4.FUNCTION      折讓單開立統計表                         */
+        /*        5.DATE-WRITTEN   94/07/22                                  */
+        /*        6.DATE-MODIFY                                              */
+        /*                                                                   */
+        /*********************************************************************/
+             PGM
+             DCL      VAR(&TYPE)   TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#IN03) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#ARE1) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#ARE2) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#CUN1) TYPE(*CHAR) LEN(6)
+             DCL      VAR(&P#CUN2) TYPE(*CHAR) LEN(6)
+             DCL      VAR(&P#DAT1) TYPE(*CHAR) LEN(8)
+             DCL      VAR(&P#DAT2) TYPE(*CHAR) LEN(8)
+             DCL      VAR(&P#ACN1) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#ACN2) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#RES1) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#RES2) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&S#DEVN) TYPE(*CHAR) LEN(10)
+             DCL      VAR(&S#USER) TYPE(*CHAR) LEN(10)
+
+             RTVJOBA  JOB(&S#DEVN) USER(&S#USER) TYPE(&TYPE)
+             IF       COND(&TYPE *EQ '0') THEN(GOTO BATCH)
+
+             CALL     PGM(ARR119RS) PARM(&P#IN03 &P#ARE1 &P#ARE2 &P#CUN1 +
+                                         &P#CUN2 &P#DAT1 &P#DAT2 &P#ACN1 +
+                                         &P#ACN2 &P#RES1 &P#RES2)
+             IF       COND(&P#IN03 *EQ '1') THEN(RETURN)
+
+             CHGDTAARA  DTAARA(*LDA (300  1)) VALUE(&P#ARE1)
+             CHGDTAARA  DTAARA(*LDA (301  1)) VALUE(&P#ARE2)
+             CHGDTAARA  DTAARA(*LDA (302  6)) VALUE(&P#CUN1)
+             CHGDTAARA  DTAARA(*LDA (308  6)) VALUE(&P#CUN2)
+             CHGDTAARA  DTAARA(*LDA (314  8)) VALUE(&P#DAT1)
+             CHGDTAARA  DTAARA(*LDA (322  8)) VALUE(&P#DAT2)
+             CHGDTAARA  DTAARA(*LDA (330  1)) VALUE(&P#ACN1)
+             CHGDTAARA  DTAARA(*LDA (331  1)) VALUE(&P#ACN2)
+             CHGDTAARA  DTAARA(*LDA (332  1)) VALUE(&P#RES1)
+             CHGDTAARA  DTAARA(*LDA (333  1)) VALUE(&P#RES2)
+
+             SBMJOB     CMD(CALL PGM(ARR119P)) JOB(ARR119P) +
+                        JOBD(ARJOBD)
+             RETURN
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (300  1)) RTNVAR(&P#ARE1)
+             RTVDTAARA  DTAARA(*LDA (301  1)) RTNVAR(&P#ARE2)
+             RTVDTAARA  DTAARA(*LDA (302  6)) RTNVAR(&P#CUN1)
+             RTVDTAARA  DTAARA(*LDA (308  6)) RTNVAR(&P#CUN2)
+             RTVDTAARA  DTAARA(*LDA (314  8)) RTNVAR(&P#DAT1)
+             RTVDTAARA  DTAARA(*LDA (322  8)) RTNVAR(&P#DAT2)
+             RTVDTAARA  DTAARA(*LDA (330  1)) RTNVAR(&P#ACN1)
+             RTVDTAARA  DTAARA(*LDA (331  1)) RTNVAR(&P#ACN2)
+             RTVDTAARA  DTAARA(*LDA (332  1)) RTNVAR(&P#RES1)
+             RTVDTAARA  DTAARA(*LDA (333  1)) RTNVAR(&P#RES2)
+
+             OVRPRTF    FILE(ARR119T) TOFILE(ARR119T) PAGESIZE(*N 198)  +
+                        CPI(15) HOLD(*YES)  USRDTA('折讓明細')
+             OVRDBF     FILE(TRNDTLL3) TOFILE(TRNDTLL3) SHARE(*YES)
+             OPNQRYF    FILE((TRNDTLL3)) QRYSLT(' +
+                        (AREA   *GE "' ||  &P#ARE1 || '")     *AND +
+                        (AREA   *LE "' ||  &P#ARE2 || '")     *AND +
+                        (TXCUNO *GE "' ||  &P#CUN1 || '")     *AND +
+                        (TXCUNO *LE "' ||  &P#CUN2 || '")     *AND +
+                        (TXACNT *GE "' ||  &P#ACN1 || '")     *AND +
+                        (TXACNT *LE "' ||  &P#ACN2 || '")     *AND +
+                        (RESV   *GE "' ||  &P#RES1 || '")     *AND +
+                        (RESV   *LE "' ||  &P#RES2 || '")     *AND +
+                        (DATE   *GE "' ||  &P#DAT1 || '")     *AND +
+                        (DATE   *LE "' ||  &P#DAT2 || '")')        +
+                        KEYFLD((TXPCNO) (TXCUNO) (TXORNO) (TXNO))  +
+                        MAPFLD((AREA  '%SST(TXNO    1 1)')         +
+                               (RESV  '%SST(TXRESV 15 1)')         +
+                               (DATE   TXDATE *CHAR 8)             +
+                               (YMD    TXDATE *CHAR 8)             +
+                               (TXPCNO '%SST(YMD   1 6)'))
+             CALL       PGM(ARR119R)
+             CLOF       OPNID(TRNDTLL3)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

@@ -1,0 +1,60 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR120P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02CSF                                    */
+        /*        4.FUNCTION      應付票據資負同在查核明細表               */
+        /*        5.DATE-WRITTEN   94/08/08                                  */
+        /*        6.DATE-MODIFY                                              */
+        /*                                                                   */
+        /*********************************************************************/
+             PGM
+             DCL      VAR(&TYPE)   TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#IN03) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#YYMM) TYPE(*CHAR) LEN(6)
+             DCL      VAR(&S#DEVN) TYPE(*CHAR) LEN(10)
+             DCL      VAR(&S#USER) TYPE(*CHAR) LEN(10)
+
+             RTVJOBA  JOB(&S#DEVN) USER(&S#USER) TYPE(&TYPE)
+             IF       COND(&TYPE *EQ '0') THEN(GOTO BATCH)
+
+             CALL     PGM(ARR120RS) PARM(&P#IN03)
+             IF       COND(&P#IN03 *EQ '1') THEN(RETURN)
+
+             SBMJOB     CMD(CALL PGM(ARR120P)) JOB(ARR120P) +
+                        JOBD(ARJOBD)
+             SNDBRKMSG  MSG('<<應付票據資負同在查核明細表+
+                         已開始處理,請稍待.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             RETURN
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (300  6)) RTNVAR(&P#YYMM)
+
+             CLRPFM     ARR120F
+             OVRDBF     FILE(INVDTLL1) TOFILE(INVDTLL1) SHARE(*YES)
+             OPNQRYF    FILE((INVDTLL1)) QRYSLT(' +
+                        (ACD1   *EQ "' ||  &P#YYMM || '")     *AND +
+                        (IVDECD *EQ " ")                      *AND +
+                        (IVACNT *EQ "6")')                         +
+                        MAPFLD((ACDT   IVACDT   *CHAR 8)           +
+                               (ACD1  '%SST(ACDT 1 6)' *CHAR 6))   +
+                        KEYFLD((IVORNO) (IVNO) (IVACNT))
+             CALL       PGM(ARR120R1)
+             CLOF       OPNID(INVDTLL1)
+             DLTOVR     FILE(*ALL)
+
+             OVRPRTF    FILE(ARR120T) TOFILE(ARR120T) PAGESIZE(*N 198)  +
+                        CPI(15) HOLD(*YES)  USRDTA('應付資負')
+             OVRDBF     FILE(ARR120F) TOFILE(ARR120F) SHARE(*YES)
+             OPNQRYF    FILE((ARR120F))                     +
+                        KEYFLD((A8CUNO) (A8RVNO) (A8ITEM))
+             CALL       PGM(ARR118R)
+             CLOF       OPNID(ARR118F)
+             DLTOVR     FILE(*ALL)
+
+             SNDBRKMSG  MSG('<<應收票據資負同在查核明細表+
+                        已處理完成,請列印.........>>') +
+                      TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             ENDPGM
+

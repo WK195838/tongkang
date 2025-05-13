@@ -1,0 +1,137 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP047RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     調整代開傳票還原（畫面）
+     H*            5.DATE-WRITTEN  86/04/20
+     H*            6.UPDATE  DATE  99/08/27 2010AR517 S00WCJ (9908A)
+     H*                           109/12/08 2020AR00058 S00WCJ (0912A)
+     H*                            增加檢核，還原起日不可大於已代開之
+     H*                            傳票日期
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARP047S CF  E                    WORKSTN
+     FARALOG  O   E           K        DISK
+     E*************************************************************
+     E                    T#ERR   1   4 70
+     I*************************************************************
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I            DS
+     I                                        1  140W#SYST
+     I                                        1   60D#ST
+     I                                        7  100D#SY
+     I                                       11  140D#SMD
+0912AIARCTL      UDS                             50
+0912AI                                        1   80D#CTLD
+     C**************************************************************
+     C*   程式參數接收區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1        結束旗標
+9008 C                     PARM           P#DATX  8        輸入日期
+     C                     PARM           P#ENDD  2        輸入止日
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+9908AC           *DATE     SUB  19000000  U#SYSD  80
+0912AC           *NAMVAR   DEFN ARCTLDTA  ARCTL
+0912AC                     UNLCKARCTL
+9008 C                     MOVE P#DATX    W#DATX  80
+     C           1         DOWEQ1
+     C                     WRITEAR047F1M
+     C                     EXFMTAR047F1
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03
+     C                     LEAVE
+     C                     ENDIF
+     C                     EXSR SR1000                     檢核
+     C           W#RTNV    IFEQ 'T'
+     C                     EXSR SR2000                     存登錄
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C                     SETON                     LR
+     C************************************
+     C*  核核
+     C************************************
+     CSR         SR1000    BEGSR
+     C                     MOVEL'F'       W#RTNV  1
+     C*                    MOVE '0'       P#FLAG  1
+     C*                    Z-ADDS#DATE    P#DATE  60
+     C*                    CALL 'C01'
+     C*                    PARM           P#DATE
+     C*                    PARM           P#FLAG  1
+     C                     MOVE *ALL'0'   P#PDAT
+     C                     MOVE S#DATE    P#PDAT
+     C                     CALL 'UTS102R'
+     C                     PARM           P#PDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM '0'       P#FLAG  1
+     C           P#FLAG    IFNE '0'
+     C                     MOVELT#ERR,1   S#MSG1           日期錯誤
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+9908AC           S#DATE    IFGT U#SYSD
+     C                     MOVELT#ERR,2   S#MSG1           大於系統日
+     C                     GOTO ES1000
+     C                     ENDIF
+0912AC*
+0912AC           S#DATE    IFGT D#CTLD
+0912AC                     MOVELT#ERR,3   S#MSG1
+0912AC                     GOTO ES1000
+0912AC                     ENDIF
+     C*
+     C*          S#DATE    IFGT W#DATX
+     C*                    MOVELT#ERR,3   S#MSG1           尚未代開
+     C*                    GOTO ES1000
+     C*                    ENDIF
+     C*
+     C           S#CGCA    IFEQ *BLANK
+     C                     MOVELT#ERR,4   S#MSG1           輸入原因
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C                     MOVEL'T'       W#RTNV
+     CSR         ES1000    ENDSR
+     C*
+     C************************************
+     C*  存檔登錄及設定傳回值
+     C************************************
+     CSR         SR2000    BEGSR
+     C                     MOVE S#DATE    P#DATX           傳回清日
+     C           S#ENDD    IFEQ 0
+     C                     MOVE '31'      P#ENDD
+     C                     ELSE
+     C                     MOVE S#ENDD    P#ENDD
+     C                     ENDIF
+     C                     MOVEL'0'       P#IN03
+     C*
+     C                     CLEARRARALOG
+9908AC                     Z-ADDU#SYSD    AGDATE           日期
+     C                     TIME           W#SYST
+     C                     Z-ADDD#ST      AGTIME           時間
+     C                     MOVELU#USID    AGURID           使用者
+     C                     MOVEL'AI9'     AGTRID           異動代號
+     C                     MOVELS#DATE    AGRENO           相關號碼
+     C                     MOVELS#CGCA    AGCGCA           修改原因
+     C                     WRITERARALOG
+     CSR                   ENDSR
+     C*
+     C**************************************************************
+** T#ERR
+０１日期錯誤．
+０２日期不可大於系統日期
+０３該日期會計帳尚未代開，無法還原
+０４異動原因必須輸入
+

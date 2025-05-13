@@ -1,0 +1,57 @@
+     /****************************************************************/
+     /*                                                              */
+     /*               >>   PROGRAM INTRODUCTION   <<                 */
+     /*                                                              */
+     /*            1.PROGRAM-ID    ARE054P                           */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S02CSF                            */
+     /*            4.FUNCTION     營業退款輸入作業                 */
+     /*            5.DATE-WRITTEN  93/07/28                          */
+     /*            6.DATE-MODIFY                                     */
+     /*                            103/02/18 S00WCJ (0302A)          */
+     /*                                                              */
+     /*   說明：A1:預收A2:銷退A3:銷折A4:暫收               */
+     /*           P : A1-->P.M ; A2-->P.M   ; A3-->P.M   ; A4-->P.M  */
+     /*           T : A1-->P   ; A2-->P     ; A3-->P     ; A4-->T    */
+     /*           H : A1-->H   ; A2-->代開; A3-->代開; A4-->P    */
+     /*           K : A1-->K   ; A2-->K     ; A3-->K     ; A4-->K    */
+     /*  (退款廠區)      (處理廠區)                              */
+     /*                                                              */
+     /****************************************************************/
+        PGM
+            DCLF      FILE(ARE054S)
+            DCL        VAR(&P#IN12) TYPE(*CHAR) LEN(1)
+
+            RTVDTAARA  DTAARA(*LDA (1001 10)) RTNVAR(&S#USID)
+            RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVN)
+
+  START:    SNDRCVF
+
+            CHGVAR    VAR(&IN32)    VALUE('0')
+
+            IF         COND(&IN03 *EQ '1') THEN(RETURN)
+            IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+   /* CHECK依日期排序OR客戶排序 */
+            IF        COND((&S#KEY *NE '1')   *AND +
+                           (&S#KEY *NE '2'))  THEN(DO)
+            CHGVAR    VAR(&IN32)    VALUE('1')
+            CHGVAR    VAR(&S#ERR)   VALUE('選項錯誤！')
+            GOTO      CMDLBL(START)
+            ENDDO
+
+   /*檢核輸入選項*/
+            IF        COND(&S#KEY *EQ '1') THEN(DO)
+               OVRDBF     FILE(ARRETNL1) TOFILE(ARRETNL3)   /*0302A*/
+            CALL      PGM(ARE054RA)  PARM(&P#IN12)
+            ENDDO
+
+            IF        COND(&S#KEY *EQ '2') THEN(DO)
+            CALL      PGM(ARE054RB)  PARM(&P#IN12)
+            ENDDO
+
+            DLTOVR    FILE(*ALL)
+            IF         COND(&P#IN12 *EQ '1') THEN(GOTO CMDLBL(START))
+
+            ENDPGM
+

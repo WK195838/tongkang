@@ -1,0 +1,57 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP089P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02YSH                                  */
+     /*     4.FUNCTION     進倉履約折讓開立還原                   */
+     /*     5.DATE-WRITTEN  91/03/04                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCLF       FILE(S02CSF/ARP089S)
+             DCL        VAR(&C#YM1)   TYPE(*CHAR)  LEN(4) /*已處理年月*/
+             DCL        VAR(&C#YM2)   TYPE(*CHAR)  LEN(4)
+             DCL        VAR(&D#YYMM)  TYPE(*DEC)   LEN(4 0)
+             DCL        VAR(&C#YY)    TYPE(*CHAR)  LEN(2)
+             DCL        VAR(&C#MM)    TYPE(*CHAR)  LEN(2)
+             DCL        VAR(&D#YY)    TYPE(*DEC)   LEN(2 0)
+             DCL        VAR(&D#MM)    TYPE(*DEC)   LEN(2 0)
+             DCL        VAR(&C#CUNS)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&C#CUNE)  TYPE(*CHAR)  LEN(6)
+             ADDLIBLE S02YSH
+             MONMSG   CPF0000
+
+             RTVDTAARA  DTAARA(DISCNTDTA (3 4)) RTNVAR(&C#YM1)
+             CHGVAR     VAR(&D#MM)  VALUE('%SST(DISCNTDTA 5 2)')
+
+             IF         COND(&P#CUNO *EQ '      ') THEN(DO)
+             CHGVAR     VAR(&C#CUNS) VALUE('      ')
+             CHGVAR     VAR(&C#CUNE) VALUE('999999')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&C#CUNS) VALUE(&P#CUNO)
+             CHGVAR     VAR(&C#CUNE) VALUE(&P#CUNO)
+             ENDDO
+
+             OVRDBF     FILE(DISMST)  TOFILE(DALIB/DISMST)  SHARE(*YES)
+             OVRPRTF    FILE(ARE050T) TOFILE(ARE050T) PAGESIZE(*N +
+                          132) CPI(10) HOLD(*YES) USRDTA('折讓開立')
+             OPNQRYF    FILE(DISMST)  OPTION(*ALL) QRYSLT('+
+                        (DMCUNO *GE "' || &C#CUNS || '") *AND +
+                        (DMCUNO *LE "' || &C#CUNE || '") *AND +
+                        (YYMM *EQ "' || &P#YYMM || '") *AND +
+                        (DMCOD2 *NE " ") *AND +
+                        (DMCOD3 *EQ " ")') +
+                        MAPFLD((CHAR1 DMYYMM *CHAR 6) +
+                               (YYMM '%SST(CHAR1 3 4)' *CHAR 4)) +
+                        KEYFLD((DMCUNO) (DMORNO))
+             CALL       PGM(ARE050R2)
+             CLOF       OPNID(DISMST)
+             DLTOVR     FILE(*ALL)
+             RMVLIBLE S02YSH
+             MONMSG   CPF0000
+
+ ENDCLPGM:   ENDPGM
+

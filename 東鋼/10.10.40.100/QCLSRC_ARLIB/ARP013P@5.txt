@@ -1,0 +1,69 @@
+             PGM
+             DCL        VAR(&YM)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&Y)    TYPE(*CHAR) LEN(4)
+             DCL        VAR(&M)    TYPE(*CHAR) LEN(2)
+
+             RTVDTAARA  DTAARA(*LDA (1    6)) RTNVAR(&YM)
+             RTVDTAARA  DTAARA(*LDA (1    4)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (5    2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (7 1)) RTNVAR(&AREA)
+
+             CLRPFM     ARP013F   /* 930827·s¼WDOWNLOAD */
+             OVRDBF     FILE(INVDTL) TOFILE(INVDTL) SHARE(*YES)
+             OVRDBF     FILE(ACTRAN) TOFILE('AC' || &AREA || +
+                          'R') LVLCHK(*NO)
+       /*    OPNQRYF    FILE((INVDTL)) QRYSLT('                +
+                          IVYM   *EQ  "' || &YM || '"          +
+                    *AND  (IVACNT *EQ  "2"                     +
+                    *OR    IVACNT *EQ  "3")                    +
+                    *AND  IVDECD *NE  "D"                      +
+                    *AND  IVFL03 *NE  "Z"')                    +
+                          KEYFLD((IVNO))                       +
+                          MAPFLD((ZONE6 IVACDT *ZONED 6)       +
+                                 (CHAR6 ZONE6  *CHAR  6)       +
+                                 (IVYM '%SST(CHAR6 1 4)' *CHAR 4))  */
+
+             IF         COND(&AREA *EQ "H") THEN(DO)
+             OPNQRYF    FILE((INVDTL)) QRYSLT('                +
+                          IVYM   *EQ  "' || &YM || '"          +
+                    *AND  (IVACNT *EQ  "2"                     +
+                    *OR    IVACNT *EQ  "3")                    +
+                    *AND  IVDECD *NE  "D"                      +
+                    *AND  IVFL03 *NE  "K"                      +
+                    *AND  IVFL03 *NE  "Z"')                    +
+                          KEYFLD((IVNO))                       +
+                          MAPFLD((ZONE6 IVACDT *ZONED 8)       +
+                                 (CHAR6 ZONE6  *CHAR  8)       +
+                                 (IVYM '%SST(CHAR6 1 6)' *CHAR 6))
+             ENDDO
+             ELSE (DO)
+             OPNQRYF    FILE((INVDTL)) QRYSLT('                +
+                          IVYM   *EQ  "' || &YM || '"          +
+                    *AND  IVACNT *EQ  "3"                     +
+                    *AND  IVDECD *NE  "D"                      +
+                    *AND  IVFL03 *NE  "K"                      +
+                    *AND  IVFL03 *NE  "Z"')                    +
+                          KEYFLD((IVNO))                       +
+                          MAPFLD((ZONE6 IVACDT *ZONED 8)       +
+                                 (CHAR6 ZONE6  *CHAR  8)       +
+                                 (IVYM '%SST(CHAR6 1 6)' *CHAR 6))
+             ENDDO
+
+             OVRDBF     FILE(ARWF02) TOFILE(ARWF02) SHARE(*YES)
+             CLRPFM     FILE(ARWF02)
+             MONMSG     MSGID(CPF3130)   /*NO DATA*/
+             CALL       PGM(ARP013RC)
+             CLOF       OPNID(INVDTL)
+             OPNQRYF    FILE((ARWF02))                         +
+                          KEYFLD((W2ACDT) (W2AREA) (W2ACNT) (W2NO))
+
+             OVRPRTF    FILE(QPRINT) PAGESIZE(*N 158) CPI(12) +
+                          USRDTA('¦©©è³f´Ú') IGCEXNCHR(*YES)
+
+             CALL       PGM(ARP013R)
+             CLOF       OPNID(ARWF02)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

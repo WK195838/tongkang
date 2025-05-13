@@ -1,0 +1,768 @@
+     A*****************************************************************
+     A*
+     A*            *****   PROGRAM INTRODUCTION   *****
+     A*
+     A*            1.PROGRAM-ID    ARE098R
+     A*            2.PROGRAM-TYPE  RPG
+     A*            3.AUTHOR        S00WCJ
+     A*            4.FUNCTION     發票區間開立試算維護作業
+     A*            5.DATE-WRITTEN  2010AR421 99/05/20
+     A*            6.UPDATE  DATE  99/12/15  2010AR560  S00WCJ (9912A)
+     A*                           100/01/14  2010AR564  S00WCJ (0001A)
+     A*                           100/02/08  2011AR582  S00WCJ (0002A)
+     A*                           101/12/19  S00WCJ (0112A)
+     A*                            避免讀單據編號檔LOCK住同一筆資料
+     A*                           101/12/24  2012AR708  S00WCJ (0112A)
+     A*                            增加發票開立區別碼
+     A*                           102/02/01  S00WCJ (0202A)
+     A*                            避免單號未跳號
+     A*                           102/05/03  S00WCJ (0205A)
+     A*                            調整數量為0時，以數量計算調整金
+     A*                            額
+     A*                           102/07/09 2013AR754 S00WCJ (0207A)
+     A*                            增加備註欄位
+     A*                           103/07/11 S00WCJ (0307A)
+     A*                            磅單編號重覆，造成資料無法讀出
+     A*                           103/09/24 S00WCJ (0309A)
+     A*                            同日期若磅單編號重覆，須排除不顯示
+     A*                           105/12/16 S00WCJ (0512A)
+     A*                            增加LOG檔
+     A*                           106/03/21 S00WCJ (0603A)
+     A*                            修正修改時，會重覆讀取TRNDTL資料
+     A*                            問題
+     A*                           107/06/01 2018AR1168 S00WCJ (0706A)
+     A*                            新增F5訂單編號查詢試算單號功能
+     A*                            鍵
+     A*                           108/07/26 2019AR00048 S00WCJ (0807A)
+     A*                            增加讀取指定開立資料
+     A*
+     A*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARE098S CF  E                    WORKSTN
+     F                                        RRN   KSFILE SF1
+     FTRNDTLL8IF  E           K        DISK
+     FINVTRL  UF  E           K        DISK                      A
+     FINVTRLL1IF  E           K        DISK
+     F            RINVTRL                           KRENAMEINVTL1
+0512AFINVTRLG O   E           K        DISK
+0512AF            RINVTRL                           KRENAMEINVTG
+     FARCUCT  IF  E           K        DISK
+     FARODCT  IF  E           K        DISK
+     FGENSEQ  UF  E           K        DISK                      A
+0207AFINVTRT  UF  E           K        DISK                      A
+     E*----------------------------------------------------------------
+     E                    TAB1    7   7  1   TAB2   10   *維護名稱
+     E                    ERR     1  23 70
+     I*****************************************************************
+     I            DS
+     I                                        1   6 S#ORNO
+     I                                        1   1 D#AREA
+     I                                        2   60D#ORNO
+     I            DS
+     I                                        1  10 GRP
+     I                                        1   1 GE1
+9912AI                                        2   60D#NUM
+9912AI*                                       2   5 D#YM
+9912AI*                                       6  100D#NUM
+9912AI*                                       2  10 GE2
+0002AI            DS
+0002AI                                        1   8 TXNO
+0002AI                                        1   1 D1AREA
+     I           UDS
+     I                                      801 8080S#DATE
+     I                                      803 806 D#YM1
+     I                                      951 985 COMP
+     I                                     10011010 D#USER
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           S#ORNO
+     C                     KFLD           S#DAT1
+     C*          KEY02     KLIST
+     C*                    KFLD           S#ORNO
+     C*                    KFLD           S#DAT1
+     C*
+     C           KEY03     KLIST
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+0309AC                     KFLD           TXDATE
+     C*
+     C           GEKEY     KLIST
+     C                     KFLD           GEKIND
+     C                     KFLD           GEPRIN
+     C*
+     C           KEY04     KLIST
+     C                     KFLD           S#NO
+     C                     KFLD           S#TXNO
+     C                     KFLD           S#ITEM
+     C*
+     C           KEYA1     KLIST
+     C                     KFLD           A1CUNO
+     C                     KFLD           A1CTKD
+     C*
+     C           KEYA2     KLIST
+     C                     KFLD           A2ORNO
+     C                     KFLD           A2CTKD
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C                     EXSR SR0000
+     C           PRCID     DOUEQ'00'
+     C           PRCID     CASEQ'01'      SR1000
+     C           PRCID     CASEQ'02'      SR2000
+     C           PRCID     CASEQ'03'      SR3000
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C                     RETRN
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*
+     C*Initialize Screen Number
+     C*
+     C                     MOVEL'01'      PRCID   2
+0001AC                     MOVEL'N'       S#YN
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C                     EXFMTTITLE
+     C*
+     C                     MOVEA'00000'   *IN,41
+     C                     MOVEL*OFF      *IN99
+0202AC                     MOVEL*OFF      *IN96
+     C                     MOVEL*BLANKS   S#ERR
+     C*
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVEL'00'      PRCID
+     C                     GOTO END100
+     C                     ENDIF
+     C*
+0706AC           *IN05     IFEQ *ON
+0706AC                     MOVEL*BLANKS   P#ORNO  6
+0706AC                     MOVEL*BLANKS   S#NO
+0706AC                     CALL 'ARS201R'
+0706AC                     PARM           P#ORNO
+0706AC                     PARM           S#NO
+0706AC                     MOVEL*BLANKS   S#ORNO
+0706AC                     MOVEL'4'       CODE
+0706AC                     ENDIF
+     C*
+     C                     EXSR SR1100
+     C*
+     C           *IN99     IFEQ *OFF
+     C           CODE      ANDEQ'5'
+     C                     CALL 'ARE098P'
+     C                     PARM           S#NO
+     C*                    FREE 'ARR001P'
+     C                     MOVEAERR,12    S#ERR
+     C                     MOVEL'01'      PRCID
+     C                     GOTO END100
+     C                     ENDIF
+     C*
+     C           *IN99     IFEQ *OFF
+     C                     EXSR SR1200
+     C                     MOVEL'02'      PRCID
+     C                     ENDIF
+     C*
+     C           END100    ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*
+     C           CODE      IFEQ '1'
+     C           S#NO      ANDNE*BLANKS
+     C                     SETON                     4599
+     C                     MOVEAERR,5     S#ERR
+     C   99                GOTO END110
+     C                     ENDIF
+     C*
+     C           CODE      IFEQ '1'
+     C           S#ORNO    ANDEQ*BLANKS
+     C*          CODE      OREQ '2'
+     C*          S#ORNO    ANDEQ*BLANKS
+     C                     SETON                     4299
+     C                     MOVEAERR,3     S#ERR
+     C   99                GOTO END110
+     C                     ENDIF
+     C*
+     C           CODE      IFNE '1'
+     C           S#NO      ANDEQ*BLANKS
+     C                     SETON                     4599
+     C                     MOVEAERR,3     S#ERR
+     C   99                GOTO END110
+     C                     ENDIF
+     C*
+     C           CODE      IFEQ '2'
+     C           S#ORNO    ANDNE*BLANKS
+     C           S#NO      CHAINRINVTRL              51
+     C  N51      ITORNO    IFNE S#ORNO
+     C                     SETON                     4299
+     C                     MOVEAERR,8     S#ERR
+     C   99                GOTO END110
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           S#ORNO    IFNE *BLANKS
+     C           S#ORNO    CHAINTXREC                51
+     C   51                SETON                     4299
+     C   51                MOVEAERR,2     S#ERR
+     C   99                GOTO END110
+     C                     ENDIF
+     C*
+     C           S#NO      IFNE *BLANKS
+     C           S#NO      CHAINRINVTRL              51
+     C   51                SETON                     4599
+     C   51                MOVEAERR,2     S#ERR
+     C   99                GOTO END110
+     C                     ENDIF
+     C*
+     C           S#DAT1    IFNE 0
+     C                     MOVE *ALL'0'   P#DATE
+     C                     MOVE S#DAT1    P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM           FLAG1   1
+     C*
+　 C*日期錯誤
+     C*
+     C           FLAG1     IFNE '0'
+     C                     SETON                     4399
+     C                     MOVEAERR,7     S#ERR
+     C   99                GOTO END110
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           S#DAT2    IFNE 0
+     C                     MOVE *ALL'0'   P#DATE
+     C                     MOVE S#DAT2    P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM           FLAG1   1
+     C*
+　 C*日期錯誤
+     C*
+     C           FLAG1     IFNE '0'
+     C                     SETON                     4499
+     C                     MOVEAERR,7     S#ERR
+     C   99                GOTO END110
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           S#DAT1    IFEQ 0
+     C           S#DAT2    ANDEQ0
+     C                     Z-ADD99999999  S#DAT2
+     C                     ENDIF
+     C*
+     C           S#DAT1    IFGT S#DAT2
+     C                     SETON                     434499
+     C                     MOVEAERR,9     S#ERR
+     C   99                GOTO END110
+     C                     ENDIF
+     C           END110    ENDSR
+     C*****************************************************************
+     C           SR1200    BEGSR
+     C*****************************************************************
+     C*
+     C                     Z-ADD1         S#NBR
+     C                     Z-ADD0         I       40
+     C           CODE      LOKUPTAB1      TAB2           50*EQ
+     C   50                MOVE TAB2      MOD
+     C*
+     C           CODE      IFEQ '1'
+     C                     Z-ADDS#DATE    S#ACDS
+0207AC                     MOVEL*BLANKS   S#TEX1
+0207AC                     MOVEL*BLANKS   S#TEX2
+     C           S#ORNO    CHAINTXREC                51
+     C  N51                MOVELTXCUNO    S#CUNO
+     C  N51                MOVELTXCUNM    S#CUNM
+     C                     ELSE
+     C           S#NO      CHAINRINVTRL              51
+     C  N51                Z-ADDITDATE    S#ACDS
+     C                     MOVELITNO      S#NO
+     C                     MOVELITORNO    S#ORNO
+     C                     MOVELITCUNO    S#CUNO
+     C                     MOVELITCUNM    S#CUNM
+0207AC           S#NO      CHAINRINVTRT             N51
+0207AC  N51                MOVELTTTEX1    S#TEX1
+0207AC  N51                MOVELTTTEX2    S#TEX2
+0207AC   51                MOVEL*BLANKS   S#TEX1
+0207AC   51                MOVEL*BLANKS   S#TEX2
+     C                     ENDIF
+     C                     MOVEL'Y'       UPDSCR
+     C*
+     C                     Z-ADD0         S#TQTY
+     C                     Z-ADD0         S#TQY2
+     C                     Z-ADD0         S#TAMT
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*
+     C*Screen Number = '02' Process
+     C*
+     C           UPDSCR    IFEQ 'Y'
+     C                     EXSR SR2100
+     C                     ENDIF
+     C*
+     C           PRCID     DOWEQ'02'
+     C*
+     C*Check Write Subfile Record Found ?
+     C*
+     C           RRN       COMP *ZEROS                   72*SFLDSP OFF
+     C   72      S#ERR     IFEQ *BLANKS
+     C                     MOVEAERR,2     S#ERR
+     C                     ENDIF
+     C                     WRITEUND01
+     C                     EXFMTSFCTL1
+     C*
+     C                     MOVEL*BLANKS   S#ERR
+     C                     MOVEL*OFF      *IN98
+     C                     Z-ADDS#CSR     S#NBR          50*EQ
+     C   50                Z-ADDW#LRRN    S#NBR          50*EQ
+     C   50                Z-ADD1         S#NBR
+     C*
+     C*PF3=Exit,PF12=Cancel
+     C*
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           *IN12     IFEQ *ON
+     C                     MOVE '01'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*Check Screen Filed
+     C*
+     C*
+     C                     MOVE '03'      PRCID
+     C                     LEAVE
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C*
+     C*
+     C                     MOVE *BLANKS   UPDSCR  1
+     C                     Z-ADD*ZEROS    W#LRRN  50       *Last RRN
+     C                     MOVEA'111'     *IN,71           *SFLCLR
+     C                     WRITESFCTL1
+     C                     MOVEA'000'     *IN,71           *SFLCLR
+     C                     Z-ADD*ZEROS    RRN     50
+     C*
+     C                     CLEARSF1
+     C*
+     C           S#NO      SETLLRINVTRL
+     C                     MOVEL*OFF      *IN51
+     C           *IN51     DOWEQ*OFF
+     C           S#NO      READERINVTRL                  51
+     C   51                LEAVE
+     C           RRN       IFGE 9998
+     C                     LEAVE
+     C                     ENDIF
+     C*
+9912AC*          CODE      IFEQ '1'
+9912AC           CODE      IFEQ '2'
+     C                     MOVEL'Y'       S#OPT
+     C                     ENDIF
+     C                     Z-ADDITTXDE    S#DATT
+     C                     MOVELITTXNO    S#TXNO
+     C                     Z-ADDITITEM    S#ITEM
+     C                     MOVELITPDNM    S#PDNM
+     C                     Z-ADDITQTY     S#QTY
+     C                     Z-ADDITUPRC    S#UPRC
+     C                     Z-ADDITSQTY    S#SQTY
+     C                     Z-ADDITSPRC    S#SPRC
+     C                     Z-ADDITAMT     S#SAMT
+     C                     ADD  ITQTY     S#TQTY
+     C                     ADD  ITSQTY    S#TQY2
+     C                     ADD  ITAMT     S#TAMT
+0112BC                     MOVEL*ON       *IN88
+     C           CODE      IFEQ '1'
+     C           CODE      OREQ '2'
+     C                     MOVEL*OFF      *IN70
+     C                     ELSE
+     C                     MOVEL*ON       *IN70
+     C                     ENDIF
+     C                     ADD  1         RRN
+     C*
+     C                     WRITESF1
+     C                     CLEARSF1
+     C                     ENDDO
+     C*
+     C           CODE      IFEQ '1'
+     C           CODE      OREQ '2'
+     C           S#ORNO    SETLLTXREC
+     C                     MOVEL*OFF      *IN52
+     C           *IN52     DOWEQ*OFF
+     C           S#ORNO    READETXREC                    52
+     C   52                LEAVE
+     C           RRN       IFGE 9998
+     C                     LEAVE
+     C                     ENDIF
+0002AC*
+0002AC           S#AREA    IFNE ' '
+0002AC           D1AREA    ANDNES#AREA
+0002AC                     ITER
+0002AC                     ENDIF
+     C*
+     C           TXDATE    IFLT S#DAT1
+     C           TXDATE    ORGT S#DAT2
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*判斷是否存在客戶管制檔
+     C*
+     C                     MOVELTXCUNO    A1CUNO
+     C                     MOVEL'04'      A1CTKD
+     C           KEYA1     CHAINRARCUCT              55
+     C           *IN55     IFEQ *OFF
+0807AC           A1MTHD    IFEQ '03'
+     C           A1RFOR    ANDEQ*BLANKS
+0807AC           A1MTHD    OREQ '04'
+0807AC           A1RFOR    ANDEQ*BLANKS
+     C                     GOTO W#WRT
+0807AC                     ENDIF
+     C                     ENDIF
+     C*
+     C*判斷是否存在訂單管制檔
+     C*
+     C                     MOVELS#ORNO    A2ORNO           訂單編號
+     C                     MOVE '001'     A2ORNO
+     C                     MOVEL'04'      A2CTKD           管制發票
+     C           KEYA2     SETLLRARODCT              55
+     C                     READ RARODCT                  55
+     C           *IN55     IFEQ *OFF
+     C                     MOVELA2ORNO    W#ORNO  6
+     C           S#ORNO    IFNE W#ORNO
+     C           S#ORNO    OREQ W#ORNO
+     C           A2MTHD    ANDNE'03'
+0807AC           A2MTHD    ANDNE'04'
+     C                     ITER
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           W#WRT     TAG
+     C*
+     C           KEY03     CHAININVTL1               55
+0603AC           *IN55     IFEQ *OFF
+0307AC*          ITTXDE    ANDGT1020101                    *磅單編號重覆不SHOW
+0603AC                     ITER
+0603AC                     ENDIF
+     C*
+     C           CODE      IFEQ '1'
+     C           CODE      OREQ '2'
+     C                     MOVEL*OFF      *IN70
+     C                     ELSE
+     C                     MOVEL*ON       *IN70
+     C                     ENDIF
+     C*
+9912AC*                    MOVEL'Y'       S#OPT
+0001AC           CODE      IFEQ '1'
+0001AC           S#YN      ANDEQ'Y'
+0001AC                     MOVEL'Y'       S#OPT
+0001AC                     ENDIF
+     C                     Z-ADDTXDATE    S#DATT
+     C                     MOVELTXNO      S#TXNO
+     C                     Z-ADDTXITEM    S#ITEM
+     C                     MOVELTXPDNM    S#PDNM
+     C                     Z-ADDTXUPRC    S#UPRC
+     C                     Z-ADDTXQTY     S#QTY
+     C                     ADD  TXQTY     S#TQTY
+     C                     MOVEL*ON       *IN88
+     C                     ADD  1         RRN
+     C*
+     C                     WRITESF1
+     C                     CLEARSF1
+     C                     ENDDO
+     C                     ENDIF
+     C*
+     C                     Z-ADDRRN       W#LRRN
+     C*
+     C           S#NBR     IFGT RRN
+     C           RRN       ANDNE*ZEROS
+     C                     Z-ADDRRN       S#NBR
+     C                     ENDIF
+     C                     ENDSR
+     C*
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*
+     C*Screen Number = '01' Process Read Subfile Screen
+     C*
+     C           PRCID     DOWEQ'03'
+     C                     READCSF1                    5353*ER*EOF
+     C   53                MOVE '01'      PRCID
+     C   53                LEAVE
+     C*
+     C                     EXSR SR3100
+     C*
+     C*
+     C                     UPDATSF1
+     C*                    Z-ADDRRN       S#NBR
+     C                     ENDDO
+     C           CODE      IFEQ '1'
+     C           SAVFLG    ANDEQ*BLANK
+     C                     MOVEL'Y'       SAVFLG  1
+     C                     MOVEAERR,10    S#ERR
+     C                     MOVEL'02'      PRCID
+     C                     ENDIF
+     C*
+     C           CODE      IFEQ '2'
+     C           CHGFLG    ANDEQ*BLANK
+     C                     MOVEL'Y'       CHGFLG  1
+     C                     MOVEAERR,11    S#ERR
+     C                     MOVEL'02'      PRCID
+     C                     ENDIF
+     C*
+     C*刪除確認用
+     C*
+     C           CODE      IFEQ '3'
+     C           DELFLG    ANDEQ*BLANK
+     C                     MOVE 'Y'       DELFLG  1
+     C                     MOVEAERR,4     S#ERR
+     C                     MOVEL'02'      PRCID
+     C                     GOTO END300
+     C                     ENDIF
+     C*
+     C           CODE      IFEQ '3'
+     C           DELFLG    ANDEQ'Y'
+     C                     EXSR SR3320
+     C                     MOVEL'01'      PRCID
+     C                     MOVEL*BLANKS   DELFLG
+     C                     ENDIF
+     C*
+     C   96      CODE      IFEQ '1'
+     C           *LOVAL    SETLLRINVTRL
+     C                     CALL 'ARE098P'
+     C                     PARM           S#NO
+     C*                    FREE 'ARR001P'
+     C                     MOVEAERR,12    S#ERR
+     C                     ENDIF
+     C           S#ERR     IFEQ *BLANKS
+     C           SAVFLG    ANDEQ'Y'
+     C           S#ERR     OREQ *BLANKS
+     C           CHGFLG    ANDEQ'Y'
+     C                     MOVEL*BLANKS   SAVFLG
+     C                     MOVEL*BLANKS   CHGFLG
+     C                     ENDIF
+     C*
+     C           END300    ENDSR
+     C*****************************************************************
+     C           SR3100    BEGSR
+     C*****************************************************************
+     C*
+     C           CODE      IFEQ '1'
+     C  N98                EXSR SR3200                     *取得單號
+     C                     ENDIF
+     C*
+0205AC           S#SQTY    IFNE 0
+0205AC           S#SPRC    ANDNE0
+     C           S#SQTY    MULT S#SPRC    S#SAMT    H
+0205AC                     ENDIF
+0205AC           S#SQTY    IFEQ 0
+0205AC           S#SPRC    ANDNE0
+0205AC           S#QTY     MULT S#SPRC    S#SAMT    H
+0205AC                     ENDIF
+0205AC           S#SQTY    IFNE 0
+0205AC           S#SPRC    ANDEQ0
+0205AC           S#SQTY    MULT S#UPRC    S#SAMT    H
+0205AC                     ENDIF
+     C*
+     C                     ADD  S#SQTY    S#TQY2
+     C                     ADD  S#SAMT    S#TAMT
+     C                     MOVEL*ON       *IN88
+     C*
+     C*
+     C           SAVFLG    IFEQ 'Y'
+     C           CHGFLG    OREQ 'Y'
+     C                     EXSR SR3300
+     C                     ENDIF
+     C*
+     C           END310    ENDSR
+     C*****************************************************************
+     C           SR3200    BEGSR
+     C*****************************************************************
+     C*
+     C                     MOVEL'VR'      GEKIND
+     C                     MOVE *BLANK    GEPRIN
+     C                     MOVE *BLANK    GRP
+     C                     MOVELTXAR      GE1
+9912AC*                    MOVELD#YM1     D#YM
+     C                     MOVELGRP       GEPRIN
+0112AC           GEKEY     CHAINGENSEQ              N97
+     C   97                Z-ADD1         GECUNO
+     C  N97                ADD  1         GECUNO
+     C                     Z-ADDGECUNO    D#NUM
+     C                     MOVELGRP       S#NO
+     C                     MOVEL*ON       *IN98
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3300    BEGSR
+     C*****************************************************************
+     C*
+     C*1=Add 2=Change 3=Copy 4=Delete 5=Display
+     C*
+     C                     MOVE 'Y'       UPDSCR
+     C           KEY04     CHAINRINVTRL              57
+     C           CODE      IFEQ '1'
+     C           CODE      OREQ '2'
+     C                     EXSR SR3310
+     C                     MOVEL*OFF      *IN88            SFLNXTCHG
+     C                     ENDIF
+     C*
+0207AC           S#NO      CHAINRINVTRT              57
+0207AC           CODE      IFEQ '1'
+0207AC           CODE      OREQ '2'
+0207AC                     EXSR SR3330
+0207AC                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3310    BEGSR
+     C*****************************************************************
+     C*
+     C*Move Screen Record To File Record
+     C*
+     C*
+     C  N96      CODE      IFEQ '1'
+     C                     MOVEL'VR'      GEKIND
+     C                     MOVE *BLANK    GEPRIN
+     C                     MOVE *BLANK    GRP
+     C                     MOVELTXAR      GE1
+9912AC*                    MOVELD#YM1     D#YM
+     C                     MOVELGRP       GEPRIN
+     C           GEKEY     CHAINGENSEQ               97
+     C   97                Z-ADD1         GECUNO
+     C   97                WRITEGEREC
+     C  N97                ADD  1         GECUNO
+     C  N97                UPDATGEREC
+     C                     Z-ADDGECUNO    D#NUM
+     C                     MOVELGRP       S#NO
+0112AC           GEKEY     SETLLGENSEQ                     將指標移走
+     C                     MOVEL*ON       *IN96
+     C                     ENDIF
+     C*
+     C   57                CLEARRINVTRL
+     C*
+     C           S#OPT     IFEQ 'Y'
+     C*
+0112BC           CODE      IFEQ '1'
+0112BC           S#YN      ANDEQ'Y'
+0112BC                     MOVEL'Y'       ITVRYN
+0112BC                     ELSE
+0112BC                     MOVEL'N'       ITVRYN
+0112BC                     ENDIF
+     C*
+     C   57                MOVEL'A'       ITFLAG
+     C  N57                MOVEL'C'       ITFLAG
+     C                     MOVELS#NO      ITNO
+     C                     MOVELS#ORNO    ITORNO
+     C                     Z-ADDS#DAT1    ITDAT1
+     C                     Z-ADDS#DAT2    ITDAT2
+     C                     Z-ADDS#DATE    ITDATE
+     C                     MOVELS#CUNO    ITCUNO
+     C                     MOVELS#CUNM    ITCUNM
+     C                     Z-ADDS#DATT    ITTXDE
+     C                     MOVELS#TXNO    ITTXNO
+     C                     Z-ADDS#ITEM    ITITEM
+     C                     MOVELS#PDNM    ITPDNM
+     C                     Z-ADDS#QTY     ITQTY
+     C                     Z-ADDS#UPRC    ITUPRC
+     C                     Z-ADDS#SQTY    ITSQTY
+     C                     Z-ADDS#SPRC    ITSPRC
+     C                     Z-ADDS#SAMT    ITAMT
+     C   57                MOVELD#USER    ITENTM           建檔人員
+     C   57                MOVE S#DATE    ITENTD           建檔日期
+     C   57                TIME           ITENTT           建檔時間
+     C                     MOVELD#USER    ITUPDM           異動人員
+     C                     MOVE S#DATE    ITUPDD           異動日期
+     C                     TIME           ITUPDT           異動時間
+     C   57                WRITERINVTRL
+     C  N57                UPDATRINVTRL
+0512AC                     MOVELD#USER    ITITDM
+0512AC                     MOVE S#DATE    ITITDD
+0512AC                     TIME           ITITDT
+0512AC                     WRITEINVTG
+     C                     ENDIF
+     C*
+     C  N57      S#OPT     IFEQ *BLANKS
+0512AC                     MOVELD#USER    ITITDM
+0512AC                     MOVE S#DATE    ITITDD
+0512AC                     TIME           ITITDT
+0512AC                     WRITEINVTG
+     C                     DELETRINVTRL
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3320    BEGSR
+     C*****************************************************************
+     C           DELFLG    IFEQ 'Y'
+     C           S#NO      SETLLRINVTRL
+     C                     MOVEL*OFF      *IN52
+     C           *IN52     DOWEQ*OFF
+     C           S#NO      READERINVTRL                  52
+     C   52                LEAVE
+0512AC                     MOVELD#USER    ITITDM
+0512AC                     MOVE S#DATE    ITITDD
+0512AC                     TIME           ITITDT
+0512AC                     WRITEINVTG
+     C                     DELETRINVTRL
+     C                     ENDDO
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+0207AC           SR3330    BEGSR
+0207AC*****************************************************************
+0207AC   57                CLEARRINVTRT
+0207AC   57                MOVEL'A'       TTFLAG
+0207AC  N57                MOVEL'C'       TTFLAG
+0207AC                     MOVELS#NO      TTNO
+0207AC                     MOVELS#TEX1    TTTEX1
+0207AC                     MOVELS#TEX2    TTTEX2
+0207AC   57                MOVELD#USER    TTENTM           建檔人員
+0207AC   57                MOVE S#DATE    TTENTD           建檔日期
+0207AC   57                TIME           TTENTT           建檔時間
+0207AC                     MOVELD#USER    TTUPDM           異動人員
+0207AC                     MOVE S#DATE    TTUPDD           異動日期
+0207AC                     TIME           TTUPDT           異動時間
+0207AC   57                WRITERINVTRT
+0207AC  N57                UPDATRINVTRT
+0207AC                     ENDSR
+     C*****************************************************************
+**  TAB1 TAB2
+1新　增2修　改3刪　除4查  詢5列　印8確  認9確認還原
+**  ERR
+01-資料已存在！
+02-資料不存在！
+03-欄位不可空白！
+04-請按＜執行鍵＞確認刪除。
+05-欄位須空白！
+06-印表作業完成，請稍候!!
+07-日期輸入錯誤！
+08-訂單編號與試算單號中之訂單編號不同，請檢核!!
+09-日期區間輸入錯誤!!
+10-請按<執行鍵>確認新增!!
+11-請按<執行鍵>確認修改!!
+12-試算表已送至批次佇列執行。
+

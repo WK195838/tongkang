@@ -1,0 +1,364 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR036RN
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     前期出貨本期開立發票明細表
+     H*            5.DATE-WRITTEN  89/04/08
+     H*            6.UPDATE  DATE  99/12/06  2010ARXXX  S00WCJ (9912A)
+     H*                            增加U廠選項
+     H*                           104/10/05  2015AR953  S00WCJ (0409A)
+     H*                            產品代碼3碼擴5碼
+     H*                           108/07/09  2019AR00017 S00WCJ (0807A)
+     H*                            若磅單重複，且發票號碼不同，則寫入
+     H*                            工作檔，以便產生另一份報表
+     H*                           112/05/03  2023AR00022 S00WCJ (1205A)
+     H*                            新增廠區N
+     H*
+     H*  說明：發票開立日期為本期但所對應之磅單為本期之前已出貨
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  IP  E           K        DISK
+     FTRNDTL  IF  E           K        DISK
+     FTRNDTLL2IF  E           K        DISK
+     F            TXREC                             KRENAMETXRECL
+     FARR084T O   E             69     PRINTER
+0807AFARR084F UF  E           K        DISK                      A
+0807AFARR084F1O   E           K        DISK
+     IINREC       01
+     I                                              INAREAL4
+     I                                              INCUNOL3
+     I                                              INORNOL2
+     I                                              INNO  L1
+     ITXRECL
+     I*             TXFLAG                          F#FLAG
+     I*             TXCODE                          F#CODE
+     I              TXNO                            F#NO
+     I*             TXITEM                          F#ITEM
+     I*             TXACNT                          F#ACNT
+     I*             TXDATE                          F#DATE
+     I*             TXACDT                          F#ACDT
+     I*             TXCUNO                          F#CUNO
+     I*             TXCUNM                          F#CUNM
+     I*             TXORNO                          F#ORNO
+     I              TXIVNO                          F#IVNO
+     I*             TXPCNO                          F#PCNO
+     I*             TXVUNO                          F#VUNO
+     I*             TXRVID                          F#RVID
+     I*             TXSALE                          F#SALE
+     I*             TXSATP                          F#SATP
+     I*             TXIVTP                          F#IVTP
+     I*             TXPDNM                          F#PDNM
+     I*             TXQTY                           F#QTY
+     I*             TXUPRC                          F#UPRC
+     I              TXAMT                           F#AMT
+     I*             TXTAX                           F#TAX
+     I*             TXFL01                          F#FL01
+     I*             TXFL02                          F#FL02
+     I*             TXTXAR                          F#TXAR
+     I*             TXTXDT                          F#TXDT
+     I*             TXRESV                          F#RESV
+     I*
+     I            DS
+     I                                        1   60D#DAT
+     I                                        1   40D#YYMM
+     I            DS
+     I                                        1  10 D#INNO
+     I                                        3  10 D#INN1
+     I            DS
+     I                                        1  10 D#INNX
+     I                                        1   4 D#INN2
+     I           UDS
+     I                                      500 5070D#DATE
+     I                                      508 5130T#YYMM
+     I                                      516 516 D#AREA
+     I                                     10011010 T#USID
+     C*****************************************************************
+     C*              KEY   KLIST
+     C*****************************************************************
+     C           K#DTL     KLIST
+     C                     KFLD           TXCODE
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           T#NO
+     C                     KFLD           T#PDNM
+     C                     KFLD           T#UPRC
+     C                     KFLD           T#QTY
+     C*
+     C*****************************************************************
+     C*              MAIN  PROGRAM
+     C*****************************************************************
+     C           *IN99     IFEQ *OFF
+     C                     EXSR INISR
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C   L4                EXSR L4CLR
+     C   L3                EXSR L3CLR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CL3 99                EXSR L3SR
+     CL4 99                EXSR L4SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     SELEC
+     C           D#AREA    WHEQ 'P'
+     C                     MOVE '台北'  T#BARA
+     C           D#AREA    WHEQ 'T'
+9912AC                     MOVE '八德'  T#BARA
+9912AC           D#AREA    WHEQ 'U'
+9912AC                     MOVE '桃園'  T#BARA
+     C           D#AREA    WHEQ 'H'
+     C                     MOVE '苗栗'  T#BARA
+     C           D#AREA    WHEQ 'M'
+     C                     MOVE '台中'  T#BARA
+     C           D#AREA    WHEQ 'K'
+     C                     MOVE '高雄'  T#BARA
+1205AC           D#AREA    WHEQ 'N'
+1205AC                     MOVEL'大業'  T#BARA
+     C                     OTHER
+     C                     MOVE '全部'  T#BARA
+     C                     ENDSL
+     C*
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C*
+     C                     MOVE *ALL'0'   W#IVNO 10
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L4CLR     BEGSR
+     C*****************************************************************
+     C*廠區別小計
+     C                     Z-ADD0         T#BAM4
+     C                     Z-ADD0         T#QTY4
+     C                     Z-ADD0         T#AMT4
+     C                     Z-ADD0         T#BAL4
+     C                     MOVE *ON       *IN69
+     C                     ENDSR
+     C*****************************************************************
+     C           L3CLR     BEGSR
+     C*****************************************************************
+     C*客戶別小計
+     C                     Z-ADD0         T#BAM3
+     C                     Z-ADD0         T#QTY3
+     C                     Z-ADD0         T#AMT3
+     C                     Z-ADD0         T#BAL3
+     C                     MOVE *OFF      *IN41
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C*訂單別小計
+     C                     Z-ADD0         T#BAM2
+     C                     Z-ADD0         T#QTY2
+     C                     Z-ADD0         T#AMT2
+     C                     Z-ADD0         T#BAL2
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C*發票別小計
+     C                     Z-ADD0         T#BAM1
+     C                     Z-ADD0         T#QTY1
+     C                     Z-ADD0         T#AMT1
+     C                     Z-ADD0         T#BAL1
+     C                     MOVE *OFF      *IN43
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+TEST C                     MOVE INNO      D#INNO
+  .  C           D#INN1    IFEQ '29152254'
+  .  C                     Z-ADD0         W#Y     10
+  .  C                     ENDIF
+     C                     MOVE *OFF      *IN40
+     C                     MOVE *BLANK    W#NO    8
+     C           INNO      SETLLTXRECL                     發票號碼
+     C           *IN40     DOWEQ*OFF
+     C           INNO      READETXRECL                   40
+     C   40                LEAVE
+     C*預防一正一負重複
+     C           F#NO      IFEQ W#NO
+     C                     ITER
+     C                     ELSE
+     C                     MOVE F#NO      W#NO
+     C                     ENDIF
+     C*---------
+     C           TXDATE    IFLT D#DATE                     單據日期
+     C**求得未經一正一負處理過之原始金額
+     C                     MOVE *OFF      *IN70
+8906 C           INTYPE    IFEQ '1'
+     C                     MOVE 'SA04'    TXCODE
+ .   C                     ELSE
+ .   C                     MOVE 'AR05'    TXCODE
+ .   C                     ENDIF
+     C                     MOVE F#NO      TXNO
+     C                     Z-ADD0         TXITEM
+     C           K#DTL     SETLLTXREC
+     C           *IN70     DOWEQ*OFF
+     C                     READ TXREC                    70
+     C           *IN70     IFEQ *ON
+     C           F#NO      ORNE TXNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           TXNO      IFEQ 'M1145531'
+     C                     Z-ADD0         W#TEST  10
+     C                     ENDIF
+     C*
+     C           TXDATE    IFLT D#DATE
+9002 C*          TXACDT    ANDLED#DATE
+8906 C*          TXIVNO    ANDEQINNO
+9003 C*9003 加上排除區間開立之部分
+9003 C           TXIVNO    IFEQ INNO
+     C*
+     C           TXNO      IFEQ 'K74809  '
+     C                     Z-ADD6081      TXAMT
+     C                     ENDIF
+     C                     EXSR WTRSR
+9003 C                     ELSE
+  .  C                     MOVE TXIVNO    D#INNX
+  .  C           D#INN2    IFEQ '0000'
+  .  C                     EXSR WTRSR
+  .  C                     ENDIF
+  .  C*
+9003 C                     ENDIF
+     C*
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDIF                            TXDATE
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           T#QTY1    IFNE 0
+     C           T#AMT1    ANDNE0
+     C           T#AMT1    SUB  T#BAM1    T#BAL1
+     C   69                WRITEAR084TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR084T2
+     C*
+     C                     ADD  T#BAM1    T#BAM2
+     C                     ADD  T#QTY1    T#QTY2
+     C                     ADD  T#AMT1    T#AMT2
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C           T#QTY2    IFNE 0
+     C           T#AMT2    ANDNE0
+     C           T#AMT2    SUB  T#BAM2    T#BAL2
+     C   69                WRITEAR084TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR084T3
+     C*
+     C                     ADD  T#BAM2    T#BAM3
+     C                     ADD  T#QTY2    T#QTY3
+     C                     ADD  T#AMT2    T#AMT3
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           L3SR      BEGSR
+     C*****************************************************************
+     C           T#QTY3    IFNE 0
+     C           T#AMT3    ANDNE0
+     C           T#AMT3    SUB  T#BAM3    T#BAL3
+     C   69                WRITEAR084TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR084T4
+     C*
+     C                     ADD  T#BAM3    T#BAM4
+     C                     ADD  T#QTY3    T#QTY4
+     C                     ADD  T#AMT3    T#AMT4
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           L4SR      BEGSR
+     C*****************************************************************
+     C           T#QTY4    IFNE 0
+     C           T#AMT4    ANDNE0
+     C           T#AMT4    SUB  T#BAM4    T#BAL4
+     C   69                WRITEAR084TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR084T5
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           WTRSR     BEGSR
+     C*****************************************************************
+     C*印明細
+     C   41                MOVE *BLANK    T#CUNO           客戶編號
+     C   41                MOVE *BLANK    T#CUNM           客戶名稱
+     C   43                MOVE *BLANK    T#IVNO           發票編號
+     C   43                Z-ADD0         T#IVDT           開立日期
+     C   43                Z-ADD0         T#BAMT
+     C  N41                MOVE INCUNO    T#CUNO           客戶編號
+     C  N41                MOVE INCUNM    T#CUNM           客戶名稱
+     C  N43                MOVE INNO      T#IVNO           發票編號
+     C  N43                Z-ADDININDT    T#IVDT           開立日期
+     C  N43                Z-SUBINBAMT    T#BAMT
+     C                     MOVELTXNO      T#NO             磅單編號
+     C                     Z-ADDTXDATE    T#DATE           出貨日期
+0409AC                     MOVELTXPDNM    T#PDNM           品名
+     C                     Z-ADDTXUPRC    T#UPRC           單價
+     C                     Z-ADDTXQTY     T#QTY            數量
+     C                     Z-ADDTXAMT     T#AMT            金額
+9008 C                     MOVELINORNO    T#ORNO           傳票號碼
+     C*
+8906 C*判斷單據年月是否與入帳年月相同
+9002 C*                    Z-ADDTXDATE    D#DAT
+ .   C*                    Z-ADDD#YYMM    W#YM1   40       出貨年月
+ .   C*                    Z-ADDTXACDT    D#DAT
+ .   C*                    Z-ADDD#YYMM    W#YM2   40       入帳年月
+9002 C*          W#YM1     IFEQ W#YM2
+9003 C*          T#AMT     IFGT 0
+  .  C           TXACDT    IFLT D#DATE
+     C   69                WRITEAR084TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR084T1
+     C                     MOVEA'111'     *IN,41
+     C*
+     C                     ADD  T#QTY     T#QTY1
+     C                     ADD  T#AMT     T#AMT1
+     C                     ADD  T#BAMT    T#BAM1
+0807AC*
+0807AC           KEY01     SETLLRARR084F
+0807AC                     MOVEL*OFF      *IN50
+0807AC           *IN50     DOWEQ*OFF
+0807AC           KEY01     READERARR084F                 50
+0807AC   50                LEAVE
+0807AC           INNO      IFNE T1IVNO
+0807AC                     WRITERARR84F1
+0807AC                     MOVELINNO      T1IVNO
+0807AC                     WRITERARR84F1
+0807AC                     ENDIF
+0807AC                     ENDDO
+0807AC                     MOVELINCUNO    T1CUNO
+0807AC                     MOVELINCUNM    T1CUNM
+0807AC                     MOVELINNO      T1IVNO
+0807AC                     Z-ADDININDT    T1IVDT
+0807AC                     Z-ADDINBAMT    T1BAMT
+0807AC                     MOVELT#NO      T1NO
+0807AC                     Z-ADDT#DATE    T1DATE
+0807AC                     MOVELT#PDNM    T1PDNM
+0807AC                     Z-ADDT#UPRC    T1UPRC
+0807AC                     Z-ADDT#QTY     T1QTY
+0807AC                     Z-ADDT#AMT     T1AMT
+0807AC                     MOVELT#ORNO    T1ORNO
+0807AC                     WRITERARR084F
+9002 C                     ENDIF
+     C                     ENDSR
+

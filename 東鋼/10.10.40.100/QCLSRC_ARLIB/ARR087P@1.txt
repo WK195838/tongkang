@@ -1,0 +1,165 @@
+     /****************************************************************/
+     /*                                                              */
+     /*               >>   PROGRAM INTRODUCTION   <<                 */
+     /*                                                              */
+     /*            1.PROGRAM-NAME  ARR087P                           */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S02HYS                            */
+     /*            4.FUNCTION     專案退稅明細表　　　　           */
+     /*            5.DATE-WRITTEN  89/05/03                          */
+     /*            6.DATE-MODIFY   89/05/03                          */
+     /*                                                              */
+     /****************************************************************/
+             PGM
+             DCLF       FILE(ARLIB/ARR087S)
+     /*宣告變數*/
+             DCL        VAR(&YM)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&YM1)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&YM2)    TYPE(*DEC) LEN(2)
+             DCL        VAR(&YM3)    TYPE(*DEC) LEN(2)
+             DCL        VAR(&Y1)     TYPE(*CHAR) LEN(6)
+             DCL        VAR(&Y2)    TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DSPID) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TYPE)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&USID)  TYPE(*CHAR) LEN(1)
+             RTVJOBA    JOB(&DSPID) OUTQ(&OUTQ) TYPE(&TYPE)
+             IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+             CHGVAR     VAR(&S#DEVN) VALUE(&DSPID)
+             RTVDTAARA  DTAARA(*LDA (1001 10)) RTNVAR(&S#USER)
+             RTVDTAARA  DTAARA(*LDA (1021  1)) RTNVAR(&USID)
+     START:  SNDRCVF
+             IF         COND((&IN03 *EQ '1') *OR (&IN12 *EQ '1')) +
+                        THEN(RETURN)
+     /*判斷月份*/
+             CHGVAR     VAR(&YM) VALUE(%SST(&S#YYMM 3 2))
+             CHGVAR     VAR(&YM1) VALUE(%SST(&S#YYM1 3 2))
+     /*判斷年度*/
+             CHGVAR     VAR(&YM2) VALUE(%SST(&S#YYMM 1 2))
+             CHGVAR     VAR(&YM3) VALUE(%SST(&S#YYM1 1 2))
+             CHGVAR     VAR(&IN30)   VALUE('0')
+
+             IF         COND(&YM2 *EQ &YM3) THEN(DO)
+             IF         COND(&YM  *GT &YM1) THEN(DO)
+                        CHGVAR  VAR(&S#ERR) VALUE('月份輸入錯誤!')
+                        CHGVAR  VAR(&IN30)  VALUE('1')
+                        CHGVAR  VAR(&IN31)  VALUE('1')
+                        GOTO    CMDLBL(START)
+                        ENDDO
+                        ENDDO
+             IF         COND(&YM2 *NE &YM3) THEN(DO)
+             CHGVAR     VAR(&YM3) VALUE(&YM3-1)
+             IF         COND(&YM2 *NE &YM3) THEN(DO)
+                        CHGVAR  VAR(&S#ERR) VALUE('只能輸入一個年份')
+                        CHGVAR  VAR(&IN30)  VALUE('1')
+                        CHGVAR  VAR(&IN31)  VALUE('1')
+                        GOTO    CMDLBL(START)
+                        ENDDO
+             IF         COND(&YM2 *EQ &YM3) THEN(DO)
+             IF         COND(&YM  *LE &YM1) THEN(DO)
+                        CHGVAR  VAR(&S#ERR) VALUE('只能輸入一個年份')
+                        CHGVAR  VAR(&IN30)  VALUE('1')
+                        CHGVAR  VAR(&IN31)  VALUE('1')
+                        GOTO    CMDLBL(START)
+                        ENDDO
+                        ENDDO
+                        ENDDO
+             IF      COND(&YM *GT '12') THEN(DO)
+                        CHGVAR  VAR(&S#ERR) VALUE('月份輸入錯誤!')
+                        CHGVAR  VAR(&IN30)  VALUE('1')
+                        GOTO    CMDLBL(START)
+                        ENDDO
+             IF      COND(&YM1 *GT '12') THEN(DO)
+                        CHGVAR  VAR(&S#ERR) VALUE('月份輸入錯誤!')
+                        CHGVAR  VAR(&IN31)  VALUE('1')
+                        GOTO    CMDLBL(START)
+                        ENDDO
+
+             IF         COND(&S#YYMM *EQ '    ') THEN(DO)
+               CHGVAR     VAR(&S#ERR) VALUE('起始年月不可空白！')
+               CHGVAR     VAR(&IN30)  VALUE('1')
+               GOTO       CMDLBL(START)
+               ENDDO
+             IF         COND(&S#YYM1 *EQ '    ') THEN(DO)
+               CHGVAR     VAR(&S#ERR) VALUE('終止年月不可空白！')
+               CHGVAR     VAR(&IN31)  VALUE('1')
+               GOTO       CMDLBL(START)
+               ENDDO
+
+     /*  紀錄值  */
+             CHGVAR     VAR(&Y1) VALUE('00' *CAT &S#YYMM)
+             CHGVAR     VAR(&Y2) VALUE('00' *CAT &S#YYM1)
+             CHGDTAARA  DTAARA(*LDA (501 6))  VALUE(&Y1)
+             CHGDTAARA  DTAARA(*LDA (507 6))  VALUE(&Y2)
+             CHGDTAARA  DTAARA(*LDA (519 10)) VALUE(&DSPID)
+             SBMJOB     CMD(CALL PGM(ARR087P)) JOB(ARR087P) +
+                        JOBD(ARJOBD) OUTQ(&OUTQ)
+             SNDBRKMSG  MSG('<<專案退稅明細表開始處理，請稍候.>>')    +
+                                 TOMSGQ(&DSPID) +
+                        MSGTYPE(*INFO)
+             RETURN      /*INTERACTIVE JOB */
+    BATCH:
+             RTVDTAARA  DTAARA(*LDA (501 6))  RTNVAR(&Y1)
+             RTVDTAARA  DTAARA(*LDA (507 6))  RTNVAR(&Y2)
+             RTVDTAARA  DTAARA(*LDA (519 10)) RTNVAR(&DSPID)
+             RTVDTAARA  DTAARA(*LDA (1021  1)) RTNVAR(&USID)
+             DLTF       FILE(QTEMP/ARBTAXX)
+             MONMSG     MSGID(CPF0000)
+
+             CRTDUPOBJ  OBJ(ARBTAX) FROMLIB(DALIB) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(ARBTAXX)
+
+             OVRDBF     FILE(ARBTAXX) TOFILE(QTEMP/ARBTAXX)
+             OVRDBF     FILE(ARBTAX) TOFILE(DALIB/ARBTAX) SHARE(*YES)
+ /*判斷列印報表人員的ＩＤ，若該人員在台北，則抓取Ｔ，Ｍ，Ｐ之訂單*/
+             IF         COND(&USID *EQ 'P')   THEN( +
+             OPNQRYF    FILE(ARBTAX) +
+                        QRYSLT('+
+                        ((ORNO   *EQ "P") *OR +
+                         (ORNO   *EQ "M") *OR +
+                         (ORNO   *EQ "T")) *AND +
+                        (AXFLAG *NE "D") *AND +
+                        (YYMM *GE "' || &Y1 || '") *AND +
+                        (YYMM *LE "' || &Y2 || '")') +
+                        MAPFLD((YYMM AXYYMM *CHAR 6) +
+                               (ORNO '%SST(AXORNO 1 1)' *CHAR 1)))
+ /*判斷列印報表人員的ＩＤ，若該人員在苗栗，則抓取Ｈ之訂單*/
+             IF         COND(&USID *EQ 'H')   THEN( +
+             OPNQRYF    FILE(ARBTAX) +
+                        QRYSLT('+
+                        (ORNO   *EQ "H") *AND +
+                        (AXFLAG *NE "D") *AND +
+                        (YYMM *GE "' || &Y1 || '") *AND +
+                        (YYMM *LE "' || &Y2 || '")') +
+                        MAPFLD((YYMM AXYYMM *CHAR 6) +
+                               (ORNO '%SST(AXORNO 1 1)' *CHAR 1)))
+ /*判斷列印報表人員的ＩＤ，若該人員在高雄，則抓取Ｋ之訂單*/
+             IF         COND(&USID *EQ 'K')   THEN( +
+             OPNQRYF    FILE(ARBTAX) +
+                        QRYSLT('+
+                        (ORNO   *EQ "K") *AND +
+                        (AXFLAG *NE "D") *AND +
+                        (YYMM *GE "' || &Y1 || '") *AND +
+                        (YYMM *LE "' || &Y2 || '")') +
+                        MAPFLD((YYMM AXYYMM *CHAR 6) +
+                               (ORNO '%SST(AXORNO 1 1)' *CHAR 1)))
+             CALL       PGM(ARLIB/ARR087R1)
+             CLOF       OPNID(ARBTAX)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(ARBTAXX) TOFILE(QTEMP/ARBTAXX) SHARE(*YES)
+             OVRPRTF    FILE(ARR087T) TOFILE(ARR087T) PAGESIZE(*N +
+                          198) CPI(15) HOLD(*YES) USRDTA('專案退稅')
+             OPNQRYF    FILE(ARBTAXX) QRYSLT('+
+                        (YYMM *GE "' || &Y1 || '") *AND +
+                        (YYMM *LE "' || &Y2 || '")') +
+                        KEYFLD((AXADDT) (AXYYMM) (AXORNO) (AXCUNO)) +
+                        MAPFLD((YYMM AXYYMM *CHAR 6))
+             CALL       PGM(ARLIB/ARR087R)
+             CLOF       OPNID(ARBTAXX)
+             DLTOVR     FILE(*ALL)
+             SNDBRKMSG  MSG('<<專案退稅表處理完畢，請列印             +
+                        ....>>') TOMSGQ(&DSPID) +
+                        MSGTYPE(*INFO)
+   ENDPGM
+

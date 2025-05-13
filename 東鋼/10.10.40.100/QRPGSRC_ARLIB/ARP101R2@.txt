@@ -1,0 +1,200 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP102R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     銷貨利息計算─計算發票加權兌現日
+     H*            5.DATE-WRITTEN  92/04/14
+     H*            6.DATE-UPDATE
+     H*
+     H* **計算發票的加權兌現日，其公式如下
+     H*１繳款金額ｘ（繳款加權兌現日─發票開立日）
+     H*２（應繳金額─繳款總金額）ｘ（程式執行日OR轉催收日─發票開立日）
+     H*３Σ（１＋２）／應繳金額
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FINVMST  IP  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FBSYSDT  IF  E           K        DISK
+     FARP101F1IF  E           K        DISK
+     FARP101F2UF  E           K        DISK                      A
+     IINREC       01
+     I           UDS
+     I                                      300 304 U#YYMM
+     C*****************************************************************
+     C*          KEY   LIST
+     C*****************************************************************
+     C*FILE==>INVDTL
+     C           W#INVD    KLIST
+     C                     KFLD           IVNO             發票號碼
+     C                     KFLD           IVACNT           類別
+     C                     KFLD           IVITEM           項次
+     C*FILE==>ARP101F1
+     C           W#ARF1    KLIST
+     C                     KFLD           A1RVNO           繳款單號
+     C                     KFLD           A1ITEM           繳款項次
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     CLEARRAR101F2
+     C*清空所有暫存變數值
+     C                     EXSR CLRSR
+     C*
+     C                     MOVELINNO      IVNO
+     C                     MOVEL'6'       IVACNT
+     C                     Z-ADD0         IVITEM
+     C           W#INVD    SETLLIVREC
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ IVREC                    40
+     C   40                LEAVE
+     C*
+     C           IVNO      IFNE INNO
+     C           IVACNT    ORNE '6'
+     C                     LEAVE
+     C                     ENDIF
+     C*計算
+     C                     EXSR SR1000
+     C                     ENDDO
+     C*寫入
+     C           W#AMT3    IFNE 0
+     C                     EXSR SR2000
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           CLRSR     BEGSR
+     C*****************************************************************
+     C*W#DAY1==>繳款加權兌現日─發票開立日
+     C*W#DAY2==>程式執行日OR轉催收日─發票開立日
+     C*W#DAY3==>發票加權兌現日
+     C*W#AMT1==>繳款金額ｘ（繳款加權兌現日─發票開立日）
+     C*W#AMT2==>（應繳金額─繳款總金額）ｘ（程式執行日OR轉催收日─發票開立日
+     C*W#AMT3==> W#AMT1 + W#AMT2
+     C*W#IAMT==>發票金額
+     C*W#DAMT==>應繳金額─繳款總金額
+     C*
+     C                     Z-ADD0         W#DAY1  40
+     C                     Z-ADD0         W#DAY2  40
+     C                     Z-ADD0         W#DAY3  40
+     C                     Z-ADD0         W#AMT1 110
+     C                     Z-ADD0         W#AMT2 110
+     C                     Z-ADD0         W#AMT3 110
+     C                     Z-ADD0         W#IAMT 110
+     C                     Z-ADD0         W#DAMT 110
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C                     MOVELINRCNO    A1RVNO           繳款單號
+     C                     Z-ADD0         A1ITEM           繳款項次
+     C           W#ARF1    SETLLRAR101F1
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ RAR101F1                 41
+     C   41                LEAVE
+     C*
+     C           A1RVNO    IFNE INRCNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     EXSR SR1100
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*繳款金額X（繳款的加權兌現日─發票開立日）
+     C                     MOVE ININDT    W#INDT  8        發票開立日
+     C                     MOVE W#INDT    P#PDAT
+     C                     MOVE A1DAT2    W#DAT2  8        加權兌現日
+     C                     MOVE W#DAT2    P#RDAT
+     C*
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT  8        起始日期
+     C                     PARM           P#RDAT  8        終止日期
+     C                     PARM '1'       P#MODE  1        民國年
+     C                     PARM           P#DIF   50       相距天數
+     C                     PARM           P#ERR   1        錯誤碼
+     C*
+     C           P#ERR     IFEQ '0'
+     C                     Z-ADDP#DIF     W#DAY1           天數
+     C           W#DAY1    MULT IVAMT     W#AMT1
+     C           W#AMT1    MULT -1        W#AMT1
+     C                     ELSE
+     C                     Z-ADD0         W#DAY1
+     C                     ENDIF
+     C*--------------------
+     C*（應繳金額─繳款總金額）X（程式執行日OR轉催收日─發票開立日）
+     C           INAAMT    ADD  INATAX    W#IAMT
+     C           W#IAMT    ADD  IVAMT     W#DAMT
+     C                     MOVE ININDT    W#INDT  8        發票開立日
+     C                     MOVE W#INDT    P#PDAT
+     C           INNO      CHAINYSREC                45
+     C  N45                MOVE YSDATE    W#DATE  8        轉催收日
+     C   45                MOVE UDATE     W#DATE  8        轉催收日
+     C                     MOVE W#DATE    P#RDAT
+     C*
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT  8        起始日期
+     C                     PARM           P#RDAT  8        終止日期
+     C                     PARM '1'       P#MODE  1        民國年
+     C                     PARM           P#DIF   50       相距天數
+     C                     PARM           P#ERR   1        錯誤碼
+     C*
+     C           P#ERR     IFEQ '0'
+     C                     Z-ADDP#DIF     W#DAY2           天數
+     C           W#DAY2    MULT W#DAMT    W#AMT2
+     C                     ELSE
+     C                     Z-ADD0         W#DAY2
+     C                     ENDIF
+     C*
+     C           W#AMT1    ADD  W#AMT2    W#AMT3
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C           W#AMT3    DIV  W#IAMT    W#DAY3    H      加權兌現天數
+     C*
+     C                     MOVE ININDT    W#INDT  8        發票開立日
+     C                     MOVE W#INDT    P#PDAT
+     C                     MOVE W#DAY3    P#DAYS  4        天數
+     C*
+     C                     CALL 'UTS104R'
+     C                     PARM           P#PDAT  8        起始日期
+     C                     PARM '1'       P#MODE  1        民國年
+     C                     PARM '2'       P#OMOD  1        向後
+     C                     PARM           P#DAYS  4        天數
+     C                     PARM           P#RDAT  8        目的日期
+     C                     PARM           P#ERR   1        錯誤碼
+     C*
+     C           P#ERR     IFEQ '0'
+     C                     MOVE P#RDAT    A2DAT1           加權兌現日
+     C                     ELSE
+     C                     Z-ADD0         A2DAT1
+     C                     ENDIF
+     C*
+     C           INNO      CHAINRAR101F2             44
+     C                     MOVELINNO      A2INNO           發票號碼
+     C                     Z-ADDININDT    A2INDT           發票開立日
+     C                     MOVELINCUNO    A2CUNO           客戶代號
+     C                     MOVELINCUNM    A2CUNM           客戶姓名
+     C                     Z-ADDW#IAMT    A2AMT            發票金額
+     C                     MOVE P#RDAT    A2DAT1           加權兌現日
+     C   44                WRITERAR101F2
+     C  N44                UPDATRAR101F2
+     C*
+     C                     ENDSR
+

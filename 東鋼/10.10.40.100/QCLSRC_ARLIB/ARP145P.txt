@@ -1,0 +1,185 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP145P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCJ                                  */
+     /*     4.FUNCTION      INESEQ年度電子發票記錄檔傳輸P-->廠區*/
+     /*     5.DATE-WRITTEN  107/12/20 2018AR00038                   */
+     /*     6.UPDATE  DATE  108/05/10 S00WCJ (0805A)                */
+     /*                     110/12/20 2021AR00047 S00WCJ (1012A)    */
+     /*                      增加傳輸至I廠                      */
+     /*                     112/02/02 2023AR00006 S00WCJ (1202A)    */
+     /*                      增加傳輸至N廠                      */
+     /*                     113/10/30 2024AR00038 S00WCJ (1310A)    */
+     /*                      移除傳輸至N廠                      */
+     /*                                                             */
+     /***************************************************************/
+
+             PGM
+             DCL        VAR(&COUNTER) TYPE(*DEC) LEN(1 0)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&LOC)  TYPE(*CHAR) LEN(1)
+  /*0805A*/  DCL        VAR(&USER)    TYPE(*CHAR) LEN(10)
+
+             CHGJOB     LOGCLPGM(*YES)
+
+             MONMSG     MSGID(CPF0000)
+  /*0805A*/  RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+        IF   COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+ START:
+             CHGVAR     VAR(&LOC)     VALUE('P')
+             CHGDTAARA  DTAARA(*LDA (5 1))  VALUE(&LOC)
+             SBMJOB     JOB(ARP145P) JOBD(ARJOBD) JOBQ(ARJOBQA) +
+                           RQSDTA('CALL ARLIB/ARP145P')
+             GOTO       CMDLBL(ENDCLPGM)
+ BATCH:
+  /*0805A*/  CHGDTAARA  DTAARA(*LDA (1001 10)) VALUE(&USER)
+             CHGVAR     VAR(&COUNTER) VALUE(0)
+ LOOP:
+             MONMSG     MSGID(CPF1002) EXEC(DO)
+             CHGVAR     VAR(&COUNTER) VALUE(&COUNTER  + 1)
+             IF   COND(&COUNTER *GE 5) THEN(GOTO CMDLBL(ENDCLPGM))
+             DLYJOB     DLY(60)
+             GOTO       CMDLBL(LOOP)
+             ENDDO
+        /*                                          */
+             RTVDTAARA  DTAARA(*LDA (5 1))  RTNVAR(&LOC)
+        /*  台北  DALIB/INETRN--> DALIB/INETRNP    */
+             OVRDBF     FILE(INESEQ) TOFILE(DALIB/INESEQ) SHARE(*YES)
+     /*      OVRDBF     FILE(INESEQ) TOFILE(S00WCJ/INESEQ) SHARE(*YES) */
+             OVRDBF     FILE(INESEQT) TOFILE(ARLIB/INESEQT)
+     /*      OVRDBF     FILE(INESEQT) TOFILE(S00WCJ/INESEQT)  */
+
+             OPNQRYF    FILE(INESEQ) OPTION(*ALL) +
+                          QRYSLT('(SQFLAG *NE " ")')
+
+             CALL       PGM(ARLIB/ARP145RA)
+             CLOF       OPNID(INESEQ)
+             DLTOVR     FILE(*ALL)
+
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMK)
+             DLTF       FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(U01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMU)
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMH)
+/*1012A*/    DLTF       FILE(QTEMP/DDMI)
+/*1012A*/    MONMSG     MSGID(CPF0000)
+/*1012A*/    CRTDUPOBJ  OBJ(I01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMI)
+/*1310A      DLTF       FILE(QTEMP/DDMN)     */
+/*1310A      MONMSG     MSGID(CPF0000)       */
+/*1310A      CRTDUPOBJ  OBJ(N01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMN)  */
+
+        /*  台北　送廠區資料*/
+
+ /*         台北 ARLIB/INESEQT 送　新桃 DALIB/INENRB      */
+             IF         COND((&LOC *EQ 'P') *OR (&LOC *EQ ' ') *OR +
+                          (&LOC *EQ 'U')) THEN(DO)
+             CHGDTAARA  DTAARA(*LDA (6 1)) VALUE('U')
+      /*     CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(S00WCJ/INESEQ) +
+                          LVLCHK(*NO)    */
+             CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(DALIB/INESEQ) +
+                          LVLCHK(*NO)
+             OVRDBF     FILE(INESEQT) TOFILE(ARLIB/INESEQT) SHARE(*YES)
+      /*     OVRDBF     FILE(INESEQT) TOFILE(S00WCJ/INESEQT) SHARE(*YES) */
+
+             OPNQRYF    FILE(INESEQT) OPTION(*ALL) +
+                          QRYSLT('SQFACT *EQ "U"') +
+                                KEYFLD((SQYY) (SQYYMM) (SQFACT))
+
+             OVRDBF     FILE(INESEQ) TOFILE(QTEMP/DDMU)
+             CALL       PGM(ARLIB/ARP145RC)
+             CLOF       OPNID(INESEQT)
+             DLTOVR     FILE(*ALL)
+             ENDDO
+
+ /*1012A    台北 ARLIB/INESEQT 送　桃園加工 DALIB/INENRB      */
+             IF         COND((&LOC *EQ 'P') *OR (&LOC *EQ ' ') *OR +
+                          (&LOC *EQ 'I')) THEN(DO)
+/*1012A*/    CHGDTAARA  DTAARA(*LDA (6 1)) VALUE('I')
+      /*     CHGDDMF    FILE(QTEMP/DDMI) RMTFILE(S00WCJ/INESEQ) +
+                          LVLCHK(*NO)    */
+/*1012A*/    CHGDDMF    FILE(QTEMP/DDMI) RMTFILE(DALIB/INESEQ) +
+                          LVLCHK(*NO)
+/*1012A*/    OVRDBF     FILE(INESEQT) TOFILE(ARLIB/INESEQT) SHARE(*YES)
+      /*     OVRDBF     FILE(INESEQT) TOFILE(S00WCJ/INESEQT) SHARE(*YES) */
+
+/*1012A*/    OPNQRYF    FILE(INESEQT) OPTION(*ALL) +
+                          QRYSLT('SQFACT *EQ "I"') +
+                                KEYFLD((SQYY) (SQYYMM) (SQFACT))
+
+/*1012A*/    OVRDBF     FILE(INESEQ) TOFILE(QTEMP/DDMI)
+/*1012A*/    CALL       PGM(ARLIB/ARP145RC)
+/*1012A*/    CLOF       OPNID(INESEQT)
+/*1012A*/    DLTOVR     FILE(*ALL)
+/*1012A*/    ENDDO
+
+        /*  台北 ARLIB/INESEQT 送　苗栗 DALIB/INESEQ      */
+             IF         COND((&LOC *EQ 'P') *OR (&LOC *EQ ' ') *OR +
+                          (&LOC *EQ 'H')) THEN(DO)
+             CHGDTAARA  DTAARA(*LDA (6 1)) VALUE('H')
+   /*        CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(S00WCJ/INESEQ) +
+                          LVLCHK(*NO)   */
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(DALIB/INESEQ) +
+                          LVLCHK(*NO)
+             OVRDBF     FILE(INESEQT) TOFILE(ARLIB/INESEQT) SHARE(*YES)
+   /*        OVRDBF     FILE(INESEQT) TOFILE(S00WCJ/INESEQT) SHARE(*YES) */
+             OPNQRYF    FILE(INESEQT) OPTION(*ALL) +
+                          QRYSLT('SQFACT *EQ "H"')       +
+                                KEYFLD((SQYY) (SQYYMM) (SQFACT))
+             OVRDBF     FILE(INESEQ) TOFILE(QTEMP/DDMH)
+             CALL       PGM(ARLIB/ARP145RC)
+             CLOF       OPNID(INESEQT)
+             DLTOVR     FILE(*ALL)
+             ENDDO
+
+
+        /*  台北 ARLIB/INESEQP 送　高雄 DALIB/INESEQ      */
+             IF         COND((&LOC *EQ 'P') *OR (&LOC *EQ ' ') *OR +
+                          (&LOC *EQ 'K')) THEN(DO)
+             CHGDTAARA  DTAARA(*LDA (6 1)) VALUE('K')
+    /*       CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(S00WCJ/INESEQ) +
+                          LVLCHK(*NO)    */
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(DALIB/INESEQ) +
+                          LVLCHK(*NO)
+             OVRDBF     FILE(INESEQT) TOFILE(ARLIB/INESEQT) SHARE(*YES)
+    /*       OVRDBF     FILE(INESEQT) TOFILE(S00WCJ/INESEQT) SHARE(*YES) */
+             OPNQRYF    FILE(INESEQT) OPTION(*ALL) +
+                          QRYSLT('SQFACT *EQ "K"') +
+                                KEYFLD((SQYY) (SQYYMM) (SQFACT))
+             OVRDBF     FILE(INESEQ) TOFILE(QTEMP/DDMK)
+             CALL       PGM(ARLIB/ARP145RC)
+             CLOF       OPNID(INESEQT)
+             DLTOVR     FILE(*ALL)
+             ENDDO
+
+
+ /*1202A    台北 ARLIB/INESEQP 送　大業 DALIB/INESEQ      */
+ /*1310A     IF         COND((&LOC *EQ 'P') *OR (&LOC *EQ ' ') *OR +
+                          (&LOC *EQ 'N')) THEN(DO)        */
+ /*1310A     CHGDTAARA  DTAARA(*LDA (6 1)) VALUE('N')     */
+ /*1310A     CHGDDMF    FILE(QTEMP/DDMN) RMTFILE(DALIB/INESEQ) +
+                          LVLCHK(*NO)                     */
+ /*1310A     OVRDBF     FILE(INESEQT) TOFILE(ARLIB/INESEQT) SHARE(*YES)  */
+ /*1310A     OPNQRYF    FILE(INESEQT) OPTION(*ALL) +
+                          QRYSLT('SQFACT *EQ "N"') +
+                                KEYFLD((SQYY) (SQYYMM) (SQFACT)) */
+ /*1310A     OVRDBF     FILE(INESEQ) TOFILE(QTEMP/DDMN)     */
+ /*1310A     CALL       PGM(ARLIB/ARP145RC)                 */
+ /*1310A     CLOF       OPNID(INESEQT)                      */
+ /*1310A     DLTOVR     FILE(*ALL)                          */
+ /*1310A     ENDDO                                          */
+
+ ENDCLPGM:   ENDPGM
+

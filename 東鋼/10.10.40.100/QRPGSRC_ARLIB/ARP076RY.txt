@@ -1,0 +1,137 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP076R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02HYS
+     H*            4.FUNCTION     銷貨帳款兌現天數處理程式
+     H*            5.DATE-WRITTEN  90/07/19
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARCADT  IP  E           K        DISK
+     FHSMASTL9IF  E           K        DISK
+     FSAMASTL9IF  E           K        DISK
+     FARCATL  O   E           K        DISK
+     IRARCADT     01
+     I                                              ARCUNOL1
+     IRHSMAST
+     I              S1SALE                          F#SALE
+     I              S1SND                           F#SND
+     I              S1RECV                          F#RECV
+     I            DS
+     I                                        1   6 D#CUNO
+     I                                        1   1 D#KIND
+     I                                        2   2 D#CUN1
+     I                                        3   5 D#CUN2
+     I                                        6   6 D#CUN3
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*FILE => HSMAST
+     C           K#HMAS    KLIST
+     C                     KFLD           S1KIND
+     C                     KFLD           S1CUN1
+     C                     KFLD           S1CUN2
+     C                     KFLD           S1CUN3
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C                     KFLD           S1ORTM
+     C*FILE => SAMAST
+     C           K#SMAS    KLIST
+     C                     KFLD           S1KIND
+     C                     KFLD           S1CUN1
+     C                     KFLD           S1CUN2
+     C                     KFLD           S1CD01
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C                     KFLD           S1ORTM
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C           *IN99     IFEQ *OFF
+     C                     EXSR INISR
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1                   EXSR L1SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     MOVE *OFF      *IN98
+     C                     Z-ADD0         W#CONT  50
+     C                     Z-ADD0         W#DAYS  70
+     C                     CLEARRARCATL
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C  N98                Z-ADDARDAT3    ALDAT1
+     C  N98                MOVE *ON       *IN98
+     C           ARDAT3    IFLT ALDAT1
+     C                     Z-ADDARDAT3    ALDAT1           極小值
+     C                     ENDIF
+     C           ARDAT3    IFGT ALDAT2
+     C                     Z-ADDARDAT3    ALDAT2           極大值
+     C                     ENDIF
+     C*
+     C                     ADD  1         W#CONT           次數
+     C                     ADD  ARDAT3    W#DAYS           總天數
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*是否有未結案訂單
+     C                     MOVEA'00'      *IN,40
+     C*HSMAST
+     C                     MOVE ARCUNO    ALCUNO
+     C                     MOVE ARCUNO    D#CUNO
+     C                     MOVE D#KIND    S1KIND
+     C                     MOVE D#CUN1    S1CUN1
+     C                     MOVE D#CUN2    S1CUN2
+     C                     MOVE D#CUN3    S1CUN3
+     C                     MOVE *BLANK    S1OREA
+     C                     Z-ADD0         S1ORNO
+     C                     Z-ADD0         S1ORTM
+     C           K#HMAS    SETLLRHSMAST
+     C                     READ RHSMAST                  41
+     C           *IN41     IFEQ *OFF
+     C           S1KIND    ANDEQD#KIND
+     C           S1CUN1    ANDEQD#CUN1
+     C           S1CUN2    ANDEQD#CUN2
+     C           S1CUN3    ANDEQD#CUN3
+     C                     SETON                     4041
+     C                     ENDIF
+     C*SAMAST
+     C           *IN40     IFEQ *OFF
+     C                     MOVE D#KIND    S1KIND
+     C                     MOVE D#CUN1    S1CUN1
+     C                     MOVE D#CUN2    S1CUN2
+     C                     MOVE D#CUN3    S1CD01
+     C                     MOVE *BLANK    S1OREA
+     C                     Z-ADD0         S1ORNO
+     C                     Z-ADD0         S1ORTM
+     C           K#HMAS    SETLLRSAMAST
+     C                     READ RSAMAST                  41
+     C           *IN41     IFEQ *OFF
+     C           S1KIND    ANDEQD#KIND
+     C           S1CUN1    ANDEQD#CUN1
+     C           S1CUN2    ANDEQD#CUN2
+     C           S1CD01    ANDEQD#CUN3
+     C                     SETON                     4041
+     C                     ENDIF
+     C                     ENDIF
+     C*寫入
+     C           *IN41     IFEQ *ON
+     C           W#DAYS    DIV  W#CONT    ALDAT3    H
+     C                     WRITERARCATL
+     C                     ENDIF
+     C                     ENDSR
+

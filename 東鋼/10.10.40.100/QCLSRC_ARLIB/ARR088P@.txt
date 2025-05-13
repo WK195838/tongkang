@@ -1,0 +1,114 @@
+     /****************************************************************/
+     /*                                                              */
+     /*               >>   PROGRAM INTRODUCTION   <<                 */
+     /*                                                              */
+     /*            1.PROGRAM-NAME  ARR088P                           */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S02YSH                            */
+     /*            4.FUNCTION     應收發票明細表(查帳用)         */
+     /*            5.DATE-WRITTEN  89/08/03                          */
+     /*            6.DATE-MODIFY   89/08/03                          */
+     /*                                                              */
+     /****************************************************************/
+             PGM
+             DCLF       FILE(ARLIB/ARR088S)
+     /*宣告變數*/
+             DCL        VAR(&DSPID)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TYPE)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DATE)    TYPE(*CHAR) LEN(6)
+             DCL        VAR(&CUNOS)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&CUNOE)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&ORNOS)   TYPE(*CHAR) LEN(5)
+             DCL        VAR(&ORNOE)   TYPE(*CHAR) LEN(5)
+             DCL        VAR(&W#DAY)   TYPE(*DEC)  LEN(8 0)
+             DCL        VAR(&W#LDAY)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#CDAY)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#ERR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#MOD)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#CNT)   TYPE(*CHAR) LEN(4)
+             DCL        VAR(&W#FUN)   TYPE(*CHAR) LEN(1)
+
+             RTVJOBA    JOB(&DSPID) OUTQ(&OUTQ) TYPE(&TYPE)
+             IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+             CHGVAR     VAR(&S#DEVN) VALUE(&DSPID)
+             RTVDTAARA  DTAARA(*LDA (1001 10)) RTNVAR(&S#USER)
+
+
+     START:  SNDRCVF
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+             CHGVAR     VAR(&IN31)    VALUE('0')
+             CHGVAR     VAR(&S#ERR)   VALUE(' ')
+     /*判斷月份*/
+             CHGVAR     VAR(&W#DAY)   VALUE(&S#DATE)
+             CHGVAR     VAR(&W#LDAY)  VALUE(&W#DAY)
+             CHGVAR     VAR(&W#MOD)   VALUE('1') /*中國年*/
+             CHGVAR     VAR(&W#CNT)   VALUE('0000') /*天數*/
+             CHGVAR     VAR(&W#FUN)   VALUE('2') /* 1:往前, 2:往後 */
+             CALL       PGM(UTS104R) PARM(&W#LDAY  &W#MOD  &W#FUN &W#CNT +
+                                          &W#CDAY &W#ERR)
+             IF         COND(&W#ERR *NE '0') THEN(DO)
+             CHGVAR     VAR(&IN31)    VALUE('1')
+             CHGVAR     VAR(&S#ERR)   VALUE('發票日期輸入錯誤')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+     /*  紀錄值  */
+             CHGVAR     VAR(&DATE)    VALUE(&S#DATE)
+             CHGDTAARA  DTAARA(*LDA (501 5))  VALUE(&S#ORNO)
+             CHGDTAARA  DTAARA(*LDA (506 6))  VALUE(&DATE)
+             CHGDTAARA  DTAARA(*LDA (519 10)) VALUE(&DSPID)
+             CHGDTAARA  DTAARA(*LDA (529 6))  VALUE(&S#CUNO)
+             SBMJOB     CMD(CALL PGM(ARR088P)) JOB(ARR088P) +
+                        JOBD(ARJOBD) OUTQ(&OUTQ)
+             SNDBRKMSG  MSG('<應收發票明細表(查帳用)開始處理，請稍候>') +
+                                 TOMSGQ(&DSPID) +
+                        MSGTYPE(*INFO)
+             RETURN      /*INTERACTIVE JOB */
+    BATCH:
+             RTVDTAARA  DTAARA(*LDA (501 5))  RTNVAR(&S#ORNO)
+             RTVDTAARA  DTAARA(*LDA (506 6))  RTNVAR(&DATE)
+             RTVDTAARA  DTAARA(*LDA (519 10)) RTNVAR(&DSPID)
+             RTVDTAARA  DTAARA(*LDA (529 6))  RTNVAR(&S#CUNO)
+
+             IF         COND(&S#CUNO *EQ '      ') THEN(DO)
+             CHGVAR     VAR(&CUNOS)    VALUE('      ')
+             CHGVAR     VAR(&CUNOE)    VALUE('999999')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&CUNOS)    VALUE(&S#CUNO)
+             CHGVAR     VAR(&CUNOE)    VALUE(&S#CUNO)
+             ENDDO
+
+             IF         COND(&S#ORNO *EQ '     ') THEN(DO)
+             CHGVAR     VAR(&ORNOS)    VALUE('     ')
+             CHGVAR     VAR(&ORNOE)    VALUE('99999')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&ORNOS)    VALUE(&S#ORNO)
+             CHGVAR     VAR(&ORNOE)    VALUE(&S#ORNO)
+             ENDDO
+
+             OVRDBF     FILE(INVMST) TOFILE(DALIB/INVMST) SHARE(*YES)
+             OVRPRTF    FILE(ARR088T) TOFILE(ARR088T) PAGESIZE(*N +
+                          132) CPI(10) HOLD(*YES) USRDTA('發票查帳')
+             OPNQRYF    FILE(INVMST) QRYSLT('+
+                        (INDECD *NE "D") *AND +
+                        (INCUNO *GE "' || &CUNOS || '") *AND +
+                        (INCUNO *LE "' || &CUNOE || '") *AND +
+                        (INORNO *GE "' || &ORNOS || '") *AND +
+                        (INORNO *LE "' || &ORNOE || '") *AND +
+                        (CHAR *LE "' || &DATE || '")') +
+                        KEYFLD((INCUNO) (INORNO) (INNO)) +
+                        MAPFLD((CHAR ININDT *CHAR 6))
+             CALL       PGM(ARLIB/ARR088R)
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+             SNDBRKMSG  MSG('<<應收發票明細表(查帳用)處理完畢，請列印 +
+                        ....>>') TOMSGQ(&DSPID) +
+                        MSGTYPE(*INFO)
+   ENDPGM
+

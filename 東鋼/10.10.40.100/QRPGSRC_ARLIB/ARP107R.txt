@@ -1,0 +1,367 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP107R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     抓取發票檔裡承購客戶的發票
+     H*            5.DATE-WRITTEN  93/03/02
+     H*            6.DATE-MODIFY
+     H*                            99/08/31  2010AR517 S00WCJ (9908A)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  IP  E           K        DISK
+     FARCUDT  IF  E           K        DISK
+     FARINVM  UF  E           K        DISK                      A
+     FARINVD  UF  E           K        DISK                      A
+     FINVDTL  IF  E           K        DISK
+     FHSCONT  IF  E           K        DISK
+     FARP107F UF  E           K        DISK                      A
+     IINREC
+     I                                              INCUNOL1
+     I            DS
+     I                                        1   80D#INDT
+     I                                        1   40D#YEAR
+     I                                        5   60D#MONT
+     I                                        7   80D#DATE
+     I           UDS
+     I                                     10011010 U#USER
+     I                                     10211021 U#AREA
+     C**************************************************************
+     C*          KEY   LIST
+     C**************************************************************
+     C*FILE==>ARINVD(承購發票明細檔)
+     C           K#INVD    KLIST
+     C                     KFLD           AVINNO
+     C                     KFLD           AVACNT
+     C                     KFLD           AVITEM
+     C*FILE==>HSCONT(合約檔)
+     C           K#CONT    KLIST
+     C                     KFLD           SBAREA
+     C                     KFLD           SBCNUM
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+9908AC           *DATE     SUB  19000000  U#SYSD  80
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN50
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     MOVELINCUNO    W#CUNO  5
+     C                     MOVELW#CUNO    K#CUNO  6
+     C           K#CUNO    CHAINRARCUDT              40
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C           *IN40     IFEQ *OFF
+     C           ININDT    ANDLEACDAT2
+     C*
+     C*寫入承購主檔
+     C                     EXSR SR1000
+     C*寫入承購明細檔
+     C   41                EXSR SR2000
+     C*寫入暫存檔(ARP107F)
+     C   41                EXSR SR3000
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*寫入承購主檔
+     C           INNO      CHAINRARINVM              41
+     C           *IN41     IFEQ *ON
+     C                     CLEARRARINVM
+     C                     MOVEL'A'       AMFLAG           處理代碼
+     C                     MOVELINNO      AMINNO           發票號碼
+     C                     Z-ADDININDT    AMINDT           發票日期
+     C                     MOVELINKIND    AMINTP           發票聯式
+     C                     MOVELINDECD    AMDELT           做廢碼
+     C                     Z-ADDINDEDT    AMDELD           做廢日期
+     C                     MOVELW#CUNO    AMCUNO           客戶代號
+     C                     MOVELINCUNM    AMCUNM           客戶簡稱
+     C                     Z-ADDINAAMT    AMAAMT           銷貨金額
+     C                     Z-ADDINATAX    AMATAX           銷貨稅額
+     C                     Z-ADDINCAMT    AMBAMT           折讓金額
+     C                     Z-ADDINCTAX    AMBTAX           折讓稅額
+     C                     Z-ADDINNBAL    AMDAMT           承購金額
+     C                     Z-ADD0         AMEAMT           已融資金額
+     C                     Z-ADD0         AMFAMT           已沖銷金額
+     C                     Z-ADDINBAMT    AMCAMT           扣預收金額
+     C                     MOVELINAPNO    AMAPN1           承購單號
+     C                     Z-ADDINAPDT    AMAPD1           承購日期
+     C*
+     C*判斷該客戶若接受多張請款單，則該客戶承購該單號即為請款單號
+     C           ACCOD1    IFNE *BLANK
+     C                     MOVELINAPNO    AMAPN2           請款單號
+     C                     Z-ADDINAPDT    AMAPD2           請款日期
+     C                     ELSE
+     C                     MOVEL*BLANK    AMAPN2
+     C                     Z-ADD0         AMAPD2
+     C                     ENDIF
+     C*
+     C                     MOVELINORNO    AMORNO           訂單號碼
+     C                     MOVELINAREA    AMAREA           開立廠區
+     C                     MOVE U#USER    AMUPDM           異動人員
+9908AC                     MOVE U#SYSD    AMUPDD           異動日期
+     C                     TIME           AMUPDT           異動時間
+     C*計算發票到期日期
+     C                     EXSR SR1100
+     C*
+     C  N50                WRITERARINVM
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C                     MOVELAMORNO    SBAREA           地區
+     C                     MOVE AMORNO    SBCNUM           流水號
+     C           K#CONT    CHAINRHSCONT              42
+     C                     MOVE AMINDT    D#INDT
+     C*
+     C                     Z-ADDSBRTD1    D#DATE
+     C                     Z-ADDD#INDT    W#DAT1  80       請款一
+     C                     Z-ADDSBRTD2    D#DATE
+     C                     Z-ADDD#INDT    W#DAT2  80       請款二
+     C                     Z-ADDSBRTD3    D#DATE
+     C                     Z-ADDD#INDT    W#DAT3  80       請款三
+     C                     Z-ADDSBRTD1    D#DATE
+     C                     ADD  1         D#MONT
+     C           D#MONT    IFEQ 13
+     C                     Z-ADD1         D#MONT
+     C                     ADD  1         D#YEAR
+     C                     ENDIF
+     C                     Z-ADDD#INDT    W#DAT4  80       次月請款一
+     C*
+     C                     MOVE W#DAT1    P#DATE
+     C                     CALL 'UTS104R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM '1'       P#MOD2  1
+     C                     PARM '0005'    P#DAYS  4
+     C                     PARM *BLANK    P#RTND  8
+     C                     PARM *BLANK    P#ERR   1
+     C           P#ERR     IFEQ '0'
+     C                     MOVE P#RTND    W#DAT1           理論請款一
+     C                     ELSE
+     C                     Z-ADD0         W#DAT1
+     C                     ENDIF
+     C*
+     C                     MOVE W#DAT2    P#DATE
+     C                     CALL 'UTS104R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM '1'       P#MOD2  1
+     C                     PARM '0005'    P#DAYS  4
+     C                     PARM *BLANK    P#RTND  8
+     C                     PARM *BLANK    P#ERR   1
+     C           P#ERR     IFEQ '0'
+     C                     MOVE P#RTND    W#DAT2           理論請款二
+     C                     ELSE
+     C                     Z-ADD0         W#DAT2
+     C                     ENDIF
+     C*
+     C                     MOVE W#DAT3    P#DATE
+     C                     CALL 'UTS104R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM '1'       P#MOD2  1
+     C                     PARM '0005'    P#DAYS  4
+     C                     PARM *BLANK    P#RTND  8
+     C                     PARM *BLANK    P#ERR   1
+     C           P#ERR     IFEQ '0'
+     C                     MOVE P#RTND    W#DAT3           理論請款三
+     C                     ELSE
+     C                     Z-ADD0         W#DAT3
+     C                     ENDIF
+     C*
+     C           AMINDT    IFLE W#DAT1                     以付款日一
+     C           SBRTD1    ANDNE0
+     C                     Z-ADDW#DAT1    D#INDT           理論請款一
+     C                     Z-ADDSBPDT1    D#DATE
+     C                     ADD  1         D#MONT
+     C           D#MONT    IFEQ 13
+     C                     Z-ADD1         D#MONT
+     C                     ADD  1         D#YEAR
+     C                     ENDIF
+     C                     Z-ADDD#INDT    AMDUDT           發票到期日
+     C                     ENDIF
+     C*
+     C           AMINDT    IFLE W#DAT2                     以付款日二
+     C           AMINDT    ANDGEW#DAT1
+     C           SBRTD2    ANDNE0
+     C                     Z-ADDW#DAT2    D#INDT           理論請款二
+     C                     Z-ADDSBPDT2    D#DATE
+     C                     ADD  1         D#MONT
+     C           D#MONT    IFEQ 13
+     C                     Z-ADD1         D#MONT
+     C                     ADD  1         D#YEAR
+     C                     ENDIF
+     C                     Z-ADDD#INDT    AMDUDT           發票到期日
+     C                     ENDIF
+     C*
+     C           AMINDT    IFLE W#DAT3                     以付款日三
+     C           AMINDT    ANDGEW#DAT2
+     C           AMINDT    ANDGEW#DAT1
+     C           SBRTD3    ANDNE0
+     C                     Z-ADDW#DAT3    D#INDT           理論請款三
+     C                     Z-ADDSBPDT3    D#DATE
+     C                     ADD  1         D#MONT
+     C           D#MONT    IFEQ 13
+     C                     Z-ADD1         D#MONT
+     C                     ADD  1         D#YEAR
+     C                     ENDIF
+     C                     Z-ADDD#INDT    AMDUDT           發票到期日
+     C                     ENDIF
+     C*
+     C           AMINDT    IFLE W#DAT4                     次月請款一
+     C           AMINDT    ANDGEW#DAT3
+     C           AMINDT    ANDGEW#DAT2
+     C           AMINDT    ANDGEW#DAT1
+     C                     Z-ADDW#DAT4    D#INDT
+     C                     Z-ADDSBPDT1    D#DATE
+     C                     ADD  1         D#MONT
+     C           D#MONT    IFEQ 13
+     C                     Z-ADD1         D#MONT
+     C                     ADD  1         D#YEAR
+     C                     ENDIF
+     C                     Z-ADDD#INDT    AMDUDT           發票到期日
+     C                     ENDIF
+     C*
+     C           SBPYCK    IFNE ' '                        支票繳款
+     C                     MOVE AMDUDT    P#DATE
+     C                     Z-ADDSBPERD    W#PERD  40
+     C                     MOVE W#PERD    P#DAYS
+     C                     CALL 'UTS104R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM '2'       P#MOD2  1
+     C                     PARM           P#DAYS  4
+     C                     PARM *BLANK    P#RTND  8
+     C                     PARM *BLANK    P#ERR   1
+     C           P#ERR     IFEQ '0'
+     C                     MOVE P#RTND    AMDUDT           預估兌現日
+     C                     ELSE
+     C                     Z-ADD0         AMDUDT
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*處理明細檔(先全部刪除後再全部重新寫入)
+     C*刪除
+     C                     MOVE *OFF      *IN89
+     C                     MOVE AMINNO    AVINNO
+     C                     MOVE *BLANK    AVACNT
+     C                     Z-ADD0         AVITEM
+     C           K#INVD    SETLLRARINVD
+     C           *IN89     DOWEQ*OFF
+     C                     READ RARINVD                  89
+     C   89                LEAVE
+     C           AVINNO    IFNE AMINNO
+     C                     LEAVE
+     C                     ENDIF
+     C                     DELETRARINVD
+     C                     ENDDO
+     C*重新寫入
+     C                     MOVE *OFF      *IN89
+     C                     MOVE AMINNO    AVINNO
+     C                     MOVE *BLANK    AVACNT
+     C                     Z-ADD0         AVITEM
+     C           K#INVD    SETLLIVREC
+     C           *IN89     DOWEQ*OFF
+     C                     READ IVREC                    89
+     C   89                LEAVE
+     C*
+     C           IVNO      IFNE AMINNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVE 'A'       AVFLAG
+     C                     MOVE IVNO      AVINNO
+     C                     MOVE IVACNT    AVACNT
+     C                     Z-ADDIVITEM    AVITEM
+     C                     Z-ADDIVACDT    AVACDT
+     C                     MOVE IVORNO    AVORNO
+     C                     Z-ADDIVQTY     AVQTY
+     C                     Z-ADDIVUPRC    AVUPRC
+     C                     Z-ADDIVAMT     AVAMT
+     C                     MOVE IVDECD    AVDECD
+     C                     MOVE IVDEDT    AVDEDT
+     C                     MOVE IVAPNO    AVAPNO
+     C                     MOVE IVACNO    AVACNO
+     C                     MOVE IVFL01    AVFL01
+     C                     MOVE IVFL02    AVFL02
+     C                     MOVE IVFL03    AVFL03
+     C                     MOVE IVTXAR    AVTXAR
+     C                     Z-ADDIVTXDT    AVTXDT
+     C                     MOVE IVRESV    AVRESV
+     C*
+     C                     WRITERARINVD
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C           AMINNO    CHAINRAR107F              43
+     C                     CLEARRAR107F
+     C                     MOVEL'A'       A7FLAG           處理代碼
+     C                     MOVELAMINNO    A7INNO           發票號碼
+     C                     Z-ADDAMINDT    A7INDT           發票日期
+     C                     MOVELAMINTP    A7INTP           發票聯式
+     C                     MOVELAMDELT    A7DELT           做廢碼
+     C                     Z-ADDAMDELD    A7DELD           做廢日期
+     C                     MOVELAMCUNO    A7CUNO           客戶代號
+     C                     MOVELAMCUNM    A7CUNM           客戶簡稱
+     C                     Z-ADDAMAAMT    A7AAMT           銷貨金額
+     C                     Z-ADDAMATAX    A7ATAX           銷貨稅額
+     C                     Z-ADDAMBAMT    A7BAMT           折讓金額
+     C                     Z-ADDAMBTAX    A7BTAX           折讓稅額
+     C                     Z-ADDAMDAMT    A7DAMT           承購金額
+     C                     Z-ADDAMEAMT    A7EAMT           已融資金額
+     C                     Z-ADDAMFAMT    A7FAMT           已沖銷金額
+     C                     Z-ADDAMCAMT    A7CAMT           扣預收金額
+     C                     MOVELAMAPN1    A7APN1           承購單號
+     C                     Z-ADDAMAPD1    A7APD1           承購日期
+     C                     MOVELAMAPN2    A7APN2           請款單號
+     C                     Z-ADDAMAPD2    A7APD2           請款日期
+     C                     MOVELAMORNO    A7ORNO           訂單號碼
+     C                     MOVELAMAREA    A7AREA           開立廠區
+     C                     MOVE AMUPDM    A7UPDM           異動人員
+     C                     MOVE AMUPDD    A7UPDD           異動日期
+     C                     Z-ADDAMUPDT    A7UPDT           異動時間
+     C   43                WRITERAR107F
+     C*
+     C                     ENDSR
+

@@ -1,0 +1,344 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR113R1
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     發票折扣核對清單
+     H*            5.DATE-WRITTEN  92/06/25
+     H*            6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  IP  E           K        DISK
+     FWTMASPL4IF  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FINVDTY  IF  E           K        DISK
+     F            IVREC                             KRENAMEIVRECY
+     FARODCT  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FTRNDTLL2IF  E           K        DISK
+     FARR113T O   E             69     PRINTER
+     E*****************************************************************
+     IINREC
+     I                                              ININDTL2
+     I                                              INNO  L1
+     IIVRECY
+     I              IVFLAG                          F#FLAG
+     I              IVNO                            F#IVNO
+     I              IVACNT                          F#ACNT
+     I              IVITEM                          F#ITEM
+     I              IVACDT                          F#ACDT
+     I              IVORNO                          F#ORNO
+     I              IVPDCD                          F#PDCD
+     I              IVQTY                           F#QTY
+     I              IVUPRC                          F#UPRC
+     I              IVAMT                           F#AMT
+     I              IVDECD                          F#DECD
+     I              IVDEDT                          F#DEDT
+     I              IVAPNO                          F#APNO
+     I              IVACNO                          F#ACNO
+     I              IVFL01                          F#FL01
+     I              IVFL02                          F#FL02
+     I              IVFL03                          F#FL03
+     I              IVTXAR                          F#TXAR
+     I              IVTXDT                          F#TXDT
+     I              IVRESV                          F#RESV
+     I           UDS
+     I                                     10011010 U#USID
+     I                                      300 305 U#CUNO
+     I                                      306 306 U#SALE
+     I                                      307 3140T#IND1
+     I                                      315 3220T#IND2
+     I                                      323 323 U#AREA
+     I                                      324 324 U#COD1
+     I                                      325 325 U#TYPE
+     I                                      326 326 U#CHIC
+     I            DS
+     I                                        1   8 D#TXNO
+     I                                        1   1 D#AREA
+     I                                        2   3 D#VNO1
+     I                                        4   80D#VNO2
+     I            DS
+     I                                        1   4 D#MARK
+     I                                        1   3 D#MAR1
+     I            DS
+     I                                        1  22 D#DEST
+     I                                        1   3 D#STAR
+     I            DS
+     I                                        1  10 D#IVNO
+     I                                        1   2 D#IVN1
+     I                                        3  10 D#IVN2
+     C*****************************************************************
+     C*      KEY   LIST
+     C*****************************************************************
+     C*FILE==>WTMASPL4(成品磅單主檔)
+     C           W#MASP    KLIST
+     C                     KFLD           W6ENTD
+     C                     KFLD           W6AREA
+     C                     KFLD           W6VNO1
+     C                     KFLD           W6VNO2
+     C*FILE==>ARODCT(訂單管制檔)
+     C           W#ODCT    KLIST
+     C                     KFLD           A2ORNO
+     C                     KFLD           A2CTKD
+     C*FILE==>INVDTL(發票明細檔)
+     C           W#INVD    KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*FILE==>INVDTY
+     C           W#INVY    KLIST
+     C                     KFLD           F#IVNO
+     C                     KFLD           F#ACNT
+     C                     KFLD           F#ITEM
+     I*****************************************************************
+     C  N99                EXSR INISR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN69
+     C*
+     C                     MOVEL*ALL'='   T#LIN1
+     C                     MOVEL*ALL'='   T#LIN2
+     C*
+     C                     MOVEL'＊'    D#MARK
+     C*廠區
+     C                     SELEC
+     C           U#AREA    WHEQ ' '
+     C                     MOVEL'全部'  T#AREA
+     C           U#AREA    WHEQ 'H'
+     C                     MOVEL'苗栗'  T#AREA
+     C           U#AREA    WHEQ 'K'
+     C                     MOVEL'高雄'  T#AREA
+     C                     ENDSL
+     C*客戶
+     C           U#CUNO    IFEQ *BLANK
+     C                     MOVEL'全部'  T#CUNH
+     C                     ELSE
+     C           U#CUNO    CHAINCBREC                41
+     C                     MOVELCBCUNM    T#CUNH
+     C                     ENDIF
+     C*業務員
+     C           U#SALE    IFEQ *BLANK
+     C                     MOVEL'全部'  T#SALE
+     C                     ELSE
+     C                     MOVELU#SALE    T#SALE
+     C                     ENDIF
+     C*報表內容
+     C           U#COD1    IFEQ '1'
+     C                     MOVEL'折扣'  T#COD1
+     C                     ELSE
+     C                     MOVEL'未折扣'T#COD1
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR113T1T
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     MOVE *BLANK    W#FLAG  1
+     C                     Z-ADD0         W#ITEM  20
+     C                     Z-ADD0         W#INDT  80
+     C                     MOVE *BLANK    W#INNO 10
+     C*
+     C                     CLEARAR113T1S
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVELINNO      D#IVNO
+     C           D#IVN1    IFEQ 'XY'
+     C           D#IVN2    ANDEQ'76119451'
+     C                     Z-ADD0         W#TMP   10
+     C                     ENDIF
+     C*
+     C           INORNO    IFEQ 'H04931'
+     C                     Z-ADD0         W#TMP
+     C                     ENDIF
+     C*判斷該張訂單是否存在訂單管制檔中
+     C*開立方式=99,訂單編號的流水號=000
+     C                     MOVELINORNO    A2ORNO
+     C                     MOVE '000'     A2ORNO           訂單編號
+     C                     MOVEL'04'      A2CTKD           管制類別
+     C           W#ODCT    CHAINRARODCT              40
+     C  N40      A2MTHD    IFEQ '99'
+     C           INNO      SETLLTXREC
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ TXREC                    41
+     C   41                LEAVE
+     C*
+     C           TXIVNO    IFNE INNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*找磅單==>判斷該張磅單交貨地點的第一碼是否為'＊'
+     C                     MOVELTXNO      D#TXNO
+     C                     MOVELD#AREA    W6AREA           廠區
+     C                     MOVELD#VNO1    W6VNO1           進出別
+     C                     Z-ADDD#VNO2    W6VNO2           流水號
+     C                     Z-ADDTXDATE    W6ENTD
+     C           W#MASP    CHAINRWTMASP              42
+     C  N42                MOVELW6DEST    D#DEST
+     C  N42      D#STAR    IFEQ D#MAR1
+     C           W6ENTD    ANDGET#IND1
+     C                     EXSR SR1000
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           T#SQT1    IFNE 0
+     C   69                WRITEAR113T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR113T1S
+     C                     ENDIF
+     C*日期合計
+     C                     ADD  T#SQT1    T#TQT1           銷貨數量
+     C                     ADD  T#SAM1    T#TAM1           銷貨金額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C           T#TQT1    IFNE 0
+     C   69                WRITEAR113T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR113T1T
+     C                     ENDIF
+     C*總計
+     C                     ADD  T#TQT1    T#AQT1           銷貨數量
+     C                     ADD  T#TAM1    T#AAM1           銷貨金額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR113T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR113T1A
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*
+     C   69                WRITEAR113T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR113T1M
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*判斷是否有折扣==>只要該張發票明細內有任一筆折扣明細
+     C*                   則不出表（因隨訂開立之故）
+     C*
+     C                     MOVELINNO      IVNO
+     C                     MOVEL'1'       IVACNT
+     C                     Z-ADD0         IVITEM
+     C           W#INVD    SETLLIVREC
+     C                     MOVE *OFF      *IN45
+     C           *IN45     DOWEQ*OFF
+     C                     READ IVREC                    45
+     C   45                LEAVE
+     C*
+     C           IVNO      IFNE INNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           IVACNT    IFNE '1'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVELIVNO      F#IVNO
+     C                     MOVEL'3'       F#ACNT
+     C                     Z-ADDIVITEM    F#ITEM
+     C           W#INVY    CHAINIVRECY               46
+     C           *IN46     IFEQ *OFF
+     C           F#FL03    ANDEQ'K'
+     C                     MOVE *BLANK    W#FLAG
+     C                     GOTO SREND
+     C                     ELSE
+     C           IVAPNO    IFEQ TXNO
+     C           IVAPNO    OREQ INORNO
+     C                     MOVE 'X'       W#FLAG
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*若無折扣則寫入報表
+     C           W#FLAG    IFNE *BLANK
+     C                     EXSR SR2000
+     C                     ENDIF
+     C*
+     C           SREND     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C                     CLEARAR113T1D
+     C*
+     C                     Z-ADDININDT    T#INDT           發票日期
+     C                     MOVELINNO      T#INNO           發票號碼
+     C                     ADD  1         W#ITEM
+     C                     Z-ADDW#ITEM    T#ITEM           項次
+     C                     MOVELTXNO      T#TXNO           磅單編號
+     C                     Z-ADDTXDATE    T#DATE           出貨日期
+     C                     MOVELINCUNO    T#CUNO           客戶代號
+     C                     MOVELINORNO    T#ORNO           訂單號碼
+     C                     Z-ADDTXQTY     T#QTY1           銷貨數量
+     C                     Z-ADDTXAMT     T#AMT1           銷貨金額
+     C           TXAMT     DIV  TXQTY     T#PRC1    H      銷貨單價
+     C           INAAMT    ADD  INATAX    T#AMT3           發票金額
+     C                     MOVELW6DEST    T#DEST           出貨地點
+     C* 940905 B05CHM要求移除
+     C*發票日期相同則省略不印
+     C*          T#INDT    IFEQ W#INDT
+     C*                    MOVE *ON       *IN50
+     C*                    ELSE
+     C*                    Z-ADDT#INDT    W#INDT
+     C*                    MOVE *OFF      *IN50
+     C*                    ENDIF
+     C*
+     C*發票號碼相同則省略不印
+     C*          T#INNO    IFEQ W#INNO
+     C*                    MOVE *ON       *IN51
+     C*                    ELSE
+     C*                    MOVELT#INNO    W#INNO 10
+     C*                    MOVE *OFF      *IN51
+     C*                    ENDIF
+     C*
+     C   69                WRITEAR113T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR113T1D
+     C*
+     C*發票小計
+     C                     MOVELT#INNO    T#INNS
+     C                     Z-ADDT#INDT    T#INDS
+     C                     ADD  T#QTY1    T#SQT1           銷貨數量
+     C                     ADD  T#AMT1    T#SAM1           銷貨金額
+     C*
+     C                     ENDSR
+

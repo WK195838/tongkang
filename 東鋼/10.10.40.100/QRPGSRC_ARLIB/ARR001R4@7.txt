@@ -1,0 +1,131 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR001R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     請款單列印作業（前期處理）
+     H*            5.DATE-WRITTEN  88/10/12
+     H*            6.UPDATE  DATE  98/06/24 2009AR330 S00WCJ (9806A)
+     H*                            98/12/03 2009AR388 S00WCJ (9812A)
+     H*                            101/01/06 S00WCJ (0101A)
+     H*                              排除重覆磅單之日期
+     H*                            102/10/29 S00WCJ (0210A)
+     H*                            磅單日期小於990101之資料不讀
+     H*                            103/04/30 S00WCJ (0304A)
+     H*                            磅單日期小於1010101之資料不讀
+     H*                            104/03/30 S00WCJ (0403A)
+     H*                            磅單日期小於1020101之資料不讀
+     H*
+     H*  <說明> 將請款單每張發票的內容寫入暫時檔內。
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR001F UP  E           K        DISK
+     FSAVOURL5IF  E           K        DISK
+     FSADLVY  IF  E           K        DISK
+     FTRNDTLL3IF  E           K        DISK
+     E*************************************************************
+     IARREC       01
+     I*
+     I            DS
+     I                                        1   8 ARWTNO
+     I                                        1   1 D#AREA
+     I                                        2   3 D#PCOD
+     I                                        4   8 D#NO
+     I*
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10211021 U#AREA
+     C**************************************************************
+     C*          KEY    LIST
+     C**************************************************************
+     C*FILE-->SAVOURL5(磅單檔)
+     C           K#SVUR    KLIST
+     C                     KFLD           K#VREA  1        地區別
+     C                     KFLD           K#PCOD  2        進出別
+     C                     KFLD           K#VRNO  50       磅單編號
+     C                     KFLD           K#VRTM  20       磅單序號
+     C*
+     C           K#SVU1    KLIST
+     C                     KFLD           K#VREA  1        地區別
+     C                     KFLD           K#PCOD  2        進出別
+     C                     KFLD           K#VRNO  50       磅單編號
+     C*
+     C           K#DLVY    KLIST
+     C                     KFLD           K#AREA  1        填單廠區
+     C                     KFLD           K#DVNO  50       流水號
+     C                     KFLD           K#ITEM  30       項次
+     C*
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVE ARWTNO    W#MARK  1
+     C*
+     C           ARWTNO    IFEQ *BLANK
+     C           W#MARK    OREQ *BLANK
+     C                     GOTO ENDTSR
+     C                     ENDIF
+     C*
+     C                     MOVELD#AREA    K#VREA           地區別
+     C                     MOVELD#PCOD    K#PCOD           進出別
+     C                     MOVE D#NO      K#VRNO           磅單編號
+     C                     Z-ADD0         K#VRTM           磅單序號
+     C*
+     C                     MOVEL*OFF      *IN40
+     C           K#SVUR    SETLLRSRVOUR
+     C           *IN40     DOWEQ*OFF
+     C           K#SVU1    READERSRVOUR                  40
+     C*
+     C   40                LEAVE
+     C*
+0304AC*          S4DATE    IFLT 1010101
+0403AC           S4DATE    IFLT 1020101
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVELS4AREA    K#AREA           填單廠區
+     C                     Z-ADDS4DVNO    K#DVNO           流水號
+     C                     Z-ADDS4ITEM    K#ITEM           項次
+     C*
+     C                     MOVEL*OFF      *IN41
+     C           K#DLVY    CHAINRSADLVY              41
+     C  N41                MOVELS2PLE1    ARPLE1           工地地點
+     C   41                MOVEL*BLANK    ARPLE1
+     C*
+     C                     LEAVE
+     C                     ENDDO
+     C*
+     C                     MOVEL*OFF      *IN42
+9806AC*          ARINNO    CHAINTXREC                42
+9806AC                     MOVEL*BLANK    ARNO
+9806AC           ARINNO    SETLLTXREC
+9806AC           *IN42     DOWEQ*OFF
+9806AC           ARINNO    READETXREC                    42
+9806AC   42                LEAVE
+9806AC           TXFLAG    IFEQ 'D'
+9806AC                     ITER
+9806AC                     ENDIF
+     C  N42                MOVELTXNO      ARNO             折讓單號
+     C   42                MOVEL*BLANK    ARNO             折讓單號
+9806AC                     ENDDO
+     C*
+     C                     UPDATARREC
+     C*
+     C           ENDTSR    ENDSR
+     C*****************************************************************
+

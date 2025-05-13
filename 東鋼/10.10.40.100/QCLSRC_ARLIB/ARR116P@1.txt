@@ -1,0 +1,52 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR116P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02CSF                                    */
+        /*        4.FUNCTION      請款別出貨及發票明細表─ＦＯＲ型鋼       */
+        /*        5.DATE-WRITTEN   93/06/10                                  */
+        /*        6.DATE-MODIFY                                              */
+        /*                                                                   */
+        /*********************************************************************/
+             PGM
+             DCL      VAR(&TYPE)   TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#IN03) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#APNO) TYPE(*CHAR) LEN(7)
+             DCL      VAR(&S#DEVN) TYPE(*CHAR) LEN(10)
+             DCL      VAR(&S#USER) TYPE(*CHAR) LEN(10)
+
+             RTVJOBA  JOB(&S#DEVN) USER(&S#USER) TYPE(&TYPE)
+             IF       COND(&TYPE *EQ '0') THEN(GOTO BATCH)
+
+             CALL     PGM(ARR116RS) PARM(&P#IN03 &P#APNO)
+             IF       COND(&P#IN03 *EQ '1') THEN(RETURN)
+
+             CHGDTAARA  DTAARA(*LDA (300  7)) VALUE(&P#APNO)
+
+             SBMJOB     CMD(CALL PGM(ARR116P)) JOB(ARR116P) +
+                        JOBD(ARJOBD)
+             RETURN
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (300  7)) RTNVAR(&P#APNO)
+
+             CLRPFM     ARR116F
+             OVRDBF     FILE(INVMSTL5) TOFILE(INVMSTL5) SHARE(*YES)
+             OPNQRYF    FILE((INVMSTL5)) QRYSLT(' +
+                        (INAPNO *EQ "' ||  &P#APNO || '")')   +
+                        KEYFLD((INNO))
+             CALL       PGM(ARR116R)
+             CLOF       OPNID(INVMSTL5)
+             DLTOVR     FILE(*ALL)
+
+             OVRPRTF    FILE(ARR116T) TOFILE(ARR116T) PAGESIZE(*N 198)  +
+                        CPI(15) HOLD(*YES)  USRDTA('請款明細')
+             OVRDBF     FILE(ARR116F) TOFILE(ARR116F) SHARE(*YES)
+             OPNQRYF    FILE((ARR116F)) +
+                        KEYFLD((A6ORNO) (A6INNO) (A6VRNO) (A6PDNM))
+             CALL       PGM(ARR116R1)
+             CLOF       OPNID(ARR116F)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

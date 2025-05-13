@@ -1,0 +1,291 @@
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E                    DISK
+     FQPRINT  O   F     132            PRINTER
+9004 E                    ARY        20 33
+     I*************************************************************
+     ITXREC
+     I                                              TXFL02L3
+     I                                              TXCUNOL2
+     I                                              TXNO  L1
+     I****
+     IAADS        DS
+     I              'も折讓開立簽回明細-C         CON3                       X
+     I              '表も　'
+     I              '東和鋼鐵企業股份有-C         CON4                       X
+     I              '限公司'
+9004 I            DS
+ .   I                                        1  33 D#ARY
+ .   I                                        1   3 D#PDNM
+ .   I                                        4  110D#QTY
+ .   I                                       12  230D#AMT
+ .   I                                       24  330D#TAX
+     I           UDS
+     I                                        1   1 AREAF
+     I                                        2   2 AREAT
+     I                                        3   80DATE1
+     I                                        9  140DATE2
+     I                                      951 985 COMP
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C**************************************************************
+     C  N90                EXSR INZ#01
+     C  N90                SETON                     90
+     C   L3                EXSR DL#L3
+     C   L2                EXSR DL#L2
+     C   L1                EXSR DL#L1
+     C                     EXSR DP#01
+     CL1                   EXSR TL#L1
+     CL2                   EXSR TL#L2
+     CL3                   EXSR TL#L3
+     CLR                   EXSR TL#LR
+     C**************************************************************
+     C*** SET INITIAL
+     CSR         INZ#01    BEGSR
+      *
+     C                     Z-ADD0         PAG     30
+     C                     Z-ADD80        LCNT    30
+     C                     Z-ADD55        TCNT    30
+     C                     Z-ADD0         QTY5    80
+     C                     Z-ADD0         AMT5   100
+     C                     Z-ADD0         TAX5   100
+     C                     Z-ADDTCNT      LCNT
+     C                     MOVE *ALL'='   ALS   132
+     C                     MOVE *ALL'-'   ALQ   132
+9004 C                     MOVE *ALL'9'   ARY
+ .   C*
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS                                **
+     C**----------------------------------------------**
+     CSR         @CHKCT    BEGSR
+     C           LCNT      COMP TCNT                 75  75
+     C   75                ADD  1         PAG
+     C   75                EXCPTEH#01
+     C   75                Z-ADD9         LCNT
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS L3                             **
+     C**----------------------------------------------**
+     CSR         DL#L3     BEGSR
+     C                     Z-ADD0         QTY3    70
+     C                     Z-ADD0         AMT3    90
+     C                     Z-ADD0         TAX3    90
+     C                     Z-ADDTCNT      LCNT
+     C                     SELEC
+     C           TXFL02    WHEQ 'P'
+     C                     MOVEL'台北'  AREAC   6
+     C           TXFL02    WHEQ 'T'
+     C                     MOVEL'桃園'  AREAC   6
+     C           TXFL02    WHEQ 'K'
+     C                     MOVEL'高雄'  AREAC   6
+     C           TXFL02    WHEQ 'L'
+     C                     MOVEL'林口'  AREAC   6
+     C           TXFL02    WHEQ 'M'
+     C                     MOVEL'台中'  AREAC   6
+     C           TXFL02    WHEQ 'H'
+     C                     MOVEL'苗栗'  AREAC   6
+     C                     OTHER
+     C                     MOVEL'　　'  AREAC
+     C                     ENDSL
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS L2                             **
+     C**----------------------------------------------**
+     CSR         DL#L2     BEGSR
+     C                     Z-ADD0         QTY2    70
+     C                     Z-ADD0         AMT2    90
+     C                     Z-ADD0         TAX2    90
+     CSR                   ENDSR
+     C* DETAIL PROCESS L1                             **
+     C**----------------------------------------------**
+     CSR         DL#L1     BEGSR
+     C                     Z-ADD0         QTY1    70
+     C                     Z-ADD0         AMT1    90
+     C                     Z-ADD0         TAX1    90
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS                                **
+     C**----------------------------------------------**
+     CSR         DP#01     BEGSR
+     C                     Z-ADDTXAMT     RAMT    90
+     C                     Z-ADDTXTAX     RTAX    90
+     C                     ADD  1         LCNT
+     C                     EXSR @CHKCT
+     C   75                ADD  1         LCNT
+     C                     EXCPTED#01
+     C                     ADD  TXQTY     QTY1
+     C                     ADD  RAMT      AMT1
+     C                     ADD  RTAX      TAX1
+9004 C*
+ .   C                     SORTAARY
+ .   C           1         DO   20        I       20
+ .   C                     MOVE ARY,I     D#ARY
+ .   C           D#PDNM    IFEQ '999'
+ .   C                     MOVE TXPDNM    D#PDNM
+ .   C                     Z-ADDTXQTY     D#QTY
+ .   C                     Z-ADDRAMT      D#AMT
+ .   C                     Z-ADDRTAX      D#TAX
+ .   C                     MOVE D#ARY     ARY,I
+ .   C                     LEAVE
+ .   C                     ELSE
+ .   C           TXPDNM    IFEQ D#PDNM
+ .   C                     ADD  TXQTY     D#QTY            數量
+ .   C                     ADD  RAMT      D#AMT            金額
+ .   C                     ADD  RTAX      D#TAX            稅額
+ .   C                     MOVE D#ARY     ARY,I
+ .   C                     LEAVE
+ .   C                     ENDIF
+ .   C                     ENDIF
+ .   C                     ENDDO
+     C**
+     CSR         DP#01Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME L1 PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#L1     BEGSR
+     C                     EXCPTET#L1
+     C                     ADD  QTY1      QTY2
+     C                     ADD  AMT1      AMT2
+     C                     ADD  TAX1      TAX2
+     C                     ADD  1         LCNT
+     CSR         TL#L1Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME L2 PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#L2     BEGSR
+     C                     EXCPTET#L2
+     C                     ADD  QTY2      QTY3
+     C                     ADD  AMT2      AMT3
+     C                     ADD  TAX2      TAX3
+     C                     ADD  1         LCNT
+     CSR         TL#L2Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME L2 PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#L3     BEGSR
+     C                     EXCPTET#L3
+     C                     ADD  QTY3      QTY5
+     C                     ADD  AMT3      AMT5
+     C                     ADD  TAX3      TAX5
+     C                     ADD  1         LCNT
+     CSR         TL#L3Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME LR PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#LR     BEGSR
+     C                     EXCPTET#LR
+9004 C*
+ .   C                     SORTAARY
+ .   C           1         DO   20        I
+ .   C                     MOVE ARY,I     D#ARY
+ .   C           D#PDNM    IFNE '999'
+ .   C                     MOVE D#PDNM    X#PDNM  3
+ .   C                     Z-ADDD#QTY     X#QTY   80
+ .   C                     Z-ADDD#AMT     X#AMT  120
+ .   C                     Z-ADDD#TAX     X#TAX  100
+ .   C  N50                EXCPTET#X1
+ .   C  N50                MOVE *ON       *IN50
+ .   C                     EXCPTET#X2
+ .   C                     ADD  X#QTY     X#QTYT  80
+ .   C                     ADD  X#AMT     X#AMTT 120
+ .   C                     ADD  X#TAX     X#TAXT 100
+ .   C                     ELSE
+ .   C                     LEAVE
+ .   C                     ENDIF
+ .   C                     ENDDO
+ .   C*印ARY合計
+ .   C           X#AMTT    IFNE 0
+ .   C                     EXCPTET#X3
+ .   C                     ENDIF
+ .   C*
+     CSR         TL#LRZ    ENDSR
+     OQPRINT  E   02           EH#01
+     O                                   18 '報表編號: ARR051'
+     O                         CON4      75                                    X
+     O                                  123 '製表日期'
+     O                                  124 ':'
+     O                         UDATE Y  132
+     O        E 1              EH#01
+     O                         CON3      76                                    X
+     O                                  123 '頁　　次'
+     O                                  124 ':'
+     O                         PAG   Z  127
+     O        E 2              EH#01
+     O                                   11 '　地區別:'
+     O                         TXFL02  +  1
+     O                         AREAC   +  1
+     O        E 1              EH#01
+     O                                   11 '簽回日期:'
+     O                         DATE1   +  1 '  /  /  '
+     O                                 +  1 '-'
+     O                         DATE2   +  1 '  /  /  '
+     O        E 1              EH#01
+     O                         ALS      132
+     O        E 1              EH#01
+     O                                   10 '客戶編號'
+     O                                   20 '客戶名稱'
+     O                                   30 '折讓單號'
+     O                                   40 '開立日期'
+     O                                   50 '發票號碼'
+     O                                   60 '品　名'
+     O                                   70 '單　價'
+     O                                   80 '數　量'
+     O                                   95 '金　額'
+     O                                  110 '稅　額'
+     O                                  120 '業務員'
+     O                                  131 '簽回日期'
+     O        E 1              EH#01
+     O                         ALS      132
+     O        E 1              ED#01
+     O                 75      TXCUNO     8
+     O                 L2      TXCUNO     8
+     O                 75      TXCUNM    20
+     O                 L2      TXCUNM    20
+     O                 75      TXNO      29
+     O                 L1      TXNO      29
+     O                 75      TXDATE    39 '  /  /  '
+     O                 L1      TXDATE    39 '  /  /  '
+     O                         TXIVNO    50
+     O                         TXPDNM    57
+     O                         TXUPRCN   69
+     O                         TXQTY N   79
+     O                         RAMT  N   94
+     O                         RTAX  N  109
+     O                         TXSALE   118
+     O                         TXACDT   130 '  /  /  '
+     O        E 1              ET#L1
+     O                                   67 '折讓單小計：'
+     O                         QTY1  N   79
+     O                         AMT1  N   94
+     O                         TAX1  N  109
+     O        E 1              ET#L2
+     O                                   67 '客戶合計：'
+     O                         QTY2  N   79
+     O                         AMT2  N   94
+     O                         TAX2  N  109
+     O        E 1              ET#L3
+     O                                   67 '廠區合計：'
+     O                         QTY3  N   79
+     O                         AMT3  N   94
+     O                         TAX3  N  109
+     O        E 1              ET#LR
+     O                                   67 '　總合計：'
+     O                         QTY5  N   79
+     O                         AMT5  N   94
+     O                         TAX5  N  109
+9004 O        E 3              ET#X1
+ .   O                                   60 '品　名'
+ .   O                                   79 '數　量'
+ .   O                                   95 '金　額'
+ .   O                                  110 '稅　額'
+ .   O        E 1              ET#X2
+ .   O                         X#PDNM    57
+ .   O                         X#QTY N   78
+ .   O                         X#AMT N   94
+ .   O                         X#TAX N  109
+ .   O        E 1              ET#X3
+ .   O                                   60 '合　計'
+ .   O                         X#QTYTN   78
+ .   O                         X#AMTTN   94
+ .   O                         X#TAXTN  109
+

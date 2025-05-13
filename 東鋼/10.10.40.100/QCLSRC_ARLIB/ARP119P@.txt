@@ -1,0 +1,64 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP119P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02LBU                                  */
+     /*     4.FUNCTION     票據退回代開傳票－暫收其他             */
+     /*     5.DATE-WRITTEN  98/08/31                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&YMD)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&ACYMD)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&Y)    TYPE(*CHAR) LEN(4)
+             DCL        VAR(&M)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DTARA) TYPE(*CHAR) LEN(11)
+             DCL        VAR(&DTAR)  TYPE(*CHAR) LEN(10)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&DTARA) VALUE('ACCTLDTA' *CAT &AREA)
+             RTVDTAARA  DTAARA(DALIB/&DTARA (1 8)) RTNVAR(&ACYMD)
+
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARP119RS) PARM(&IN03 &YMD &ACYMD)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&YMD)
+
+             SBMJOB     JOB(ARP119P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARP119P')
+             RETURN
+             ENDDO
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1    8)) RTNVAR(&YMD)
+             RTVDTAARA  DTAARA(*LDA (1    4)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (5    2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+
+             OVRDBF     FILE(RCVDTLL1) TOFILE(RCVDTLL1) SHARE(*YES)
+             OPNQRYF    FILE((RCVDTLL1))     QRYSLT('   +
+                          RVNTDT *EQ   ' || &YMD || '          +
+                    *AND  RVNTCD *EQ   "2"                     +
+                    *AND  RVVNO2 *EQ   " "                     +
+                    *AND  %SST(RVWRNO  1 1) *EQ  "' || &AREA || '" +
+                    *AND  %SST(RVRESV 11 1) *EQ  "9"               +
+                    *AND  RVDECD *NE  "D"')                    +
+                          KEYFLD((RVWRNO)(RVITEM))
+
+             OVRDBF     FILE(ACTRAN) TOFILE(DALIB/('AC' || &AREA || +
+                          'R')) LVLCHK(*NO)
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 176) +
+                          CPI(13.3)
+             CALL       PGM(ARLIB/ARP119R)
+             CLOF       OPNID(RCVDTLL1)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

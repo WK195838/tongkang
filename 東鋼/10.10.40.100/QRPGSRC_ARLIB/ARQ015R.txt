@@ -1,0 +1,187 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARQ015R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     客戶繳款應轉暫收額度計算程式
+     H*            5.DATE-WRITTEN  88/11/12
+     H*                           101/09/24  2012AR682 S00WCJ (0109A)
+     H*                           102/09/26  S00WCJ (0209A)
+     H*                           增加外幣計算避免外幣繳款AR2159D金
+     H*                           額錯誤
+     H*
+     H* 說明：   1.應用程式傳入繳款書編號及項次。
+     H*            2.本程式傳回該筆項次的繳款其應轉暫收的額度。
+     H*            3.計算原則：借方金額優先扣抵貨款、次而其他貸方
+     H*                        科目，最後才是暫收款。所有借方金額
+     H*                        依兌現日期的先後及其項次的順序來處理。
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FRCVDTLL8IF  E           K        DISK
+     E*************************************************************
+     E                    ARY1      100 21
+0209AE                    ARY2      100 23
+     I*************************************************************
+     I            DS
+     I                                        1  21 A#DATA
+     I                                        1   80A@NTDT
+     I                                        9  100A@ITEM
+     I                                       11  210A@RAMT
+0209AI            DS
+0209AI                                        1  23 E#DATA
+0209AI                                        1   80E@NTDT
+0209AI                                        9  100E@ITEM
+0209AI                                       11  232E@RAMT
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#RVNO  6
+     C                     PARM           P#ITEM  20
+     C                     PARM           P#MODE  1
+     C                     PARM           P#RAMT 110
+0209AC                     PARM           P#RAM1 132
+     C**************************************************************
+     C*   搜尋關鍵
+     C**************************************************************
+     C           K#RV      KLIST
+     C                     KFLD           RVNO
+     C                     KFLD           RVITEM
+     C**************************************************************
+     C*   主程式
+     C**************************************************************
+     C                     Z-ADD0         P#RAMT
+0209AC                     Z-ADD0         P#RAM1
+     C*
+     C                     MOVELP#RVNO    RVNO
+     C                     Z-ADDP#ITEM    RVITEM
+     C           K#RV      CHAINRVREC                69
+     C           *IN69     IFEQ '1'                        不存在
+     C           RVACTP    OREQ 'C'                        貸方
+     C                     SETON                     LR
+     C                     RETRN
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         I       20
+     C                     Z-ADD0         ARY1L   20
+     C                     MOVEL*ALL'9'   ARY1
+0209AC                     MOVEL*ALL'9'   ARY2
+     C                     Z-ADD0         W#2159 110
+0209AC                     Z-ADD0         E#2159 132
+     C                     Z-ADD0         W#DAMT 110
+0209AC                     Z-ADD0         E#DAMT 132
+     C                     Z-ADD0         W#CAMT 110
+0209AC                     Z-ADD0         E#CAMT 132
+     C*
+     C           RVNO      SETLLRVREC                69
+ {   C           1         DOWEQ1
+     C           RVNO      READERVREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           RVACTP    IFEQ 'D'
+     C                     ADD  RVRAMT    W#DAMT
+0209AC                     ADD  RVCAMT    E#DAMT
+     C                     EXSR SR1000                     兌現日期
+     C                     Z-ADDW#NTDT    A@NTDT
+     C                     Z-ADDRVITEM    A@ITEM
+     C                     Z-ADDRVRAMT    A@RAMT
+0209AC                     Z-ADDW#NTDT    E@NTDT
+0209AC                     Z-ADDRVITEM    E@ITEM
+0209AC                     Z-ADDRVCAMT    E@RAMT
+     C                     ADD  1         I
+     C                     ADD  1         ARY1L
+     C                     MOVELA#DATA    ARY1,I
+0209AC                     MOVELE#DATA    ARY2,I
+     C                     ENDIF
+     C*
+     C           RVACTP    IFEQ 'C'
+     C           RVACNO    ANDEQ'2159'
+0109AC           RVACTP    OREQ 'C'
+0109AC           RVACNO    ANDEQ'211301'
+     C                     ADD  RVRAMT    W#2159
+0209AC                     ADD  RVCAMT    E#2159
+     C                     ENDIF
+ }   C                     ENDDO
+     C*
+     C           W#DAMT    SUB  W#2159    W#CAMT
+0209AC           E#DAMT    SUB  E#2159    E#CAMT
+     C                     SORTAARY1
+     C*
+ {   C           1         DO   ARY1L     I
+     C                     MOVELARY1,I    A#DATA
+0209AC                     MOVELARY2,I    E#DATA
+     C           W#CAMT    IFLE A@RAMT
+     C                     SUB  W#CAMT    A@RAMT
+     C                     Z-ADD0         W#CAMT
+     C                     ELSE
+     C                     SUB  A@RAMT    W#CAMT
+     C                     Z-ADD0         A@RAMT
+     C                     ENDIF
+0209AC           E#CAMT    IFLE E@RAMT
+0209AC                     SUB  E#CAMT    E@RAMT
+0209AC                     Z-ADD0         E#CAMT
+0209AC                     ELSE
+0209AC                     SUB  E@RAMT    E#CAMT
+0209AC                     Z-ADD0         E@RAMT
+0209AC                     ENDIF
+     C                     MOVELA#DATA    ARY1,I
+0209AC                     MOVELE#DATA    ARY2,I
+ }   C                     ENDDO
+     C*
+ {   C           1         DO   ARY1L     I
+     C                     MOVELARY1,I    A#DATA
+0209AC                     MOVELARY2,I    E#DATA
+     C           A@ITEM    IFEQ P#ITEM
+     C                     Z-ADDA@RAMT    P#RAMT
+0209AC                     Z-ADDE@RAMT    P#RAM1
+     C                     LEAVE
+     C                     ENDIF
+ }   C                     ENDDO
+     C*
+YSH  C           P#MODE    IFEQ '1'                        針對還原
+ .   C*          W#DAMT    ANDEQW#2159                      2159
+ .   C                     Z-ADDW#2159    P#RAMT
+0209AC                     Z-ADDE#2159    P#RAM1
+ .   C                     ENDIF
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+     C*
+     C************************************
+     C*  求得該筆繳款明細項之兌現日期
+     C************************************
+     CSR         SR1000    BEGSR
+     C                     Z-ADD0         W#NTDT  80       兌現日期
+     C*
+     C           RVNTTP    IFEQ 'F'                        匯票
+     C           RVNTTP    OREQ 'G'                        匯款
+     C           RVNTTP    OREQ 'H'                        現金
+     C           RVNTTP    OREQ 'J'                        銀行存款
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C           RVACNO    IFEQ '1131'
+     C           RVNTCD    ANDEQ'1'
+0109AC           RVACNO    OREQ '111001'
+0109AC           RVNTCD    ANDEQ'1'
+     C                     Z-ADDRVNTDT    W#NTDT
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C           RVACNO    IFEQ '1131'
+0109AC           RVACNO    OREQ '111001'
+     C                     Z-ADDRVDUDT    W#NTDT
+     C                     ENDIF
+     CSR         ES1000    ENDSR
+     C****************************************************************
+

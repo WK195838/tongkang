@@ -1,0 +1,79 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR121P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02CSF                                    */
+        /*        4.FUNCTION      客戶別押匯明細表                         */
+        /*        5.DATE-WRITTEN   94/08/08                                  */
+        /*        6.DATE-MODIFY                                              */
+        /*                                                                   */
+        /*********************************************************************/
+             PGM
+             DCL      VAR(&TYPE)   TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#IN03) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#CUNO) TYPE(*CHAR) LEN(6)
+             DCL      VAR(&P#DAT1) TYPE(*CHAR) LEN(8)
+             DCL      VAR(&P#DAT2) TYPE(*CHAR) LEN(8)
+             DCL      VAR(&P#AREA) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#ARE1) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#ARE2) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&S#DEVN) TYPE(*CHAR) LEN(10)
+             DCL      VAR(&S#USER) TYPE(*CHAR) LEN(10)
+
+             RTVJOBA  JOB(&S#DEVN) USER(&S#USER) TYPE(&TYPE)
+             IF       COND(&TYPE *EQ '0') THEN(GOTO BATCH)
+
+             CALL     PGM(ARR121RS) PARM(&P#IN03)
+             IF       COND(&P#IN03 *EQ '1') THEN(RETURN)
+
+             SBMJOB     CMD(CALL PGM(ARR121P)) JOB(ARR121P) +
+                        JOBD(ARJOBD)
+             SNDBRKMSG  MSG('<<客戶別押匯明細表已開始處理+
+                         ,請稍待.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             RETURN
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (300  6)) RTNVAR(&P#CUNO)
+             RTVDTAARA  DTAARA(*LDA (306  8)) RTNVAR(&P#DAT1)
+             RTVDTAARA  DTAARA(*LDA (314  8)) RTNVAR(&P#DAT2)
+             RTVDTAARA  DTAARA(*LDA (322  1)) RTNVAR(&P#AREA)
+             IF         COND(&P#AREA  *EQ ' ')  THEN(DO)
+             CHGVAR     VAR(&P#ARE1)   VALUE(' ')
+             CHGVAR     VAR(&P#ARE2)   VALUE('9')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&P#ARE1)   VALUE(&P#AREA)
+             CHGVAR     VAR(&P#ARE2)   VALUE(&P#AREA)
+             ENDDO
+
+             CLRPFM     ARR121F
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE((TRNDTL)) QRYSLT('                    +
+                        (TXCODE *EQ "AR06")                   *AND +
+                        (TXFLAG *NE "D")                      *AND +
+                        (TXCUNO *EQ "' || &P#CUNO || '")      *AND +
+                        (DATE   *GE "' || &P#DAT1 || '")      *AND +
+                        (DATE   *LE "' || &P#DAT2 || '")')         +
+                        MAPFLD((DATE   TXDATE   *CHAR 8))          +
+                        KEYFLD((TXCUNO) (TXORNO) (TXNO))
+             CALL       PGM(ARR121R1)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             OVRPRTF    FILE(ARR121T) TOFILE(ARR121T) PAGESIZE(*N 198)  +
+                        CPI(15) HOLD(*YES)  USRDTA('押匯明細')
+             OVRDBF     FILE(ARR121F) TOFILE(ARR121F) SHARE(*YES)
+             OPNQRYF    FILE((ARR121F)) QRYSLT('                   +
+                        (A2AREA *GE "' || &P#ARE1 || '")      *AND +
+                        (A2AREA *LE "' || &P#ARE2 || '")')         +
+                        KEYFLD((A2AREA) (A2CUNO) (A2ORNO) (A2TXNO) (A2IVNO))
+             CALL       PGM(ARR121R)
+             CLOF       OPNID(ARR121F)
+             DLTOVR     FILE(*ALL)
+
+             SNDBRKMSG  MSG('<<客戶別押匯明細表已處理完成+
+                        ,請列印.........>>') +
+                      TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             ENDPGM
+

@@ -1,0 +1,171 @@
+     /****************************************************************/
+     /*                                                              */
+     /*               >>   PROGRAM INTRODUCTION   <<                 */
+     /*                                                              */
+     /*            1.PROGRAM-ID    ARR091P                           */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S02YSH                            */
+     /*            4.FUNCTION     應收款項彙總表                  */
+     /*            5.DATE-WRITTEN  90/11/13                          */
+     /*                                                              */
+     /****************************************************************/
+             PGM
+             DCLF       FILE(ARR091S)
+             DCL        VAR(&TYPE)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&YMDF) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&YMDT) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATC) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&DATD) TYPE(*DEC)  LEN(4 0)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&TYPE) USER(&S#USER)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVN)
+             RTVDTAARA  DTAARA(*LDA (1021 1))  RTNVAR(&S#AREA)
+             IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+             CHGVAR     VAR(&S#DAT1) VALUE(20)
+             CHGVAR     VAR(&S#DAT2) VALUE(45)
+             CHGVAR     VAR(&S#DAT3) VALUE(30)
+             IF         COND(&S#AREA *NE 'P') THEN(DO)
+             CHGVAR     VAR(&IN24)   VALUE('1')
+             ENDDO
+             CHGVAR     VAR(&S#TYPE) VALUE('A')
+
+ START:      SNDRCVF    RCDFMT(AR091F1)
+             /* PF3=結束作業*/
+                        CHGVAR VAR(&IN25) VALUE('0')
+                        CHGVAR VAR(&IN26) VALUE('0')
+                        CHGVAR VAR(&S#ERR) VALUE(' ')
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+             CHGVAR     VAR(&YMDF) VALUE(&S#DUS)
+             CHGVAR     VAR(&YMDT) VALUE(&S#DUE)
+
+             /* Check日期*/
+             IF         COND(&YMDF *EQ '00000000') THEN(DO)
+               CHGVAR     VAR(&S#ERR) VALUE('日期不可空白！')
+               CHGVAR     VAR(&IN25)  VALUE('1')
+               GOTO       CMDLBL(START)
+               ENDDO
+
+             IF         COND(&YMDT *EQ '00000000') THEN(DO)
+             CHGVAR     VAR(&YMDT) VALUE(&YMDF)
+               ENDDO
+
+
+             IF         COND((&YMDF *NE '00000000') *AND (&YMDT *LT +
+                          &YMDF)) THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('日期不得小於前項日期！')
+               CHGVAR     VAR(&IN26)  VALUE('1')
+               GOTO       CMDLBL(START)
+               ENDDO
+
+             CHGDTAARA  DTAARA(*LDA (101 8)) VALUE(&YMDF)
+             CHGDTAARA  DTAARA(*LDA (111 8)) VALUE(&YMDT)
+             CHGDTAARA  DTAARA(*LDA (398 1)) VALUE(&S#AREA)
+             CHGVAR     VAR(&DATD) VALUE(&S#DAT1)
+             CHGVAR     VAR(&DATC) VALUE(&DATD)
+             CHGDTAARA  DTAARA(*LDA (401 4)) VALUE(&DATC)
+             CHGVAR     VAR(&DATD) VALUE(&S#DAT2)
+             CHGVAR     VAR(&DATC) VALUE(&DATD)
+             CHGDTAARA  DTAARA(*LDA (405 4)) VALUE(&DATC)
+             CHGVAR     VAR(&DATD) VALUE(&S#DAT3)
+             CHGVAR     VAR(&DATC) VALUE(&DATD)
+             CHGDTAARA  DTAARA(*LDA (409 4)) VALUE(&DATC)
+             CHGDTAARA  DTAARA(*LDA (413 1)) VALUE(&S#TYPE)
+             SBMJOB     JOB(ARR091P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR091P')
+             RETURN
+ BATCH:
+             CHGDTAARA  DTAARA(*LDA (397 1)) VALUE(' ')
+             CHGDTAARA  DTAARA(*LDA (399 1)) VALUE(' ')
+             CALL ARP079P
+             RTVDTAARA  DTAARA(*LDA (101 8)) RTNVAR(&YMDF)
+             RTVDTAARA  DTAARA(*LDA (111 8)) RTNVAR(&YMDT)
+
+   /***************************************************************/
+   /*催收*/
+             RTVDTAARA  DTAARA(*LDA (413 1)) RTNVAR(&S#TYPE)
+
+             CHGDTAARA  DTAARA(*LDA (399 1)) VALUE(' ')
+             IF         COND(&S#TYPE *EQ 'A') THEN(DO)
+             CHGDTAARA  DTAARA(*LDA (400 1)) VALUE('A')
+             OVRDBF     FILE(ARP079F) TOFILE(ARP079F) SHARE(*YES)
+             OVRPRTF    FILE(ARR091T) TOFILE(ARR091T) PAGESIZE(*N +
+                          198) CPI(15) HOLD(*YES) +
+                          USRDTA('應收異常') IGCDTA(*YES)
+             OPNQRYF    FILE((ARP079F)) QRYSLT('+
+                        (WFCODE *EQ "3")') +
+                        KEYFLD((WFDATE) (WFCUNO))
+             CALL       PGM(ARR091R)
+             CLOF       OPNID(ARP079F)
+             DLTOVR     FILE(*ALL)
+
+   /*發票未開*/
+             CHGDTAARA  DTAARA(*LDA (400 1)) VALUE('B')
+             RTVDTAARA  DTAARA(*LDA (401 4)) RTNVAR(&DATC)
+             CHGVAR     VAR(&DATD) VALUE(&DATC)
+             OVRDBF     FILE(ARP079F) TOFILE(ARP079F) SHARE(*YES)
+             OVRPRTF    FILE(ARR091T) TOFILE(ARR091T) PAGESIZE(*N +
+                          198) CPI(15) HOLD(*YES) +
+                          USRDTA('應收異常') IGCDTA(*YES)
+             OPNQRYF    FILE((ARP079F)) QRYSLT('+
+                        (WFNOTP *EQ "TN") *AND +
+                        (DATS *GT "' || &DATC || '") *AND +
+                        (WFCODE *NE "3")') +
+                        KEYFLD((WFDATE) (WFCUNO)) +
+                        MAPFLD((DATS WFDATS *CHAR 4))
+             CALL       PGM(ARR091R)
+             CLOF       OPNID(ARP079F)
+             DLTOVR     FILE(*ALL)
+
+   /*發票已開未請款*/
+             CHGDTAARA  DTAARA(*LDA (400 1)) VALUE('C')
+             RTVDTAARA  DTAARA(*LDA (405 4)) RTNVAR(&DATC)
+             OVRDBF     FILE(ARP079F) TOFILE(ARP079F) SHARE(*YES)
+             OVRPRTF    FILE(ARR091T) TOFILE(ARR091T) PAGESIZE(*N +
+                          198) CPI(15) HOLD(*YES) +
+                          USRDTA('應收異常') IGCDTA(*YES)
+             OPNQRYF    FILE((ARP079F)) QRYSLT('+
+                        (WFNOTP *EQ "IN") *AND +
+                        (DATS *GT "' || &DATC || '") *AND +
+                        (WFCODE *EQ "1")') +
+                        KEYFLD((WFDATE) (WFCUNO)) +
+                        MAPFLD((DATS WFDATS *CHAR 4))
+             CALL       PGM(ARR091R)
+             CLOF       OPNID(ARP079F)
+             DLTOVR     FILE(*ALL)
+
+   /*已請款未繳款*/
+             CHGDTAARA  DTAARA(*LDA (400 1)) VALUE('D')
+             RTVDTAARA  DTAARA(*LDA (409 4)) RTNVAR(&DATC)
+             OVRDBF     FILE(ARP079F) TOFILE(ARP079F) SHARE(*YES)
+             OVRPRTF    FILE(ARR091T) TOFILE(ARR091T) PAGESIZE(*N +
+                          198) CPI(15) HOLD(*YES) +
+                          USRDTA('應收異常') IGCDTA(*YES)
+             OPNQRYF    FILE((ARP079F)) QRYSLT('+
+                        (WFNOTP *EQ "IN") *AND +
+                        (DATS *GT "' || &DATC || '") *AND +
+                        (WFCODE *EQ "2")') +
+                        KEYFLD((WFDATE) (WFCUNO)) +
+                        MAPFLD((DATS WFDATS *CHAR 4))
+             CALL       PGM(ARR091R)
+             CLOF       OPNID(ARP079F)
+             DLTOVR     FILE(*ALL)
+             ENDDO
+
+             IF         COND(&S#TYPE *EQ 'B') THEN(DO)
+             CHGDTAARA  DTAARA(*LDA (400 1)) VALUE(' ')
+             OVRDBF     FILE(ARP079F) TOFILE(ARP079F) SHARE(*YES)
+             OVRPRTF    FILE(ARR091T) TOFILE(ARR091T) PAGESIZE(*N +
+                          198) CPI(15) HOLD(*YES) +
+                          USRDTA('應收檢核') IGCDTA(*YES)
+             OPNQRYF    FILE((ARP079F)) QRYSLT('+
+                        (WFCODE *NE "3")') +
+                        KEYFLD((WFDATE) (WFCUNO))
+             CALL       PGM(ARR091R)
+             CLOF       OPNID(ARP079F)
+             DLTOVR     FILE(*ALL)
+             ENDDO
+
+             ENDPGM
+

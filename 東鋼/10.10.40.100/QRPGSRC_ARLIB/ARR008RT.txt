@@ -1,0 +1,188 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR103R1
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     跨年度發票作廢統計表表
+     H*          5.DATE-WRITTEN  92/01/09
+     H*          6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E                    DISK
+     FSARVORL3IF  E           K        DISK
+     FARSAID  IF  E           K        DISK
+     FARR008TSO   E             66     PRINTER
+     F*************************************************************
+     E**                  TAB1    1   5  1   TABR1  10
+     I*************************************************************
+     ITXREC
+     I                                              TXCUNOL2
+     I                                              TXVUNOL1
+     I*
+     I            DS
+     I                                        1   9 TXORNO
+     I                                        1   6 D#ORNO
+     I*
+     I           UDS
+     I                                      301 306 D#CUNS
+     I                                      307 312 D#CUNE
+     I                                      313 316 D#DPNS
+     I                                      317 320 D#DPNE
+     C*****************************************************************
+     C*          KEY       LIST
+     C*****************************************************************
+     C           TXKEY     KLIST
+     C                     KFLD           K#ORNO 10
+     C*
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C  N90                EXSR INZ#01
+     C  N90                SETON                     90
+     C   L2                EXSR DL#L2
+     C   L1                EXSR DL#L1
+     C                     EXSR DP#01
+     CL1                   EXSR TL#L1
+     CL2                   EXSR TL#L2
+     CLR                   EXSR TL#LR
+     CLRN90                EXSR MSGSR
+     C*
+     C*****************************************************************
+     CSR         INZ#01    BEGSR
+     C*****************************************************************
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C                     MOVE *ALL'-'   T#LIN3
+     C                     MOVE *ALL'-'   T#LIN4
+     C*
+     C                     MOVELD#CUNS    T#CUNS
+     C                     MOVELD#CUNE    T#CUNE
+     C                     MOVELD#DPNS    T#DPNO
+     C*
+     C                     Z-ADD0         W#TAM1 100
+     C                     Z-ADD0         W#TAM2 100
+     C                     Z-ADD0         W#TAM3 100
+     C*
+     C                     MOVE *ON       *IN66
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         DL#L2     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#SAM1 100
+     C                     Z-ADD0         W#SAM2 100
+     C                     Z-ADD0         W#SAM3 100
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         DL#L1     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AMT1 100
+     C                     Z-ADD0         W#AMT2 100
+     C                     Z-ADD0         W#NOAM 110
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         DP#01     BEGSR
+     C*****************************************************************
+     C           D#DPNS    IFNE *BLANK
+     C           TXRVID    CHAINRARSAID              30
+     C           *IN30     IFEQ *OFF
+     C           SADEPT    ANDNED#DPNS
+     C                     GOTO ENDTSR
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ADD  TXAMT     W#AMT1
+     C*
+     CSR         ENDTSR    ENDSR
+     C*****************************************************************
+     CSR         TL#L1     BEGSR
+     C*****************************************************************
+     C                     MOVELTXCUNO    T#CUNO           客戶代號
+     C                     MOVELTXCUNM    T#CUNM           客戶簡稱
+     C                     MOVELTXRVID    T#SALE           業務員
+     C                     MOVELTXORNO    T#ORNO           訂單編號
+     C*
+     C                     EXSR SR1000
+     C*
+     C           W#NOAM    IFNE 0
+     C                     Z-ADDW#NOAM    T#AMT1           應收貨款
+     C                     ELSE
+     C                     Z-ADDW#AMT1    T#AMT1           應收貨款
+     C                     ENDIF
+     C*
+     C                     Z-ADDW#AMT2    T#AMT2           已收金額
+     C           T#AMT1    SUB  T#AMT2    T#AMT3           應收帳款
+     C*
+     C   66                WRITEAR008T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR008T1D
+     C*
+     C                     ADD  T#AMT1    W#SAM1
+     C                     ADD  T#AMT2    W#SAM2
+     C                     ADD  T#AMT3    W#SAM3
+     C*
+     CSR         TL#L1Z    ENDSR
+     C*****************************************************************
+     CSR         SR1000    BEGSR
+     C*****************************************************************
+     C                     MOVELD#ORNO    K#ORNO
+     C                     MOVE *OFF      *IN31
+     C           K#ORNO    SETLLSOREC
+     C           *IN31     DOWEQ*OFF
+     C           K#ORNO    READESOREC                    31
+     C*
+     C   31                LEAVE
+     C*
+     C           SOCODE    IFNE 'Y'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     ADD  SONOAM    W#NOAM
+     C                     ADD  SONOXA    W#AMT2
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         TL#L2     BEGSR
+     C*****************************************************************
+     C                     Z-ADDW#SAM1    T#SAM1
+     C                     Z-ADDW#SAM2    T#SAM2
+     C                     Z-ADDW#SAM3    T#SAM3
+     C*
+     C   66                WRITEAR008T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR008T1S
+     C*
+     C                     ADD  T#SAM1    W#TAM1
+     C                     ADD  T#SAM2    W#TAM2
+     C                     ADD  T#SAM3    W#TAM3
+     C*
+     CSR         TL#L2Z    ENDSR
+     C*****************************************************************
+     CSR         TL#LR     BEGSR
+     C*****************************************************************
+     C                     Z-ADDW#TAM1    T#TAM1
+     C                     Z-ADDW#TAM2    T#TAM2
+     C                     Z-ADDW#TAM3    T#TAM3
+     C*
+     C   66                WRITEAR008T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR008T1T
+     C*
+     CSR         TL#LRZ    ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INZ#01
+     C*
+     C   66                WRITEAR008T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR008T1M
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+

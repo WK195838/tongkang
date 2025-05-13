@@ -1,0 +1,102 @@
+     /****************************************************************/
+     /*                                                              */
+     /*               >>   PROGRAM INTRODUCTION   <<                 */
+     /*                                                              */
+     /*            1.PROGRAM-NAME  ARR020P                           */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S01LYH                            */
+     /*            4.FUNCTION     客戶銷項往來明細表               */
+     /*            5.DATE-WRITTEN  '90/12/13                         */
+     /*                                                              */
+     /****************************************************************/
+             DCLF       FILE(ARR020S)
+             DCL        VAR(&S#AREA)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DA1)       TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DA2)       TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DAA)       TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DAB)       TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DSPID)     TYPE(*CHAR) LEN(10)
+             DCL        VAR(&OUTQ)      TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TYPE)      TYPE(*CHAR) LEN(1)
+             DCL        VAR(&JOBTYPE)   TYPE(*CHAR) LEN(1)
+             RTVJOBA    JOB(&DSPID) OUTQ(&OUTQ) TYPE(&JOBTYPE) +
+                          USER(&S#USER)
+             IF         COND(&JOBTYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+             RTVDTAARA  DTAARA(*LDA (1001 10))  RTNVAR(&S#USER)
+             RTVDTAARA  DTAARA(*LDA (1011 10))  RTNVAR(&S#DEVN)
+             RTVDTAARA  DTAARA(*LDA (1021  1))  RTNVAR(&S#AREA)
+             CHGDTAARA  DTAARA(*LDA (500 10))   VALUE(&DSPID)
+START:       SNDRCVF
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             IF         COND(&IN12 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&IN31) VALUE('0')
+             CHGVAR     VAR(&IN32) VALUE('0')
+             CHGVAR     VAR(&S#ERR) VALUE(' ')
+             IF         COND(&S#DA1 *EQ 0) THEN(DO)
+             CHGVAR     VAR(&IN31)  VALUE('1')
+             CHGVAR     VAR(&S#ERR) VALUE('訊息－起始日期不得空白！')
+               GOTO       CMDLBL(START)
+             ENDDO
+             IF         COND(&S#DAA *EQ 0) THEN(DO)
+             CHGVAR     VAR(&IN32)  VALUE('1')
+             CHGVAR     VAR(&S#ERR) VALUE('訊息－起始日期不得空白！')
+               GOTO       CMDLBL(START)
+             ENDDO
+             CHGVAR     VAR(&DA1) VALUE(&S#DA1)
+             CHGVAR     VAR(&DA2) VALUE(&S#DA2)
+             CHGVAR     VAR(&DAA) VALUE(&S#DAA)
+             CHGVAR     VAR(&DAB) VALUE(&S#DAB)
+             IF         COND(&DA2 *EQ '00000000') THEN(DO)
+                 CHGVAR     VAR(&DA2) VALUE(&DA1)
+             ENDDO
+             IF         COND(&DAB *EQ '00000000') THEN(DO)
+                 CHGVAR     VAR(&DAB) VALUE(&DAA)
+             ENDDO
+             IF         COND(&DA1 *GT &DA2) THEN(DO)
+             CHGVAR     VAR(&IN31)  VALUE('1')
+             CHGVAR     VAR(&S#ERR) VALUE('訊息－挑選日期區間錯誤！')
+               GOTO       CMDLBL(START)
+             ENDDO
+             IF         COND(&DAA *GT &DAB) THEN(DO)
+             CHGVAR     VAR(&IN32)  VALUE('1')
+             CHGVAR     VAR(&S#ERR) VALUE('訊息－挑選日期區間錯誤！')
+               GOTO       CMDLBL(START)
+             ENDDO
+             CHGDTAARA  DTAARA(*LDA (401 1))   VALUE(&S#AREA)
+             CHGDTAARA  DTAARA(*LDA (402 8))   VALUE(&DA1)
+             CHGDTAARA  DTAARA(*LDA (410 8))   VALUE(&DA2)
+             CHGDTAARA  DTAARA(*LDA (421 8))   VALUE(&DAA)
+             CHGDTAARA  DTAARA(*LDA (431 8))   VALUE(&DAB)
+             SBMJOB     JOB(ARR020P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR020P')
+         SNDBRKMSG  MSG('<<票據資料挑選表處理中，請稍待+
+                        ....>>') TOMSGQ(%SST(*LDA 500 10)) +
+                        MSGTYPE(*INFO)
+             RETURN    /*  INTERACTIVE JOB */
+BATCH:
+     /* 報表處理 */
+             RTVDTAARA  DTAARA(*LDA (401 1))  RTNVAR(&S#AREA)
+             RTVDTAARA  DTAARA(*LDA (402 8))  RTNVAR(&DA1)
+             RTVDTAARA  DTAARA(*LDA (410 8))  RTNVAR(&DA2)
+             RTVDTAARA  DTAARA(*LDA (421 8))  RTNVAR(&DAA)
+             RTVDTAARA  DTAARA(*LDA (431 8))  RTNVAR(&DAB)
+         /*成本中心*/
+             OVRPRTF    FILE(ARR020T) TOFILE(ARR020T) PAGESIZE(*N +
+                          158) CPI(12) HOLD(*YES) USRDTA('票據挑選')
+             OVRDBF     FILE(RCVDTLL1)   TOFILE(RCVDTLL1) SHARE(*YES)
+             OPNQRYF    FILE((RCVDTLL1)) QRYSLT(' (YMD *GE "' || +
+                          &DA1 || '") *AND (YMD *LE "' || &DA2 || +
+                          '") *AND (YMDA *GE "' || &DAA || '") *AND +
+                          (YMDA *LE "' || &DAB || '") *and (RVAREA +
+                          *EQ "P")') KEYFLD((RVDUDT) (RVDATE) +
+                          (RVNTNO) (RVNO) (RVITEM)) MAPFLD((YMD +
+                          RVDUDT *CHAR 8) (YMDA RVOLDT *CHAR 8))
+             CALL       PGM(ARR020R)
+             CLOF       OPNID(RCVDTLL1)
+             DLTOVR     FILE(*ALL)
+             SNDBRKMSG  MSG('<<票據資料挑選報表已完成，請列印。+
+                        >>') TOMSGQ(%SST(*LDA 500 10)) +
+                        MSGTYPE(*INFO)
+ENDCLPGM:    ENDPGM
+

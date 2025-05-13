@@ -1,0 +1,342 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR051P#                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     折讓開立簽回明細表（整月）             */
+     /*     5.DATE-WRITTEN  87/05/29                                */
+     /*                                                             */
+     /*    說明:950823新增折讓開立彙總表選項                    */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCLF       FILE(ARR051S#)
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&SYSN)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&YYMM)   TYPE(*CHAR) LEN(4)
+             DCL        VAR(&MM)     TYPE(*CHAR) LEN(2)
+             DCL        VAR(&YM)     TYPE(*CHAR) LEN(6)
+             DCL        VAR(&BLK)    TYPE(*CHAR) LEN(70)
+
+             RTVNETA    SYSNAME(&SYSN)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+             CHGVAR     VAR(&S#OPT) VALUE('2')
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&S#AREA)
+             RTVDTAARA  DTAARA(*LDA (951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+
+             IF         COND(&SYSN *EQ 'H03') THEN(+
+                CHGVAR  VAR(&S#MSG1) VALUE(+
+                '由於折讓單改在台北開立，故請台北的業助列印本表。'))
+
+ INPUT:
+             SNDRCVF
+
+             IF         COND(&IN03 *EQ '1' *OR &IN12 *EQ '1' +
+                             *OR &SYSN *EQ 'H03') +
+                        THEN(RETURN)
+
+             CHGVAR     VAR(&IN30)   VALUE('0')
+             CHGVAR     VAR(&IN31)   VALUE('0')
+             CHGVAR     VAR(&IN32)   VALUE('0')
+             CHGVAR     VAR(&S#MSG1) VALUE(&BLK)
+
+       /* CHECK 廠區*/
+             IF         COND((&S#AREA *NE 'P')  *AND +
+                             (&S#AREA *NE 'T')  *AND +
+                             (&S#AREA *NE 'M')  *AND +
+                             (&S#AREA *NE 'H')  *AND +
+                             (&S#AREA *NE 'K')) THEN(DO)
+             CHGVAR     VAR(&IN30)   VALUE('1')
+             CHGVAR     VAR(&S#MSG1) VALUE('廠區輸入錯誤')
+             GOTO       CMDLBL(INPUT)
+             ENDDO
+
+       /* CHECK 簽回年月*/
+             IF         COND((&S#YYMM *EQ 0)) THEN(DO)
+             CHGVAR     VAR(&IN31)   VALUE('1')
+             CHGVAR     VAR(&S#MSG1) VALUE('簽回年月輸入錯誤')
+             GOTO       CMDLBL(INPUT)
+             ENDDO
+
+       /* CHECK 簽回年月*/
+             CHGVAR     VAR(&YM)   VALUE(&S#YYMM)
+             CHGVAR     VAR(&MM)   VALUE(%SST(&YM 5 2))
+             IF         COND((&MM     *LT '01')  *OR  +
+                             (&MM     *GT '12')) THEN(DO)
+             CHGVAR     VAR(&IN31)   VALUE('1')
+             CHGVAR     VAR(&S#MSG1) VALUE('簽回年月輸入錯誤')
+             GOTO       CMDLBL(INPUT)
+             ENDDO
+
+       /* CHECK 報表選擇*/
+             IF         COND((&S#OPT *NE '1')  *AND +
+                             (&S#OPT *NE '2')) THEN(DO)
+             CHGVAR     VAR(&IN32)   VALUE('1')
+             CHGVAR     VAR(&S#MSG1) VALUE('報表選擇錯誤')
+             GOTO       CMDLBL(INPUT)
+             ENDDO
+
+        /*記錄輸入值*/
+             CHGDTAARA  DTAARA(*LDA (1 1)) VALUE(&S#AREA)
+             CHGDTAARA  DTAARA(*LDA (2 6)) VALUE(&YM)
+             CHGDTAARA  DTAARA(*LDA (8 1)) VALUE(&S#OPT)
+
+             SBMJOB     JOB(ARR051P#) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                        RQSDTA('CALL ARR051P#')
+             CHGDTAARA  DTAARA(*LDA (801 70)) +
+             VALUE('折讓開立簽回明細表（整月）已匯入排程中。')
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 1))   RTNVAR(&S#AREA)
+             RTVDTAARA  DTAARA(*LDA (2 6))   RTNVAR(&YM)
+             RTVDTAARA  DTAARA(*LDA (4 4))   RTNVAR(&YYMM)
+             RTVDTAARA  DTAARA(*LDA (8 1))   RTNVAR(&S#OPT)
+
+   /*****************************/
+   /*台北RUN苗栗廠明細表資料*/
+   /*****************************/
+             IF         COND(&S#AREA *EQ 'H'   *AND +
+                             &SYSN   *EQ 'P02' *AND +
+                             &S#OPT  *EQ '1')       +
+                        THEN(GOTO SPECIAL1)
+
+   /*****************************/
+   /*台北RUN苗栗廠彙總表資料*/
+   /*****************************/
+             IF         COND(&S#AREA *EQ 'H'   *AND +
+                             &SYSN   *EQ 'P02' *AND +
+                             &S#OPT  *EQ '2')       +
+                        THEN(GOTO SPECIAL2)
+
+
+   /**************************/
+   /* RUN非苗栗廠明細表資料*/
+   /**************************/
+             IF         COND(&S#OPT  *EQ '1') THEN(DO)
+
+   /* 銷貨折讓  */
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('TXCODE *EQ "AR06" *AND +
+                                TXFL01 *NE " " *AND +
+                                TXACNT *EQ "3" *AND +
+                         %SST(TXNO 1 1) *EQ "' || &S#AREA || '" *AND +
+                         %SST(TXRESV 1 4) *EQ "' || &YYMM || '" *AND +
+                                TXFLAG *NE "D"') +
+                        KEYFLD((TXFL02) (TXCUNO) (TXNO)) +
+                        MAPFLD((TXFL02 '%SST(TXNO 1 5)'))
+             CHGDTAARA  DTAARA(*LDA (10 1)) VALUE('3')
+             OVRPRTF    FILE(QPRINT) USRDTA('銷貨折讓')
+             CALL       PGM(ARR051R#)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+   /* 銷貨退回  */
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('TXCODE *EQ "AR06" *AND +
+                                TXFL01 *NE " " *AND +
+                                TXACNT *EQ "2" *AND +
+                         %SST(TXNO 1 1) *EQ "' || &S#AREA || '" *AND +
+                         %SST(TXRESV 1 4) *EQ "' || &YYMM || '" *AND +
+                                TXFLAG *NE "D"') +
+                        KEYFLD((TXFL02) (TXCUNO) (TXNO)) +
+                        MAPFLD((TXFL02 '%SST(TXNO 1 5)'))
+             CHGDTAARA  DTAARA(*LDA (10 1)) VALUE('2')
+             OVRPRTF    FILE(QPRINT) USRDTA('銷貨退回')
+             CALL       PGM(ARR051R#)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+   /* 預收折讓  */
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('TXCODE *EQ "AR06" *AND +
+                                TXFL01 *NE " " *AND +
+                                TXACNT *EQ "4" *AND +
+                         %SST(TXNO 1 1) *EQ "' || &S#AREA || '" *AND +
+                         %SST(TXRESV 1 4) *EQ "' || &YYMM || '" *AND +
+                                TXFLAG *NE "D"') +
+                        KEYFLD((TXFL02) (TXCUNO) (TXNO)) +
+                        MAPFLD((TXFL02 '%SST(TXNO 1 5)'))
+             CHGDTAARA  DTAARA(*LDA (10 1)) VALUE('4')
+             OVRPRTF    FILE(QPRINT) USRDTA('預收折讓')
+             CALL       PGM(ARR051R#)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+
+             GOTO       ENDDING
+             ENDDO
+
+   /**************************/
+   /* RUN非苗栗廠彙總表資料*/
+   /**************************/
+             IF         COND(&S#OPT  *EQ '2') THEN(DO)
+
+   /*銷折、銷退、預折*/
+             CLRPFM     FILE(ARLIB/ARR051F#)
+             CHGDTAARA  DTAARA(*LDA (301 1)) VALUE(' ')
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('TXCODE *EQ "AR06" *AND +
+                                TXFL01 *NE " " *AND +
+                                TXACNT *GE "2" *AND +
+                                TXACNT *LE "4" *AND +
+                         %SST(TXNO 1 1) *EQ "' || &S#AREA || '" *AND +
+                         %SST(TXRESV 1 4) *EQ "' || &YYMM || '" *AND +
+                                TXFLAG *NE "D"') +
+                        KEYFLD((TXFL02) (TXCUNO) (TXNO)) +
+                        MAPFLD((TXFL02 '%SST(TXNO 1 5)'))
+             CALL       PGM(ARR051R2)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(ARR051F#) TOFILE(ARR051F#) SHARE(*YES)
+             OPNQRYF    FILE(ARR051F#) +
+                        KEYFLD((TFFLAG)(TFCUNO)(TFNO)(TFACNT))
+             OVRPRTF    FILE(ARR051T#) TOFILE(ARR051T#) +
+                        PAGESIZE(*N 132) CPI(10) HOLD(*YES) +
+                        USRDTA('折退彙總')
+             CALL       PGM(ARR051R1)
+             CLOF       OPNID(ARR051F#)
+             DLTOVR     FILE(*ALL)
+
+
+             GOTO       ENDDING
+             ENDDO
+ /* ============================================================== */
+
+ SPECIAL1:   /*  型鋼之折讓改在台北進行，因此有苗栗及高雄兩廠發票 */
+
+             CRTDUPOBJ  OBJ(TRNDTL) FROMLIB(DALIB) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(TRNDTLX)
+             OVRDBF     FILE(TRNDTLL3) TOFILE(QTEMP/TRNDTLX)
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('TXCODE *EQ "AR06" *AND +
+                                TXFL01 *NE " " *AND +
+                                TXACNT *EQ %VALUES("2" "3" "4") *AND +
+                         %SST(TXNO 1 1) *EQ "H" *AND +
+                         %SST(TXRESV 1 4) *EQ "' || &YYMM || '" *AND +
+                                TXFLAG *NE "D"')
+             CALL       PGM(ARR051R0)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+
+    /* 銷貨折讓  */
+             OVRDBF     FILE(TRNDTL) TOFILE(QTEMP/TRNDTLX) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('TXFLAG *EQ "H" *AND +
+                                TXACNT *EQ "3"') +
+                        KEYFLD((TXFL02) (TXCUNO) (TXNO)) +
+                        MAPFLD((TXFL02 TXFLAG))
+             CHGDTAARA  DTAARA(*LDA (10 1)) VALUE('3')
+             OVRPRTF    FILE(QPRINT) USRDTA('苗栗型折')
+             CALL       PGM(ARR051R#)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(TRNDTL) TOFILE(QTEMP/TRNDTLX) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('TXFLAG *EQ "K" *AND +
+                                TXACNT *EQ "3"') +
+                        KEYFLD((TXFL02) (TXCUNO) (TXNO)) +
+                        MAPFLD((TXFL02 TXFLAG))
+             CHGDTAARA  DTAARA(*LDA (10 1)) VALUE('3')
+             OVRPRTF    FILE(QPRINT) USRDTA('高雄型折')
+             CALL       PGM(ARR051R#)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+    /* 銷貨退回  */
+             OVRDBF     FILE(TRNDTL) TOFILE(QTEMP/TRNDTLX) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('TXFLAG *EQ "H" *AND +
+                                TXACNT *EQ "2"') +
+                        KEYFLD((TXFL02) (TXCUNO) (TXNO)) +
+                        MAPFLD((TXFL02 TXFLAG))
+             CHGDTAARA  DTAARA(*LDA (10 1)) VALUE('2')
+             OVRPRTF    FILE(QPRINT) USRDTA('苗栗型退')
+             CALL       PGM(ARR051R#)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(TRNDTL) TOFILE(QTEMP/TRNDTLX) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('TXFLAG *EQ "K" *AND +
+                                TXACNT *EQ "2"') +
+                        KEYFLD((TXFL02) (TXCUNO) (TXNO)) +
+                        MAPFLD((TXFL02 TXFLAG))
+             CHGDTAARA  DTAARA(*LDA (10 1)) VALUE('2')
+             OVRPRTF    FILE(QPRINT) USRDTA('高雄型退')
+             CALL       PGM(ARR051R#)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+    /* 預收折讓  */
+             OVRDBF     FILE(TRNDTL) TOFILE(QTEMP/TRNDTLX) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('TXFLAG *EQ "H" *AND +
+                                TXACNT *EQ "4"') +
+                        KEYFLD((TXFL02) (TXCUNO) (TXNO)) +
+                        MAPFLD((TXFL02 TXFLAG))
+             CHGDTAARA  DTAARA(*LDA (10 1)) VALUE('4')
+             OVRPRTF    FILE(QPRINT) USRDTA('苗栗預折')
+             CALL       PGM(ARR051R#)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(TRNDTL) TOFILE(QTEMP/TRNDTLX) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('TXFLAG *EQ "K" *AND +
+                                TXACNT *EQ "4"') +
+                        KEYFLD((TXFL02) (TXCUNO) (TXNO)) +
+                        MAPFLD((TXFL02 TXFLAG))
+             CHGDTAARA  DTAARA(*LDA (10 1)) VALUE('4')
+             OVRPRTF    FILE(QPRINT) USRDTA('高雄預折')
+             CALL       PGM(ARR051R#)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             GOTO       ENDDING
+
+ /* =============================================================== */
+ SPECIAL2:   /*  型鋼之折讓改在台北進行，因此有苗栗及高雄兩廠發票 */
+
+             CLRPFM     FILE(ARLIB/ARR051F#)
+             CHGDTAARA  DTAARA(*LDA (301 1)) VALUE('Y')
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('TXCODE *EQ "AR06" *AND +
+                                TXFL01 *NE " " *AND +
+                                TXACNT *EQ %VALUES("2" "3" "4") *AND +
+                         %SST(TXNO 1 1) *EQ "H" *AND +
+                         %SST(TXRESV 1 4) *EQ "' || &YYMM || '" *AND +
+                                TXFLAG *NE "D"')
+             CALL       PGM(ARR051R2)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(ARR051F#) TOFILE(ARR051F#) SHARE(*YES)
+             OPNQRYF    FILE(ARR051F#) +
+                        KEYFLD((TFFLAG)(TFCUNO)(TFNO)(TFACNT))
+             OVRPRTF    FILE(ARR051T#) TOFILE(ARR051T#) +
+                        PAGESIZE(*N 132) CPI(10) HOLD(*YES) +
+                        USRDTA('折退彙總')
+             CALL       PGM(ARR051R1)
+             CLOF       OPNID(ARR051F#)
+             DLTOVR     FILE(*ALL)
+
+
+ ENDDING:    ENDPGM
+

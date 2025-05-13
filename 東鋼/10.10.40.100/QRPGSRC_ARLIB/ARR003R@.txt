@@ -1,0 +1,215 @@
+     H************************************************************
+     H*                                                          *
+     H*         PROGRAM   ID        :   ARR003R                  *
+     H*         PROGRAM   FUNCTION  :  預收貨款餘額明細表      *
+     H*         AUTHER              :   NANCY       JEFF         *
+     H*         CREATE    DATE      :   81/10/01    81/10/13     *
+     H*         MAINTAIN  DATE      :                            *
+     H*         RELATION  PROGRAM   :   ARR003P                  *
+     H*         NOTE                :                            *
+     H*                                                          *
+     H************************************************************
+     H        1   Y D                                   1                 BR003
+     FINVMST  IP  E           K        DISK
+     FARSTAT  IF  E           K        DISK
+     FQPRINT  O   F     132            PRINTER
+     F*---------------------------------------------------------------
+     IINREC
+     I                                              INORNOL1
+     IAADS        DS
+     I              '東和鋼鐵企業股份有-C         CON4                       X
+     I              '限公司'
+     I           UDS
+     I                                        1   5 ORNOF
+     I                                        6  10 ORNOT
+     C*----------------------------------------------------
+     C  N90                EXSR IN#01
+     C*  L2                EXSR DL#02
+     C   L1                EXSR DL#01
+     C                     EXSR DP#01
+     CL1                   EXSR TL#01
+     C*2                   EXSR TL#02
+     C**----------------------------------------------**
+     C**   INITIAL ROUTING                            **
+     C**----------------------------------------------**
+     CSR         IN#01     BEGSR
+     C                     Z-ADD80        LCNT    20
+     C                     Z-ADD58        TCNT    20
+     C                     Z-ADD0         PAG     30
+     C                     SETON                     90
+     CSR                   ENDSR
+     C**********
+     C* L1RTN  *
+     C**********
+     CSR         DL#01     BEGSR
+     C                     Z-ADD0         BAL1   110
+     C                     Z-ADD0         TOT1   110
+     C                     Z-ADD0         TOT2   110
+     C                     Z-ADD0         TOT3   110
+     C                     Z-ADD0         TOT4   110
+     C                     Z-ADD0         TOT5   110
+     C                     Z-ADD0         TOT6   110
+     C           INORNO    CHAINARSTAT               97
+     C   97                Z-ADD0         ARMAMT
+     C           ARMAMT    COMP 0                    212223
+     C           ARMAMT    IFNE 0
+     C                     Z-ADDARMAMT    BAL1
+     C                     ADD  1         PAG
+     C                     EXCPTEH#01
+     C                     Z-ADD9         LCNT
+     C                     EXCPTED#02
+     C                     ADD  1         LCNT
+     C                     ENDIF
+     CSR         DL#01Z    ENDSR
+     C**********
+     C* L2RTN  *
+     C**********
+     C*R         DL#02     BEGSR
+     C*                    Z-ADD0         BAL11  110
+     C*                    Z-ADD0         TOT11  110
+     C*                    Z-ADD0         TOT21  110
+     C*                    Z-ADD0         TOT31  110
+     C*                    Z-ADD0         TOT41  110
+     C*                    Z-ADD0         TOT51  110
+     C*                    Z-ADD0         TOT61  110
+     C*R         DL#02Z    ENDSR
+     C**********
+     C* RTN01  *
+     C**********
+     CSR         DP#01     BEGSR
+     C                     Z-ADD0         BAL    110
+     C                     Z-ADD0         FAMT   110
+     C                     Z-ADD0         AAMT   110
+     C                     Z-ADD0         CAMT   110
+     ***
+     C           INTYPE    IFEQ '2'
+     C                     Z-ADDINAAMT    AAMT   110
+     C                     Z-ADDINCAMT    CAMT   110
+     C*                    Z-ADDINAAMT    HAMT   110
+     C*                    ADD  INCAMT    HAMT
+     C*          INEAMT    ADD  INFAMT    EAMT   110
+     C*          EAMT      MULT -1        FAMT   110
+     C*          FAMT      IFGE HAMT
+     C*                    Z-ADDHAMT      FAMT
+     C*                    ELSE
+     C*                    Z-ADDFAMT      FAMT
+     C*                    END
+     C                     END
+     C**
+     C                     ADD  AAMT      BAL
+     C                     ADD  INBAMT    BAL
+     C                     ADD  CAMT      BAL
+     C                     ADD  INDAMT    BAL
+     C                     ADD  BAL       BAL1
+     ***
+     C                     EXSR PR#01
+     ***
+     C                     ADD  AAMT      TOT1
+     C                     ADD  INBAMT    TOT2
+     C                     ADD  CAMT      TOT3
+     C                     ADD  INDAMT    TOT4
+     C*                    ADD  AAMT      TOT11
+     C*                    ADD  INBAMT    TOT21
+     C*                    ADD  CAMT      TOT31
+     C*                    ADD  INDAMT    TOT41
+     CSR         DP#01Z    ENDSR
+     C**--------------------------------------**
+     C**  PRINT DETAIL                        **
+     C**--------------------------------------**
+     CSR         PR#01     BEGSR
+     C           LCNT      COMP TCNT                 75  75
+     C   75                ADD  1         PAG
+     C   75                EXCPTEH#01
+     C   75                Z-ADD9         LCNT
+     C**
+     C                     ADD  1         LCNT
+     C                     EXCPTED#01
+     CSR                   ENDSR
+     C**--------------------------------------**
+     C**  PROCESS TOTAL TIME L1               **
+     C**--------------------------------------**
+     CSR         TL#01     BEGSR
+     C                     Z-ADDBAL1      TOT6
+     C                     EXCPTET#01
+     C                     Z-ADD80        LCNT
+     CSR         TL#01Z    ENDSR
+     C**--------------------------------------**
+     C**  PROCESS TOTAL TIME L1               **
+     C**--------------------------------------**
+     C*R         TL#02     BEGSR
+     C*                    EXCPTET#02
+     C*                    Z-ADD80        LCNT
+     C*R         TL#02Z    ENDSR
+     C*---------------------------------------------------------------
+     OQPRINT  E   03           EH#01
+     O                                   12 '報表編號：'
+     O                                   17 'AR003'
+     O                         CON4      75                                    X
+     O                                  120 '印表日期：'
+     O                         UDATE Y  128
+     O        E 1              EH#01
+     O                                   74 '預收貨款餘額發票明細表'
+     O                                  120 '頁　　數：'
+     O                         PAG   Z  124
+     O        E 1              EH#01
+     O                                   12 '訂單號碼：'
+     O                         ORNOF   +  1
+     O                                 +  1 '至'
+     O                         ORNOT   +  1
+     O        E 1              EH#01
+     O                                   12 '客戶編號：'
+     O                         INCUNO    18
+     O                                   34 '客戶名稱：'
+     O                         INCUNM    44
+     O        E 2              EH#01
+     O                                   10 '訂單號碼'
+     O                                   21 '發票號碼'
+     O                                   32 '發票日期'
+     O                                   47 '預收貨款'
+     O                                   62 '扣預收款'
+     O                                   79 '折讓／銷退金額'
+     O                                   94 '扣預收款沖回'
+     O                                  112 '轉入／轉出金額'
+     O                                  128 '預收貨款餘額'
+     O        E 1              EH#01
+     O                                   20 '--------------------'
+     O                                   40 '--------------------'
+     O                                   60 '--------------------'
+     O                                   80 '--------------------'
+     O                                  100 '--------------------'
+     O                                  121 '---------------------'
+     O                                  128 '-------'
+     O        E 1              ED#01
+     O                 L1 23   INORNO     7
+     O                 75      INORNO     7
+     O                         INNO      21
+     O                         ININDTY   31
+     O                         AAMT  N   46
+     O                         INBAMTN   61
+     O                         CAMT  N   78
+     O                         INDAMTN   93
+     O                         BAL1  N  127
+     O        E 1              ED#02
+     O                         INORNO     7
+     O                         INORNO     7
+     O                 21                21 '前期轉入'
+     O                 22                21 '前期轉出'
+     O                         ARMAMTN  111
+     O                         BAL1  N  127
+     O        E 2              ET#01
+     O                                   24 '訂單合計：'
+     O                         TOT1  N   46
+     O                         TOT2  N   61
+     O                         TOT3  N   78
+     O                         TOT4  N   93
+     O                         ARMAMTN  111
+     O                         TOT6  N  127
+     O*       E 2              ET#02
+     O*                                  24 '客戶合計：'
+     O*                        TOT11 J   46
+     O*                        TOT21 J   61
+     O*                        TOT31 J   78
+     O*                        TOT41 J   93
+     O*                        TOT51 J  111
+     O*                        TOT61 J  127
+

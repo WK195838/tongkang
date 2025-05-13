@@ -1,0 +1,172 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE055RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     營業退款過入財會處理作業（畫面檢核）
+     H*            5.DATE-WRITTEN  93/10/13
+     H*            6.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARE055S CF  E                    WORKSTN
+     E*************************************************************
+     E                    ERR     1  10 70
+     I*************************************************************
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10211021 S#RTDP
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C                     PARM           P#RTDP  1
+     C                     PARM           P#RTDS  80
+     C                     PARM           P#RTDE  80
+     C                     PARM           P#USTP  2
+     C                     PARM           P#CODE  1
+     C**************************************************************
+     C*          KEY  LIST
+     C**************************************************************
+     C*FILE==>ACCTRL(傳票程序控制檔)
+     C*          K#AC      KLIST
+     C*                    KFLD           AAAREA            廠區別
+     C*                    KFLD           AAYYMM            年月
+     C*                    KFLD           AAFSYS            作業來源
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C                     EXSR SR0000                     初始程式
+     C*
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C           SR0000    BEGSR
+     C**************************************************************
+     C                     MOVEL'01'      W#PRID  2        畫面一
+     C*
+     C                     ENDSR
+     C**************************************************************
+     C           SR1000    BEGSR
+     C**************************************************************
+     C*W#PRID='01'-->畫面一
+     C           W#PRID    DOWEQ'01'
+     C                     EXFMTAR055H                     螢幕輸入
+     C                     MOVEL*BLANK    S#ERR
+     C                     MOVE *OFF      *IN99
+     C*
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03           回前畫面
+     C                     MOVEL'00'      W#PRID           結束
+     C                     LEAVE
+     C                     ENDIF
+     C*檢核
+     C                     EXSR SR1100                     檢核
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         SR1100    BEGSR
+     C**************************************************************
+     C                     MOVEA'000'     *IN,51
+     C                     MOVE *OFF      *IN99
+     C*----------------
+     C*檢核退款日期 -
+     C*----------------
+     C           S#RTDS    IFEQ 0
+     C                     MOVELERR,1     S#ERR
+     C                     SETON                     5199
+     C                     ENDIF
+     C*
+     C  N99      S#RTDE    IFEQ 0
+     C                     MOVELERR,2     S#ERR
+     C                     SETON                     5299
+     C                     ENDIF
+     C*
+     C  N99                MOVE S#RTDS    P#DATE           退款起日
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM           P#ERR   1
+     C  N99      P#ERR     IFNE '0'
+     C                     SETON                     5199
+     C                     MOVELERR,3     S#ERR
+     C                     ENDIF
+     C*
+     C  N99                MOVE S#RTDE    P#DATE           退款起日
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM           P#ERR   1
+     C  N99      P#ERR     IFNE '0'
+     C                     SETON                     5299
+     C                     MOVELERR,4     S#ERR
+     C                     ENDIF
+     C*
+     C  N99      S#RTDS    IFGT S#RTDE
+     C                     MOVELERR,5     S#ERR
+     C                     SETON                     515299
+     C                     ENDIF
+     C*
+     C  N99      S#USTP    IFEQ *BLANK
+     C                     MOVELERR,6     S#ERR
+     C                     SETON                     5399
+     C                     ENDIF
+     C*
+     C  N99      S#USTP    IFNE 'A1'
+     C           S#USTP    ANDNE'A2'
+     C           S#USTP    ANDNE'A3'
+     C           S#USTP    ANDNE'A4'
+     C                     MOVELERR,7     S#ERR
+     C                     SETON                     5399
+     C                     ENDIF
+     C*
+     C  N99      S#RTDP    IFEQ 'T'
+     C           S#USTP    ANDNE'A4'
+     C                     MOVELERR,8     S#ERR
+     C           S#RTDP    CAT  S#ERR     S#ERR
+     C                     SETON                     5399
+     C                     ENDIF
+     C*
+     C  N99      S#RTDP    IFEQ 'H'
+     C           S#USTP    ANDNE'A1'
+     C           S#USTP    ANDNE'A2'
+     C           S#USTP    ANDNE'A3'
+     C                     MOVELERR,9     S#ERR
+     C           S#RTDP    CAT  S#ERR     S#ERR
+     C                     SETON                     5399
+     C                     ENDIF
+     C*
+     C  N99                MOVEL'00'      W#PRID
+     C  N99                MOVELS#RTDP    P#RTDP
+     C  N99                Z-ADDS#RTDS    P#RTDS
+     C  N99                Z-ADDS#RTDE    P#RTDE
+     C  N99                MOVELS#USTP    P#USTP
+     C  N99                MOVELS#CODE    P#CODE           成功
+     C*
+     C                     ENDSR
+     C*****************************************************************
+** ERR
+０１－請輸入退款日期的起日！
+０２－請輸入退款日期的止日！
+０３－退款起日輸入錯誤！
+０４－退款止日輸入錯誤！
+０５－退款日期起日不可大於退款日期止日！
+０６－請輸入款項別！
+０７－款項別輸入錯誤！
+廠只能做退暫收，不可做其他款項別！！
+廠不可做退暫收，退暫收須在台北進行！！
+

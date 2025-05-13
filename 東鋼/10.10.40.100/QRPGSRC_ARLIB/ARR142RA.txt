@@ -1,0 +1,197 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR142RA
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     折讓開立分攤未確認檢核表寫入工作檔
+     H*            5.DATE-WRITTEN  105/12/12 2016AR931
+     H*            6.UPDATE  DATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FTRNDTS  IF  E           K        DISK
+     FHSVOUR  IF  E           K        DISK
+     FINVDTLL4IF  E           K        DISK
+     F            IVREC                             KRENAMEIVREC4
+     FTRNDTLLBIF  E           K        DISK
+     F            TXREC                             KRENAMETRNDLB
+     FARR142F UF  E           K        DISK                      A
+     F*
+     ITXREC       01
+     I                                              TXNO  L1
+     ITRNDLB
+     I              TXDATE                          T2DATE
+     I              TXNO                            T2TXNO
+     I              TXITEM                          T2ITEM
+     I              TXCUNO                          T2CUNO
+     I              TXCUNM                          T2CUNM
+     I              TXORNO                          T2ORNO
+     I              TXIVNO                          T2IVNO
+     I              TXPDNM                          T2PDNM
+     I              TXUPRC                          T2UPRC
+     I              TXQTY                           T2QTY
+     I              TXTAX                           T2TAX
+     I              TXAMT                           T2AMT
+     I              TXTXAR                          T2TXAR
+     I              TXRESV                          T2RESV
+     I            DS
+     I                                        1   8 T2TXNO
+     I                                        1   1 D2AREA
+     I                                        2   3 D2VNO1
+     I                                        4   80D2VNO2
+     I            DS
+     I                                        1  30 T2RESV
+     I                                       13  14 D#TXIT
+     I            DS
+     I                                        1   7 S4SPE5
+     I                                        1   6 D#SPE5
+     I           UDS
+     I                                      501 506 T#TXN1
+     I                                      507 512 T#TXN2
+     I                                     10011010 T#USID
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*              MAIN  PROGRAM
+     C*****************************************************************
+     C           KEY01     KLIST
+     C                     KFLD           D2AREA
+     C                     KFLD           D2VNO1
+     C                     KFLD           D2VNO2
+     C*
+     C           KEY02     KLIST
+     C                     KFLD           TXCODE
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+     C*
+     C           KEY03     KLIST
+     C                     KFLD           D2AREA
+     C                     KFLD           D2VNO1
+     C                     KFLD           D2VNO2
+     C                     KFLD           W1TXIT
+     C*
+     C           KEY04     KLIST
+     C                     KFLD           TXIVNO
+     C                     KFLD           TXPDNM
+     C*
+     C           KEY05     KLIST
+     C                     KFLD           W1TXNO
+     C                     KFLD           W1TXIT
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+     C*
+     C           KEY02     CHAINTRNDTS               51
+     C           TSCHYN    IFEQ 'N'
+     C*
+     C                     Z-ADD0         W#VQTY  80
+     C           KEY04     SETLLIVREC4
+     C                     MOVEL*OFF      *IN55
+     C           *IN55     DOWEQ*OFF
+     C           KEY04     READEIVREC4                   55
+     C   55                LEAVE
+     C*
+     C           IVACNT    IFEQ '1'
+     C                     ADD  IVQTY     W#VQTY
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C*
+     C                     Z-ADDTXAMT     W#AMTT 120H
+     C                     Z-ADDTXTAX     W1AMTT 120H
+     C*
+     C*計算折讓單價(折讓金額/發票中同品項之數量)
+     C*
+     C           W#AMTT    DIV  W#VQTY    W#PRIC  53H
+     C*
+     C           KEY04     SETLLTRNDLB
+     C                     MOVEL*OFF      *IN55
+     C           *IN55     DOWEQ*OFF
+     C           KEY04     READETRNDLB                   55
+     C   55                LEAVE
+     C                     CLEARRAR142F
+     C*
+     C                     MOVELT2TXNO    W1TXNO  8
+     C           D#TXIT    IFEQ '  '
+     C                     Z-ADD0         W1TXIT  20
+     C                     ELSE
+     C                     MOVELD#TXIT    W1TXIT
+     C                     ENDIF
+     C*
+     C                     Z-ADDT2QTY     W1QTY   70
+     C                     MOVELT2PDNM    W1PDNM  5
+     C                     Z-ADDT2UPRC    W1UPRC  53
+     C*
+     C                     MOVELT2CUNO    A4CUNO           客戶代號
+     C                     MOVELT2ORNO    A4ORNO           訂單編號
+     C                     Z-ADDW#PRIC    A4UPRC           折讓單價
+     C                     MOVELT2IVNO    A4IVNO           發票號碼
+     C*
+     C                     MOVELT2TXNO    A4TXNO           磅單編號
+     C                     Z-ADDW1TXIT    A4TXIT           磅單項次
+     C                     MOVELT2PDNM    A4PDNM           品名
+     C                     Z-ADDT2QTY     ASQTY1  70       銷貨數量
+     C                     Z-ADDT2QTY     A4QTY
+     C                     Z-ADDT2UPRC    ASPRC1  53       銷貨單價
+     C                     Z-ADDT2AMT     ASAMT1 110       銷貨金額
+     C*
+     C           W#PRIC    MULT ASQTY1    A4AMT     H      折讓金額
+     C           W#AMTT    SUB  A4AMT     W#AMTT
+     C           A4AMT     MULT 0.05      A4TAX     H      折讓稅額
+     C           W1AMTT    SUB  A4TAX     W1AMTT
+     C                     MOVELTXNO      A4DXNO           折讓單號
+     C                     Z-ADDTXITEM    A4DXIT           折讓單項次
+     C*
+     C*寫入磅單之鋼種尺寸長度欄位
+     C*
+     C           KEY03     SETLLHSVOUR
+     C           KEY03     CHAINHSVOUR               96
+     C           *IN96     IFEQ '0'
+     C                     MOVELS4QULT    A4METL
+     C                     MOVELS4SPE1    A4SPE1
+     C                     MOVELS4SPE2    A4SPE2
+     C                     MOVELD#SPE5    A4SPE5
+     C                     ENDIF
+     C                     WRITERAR142F
+     C                     ENDDO
+     C*
+     C           W#AMTT    IFNE 0
+     C           W1AMTT    ORNE 0
+     C           W1TXIT    IFNE 0
+     C           KEY05     CHAINRAR142F              56
+     C           W#AMTT    IFNE 0
+     C           A4AMT     ADD  W#AMTT    A4AMT
+     C                     Z-ADD0         W#AMTT
+     C                     ENDIF
+     C*
+     C           W1AMTT    IFNE 0
+     C           A4TAX     ADD  W1AMTT    A4TAX
+     C                     Z-ADD0         W1AMTT
+     C                     ENDIF
+     C  N56                UPDATRAR142F
+     C                     ENDIF
+     C*
+     C           W1TXIT    IFEQ 0
+     C           KEY05     SETLLRAR142F
+     C                     MOVEL*OFF      *IN58
+     C           *IN58     DOWEQ*OFF
+     C           KEY05     READERAR142F                  58
+     C   58                LEAVE
+     C           A4PDNM    IFEQ W1PDNM
+     C           W#AMTT    IFNE 0
+     C           A4AMT     ADD  W#AMTT    A4AMT
+     C                     Z-ADD0         W#AMTT
+     C                     ENDIF
+     C           W1AMTT    IFNE 0
+     C           A4TAX     ADD  W1AMTT    A4TAX
+     C                     Z-ADD0         W1AMTT
+     C                     ENDIF
+     C                     UPDATRAR142F
+     C                     ENDIF
+     C                     ENDDO
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C                     ENDIF
+

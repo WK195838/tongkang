@@ -1,0 +1,120 @@
+     /*******************************************************************/
+     /*                                                                 */
+     /*               >>   PROGRAM INTRODUCTION   <<                    */
+     /*                                                                 */
+     /*            1.PROGRAM-ID    ARP109P                              */
+     /*            2.PROGRAM-TYPE  CLP                                  */
+     /*            3.AUTHOR        S02CSF                               */
+     /*            4.FUNCTION     筿坝叭--砯〓祇布戈更矪瞶  */
+     /*            5.DATE-WRITTEN  93/06/18                             */
+     /*            6.DATE-MODIFY                                        */
+     /*                                                                 */
+     /*******************************************************************/
+            PGM
+            DCL        VAR(&COND)   TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&INT)    TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&DSPID)  TYPE(*CHAR)  LEN(10)
+            DCL        VAR(&W#YMD)  TYPE(*CHAR)  LEN(6)
+            DCL        VAR(&W#DATE) TYPE(*CHAR)  LEN(6)
+            DCL        VAR(&W#RDAT) TYPE(*CHAR)  LEN(6)
+            DCL        VAR(&P#PDAT) TYPE(*CHAR)  LEN(8)
+            DCL        VAR(&P#RDAT) TYPE(*CHAR)  LEN(8)
+            DCL        VAR(&P#OMOD) TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&P#MODE) TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&P#DAYS) TYPE(*CHAR)  LEN(4)
+            DCL        VAR(&P#ERR)  TYPE(*CHAR)  LEN(1)
+
+            RTVJOBA    JOB(&DSPID)   TYPE(&INT)
+            IF         COND(&INT  *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+       /*   SBMJOB     CMD(CALL PGM(ARP109P)) JOB(ARP109P) +
+                       JOBD(ARJOBD)
+       /*   RETURN
+
+ BATCH:
+            RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&W#YMD)
+
+        /* STEP 0 : 埃玡②⑤⒄郎戈 */
+
+            RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&W#DATE)
+            CHGVAR     VAR(&P#PDAT)  VALUE(&W#DATE) /*ㄓ方ら戳*/
+            CHGVAR     VAR(&P#MODE)  VALUE('1') /*い瓣*/
+            CHGVAR     VAR(&P#DAYS)  VALUE('0180') /*ぱ计*/
+            CHGVAR     VAR(&P#OMOD)  VALUE('1') /* 1:┕玡, 2:┕  */
+            CALL       PGM(UTS104R) PARM(&P#PDAT  &P#MODE  &P#OMOD  &P#DAYS +
+                                          &P#RDAT &P#ERR)
+            IF         COND(&P#ERR *EQ '0') THEN(DO)
+            CHGVAR     VAR(&W#RDAT)  VALUE(&P#RDAT)
+
+                      /*埃綪砯更②⑤⒄郎 */
+            OVRDBF     FILE(TNDLOG) TOFILE(ARLIB/TNDLOG) SHARE(*YES)
+            OPNQRYF    FILE(TNDLOG) OPTION(*ALL)  QRYSLT('      +
+                       (DATE   *LE "' || &W#RDAT || '")')       +
+                       MAPFLD((DAT1  TWDATE       *CHAR 8 )     +
+                              (DATE  '%SST(DAT1 3 6)' *CHAR 6)) +
+                       KEYFLD((TWDATE))
+            CALL       PGM(ARLIB/ARP109R4)
+            CLOF       OPNID(TNDLOG)
+            DLTOVR     FILE(*ALL)
+
+                      /*埃祇布更②⑤⒄郎 */
+            OVRDBF     FILE(INMLOG) TOFILE(ARLIB/INMLOG) SHARE(*YES)
+            OPNQRYF    FILE(INMLOG) OPTION(*ALL)  QRYSLT('      +
+                       (INDT   *LE "' || &W#RDAT || '")')       +
+                       MAPFLD((IND1  IMINDT       *CHAR 8 )     +
+                              (INDT  '%SST(IND1 3 6)' *CHAR 6)) +
+                       KEYFLD((IMINDT))
+            CALL       PGM(ARLIB/ARP109R5)
+            CLOF       OPNID(INMLOG)
+            DLTOVR     FILE(*ALL)
+
+                      /* REORGANIZE */
+            RGZPFM     FILE(DALIB/TNDLOG)
+            MONMSG     MSGID(CPF0000)
+            RGZPFM     FILE(DALIB/INMLOG)
+            MONMSG     MSGID(CPF0000)
+            ENDDO
+
+
+        /* STEP 1 : 矪瞶祇布穝糤籔э场だ */
+
+            OVRDBF     FILE(INVMST) TOFILE(DALIB/INVMST) SHARE(*YES)
+            OPNQRYF    FILE(INVMST) OPTION(*ALL)  QRYSLT('      +
+                       (INFLAG *NE " ")          *AND           +
+                       (INFLAG *NE "D")          *AND           +
+                       (TXDT   *EQ "' || &W#YMD || '")')        +
+                       MAPFLD((TXD1  INTXDT       *CHAR 8 )     +
+                              (TXDT  '%SST(TXD1 3 6)' *CHAR 6)) +
+                       KEYFLD((INCUNO) (INNO))
+            CALL       PGM(ARLIB/ARP109R1)
+            CLOF       OPNID(INVMST)
+            DLTOVR     FILE(*ALL)
+
+        /* STEP 2 : 矪瞶綪砯穝糤籔э场だ */
+
+            OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+            OPNQRYF    FILE(TRNDTL) OPTION(*ALL)  QRYSLT('      +
+                       ((TXFLAG *NE " ")           *OR          +
+                        (RESV   *EQ "*"))          *AND         +
+                       (TXCODE *EQ "SA04")')                    +
+                       MAPFLD((RESV  '%SST(TXRESV 10 1)' *CHAR 1)) +
+                       KEYFLD((TXCUNO) (TXNO))
+            CALL       PGM(ARLIB/ARP109R2)
+            CLOF       OPNID(TRNDTL)
+            DLTOVR     FILE(*ALL)
+
+        /* STEP 3 : 矪瞶祇布紀场だ */
+
+            OVRDBF     FILE(INVMST) TOFILE(DALIB/INVMST) SHARE(*YES)
+            OPNQRYF    FILE(INVMST) OPTION(*ALL)  QRYSLT('      +
+                       (INFLAG *EQ "D")          *AND           +
+                       (DEDT   *EQ "' || &W#YMD || '")')        +
+                       MAPFLD((DEDX  INDEDT       *CHAR 8 )     +
+                              (DEDT  '%SST(DEDX 3 6)' *CHAR 6)) +
+                       KEYFLD((INCUNO) (INNO))
+            CALL       PGM(ARLIB/ARP109R3)
+            CLOF       OPNID(INVMST)
+            DLTOVR     FILE(*ALL)
+
+            ENDPGM
+

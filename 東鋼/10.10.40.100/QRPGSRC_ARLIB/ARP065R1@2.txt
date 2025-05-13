@@ -1,0 +1,135 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP065R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     發票開立挑選資料
+     H*            5.DATE-WRITTEN  88/01/31
+     H*
+     H* 說明：將原銷貨明細檔內的資料挑出再寫入銷貨暫時檔內，
+     H*       同時加上訂單管控的資訊。
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FARCUCT  IF  E           K        DISK
+     FARODCT  IF  E           K        DISK
+     FTRNDTLN O   E           K        DISK
+     F*****************************************************************
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10011003 U#DPID
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C                     EXSR DTLSR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C           K#A1      KLIST
+     C                     KFLD           A1CUNO
+     C                     KFLD           A1CTKD
+     C*
+     C           K#A2      KLIST
+     C                     KFLD           A2ORNO
+     C                     KFLD           A2CTKD
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     MOVEL'00'      TNMTHD           初始為隨車
+     C                     Z-ADD0         TNTYP1
+     C                     Z-ADD0         TNRAT1
+     C                     Z-ADD0         TNTYP2
+     C                     Z-ADD0         TNRAT2
+     C*
+     C                     MOVELTXCUNO    A1CUNO
+     C                     MOVEL'04'      A1CTKD
+     C           K#A1      CHAINRARCUCT              69
+     C           *IN69     IFEQ '0'
+     C                     MOVELA1MTHD    TNMTHD           預設客戶
+     C                     Z-ADDA1TYP1    TNTYP1
+     C                     Z-ADDA1RAT1    TNRAT1
+     C                     Z-ADDA1TYP2    TNTYP2
+     C                     Z-ADDA1RAT2    TNRAT2
+     C           A1RFOR    IFEQ ' '                        採客戶
+     C                     GOTO L#SAVE
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVELTXORNO    A2ORNO
+     C                     MOVEL'04'      A2CTKD
+     C           K#A2      CHAINRARODCT              69
+     C           *IN69     IFEQ '0'                        採訂單
+     C                     MOVELA2MTHD    TNMTHD
+     C                     Z-ADDA2TYP1    TNTYP1
+     C                     Z-ADDA2RAT1    TNRAT1
+     C                     Z-ADDA2TYP2    TNTYP2
+     C                     Z-ADDA2RAT2    TNRAT2
+     C                     ENDIF
+     C*
+     C           L#SAVE    TAG                             存檔旗標
+     C*
+     C                     EXSR SR1000                     搬移資料
+     C                     WRITETNREC
+     CSR                   ENDSR
+     C*
+     C*-------------------------------
+     C* 搬移資料
+     C*-------------------------------
+     CSR         SR1000    BEGSR
+     C                     MOVELTXFLAG    TNFLAG
+     C                     MOVELTXCODE    TNCODE
+     C                     MOVELTXNO      TNNO
+     C                     Z-ADDTXITEM    TNITEM
+     C                     MOVELTXACNT    TNACNT
+     C                     Z-ADDTXDATE    TNDATE
+     C                     Z-ADDTXACDT    TNACDT
+     C                     MOVELTXCUNO    TNCUNO
+     C                     MOVELTXCUNM    TNCUNM
+     C                     MOVELTXORNO    TNORNO
+     C                     MOVELTXIVNO    TNIVNO
+     C                     MOVELTXPCNO    TNPCNO
+     C                     MOVELTXVUNO    TNVUNO
+     C                     MOVELTXRVID    TNRVID
+     C                     MOVELTXSALE    TNSALE
+     C                     MOVELTXSATP    TNSATP
+     C                     MOVELTXIVTP    TNIVTP
+     C                     MOVELTXPDNM    TNPDNM
+     C                     Z-ADDTXQTY     TNQTY
+     C                     Z-ADDTXUPRC    TNUPRC
+     C                     Z-ADDTXAMT     TNAMT
+     C                     Z-ADDTXTAX     TNTAX
+     C                     MOVELTXFL01    TNFL01
+     C                     MOVELTXFL02    TNFL02
+     C                     MOVELTXTXAR    TNTXAR
+     C                     Z-ADDTXTXDT    TNTXDT
+     C                     MOVELTXRESV    TNRESV
+     C*
+     C                     MOVELTXORNO    TNORN5
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  印核覆
+     C*********************************
+     CSR         LRSR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+

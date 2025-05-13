@@ -1,0 +1,121 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP050P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     地磅重與銷貨重之差異分析表（型鋼）     */
+     /*     5.DATE-WRITTEN  86/04/29                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&YMS)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&YME)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&YMSX) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&YMEX) TYPE(*CHAR) LEN(5)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+             CALL       PGM(ARP050RS) PARM(&IN03 &YMS &YME)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&YMS)
+             CHGDTAARA  DTAARA(*LDA (9 8)) VALUE(&YME)
+             SBMJOB     JOB(ARP050P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARP050P')
+             RETURN
+
+ BATCH:      RTVDTAARA  DTAARA(*LDA (1 8))      RTNVAR(&YMS)
+             RTVDTAARA  DTAARA(*LDA (9 8))      RTNVAR(&YME)
+             RTVDTAARA  DTAARA(*LDA (1021 1))   RTNVAR(&AREA)
+
+             CRTDUPOBJ  OBJ(ARP050F) FROMLIB(ARLIB) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+             OVRDBF     FILE(ARP050F) TOFILE(QTEMP/ARP050F) SHARE(*YES)
+
+ STEP1:                 /* 計算地磅重 */
+             OVRDBF   FILE(WTMASPJ1) TOFILE(DALIB/WTMASPJ1) SHARE(*YES)
+             OPNQRYF  FILE(WTMASPJ1) +
+                        QRYSLT( +
+                           'W6FLAG *NE "D" *AND +
+                            W6AREA *EQ "' || &AREA || '" *AND +
+                            W6ENTD *GE ' || &YMS || ' *AND +
+                            W6ENTD *LE ' || &YME || ' *AND +
+                            W6TRCD *EQ %VALUES("11" "1E" "1F" "1G" +
+                                               "0A") *AND +
+                            W7SPLT *EQ %VALUES("W" "1" "2" "3" "4" +
+                                    "5" "6" "7" "8" "9" " ") *AND +
+                            %SST(W7NAME 1 1) *EQ "3" ') +
+                        KEYFLD((W6CUNO) (W6ORNO))
+             CALL       PGM(ARP050R1)
+             CLOF       OPNID(WTMASPJ1)
+
+ STEP2:                 /* 計算銷貨重（出貨及調整） */
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT( +
+                           'TXDATE *GE ' || &YMS || ' *AND    +
+                            TXDATE *LE ' || &YME || ' *AND    +
+                            TXFLAG *NE "D" *AND    +
+                            %SST(TXPDNM 1 1) *EQ "3" *AND +
+                            TXCODE *EQ %VALUES("SA04" "AR05") *AND +
+                            %SST(TXNO 1 1) *EQ "' || &AREA || '"') +
+                        MAPFLD((TXRESV '%SST(TXORNO 1 6)')) +
+                        KEYFLD((TXCUNO) (TXRESV))
+
+             CALL       PGM(ARP050R2)
+             CLOF       OPNID(TRNDTL)
+
+ STEP3:                 /* 計算銷貨重（折讓） */
+             CHGVAR     VAR(&YMSX)   VALUE(%SST(&YMS 2 5))
+             CHGVAR     VAR(&YMEX)   VALUE(%SST(&YME 2 5))
+             OVRDBF     FILE(INVMST) TOFILE(DALIB/INVMST) SHARE(*YES)
+             OVRDBF     FILE(INVDTL) TOFILE(DALIB/INVDTL) SHARE(*YES)
+             OPNQRYF    FILE(INVDTL) +
+                        QRYSLT(   +
+                         '((IVACDT *GE ' || &YMS || '  *AND    +
+                            IVACDT *LE ' || &YME || ') *OR     +
+                           (IVACDT *EQ 99999999 *AND +
+                        %SST(IVRESV 1 5) *GE "' || &YMSX || '" *AND +
+                        %SST(IVRESV 1 5) *LE "' || &YMEX || '")) *AND +
+                            IVFLAG *NE "D" *AND    +
+                            IVDECD *NE "D" *AND    +
+                            %SST(IVPDCD 1 1) *EQ "3" *AND +
+                            IVACNT *EQ %VALUES("2" "3")') +
+                        MAPFLD((IVACNO '%SST(IVORNO 1 5)')) +
+                        KEYFLD((IVACNO))
+
+             CALL       PGM(ARP050R3)
+             CLOF       OPNID(INVDTL)
+
+ STEP4:                 /* 彙總數量 */
+             CALL       PGM(ARP050R4)
+
+ STEP5:                 /* 列印差異表 */
+             OPNQRYF    FILE(ARP050F) +
+                        QRYSLT('WDPADF *NE 0') +
+                        KEYFLD((WDCUNO) (WDORNO))
+             OVRPRTF    FILE(ARP050T) TOFILE(ARLIB/ARP050T) +
+                        HOLD(*YES) USRDTA('銷貨重差')
+             CALL       PGM(ARP050R5)
+
+             CLOF       OPNID(ARP050F)
+
+ STEP6:                 /* 列印彙總表 */
+             OPNQRYF    FILE(ARP050F) +
+                        KEYFLD((WDCUNO) (WDORNO))
+             OVRPRTF    FILE(ARP050T) TOFILE(ARLIB/ARP050TA) +
+                        HOLD(*YES) USRDTA('銷貨報表')
+             CALL       PGM(ARP050R5)
+
+             CLOF       OPNID(ARP050F)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

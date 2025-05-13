@@ -1,0 +1,62 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP021PK                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     發票主檔即時上傳　（高雄）             */
+     /*     5.DATE-WRITTEN  87/02/24                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&USER) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+
+             RTVJOBA    USER(&USER) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             SBMJOB     JOB(ARP021PK) JOBD(ARJOBD) JOBQ(QSYS/QCTL) +
+                        RQSDTA('CALL ARLIB/ARP021PK')
+             RETURN
+             ENDDO
+
+ BATCH:
+
+ STEP1:
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMK)
+
+ STEP2:       /*  台北　抓　高雄  ARLIB/INVMSTK ............ */
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP021PA) PARM(''K'')') +
+                        DDMFILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP3)
+
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(*NONSTD +
+                        'ARLIB/INVMSTK') LVLCHK(*NO)
+             CPYF       FROMFILE(QTEMP/DDMK) TOFILE(QTEMP/INVMSTK) +
+                        TOMBR(*FROMMBR) MBROPT(*REPLACE) CRTFILE(*YES)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP3)
+
+             OVRDBF     FILE(INVMSTP) TOFILE(QTEMP/INVMSTK)
+             OVRDBF     FILE(INVMST)  TOFILE(INVMST)
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                        CPI(15)
+             OVRPRTF    FILE(PRINT1) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                        CPI(15) USRDTA('高雄重複')
+             CHGDTAARA  DTAARA(*LDA (21 1)) VALUE('K')
+             CALL       PGM(ARLIB/ARP021RJ)
+             DLTOVR     FILE(*ALL)
+
+             CLRPFM     FILE(QTEMP/DDMK)     /* 清除廠區之異動檔 */
+             MONMSG     MSGID(CPF0000) EXEC(GOTO STEP3)
+
+             GOTO       ENDCLPGM
+
+ STEP3:     /* 失敗通知 */
+             SNDMSG     TOUSR(&USER) MSG(+
+                        '高雄廠發票主檔即時傳輸失敗')
+
+ ENDCLPGM:   ENDPGM
+

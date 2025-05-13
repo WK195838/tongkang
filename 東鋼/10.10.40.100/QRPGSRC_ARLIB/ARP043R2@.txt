@@ -1,0 +1,262 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP043R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     組立加工之勞務收入代開傳票代開
+     H*            5.DATE-WRITTEN  85/12/26
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVDTLW IP  E           K        DISK
+     F            IVREC                             KRENAMEIVRECW
+     FINVDTL  UF  E           K        DISK
+     FACTRAN  UF  E           K        DISK                      A
+     FINVMST  IF  E           K        DISK
+     FHIPROD  IF  E           K        DISK
+     FARP043T O   E             66     PRINTER
+     F*****************************************************************
+     E                    TAB1    1   4  1   TABR1  18
+     E*****************************************************************
+     IIVRECW
+     I                                              IVACDTL2
+     I                                              IVNO  L1
+     I*------------------------------------------------------
+     I              '加工收入'          C         N#4122
+     I              '應收帳款'          C         N#1134
+     I              '公司往來'          C         N#3511
+     I*------------------------------------------------------
+     I           UDS
+     I                                        1   60U#YMD
+     I                                        7   7 U#TXAR
+     I                                     10011010 U#USID
+     I                                     10011003 U#DPID
+     I*------------------------------------------------------
+     I            DS
+     I                                        1   7 IVACNO
+     I                                        1   1 D#FRAR
+     I                                        2   2 D#TOAR
+     I                                        3   7 D#VRNO
+     I            DS
+     I                                        1   4 ACVRNO
+     I                                        1   1 D#VRTP
+     I            DS
+     I                                        1   4 W#VRNO
+     I                                        2   40D#WVRN
+     I            DS
+     I                                        1  18 W#KGRP
+     I                                        1   4 D#ACNO
+     I                                        5  14 D#ACNM
+     I                                       15  18 D#DPNO
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C*          ---------------------------------欄位關鍵定義
+     C           K#AC      KLIST
+     C                     KFLD           ACVRNO
+     C                     KFLD           ACITEM
+     C*
+     C           K#IV      KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*          ---------------------------------初始變數宣告
+     C                     MOVE *BLANK    W#ACDC  1        借貸參數
+     C                     Z-ADDU#YMD     W#DATE  60       設定日期
+     C                     MOVE *BLANK    W#KGRP
+     C           U#TXAR    LOKUPTAB1      TABR1          69
+     C   69                MOVELTABR1     W#KGRP
+     C*          ---------------------------------獲得傳票號碼W#VRNC
+     C                     CLEARRACVOUR
+     C                     MOVEL'O999'    ACVRNO
+     C                     Z-ADD99        ACITEM
+     C                     SETOF                     69
+     C           K#AC      SETGTACTRAN
+     C                     READPACTRAN                   69
+     C           *IN69     IFEQ '0'
+     C           D#VRTP    ANDEQ'O'
+     C                     MOVELACVRNO    W#VRNO           目前傳票號
+     C                     ELSE
+     C                     MOVEL'O000'    W#VRNO           重新編號
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2清除函式     (換了日期)
+     C*********************************
+     CSR         L2CLR     BEGSR
+     C                     Z-ADD0         W#TAMT 132       金額合計
+     C                     Z-ADD0         W#RCNT  40       入帳筆數
+     C                     SETON                     66    設定換頁
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式     (換了發票)
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     ADD  1         D#WVRN           指向下一號
+     C                     Z-ADD1         W#ITEM  20       項次
+     C*
+     C                     Z-ADD0         W#AMTD 132       借方金額
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C           K#IV      CHAININVDTL               69
+     C                     MOVELU#TXAR    D#FRAR           廠區到台北
+     C                     MOVEL'P'       D#TOAR
+     C                     MOVELW#VRNO    D#VRNO
+     C                     UPDATIVREC                      改發票明細
+     C*                    --------------
+     C                     MOVEL'C'       W#ACDC           寫貸方
+     C                     EXSR SRWR01
+     C*                    --------------
+     C                     EXSR SRPR01                     印出一筆
+     C*                    --------------
+     C                     ADD  IVAMT     W#AMTD           累計金額
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  換了發票
+     C*********************************
+     CSR         L1SR      BEGSR
+     C                     MOVEL'D'       W#ACDC
+     C                     EXSR SRWR01
+     C*                    --------------
+     C                     EXSR SRPR01                     印出一筆
+     C*                    --------------
+     C                     ADD  W#AMTD    W#TAMT           彙總金額
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2 函式  換了日期
+     C*********************************
+     CSR         L2SR      BEGSR
+     C                     CLEARAR043T1T                   列印合計
+     C                     Z-ADDW#RCNT    R#RCNT
+     C                     Z-ADDW#TAMT    R#TAMT
+     C                     WRITEAR043T1T
+     C                     SETON                     66    設定換頁
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  印核覆
+     C*********************************
+     CSR         LRSR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     WRITEAR043T1H
+     C                     WRITEAR043T1M
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  子函式集
+     C*********************************
+     C*
+     C*-------------------------------
+     C* 明細寫入傳票檔(參數為 W#ACDC )
+     C*-------------------------------
+     CSR         SRWR01    BEGSR
+     C                     CLEARRACVOUR
+     C           IVNO      CHAININVMST               69    找客戶名稱
+     C*
+     C                     MOVELW#ACDC    ACDC             借貸別
+     C                     MOVEL'N'       ACVRTY
+     C                     MOVELU#TXAR    ACDM03           開立廠區
+     C                     MOVEL'P'       ACCARD           傳票廠區
+     C                     MOVEL'A'       ACKIND           一般傳票
+     C                     Z-ADDIVACDT    ACYMD            入帳日期
+     C                     MOVELW#VRNO    ACVRNO           傳票號碼
+     C                     MOVELIVORNO    ACRLNO           相關號碼
+     C                     MOVELINCUNM    ACCSNM           客戶簡稱
+     C                     MOVEL'A'       ACSEPT
+     C                     MOVELIVPDCD    ACDSC1           品名代號
+     C*
+     C           W#ACDC    IFEQ 'C'                        貸方
+     C                     ADD  1         W#ITEM           項次加1
+     C                     Z-ADDW#ITEM    ACITEM           傳票項次
+     C                     Z-ADDIVAMT     ACAMT            金額
+     C                     MOVEL'4122'    ACNO             會計科目
+     C                     MOVEL'L'       ACTYCO           要件代號
+     C                     MOVELD#DPNO    ACDPNO           部門代號
+     C*          -------
+     C                     ELSE                            借方
+     C                     Z-ADD1         ACITEM           項次為1
+     C                     Z-ADDW#AMTD    ACAMT            金額
+     C                     MOVEL'1134'    ACNO             會計科目
+     C                     MOVEL'G'       ACTYCO           要件代號
+     C                     MOVEL*BLANK    ACDPNO           部門代號
+     C                     ENDIF
+     C*
+     C                     WRITERACVOUR
+     C                     ADD  1         W#RCNT           入帳筆數
+     CSR                   ENDSR
+     C*
+     C*-------------------------------
+     C* 印出一筆明細記錄
+     C*-------------------------------
+     CSR         SRPR01    BEGSR
+     C           *IN66     IFEQ '1'                        換頁
+     C                     WRITEAR043T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C*
+     C                     CLEARAR043T1D
+     C*
+     C                     Z-ADDACYMD     R#DATE           入帳日期
+     C                     MOVELACRLNO    R#ORNO           訂單編號
+     C                     MOVELACCSNM    R#CUNO           客戶簡稱
+     C                     MOVELACDC      R#ACDC           借貸別
+     C                     MOVELACNO      R#ACNO           會計科目
+     C                     MOVELACTYCO    R#TYCO           要件代號
+     C                     MOVELACDM03    R#FRAR           開立廠區
+     C                     MOVELACCARD    R#TOAR           傳票廠區
+     C                     MOVELACVRNO    R#VRNO           傳票號碼
+     C                     MOVELACITEM    R#VRIT           項次
+     C*
+     C           ACDC      IFEQ 'C'
+     C                     MOVELIVNO      R#IVNO           發票號碼
+     C                     MOVELN#4122    R#ACNM           會計科目名
+     C                     MOVELIVPDCD    R#PDNO           品名代號
+     C           IVPDCD    CHAINHIPROD               69
+     C  N69                MOVELF4CHIN    R#PDNM           品名名稱
+     C                     Z-ADDACAMT     R#AMTC           貸方金額
+     C                     MOVELACDPNO    R#DPNO           部門
+     C*
+     C                     ELSE
+     C                     MOVELN#1134    R#ACNM           會計科目名
+     C                     Z-ADDACAMT     R#AMTD           借方金額
+     C                     ENDIF
+     C*
+     C                     WRITEAR043T1D
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+** TAB1
+K3512高雄往來B030
+T3513桃園往來B020
+H3514苗栗往來B050
+M3515台中往來B040
+

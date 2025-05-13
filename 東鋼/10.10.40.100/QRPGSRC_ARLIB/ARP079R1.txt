@@ -1,0 +1,325 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP079R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     現金流出入彙總預估(TRNDTL->ARP079F)
+     H*            5.DATE-WRITTEN  90/09/29
+     H*            6.UPDATE  DATE  99/08/31  2010AR517  S00WCJ (9908A)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FHSCONT  IF  E           K        DISK
+     FARR092F IF  E           K        DISK
+     FARCUDT  IF  E           K        DISK
+     FARP079F O   E           K        DISK
+     ITXREC       01
+     I                                              TXDATEL1
+     I                                              TXNO  L1
+     I            DS
+     I                                        1   9 D#ORNO
+     I                                        1   1 D#ORN1
+     I                                        2   6 D#ORN2
+9010 I           UDS
+ .   I                                        1   80D#INDT
+ .   I                                        1   40D#YEAR
+     I                                        5   60D#MONT
+     I                                        7   80D#DATE
+     I                                      399 399 D#KIND
+     C*****************************************************************
+     C*         KEY  LIST
+     C*****************************************************************
+     C*HSCONT
+     C           K#CONT    KLIST
+     C                     KFLD           SBAREA
+     C                     KFLD           SBCNUM
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+9908AC           *DATE     SUB  19000000  U#SYSD  80
+     C  N99                MOVE *ON       *IN99
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR                   RETRN
+     C*********************************
+     C*  L1CLR       函式
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     CLEARRARP079
+     C                     ENDSR
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     ADD  TXAMT     WFAMT
+     C                     ENDSR
+     C*********************************
+     C*  LISR        函式
+     C*********************************
+     CSR         L1SR      BEGSR
+     C           D#KIND    IFEQ *BLANK
+     C                     EXSR SR1000
+     C                     ELSE
+     C                     EXSR SR2000
+     C                     ENDIF
+     C                     ENDSR
+     C*********************************
+     C*  SR1000      函式  (鋼筋用)
+     C*********************************
+     CSR         SR1000    BEGSR
+     C           TXDATE    IFLE 890601
+     C                     GOTO END1
+     C                     ENDIF
+     C                     MOVELTXNO      WFNO             單據號碼
+     C                     MOVELTXORNO    WFORNO           訂單號碼
+     C                     MOVE 'TN'      WFNOTP           單據類別
+     C                     MOVELTXCUNO    WFCUNO           客戶代號
+     C                     MOVELTXCUNM    WFCUNM           客戶簡稱
+     C                     Z-ADDTXDATE    WFNODT           單據日期
+9908AC                     MOVE U#SYSD    WFENTD           處理日期
+     C*計算發票到期日期
+     C                     MOVELTXORNO    D#ORNO
+     C*排除型鋼訂單
+     C           D#ORN1    IFEQ 'H'
+     C                     GOTO END1
+     C                     ENDIF
+     C*排除鋼筋承購
+     C                     MOVELTXCUNO    W#CUNO  5
+     C                     MOVELW#CUNO    ACCUNO
+     C           TXCUNO    CHAINRARCUDT             N50
+     C   50      ACCUNO    CHAINRARCUDT             N50
+     C  N50                GOTO END1
+     C*
+     C                     MOVELD#ORN1    SBAREA
+     C                     MOVELD#ORN2    SBCNUM
+     C           K#CONT    CHAINRHSCONT              40
+     C*計算發票到期日
+     C                     MOVE TXDATE    D#INDT
+     C*
+     C                     Z-ADDSBRTD1    D#DATE
+     C                     Z-ADDD#INDT    W#DAT1  80       請款一
+     C*
+     C                     MOVE TXDATE    D#INDT
+     C                     Z-ADDSBRTD2    D#DATE
+     C           SBRTD2    IFLT SBRTD1
+     C                     ADD  1         D#MONT
+     C           D#MONT    IFEQ 13
+     C                     Z-ADD1         D#MONT
+     C                     ADD  1         D#YEAR
+     C                     ENDIF
+     C                     ENDIF
+     C                     Z-ADDD#INDT    W#DAT2  80       請款二
+     C*
+     C                     MOVE TXDATE    D#INDT
+     C                     Z-ADDSBRTD3    D#DATE
+     C           SBRTD3    IFLT SBRTD2
+     C                     ADD  1         D#MONT
+     C           D#MONT    IFEQ 13
+     C                     Z-ADD1         D#MONT
+     C                     ADD  1         D#YEAR
+     C                     ENDIF
+     C                     ENDIF
+     C                     Z-ADDD#INDT    W#DAT3  80       請款三
+     C*
+     C                     MOVE TXDATE    D#INDT
+     C                     Z-ADDSBRTD1    D#DATE
+     C                     ADD  1         D#MONT
+     C           D#MONT    IFEQ 13
+     C                     Z-ADD1         D#MONT
+     C                     ADD  1         D#YEAR
+     C                     ENDIF
+     C                     Z-ADDD#INDT    W#DAT4  80       次月請款一
+     C*
+     C                     MOVE W#DAT1    P#DATE
+     C                     CALL 'UTS104R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM '1'       P#MOD2  1
+     C                     PARM '0005'    P#DAYS  4
+     C                     PARM *BLANK    P#RTND  8
+     C                     PARM *BLANK    P#ERR   1
+     C           P#ERR     IFEQ '0'
+     C                     MOVE P#RTND    W#DAT1           理論請款一
+     C                     ELSE
+     C                     Z-ADD0         W#DAT1
+     C                     ENDIF
+     C*
+     C                     MOVE W#DAT2    P#DATE
+     C                     CALL 'UTS104R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM '1'       P#MOD2  1
+     C                     PARM '0005'    P#DAYS  4
+     C                     PARM *BLANK    P#RTND  8
+     C                     PARM *BLANK    P#ERR   1
+     C           P#ERR     IFEQ '0'
+     C                     MOVE P#RTND    W#DAT2           理論請款二
+     C                     ELSE
+     C                     Z-ADD0         W#DAT2
+     C                     ENDIF
+     C*
+     C                     MOVE W#DAT3    P#DATE
+     C                     CALL 'UTS104R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM '1'       P#MOD2  1
+     C                     PARM '0005'    P#DAYS  4
+     C                     PARM *BLANK    P#RTND  8
+     C                     PARM *BLANK    P#ERR   1
+     C           P#ERR     IFEQ '0'
+     C                     MOVE P#RTND    W#DAT3           理論請款三
+     C                     ELSE
+     C                     Z-ADD0         W#DAT3
+     C                     ENDIF
+     C*
+     C           TXDATE    IFLE W#DAT1                     以付款日一
+     C                     Z-ADDW#DAT1    D#INDT           理論請款一
+     C                     Z-ADDSBPDT1    D#DATE
+     C                     ADD  1         D#MONT
+     C           D#MONT    IFEQ 13
+     C                     Z-ADD1         D#MONT
+     C                     ADD  1         D#YEAR
+     C                     ENDIF
+     C                     Z-ADDD#INDT    WFDATE           發票到期日
+     C                     ENDIF
+     C*
+     C           TXDATE    IFLE W#DAT2                     以付款日二
+     C           TXDATE    ANDGEW#DAT1
+     C                     Z-ADDW#DAT2    D#INDT           理論請款二
+     C                     Z-ADDSBPDT2    D#DATE
+     C                     ADD  1         D#MONT
+     C           D#MONT    IFEQ 13
+     C                     Z-ADD1         D#MONT
+     C                     ADD  1         D#YEAR
+     C                     ENDIF
+     C                     Z-ADDD#INDT    WFDATE           發票到期日
+     C                     ENDIF
+     C*
+     C           TXDATE    IFLE W#DAT3                     以付款日三
+     C           TXDATE    ANDGEW#DAT2
+     C           TXDATE    ANDGEW#DAT1
+     C                     Z-ADDW#DAT3    D#INDT           理論請款三
+     C                     Z-ADDSBPDT3    D#DATE
+     C                     ADD  1         D#MONT
+     C           D#MONT    IFEQ 13
+     C                     Z-ADD1         D#MONT
+     C                     ADD  1         D#YEAR
+     C                     ENDIF
+     C                     Z-ADDD#INDT    WFDATE           發票到期日
+     C                     ENDIF
+     C*
+     C           TXDATE    IFLE W#DAT4                     次月請款一
+     C           TXDATE    ANDGEW#DAT3
+     C           TXDATE    ANDGEW#DAT2
+     C           TXDATE    ANDGEW#DAT1
+     C                     Z-ADDW#DAT4    D#INDT
+     C                     Z-ADDSBPDT1    D#DATE
+     C                     ADD  1         D#MONT
+     C           D#MONT    IFEQ 13
+     C                     Z-ADD1         D#MONT
+     C                     ADD  1         D#YEAR
+     C                     ENDIF
+     C                     Z-ADDD#INDT    WFDATE           發票到期日
+     C                     ENDIF
+     C*
+     C           SBPYCK    IFNE ' '                        支票繳款
+     C                     MOVE WFDATE    P#DATE
+     C                     Z-ADDSBPERD    W#PERD  40
+     C                     MOVE W#PERD    P#DAYS
+     C                     CALL 'UTS104R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM '2'       P#MOD2  1
+     C                     PARM           P#DAYS  4
+     C                     PARM *BLANK    P#RTND  8
+     C                     PARM *BLANK    P#ERR   1
+     C           P#ERR     IFEQ '0'
+     C                     MOVE P#RTND    WFDATE           預估兌現日
+     C                     ELSE
+     C                     Z-ADD0         W#DAT3
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVE '1'       WFCODE
+     C*計算天數----------
+     C                     MOVE TXDATE    P#PDAT
+     C*
+9908AC                     MOVE U#SYSD    W#DATE  80
+     C                     Z-ADDW#DATE    W#DAT   80
+     C                     MOVE W#DAT     P#EDAT
+     C*
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT  8
+     C                     PARM           P#EDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#DIF   50
+     C                     PARM *BLANK    P#ERR   1
+     C*
+     C                     Z-ADDP#DIF     WFDATS
+     C*
+     C           WFAMT     IFNE 0
+     C                     WRITERARP079
+     C                     ENDIF
+     C*
+     C           END1      ENDSR
+     C*********************************
+     C*  SR2000      函式  (型板用)
+     C*********************************
+     CSR         SR2000    BEGSR
+     C           TXDATE    IFLE 890601
+     C                     GOTO END2
+     C                     ENDIF
+     C           TXCUNO    IFEQ 'DH043'
+     C                     GOTO END2
+     C                     ENDIF
+     C           TXNO      IFEQ 'H1155300'
+     C                     Z-ADD0         W#TEST  10
+     C                     ENDIF
+     C                     MOVELTXNO      WFNO             單據號碼
+     C                     MOVELTXORNO    WFORNO           訂單號碼
+     C                     MOVE 'TN'      WFNOTP           單據類別
+     C                     Z-ADDTXDATE    WFNODT           單據日期
+     C                     MOVELTXCUNO    WFCUNO           客戶代號
+     C                     MOVELTXCUNM    WFCUNM           客戶簡稱
+9908AC                     MOVE U#SYSD    WFENTD           處理日期
+     C*計算發票到期日期
+     C                     MOVELTXORNO    D#ORNO
+     C*排除鋼筋訂單
+     C           D#ORN1    IFNE 'H'
+     C                     GOTO END2
+     C                     ENDIF
+     C*
+     C                     MOVE TXDATE    P#PDAT
+     C                     MOVE '1'       WFCODE
+     C           WFCUNO    CHAINRARR092              40
+     C  N40      A9DATS    IFGE 0
+     C                     MOVE '2'       P#OMOD
+     C                     Z-ADDA9DATS    WFDATS
+     C                     ELSE
+     C                     MOVE '1'       P#OMOD
+     C                     Z-SUBA9DATS    WFDATS
+     C                     ENDIF
+     C   40                MOVE '2'       P#OMOD
+     C   40                Z-ADD45        WFDATS
+     C*
+     C                     MOVE WFDATS    P#DAYS
+     C                     CALL 'UTS104R'
+     C                     PARM           P#PDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#OMOD  1
+     C                     PARM           P#DAYS  4
+     C                     PARM           P#EDAT  8
+     C                     PARM *BLANK    P#ERR   1
+     C*
+     C                     MOVE P#EDAT    WFDATE
+     C*
+     C           WFAMT     IFNE 0
+     C                     WRITERARP079
+     C                     ENDIF
+     C*
+     C           END2      ENDSR
+

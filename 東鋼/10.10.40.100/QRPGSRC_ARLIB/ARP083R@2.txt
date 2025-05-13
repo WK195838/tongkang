@@ -1,0 +1,495 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARP083R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     承購發票下載試算作業--試算確認
+     H*            5.DATE-WRITTEN  91/02/06
+     H*            6.UPDATE
+     H*****************************************************************
+     H        1   Y                                     1
+     FARP083S CF  E                    WORKSTN
+     F                                        RRN1  KSFILE AR083F1
+     F                                        RRN2  KSFILE AR083F2
+     FARINVMX UF  E           K        DISK
+     FARBANK  IF  E           K        DISK
+     FARINVML2UF  E           K        DISK
+     F            RARINVM                           KRENAMERINVML
+     FARCUDT  IF  E           K        DISK
+     E                    ERR     1   4 70               *錯誤訊息
+     E                    ARY       150 16               *發票號碼
+     I            DS
+     I                                        1  16 D#ARY
+     I                                        1   6 D#APNO
+     I                                        7  16 D#INNO
+     I            DS
+     I                                        1  30 D#BHID
+     I                                        1   8 D#INID
+     I                                        9  16 D#DATE
+     I                                       17  22 D#TIME
+     I           UDS
+     I                                      301 303 D#BKID
+     I                                      304 309 D#CUID
+     I                                      310 321 D#AMT1
+     I                                      322 322 D#RETR
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVI
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*FILE => ARINVMX
+     C           K#INVX    KLIST
+     C                     KFLD           K#APDX           承購日期
+     C                     KFLD           K#CUNX           客戶代號
+     C                     KFLD           K#APNX           承購單號
+     C*FILE => ARINVML2
+     C           K#INVL    KLIST
+     C                     KFLD           K#APDL           承購日期
+     C                     KFLD           K#APNL           承購單號
+     C                     KFLD           K#CUNL           客戶代號
+     C                     KFLD           K#INNL           發票號碼
+     C****************************************************************
+     C*      MAIN           PROGRAM
+     C****************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000            READC
+     C           W#PRID    CASEQ'03'      SR3000           畫面二
+     C           W#PRID    CASEQ'04'      SR4000            READC
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C                     MOVEL'ARP083S-'S#SRID
+     C                     MOVE '01'      W#PRID  2
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVE *ALL'-'   S#LIN3
+     C*
+     C                     MOVE D#BKID    S#BKID           銀行代號
+     C           S#BKID    CHAINRARBANK             N40
+     C                     MOVE ABBKNM    S#BKNM           銀行簡稱
+     C*
+     C                     MOVE D#CUID    S#CUN1           客戶代號
+     C           S#CUN1    CHAINRARCUDT             N40
+     C                     MOVELACCUNM    S#CUM1           客戶簡稱
+     C*
+     C                     MOVE D#AMT1    S#AMT1           欲承購金額
+     C*
+     C           ACAAMT    SUB  ACAAM1    S#AMT2           可承購金額
+     C*
+     C                     Z-ADD0         S#AMT3           總選取金額
+     C*
+     C                     MOVE *ALL'9'   ARY
+     C*
+     C                     MOVE *OFF      *IN96            確認燈號
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->ARP083S-02 畫面
+     C                     MOVE '02'      S#SRID
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN74             SFLCLR
+     C                     WRITEAR083F1C
+     C                     MOVE *OFF      *IN74             SFLCLR
+     C*
+     C                     EXSR SR1100                     讀入SFL
+     C*
+     C*=======(顯示畫面)
+     C                     MOVEA'00'      *IN,71
+     C                     MOVE *OFF      *IN31
+     C           RRN1      IFEQ 0
+     C                     MOVELERR,1     S#ERR1
+     C                     MOVE *ON       *IN72             SFLDSP OFF
+     C                     ENDIF
+     C*
+     C           W#PRID    DOWEQ'01'
+     C*
+     C                     WRITEAR083H
+     C                     WRITEAR083F1M
+     C                     EXFMTAR083F1C
+     C                     MOVE *OFF      *IN30
+     C                     MOVE *BLANK    S#ERR1
+     C*
+     C   96                MOVE '00'      W#PRID
+     C   96                MOVE '1'       D#RETR
+     C   96                LEAVE
+     C*F3=結束作業
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     MOVE '0'       D#RETR
+     C                     LEAVE
+     C                     ENDIF
+     C*F12=回前頁
+     C           *IN12     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     MOVE '1'       D#RETR
+     C                     LEAVE
+     C                     ENDIF
+     C* CHECK DATA
+     C           S#AMT3    IFGT S#AMT2
+     C                     MOVELERR,2     S#ERR1
+     C                     MOVE *ON       *IN30
+     C                     ENDIF
+     C* F5=全部選取
+     C   05N30             EXSR SR1200
+     C* F10=確認執行（已選取金額<可承購金額）
+     C   10N30   S#AMT3    IFLE S#AMT2
+     C           S#AMT3    ANDNE0
+     C*         先紀錄選取之資訊
+     C                     EXSR SR9000
+     C*         下載
+     C                     CALL 'ARP083P2'
+     C                     PARM           D#BHID
+     C*
+     C           S#ERR1    CAT  ERR,3:0   S#ERR1
+     C           S#ERR1    CAT  D#BHID:0  S#ERR1
+     C           S#ERR1    CAT  ERR,4:0   S#ERR1
+     C*
+     C                     MOVE *ON       *IN96
+     C                     ENDIF
+     C*
+     C                     MOVE '02'      W#PRID
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*一次讀入ARINVMX資料
+     C                     Z-ADD0         RRN1    40
+     C                     Z-ADD0         S#AMT3           總選取金額
+     C*
+     C           *LOVAL    SETLLRARINVMX
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C*
+     C                     READ RARINVMX            N    40
+     C   40                LEAVE
+     C                     Z-ADDAWAPCD    S#OPT1            OP CODE
+     C                     Z-ADDAWAPD1    S#APD1           承購日期
+     C                     MOVE AWAPN1    S#APN1           承購單號
+     C                     Z-ADDAWDAMT    S#AMT4           總金額
+     C                     Z-ADDAWEAMT    S#AMT5           選取金額
+     C*合計總選取金額
+     C                     ADD  AWEAMT    S#AMT3
+     C*
+     C                     ADD  1         RRN1
+     C                     WRITEAR083F1
+     C*
+     C                     ENDDO
+     C*
+     C           RRN1      IFNE 0
+     C                     Z-ADD1         S#NBR1
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1200    BEGSR
+     C*****************************************************************
+     C* F5 全選處理
+     C           *LOVAL    SETLLRARINVMX
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C*
+     C                     READ RARINVMX                 40
+     C   40                LEAVE
+     C                     Z-ADD2         AWAPCD            OP CODE
+     C                     Z-ADDAWDAMT    AWEAMT           選取金額
+     C                     UPDATRARINVMX
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C***************************************************************
+     C           SR2000    BEGSR
+     C**************************************************************
+     C*READC  AR083F1
+     C           W#PRID    DOWEQ'02'
+     C                     READCAR083F1                  43
+     C   43                MOVE '01'      W#PRID
+     C   43                LEAVE
+     C*
+     C                     Z-ADDS#APD1    K#APDX  80       承購日期
+     C                     MOVE S#CUN1    K#CUNX  6        客戶代號
+     C                     MOVE S#APN1    K#APNX  6        承購單號
+     C           K#INVX    CHAINRARINVMX             40
+     C*現在選的和之前的不一樣
+     C           S#OPT1    IFNE AWAPCD
+     C                     Z-ADDS#OPT1    AWAPCD            OP CODE
+     C                     Z-ADD0         AWEAMT
+     C                     ENDIF
+     C*
+     C           S#OPT1    IFEQ 0                          未選取
+     C                     Z-ADD0         AWEAMT
+     C                     ENDIF
+     C*
+     C           S#OPT1    IFEQ 2                          已選取
+     C                     Z-ADDAWDAMT    AWEAMT
+     C                     ENDIF
+     C*
+     C           S#OPT1    IFEQ 5                          部分選取
+     C                     MOVE '03'      W#PRID
+     C                     ENDIF
+     C*
+     C                     UPDATRARINVMX
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*W#PRID='03'--->ARP083S-03 畫面
+     C                     MOVE '03'      S#SRID
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN79             SFLCLR
+     C                     WRITEAR083F2C
+     C                     MOVE *OFF      *IN79             SFLCLR
+     C*
+     C                     EXSR SR3100                     讀入SFL
+     C*
+     C                     MOVE *ON       *IN31
+     C*=======(顯示畫面)
+     C           W#PRID    DOWEQ'03'
+     C*
+     C                     WRITEAR083H
+     C                     WRITEAR083F2M
+     C                     EXFMTAR083F2C
+     C                     MOVE *OFF      *IN30
+     C                     MOVE *BLANK    S#ERR1
+     C*F3=結束作業
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     MOVE '0'       D#RETR
+     C                     LEAVE
+     C                     ENDIF
+     C*F12=回前頁
+     C           *IN12     IFEQ *ON
+     C                     MOVE '02'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVE '04'      W#PRID           READC
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3100    BEGSR
+     C*****************************************************************
+     C*一次讀入ARP083S-03之資料
+     C                     Z-ADD0         RRN2    40
+     C*
+     C                     MOVE S#APD1    K#APDL  80
+     C                     MOVE S#APN1    K#APNL  6
+     C                     MOVE S#CUN1    K#CUNL  6
+     C                     MOVE *BLANK    K#INNL 10
+     C           K#INVL    SETLLRINVML
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RINVML                   40
+     C   40                LEAVE
+     C*
+     C           AMAPN1    IFEQ S#APN1                     承購單號
+XXXX C           AMAPCD    ANDEQ*BLANK                     承購下載
+     C                     MOVE *ON       *IN75             SFLNXTCHG
+     C                     MOVE AMINNO    S#INNO           發票號碼
+ 9212C                     MOVE AMORNO    S#ORNO           訂單編號
+     C                     Z-ADDAMINDT    S#INDT           開立日期
+     C                     Z-ADDAMDAMT    S#INAM           發票金額
+     C*取得先前所打的OP CODE
+     C                     Z-ADD0         S#OPT2           給預設值
+     C                     SORTAARY
+     C           1         DO   150       I       30
+     C                     MOVE ARY,I     D#ARY
+     C           D#INNO    IFEQ AMINNO
+     C                     Z-ADD2         S#OPT2
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           D#APNO    IFEQ '999999'                   初始值
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ITER
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ADD  1         RRN2
+     C                     WRITEAR083F2
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C           RRN2      IFNE 0
+     C                     Z-ADD1         S#NBR2
+     C                     ENDIF
+     C*
+     C                     EXSR SR3110
+     C*
+     C                     ENDSR
+     C***************************************************************
+     C           SR3110    BEGSR
+     C**************************************************************
+     C*重新合計總選取金額
+     C                     Z-ADD0         S#AMT3
+     C           *LOVAL    SETLLRARINVMX
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C*
+     C                     READ RARINVMX            N    40
+     C   40                LEAVE
+     C*
+     C                     ADD  AWEAMT    S#AMT3
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C***************************************************************
+     C           SR4000    BEGSR
+     C**************************************************************
+     C*READC  AR083F2
+     C           W#PRID    DOWEQ'04'
+     C                     READCAR083F2                  43
+     C   43                MOVE '02'      W#PRID
+     C   43                LEAVE
+     C*紀錄所選取的值
+     C                     MOVEA'00'      *IN,97           初始燈號
+     C*
+     C                     SORTAARY
+     C           1         DO   150       I
+     C                     MOVE ARY,I     D#ARY
+     C*
+     C           D#INNO    IFEQ S#INNO                     原先有紀錄
+     C           S#OPT2    IFEQ 0                          未選取
+     C                     MOVE *ALL'9'   ARY,I
+     C                     MOVE *ON       *IN97            狀態紀錄
+     C                     ELSE
+     C                     MOVE S#APN1    D#APNO
+     C                     MOVE S#INNO    D#INNO
+     C                     MOVE D#ARY     ARY,I
+     C                     MOVE *ON       *IN98            狀態紀錄
+     C                     ENDIF
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           D#APNO    IFEQ '999999'                   初始值
+     C           S#OPT2    IFNE 0                          已選取
+     C                     MOVE S#APN1    D#APNO
+     C                     MOVE S#INNO    D#INNO
+     C                     MOVE D#ARY     ARY,I
+     C                     MOVE *ON       *IN98            狀態紀錄
+     C                     ENDIF
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDDO                            FOR ARY
+     C*金額處理
+     C*  *IN97=*ON  =>代表原先有選取後來刪除,故金額必須扣除
+     C*  *IN98=*ON  =>反之
+     C                     Z-ADDS#APD1    K#APDX
+     C                     MOVE S#APN1    K#APNX
+     C                     MOVE S#CUN1    K#CUNX
+     C           K#INVX    CHAINRARINVMX             40
+     C   97                SUB  S#INAM    AWEAMT
+     C   98                ADD  S#INAM    AWEAMT
+     C           AWEAMT    IFEQ 0
+     C                     Z-ADD0         AWAPCD
+     C                     ENDIF
+     C   97
+     COR 98                UPDATRARINVMX
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C***************************************************************
+     C           SR9000    BEGSR
+     C**************************************************************
+     C*先產生批號
+     C                     MOVE '75280209'D#INID
+     C                     MOVE UDATE     W#DATE  80
+     C                     ADD  19110000  W#DATE
+     C                     MOVE W#DATE    D#DATE
+     C                     TIME           W#TIME  60
+     C                     MOVE W#TIME    D#TIME
+     C*開始存入資料
+     C           *LOVAL    SETLLRARINVMX
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RARINVMX            N    40
+     C   40                LEAVE
+     C*全選
+     C           AWAPCD    IFEQ 2
+     C                     EXSR SR9100
+     C                     ENDIF
+     C*部分選取
+     C           AWAPCD    IFEQ 5
+     C                     EXSR SR9200
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C***************************************************************
+     C           SR9100    BEGSR
+     C**************************************************************
+     C                     Z-ADDAWAPD1    K#APDL
+     C                     MOVE AWAPN1    K#APNL
+     C                     MOVE AWCUNO    K#CUNL
+     C                     MOVE *BLANK    K#INNL
+     C           K#INVL    SETLLRINVML
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ RINVML                   41
+     C   41                LEAVE
+     C           AMAPN1    IFNE K#APNL                     承購單號
+     C           AMCUNO    ORNE K#CUNL                     客戶代號
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVE D#BHID    AMBLCB           下載批號
+     C                     UPDATRINVML
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C***************************************************************
+     C           SR9200    BEGSR
+     C**************************************************************
+     C*部分選取
+     C                     SORTAARY
+     C           1         DO   150       I
+     C                     MOVE ARY,I     D#ARY
+     C*
+     C           D#APNO    IFEQ '999999'                   初始值
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           D#APNO    IFNE AWAPN1                     承購單號
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     Z-ADDAWAPD1    K#APDL
+     C                     MOVE AWAPN1    K#APNL
+     C                     MOVE AWCUNO    K#CUNL
+     C                     MOVE D#INNO    K#INNL
+     C           K#INVL    CHAINRINVML               41
+     C*
+     C                     MOVE D#BHID    AMBLCB           下載批號
+     C                     UPDATRINVML
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+**  ERR
+01-無相關資料！
+02-總選取金額超過可承購金額！
+本次承購之相關批號為
+請啟動相關程式下載！
+

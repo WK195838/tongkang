@@ -1,0 +1,121 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP050P4                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCH                                  */
+     /*     4.FUNCTION     進倉履約折讓自動處理作業-重新列印    */
+     /*     5.DATE-WRITTEN  102/12/17 2013AR787 S00WCJ              */
+     /*                                                             */
+     /***************************************************************/
+             PGM        PARM(&P#SAL1 &P#CUN1 &P#ORN1 &P#PRO1 +
+                             &P#ARE1 &P#PRYM &P#PRT)
+
+             DCL        VAR(&P#SAL1)  TYPE(*CHAR)  LEN(2)
+             DCL        VAR(&C#SALS)  TYPE(*CHAR)  LEN(2)
+             DCL        VAR(&C#SALE)  TYPE(*CHAR)  LEN(2)
+             DCL        VAR(&P#CUN1)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&C#CUNS)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&C#CUNE)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&P#ORN1)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&C#ORNS)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&C#ORNE)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&P#PRO1)  TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&C#PROS)  TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&C#PROE)  TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&P#ARE1)  TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&C#ARES)  TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&C#AREE)  TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&P#PRYM)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&P#PRT)   TYPE(*CHAR)  LEN(1)
+
+             CHGDTAARA  DTAARA(*LDA (501 2)) VALUE(&P#SAL1)
+             CHGDTAARA  DTAARA(*LDA (503 6)) VALUE(&P#CUN1)
+             CHGDTAARA  DTAARA(*LDA (509 6)) VALUE(&P#ORN1)
+             CHGDTAARA  DTAARA(*LDA (514 1)) VALUE(&P#PRO1)
+             CHGDTAARA  DTAARA(*LDA (515 1)) VALUE(&P#ARE1)
+             CHGDTAARA  DTAARA(*LDA (516 6)) VALUE(&P#PRYM)
+             CHGDTAARA  DTAARA(*LDA (523 1)) VALUE(&P#PRT)
+
+             IF         COND(&P#SAL1 *EQ '  ') THEN(DO)
+               CHGVAR   VAR(&C#SALS) VALUE('  ')
+               CHGVAR   VAR(&C#SALE) VALUE('99')
+             ENDDO
+             ELSE (DO)
+               CHGVAR   VAR(&C#SALS) VALUE(&P#SAL1)
+               CHGVAR   VAR(&C#SALE) VALUE(&P#SAL1)
+             ENDDO
+
+
+             IF         COND(&P#CUN1 *EQ '      ') THEN(DO)
+               CHGVAR     VAR(&C#CUNS) VALUE('      ')
+               CHGVAR     VAR(&C#CUNE) VALUE('999999')
+             ENDDO
+             ELSE (DO)
+               CHGVAR     VAR(&C#CUNS) VALUE(&P#CUN1)
+               CHGVAR     VAR(&C#CUNE) VALUE(&P#CUN1)
+             ENDDO
+
+             IF         COND(&P#ORN1 *EQ '      ') THEN(DO)
+               CHGVAR     VAR(&C#ORNS) VALUE('      ')
+               CHGVAR     VAR(&C#ORNE) VALUE('999999')
+             ENDDO
+             ELSE (DO)
+               CHGVAR     VAR(&C#ORNS) VALUE(&P#ORN1)
+               CHGVAR     VAR(&C#ORNE) VALUE(&P#ORN1)
+             ENDDO
+
+             IF         COND(&P#PRO1 *EQ ' ') THEN(DO)
+               CHGVAR     VAR(&C#PROS) VALUE('3')
+               CHGVAR     VAR(&C#PROE) VALUE('6')
+             ENDDO
+             ELSE (DO)
+               CHGVAR     VAR(&C#PROS) VALUE(&P#PRO1)
+               CHGVAR     VAR(&C#PROE) VALUE(&P#PRO1)
+             ENDDO
+
+             OVRDBF     FILE(DISDTL)  TOFILE(DISDTL)  SHARE(*YES)
+             OVRPRTF    FILE(ARE050T) TOFILE(ARE050T) PAGESIZE(*N +
+                          132) CPI(10) HOLD(*YES) USRDTA('折讓開立')
+          IF         COND(&P#ARE1 *EQ ' ') THEN(DO)
+             OPNQRYF    FILE(DISDTL)  OPTION(*ALL) QRYSLT('+
+                        (YYMM *EQ "' || &P#PRYM || '") *AND +
+                        (DSCUNO *GE "' || &C#CUNS || '") *AND +
+                        (DSCUNO *LE "' || &C#CUNE || '") *AND +
+                        (DSORNO *GE "' || &C#ORNS || '") *AND +
+                        (DSORNO *LE "' || &C#ORNE || '") *AND +
+                        (  PROD *GE "' || &C#PROS || '") *AND +
+                        (  PROD *LE "' || &C#PROE || '") *AND +
+                        ((DSAREA *EQ "H" *OR DSAREA *EQ "K")) *AND +
+                        (DSAMT1 *NE 0)') +
+                        MAPFLD((YYMM  DSYYMM *CHAR 6)  +
+                               (PROD '%SST(DSPROD 1 1)')) +
+                        KEYFLD((DSCUNO) (DSAREA) (DSORNO) (DSTXNO))
+          ENDDO
+
+          IF         COND(&P#ARE1 *NE ' ') THEN(DO)
+             OPNQRYF    FILE(DISDTL)  OPTION(*ALL) QRYSLT('+
+                        (YYMM *EQ "' || &P#PRYM || '") *AND +
+                        (DSCUNO *GE "' || &C#CUNS || '") *AND +
+                        (DSCUNO *LE "' || &C#CUNE || '") *AND +
+                        (DSORNO *GE "' || &C#ORNS || '") *AND +
+                        (DSORNO *LE "' || &C#ORNE || '") *AND +
+                        (  PROD *GE "' || &C#PROS || '") *AND +
+                        (  PROD *LE "' || &C#PROE || '") *AND +
+                        (DSAREA *EQ "' || &P#ARE1 || '") *AND +
+                        (DSAMT1 *NE 0)') +
+                        MAPFLD((YYMM  DSYYMM *CHAR 6) +
+                               (PROD '%SST(DSPROD 1 1)')) +
+                        KEYFLD((DSCUNO) (DSAREA) (DSORNO) (DSTXNO))
+          ENDDO
+
+   /* CPYFRMQRYF   FROMOPNID(DISDTL) TOFILE(S00WCJ/DIST) +
+                   MBROPT(*REPLACE)  CRTFILE(*YES) */
+
+             CALL       PGM(ARE050R3)
+             CLOF       OPNID(DISDTL)
+             DLTOVR     FILE(*ALL)
+
+ ENDCLPGM:   ENDPGM
+

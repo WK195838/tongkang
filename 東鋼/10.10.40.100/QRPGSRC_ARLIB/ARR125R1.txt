@@ -1,0 +1,160 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR125R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LBU
+     H*            4.FUNCTION     廠區別隨車折扣明細表（大類-先前處理）
+     H*            5.DATE-WRITTEN  95/04/26
+     H*            6.DATE-MODIFY
+     H*                            104/10/08  2015AR953  S00WCJ (0409A)
+     H*                             產品代碼3碼擴5碼
+     H*
+     H*  ADRESV==>產品名稱第一碼
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARDSLG  IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FARR125F O   E           K        DISK
+     I*****************************************************************
+     IRARDSLG
+     I                                              ADAREAL1
+     I                                              ADINNOL1
+     I                                              ADRESVL1
+     I                                              ADACNTL1
+     I                                              ADSALEL1
+     I*
+     I            DS
+0409AI                                        1   5 ADPDNM
+     I                                        1   1 D#PDN1
+     I                                        1   2 D#PDN2
+0409AI                                        4   4 D#PDN4
+     C*****************************************************************
+     C*         KEY   LIST
+     C*****************************************************************
+     C*FILE==>INVDTL(發票明細檔)
+     C*
+     C           K#INVD    KLIST
+     C                     KFLD           IVNO             發票號碼
+     C                     KFLD           IVACNT           類別
+     C                     KFLD           IVITEM           項次
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARRAR125F
+     C                     Z-ADD0         W#AMTE 110
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVE *OFF      *IN50
+     C           ADINNO    CHAININVMST               50
+     C           INDECD    IFEQ 'D'
+     C                     GOTO ENDTSR
+     C                     ENDIF
+     C*
+     C                     ADD  ADQTY2    ARQTY
+     C                     ADD  ADAMT2    ARAMT
+     C*
+     C           ENDTSR    ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C                     MOVELADAREA    ARAREA
+     C                     MOVELADCUNO    ARCUTY
+     C*
+     C           ARCUTY    IFEQ 'E'
+     C                     Z-ADD0         W#TMP   10
+     C                     ENDIF
+     C*
+     C                     MOVELADPDNM    W#PDNM  1
+     C                     SELEC
+     C           W#PDNM    WHEQ '1'
+     C                     MOVELADPDNM    W#CODE  2
+     C           W#CODE    IFEQ '17'
+     C                     MOVEL'G'       ARCODE           扁鋼胚
+     C                     ELSE
+     C                     MOVEL'H'       ARCODE           鋼胚
+     C                     ENDIF
+     C*
+     C           W#PDNM    WHEQ '2'
+     C                     MOVEL'A'       ARCODE           鋼筋
+     C*
+     C           W#PDNM    WHEQ '3'
+     C                     MOVELADPDNM    W#CODE
+     C           W#CODE    IFEQ '37'
+     C                     MOVEL'F'       ARCODE           ＢＨ型鋼
+     C                     ELSE
+     C                     MOVEL'B'       ARCODE           Ｈ型鋼
+     C                     ENDIF
+     C*
+     C           W#PDNM    WHEQ '4'
+     C                     MOVEL'C'       ARCODE           鋼板
+     C*
+     C           W#PDNM    WHEQ '5'
+     C                     MOVEL'D'       ARCODE           槽鋼
+     C*
+     C           W#PDNM    WHEQ '6'
+     C                     MOVEL'E'       ARCODE           Ｉ型鋼
+     C                     ENDSL
+     C*
+     C           ADINNO    IFNE *BLANK
+     C           ARCUTY    ANDEQ'E'                        外銷
+     C                     EXSR SR1000
+     C                     ENDIF
+     C*
+     C                     WRITERAR125F
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C                     MOVELADINNO    IVNO
+     C                     MOVEL'1'       IVACNT
+     C                     Z-ADD0         IVITEM
+     C*
+     C           K#INVD    SETLLIVREC
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ IVREC                    40
+     C   40                LEAVE
+     C*
+     C           IVNO      IFNE ADINNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVELIVPDCD    W#PDCD  1
+     C           W#PDCD    IFEQ W#PDNM
+     C                     ADD  IVAMT     W#AMTE
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     Z-ADDW#AMTE    ARAMT
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C*
+     C                     ENDSR
+     C*****************************************************************
+

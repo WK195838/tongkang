@@ -1,0 +1,225 @@
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E                    DISK
+     FHIPROD  IF  E           K        DISK
+     FQPRINT  O   F     132            PRINTER
+      *************************************************************
+     E**                  TAB1    1   5  1   TABR1  10
+     I*************************************************************
+     ITXREC
+     I                                              TXACDTL2
+     I                                              TXNO  L1
+     I****
+     IAADS        DS
+     I              '型鋼槽鋼　出貨日報-C         CON3                       X
+     I              '表（代傳票）'
+     I              '東和鋼鐵企業股份有-C         CON4                       X
+     I              '限公司'
+CLJ  I            DS
+     I                                        1   2 W#OEOF
+     I                                        1   1 D#OE
+     I                                        2   2 D#OF
+     I            DS
+     I                                        1  12 NAME1
+---  I                                       12  12 D#NOF
+     I           UDS
+     I                                        1   1 AREAF
+     I                                        2   2 AREAT
+     I                                      951 985 COMP
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C**************************************************************
+     C  N90                EXSR INZ#01
+     C  N90                SETON                     90
+     C   L2                EXSR DL#L2
+     C   L1                EXSR DL#L1
+     C                     EXSR DP#01
+     CL1                   EXSR TL#L1
+     CL2                   EXSR TL#L2
+     CLR                   EXSR TL#LR
+     C**************************************************************
+     C*** SET INITIAL
+     CSR         INZ#01    BEGSR
+      *
+     C                     Z-ADD0         PAG     30
+     C                     Z-ADD80        LCNT    30
+     C                     Z-ADD55        TCNT    30
+     C                     Z-ADD0         QTY3    80
+     C                     Z-ADD0         AMT3   112
+     C                     Z-ADD0         COUNT   30
+     C                     Z-ADDTCNT      LCNT
+     C                     MOVE *ALL'='   ALS   132
+     C                     MOVE *ALL'-'   ALQ   132
+     C                     SELEC
+     C           TXAR      WHEQ 'P'
+     C                     MOVEL'台北'  AREAC   6
+     C           TXAR      WHEQ 'T'
+     C                     MOVEL'桃園'  AREAC   6
+     C           TXAR      WHEQ 'K'
+     C                     MOVEL'高雄'  AREAC   6
+     C           TXAR      WHEQ 'L'
+     C                     MOVEL'林口'  AREAC   6
+     C           TXAR      WHEQ 'M'
+     C                     MOVEL'台中'  AREAC   6
+     C           TXAR      WHEQ 'H'
+     C                     MOVEL'苗栗'  AREAC   6
+     C                     OTHER
+     C                     MOVEL'　　'  AREAC
+     C                     ENDSL
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS                                **
+     C**----------------------------------------------**
+     CSR         @CHKCT    BEGSR
+     C           LCNT      COMP TCNT                 75  75
+     C   75                ADD  1         PAG
+     C   75                EXCPTEH#01
+     C   75                Z-ADD8         LCNT
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS L2                             **
+     C**----------------------------------------------**
+     CSR         DL#L2     BEGSR
+     C                     Z-ADD0         QTY2    70
+     C                     Z-ADD0         AMT2   112
+     CSR                   ENDSR
+     C* DETAIL PROCESS L1                             **
+     C**----------------------------------------------**
+     CSR         DL#L1     BEGSR
+     C                     Z-ADD0         QTY1    70
+     C                     Z-ADD0         AMT1   112
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS                                **
+     C**----------------------------------------------**
+     CSR         DP#01     BEGSR
+     C           TXPDNM    CHAINHIPROD               97
+CLJ  C           *IN97     IFEQ '0'
+     C                     MOVE ''      W#OEOF
+     C                     MOVELF4CHIN    NAME1
+     C                     MOVE D#OF      D#NOF
+     C                     ELSE
+     C                     MOVE *BLANK    NAME1
+---  C                     ENDIF
+     C                     ADD  1         COUNT
+9009 C                     MOVELTXORNO    ORNO    6
+     C                     SELEC
+     C           TXACNT    WHEQ '1'
+     C                     MOVEL'銷貨'  ACNT    6
+     C           TXACNT    WHEQ '2'
+     C                     MOVEL'磅差'  ACNT    6
+     C           TXACNT    WHEQ '3'
+     C                     MOVEL'價差'  ACNT    6
+     C                     OTHER
+     C                     MOVEL'　　'  ACNT    6
+     C                     ENDSL
+     C                     Z-ADDTXAMT     RAMT   112
+     C                     MOVELTXRESV    TPRCA   7
+     C                     SETOF                     21
+     C                     TESTN          TPRCA      21
+     C   21                MOVE TPRCA     TPRCN   70
+     C   21      TPRCN     DIV  100000    TPRC    75
+     C  N21                Z-ADDTXUPRC    TPRC
+     C                     ADD  1         LCNT
+     C                     EXSR @CHKCT
+     C   75                ADD  1         LCNT
+     C                     EXCPTED#01
+     C                     ADD  TXQTY     QTY1
+     C                     ADD  RAMT      AMT1
+     C**
+     CSR         DP#01Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME L1 PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#L1     BEGSR
+     C                     EXCPTET#L1
+     C                     ADD  QTY1      QTY2
+     C                     ADD  AMT1      AMT2
+     C                     ADD  2         LCNT
+     CSR         TL#L1Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME L2 PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#L2     BEGSR
+     C                     EXCPTET#L2
+     C                     ADD  QTY2      QTY3
+     C                     ADD  AMT2      AMT3
+     C                     ADD  1         LCNT
+     CSR         TL#L2Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME LR PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#LR     BEGSR
+     C                     EXCPTET#LR
+     CSR         TL#LRZ    ENDSR
+     OQPRINT  E   02           EH#01
+     O                                   17 '報表編號: AR039'
+     O                         CON4      75                                    X
+     O                                  123 '製表日期'
+     O                                  124 ':'
+     O                         UDATE Y  132
+     O        E 1              EH#01
+     O                         CON3      79                                    X
+     O                                  123 '頁　　次'
+     O                                  124 ':'
+     O                         PAG   Z  127
+     O        E 2              EH#01
+     O                                   11 '　地區別:'
+     O                         TXAR    +  1
+     O                         AREAC   +  1
+     O        E 1              EH#01
+     O                         ALS      132
+     O        E 1              EH#01
+     O                                   10 '入帳日期'
+     O                                   20 '磅單號碼'
+     O                                   30 '客戶編號'
+     O                                   40 '客戶名稱'
+     O                                   46 '訂單'
+     O                                   54 '異動別'
+     O                                   68 '品　名'
+     O                                   80 '數　量'
+     O                                   90 '單　價'
+     O                                  105 '銷貨金額'
+     O                                  115 '扣預收款'
+     O                                  130 '應收金額'
+     O        E 1              EH#01
+     O                         ALS      132
+     O        E 1              ED#01
+9009 O                 75      TXACDT    10 '    /  /  '
+LYW  O                 L2      TXACDT    10 '    /  /  '
+     O                 75      TXNO      20
+     O                 L1      TXNO      20
+     O                         TXCUNO    27
+     O                         TXCUNM    40
+     O                         ORNO      46
+     O                         TXACNT    48
+     O                         ACNT      54
+     O                         TXPDNM    58
+     O                         NAME1     70
+     O                         TXQTY N   80
+     O                         TPRC  2   89
+     O                         RAMT  N  105
+     O        E 11             ET#L1
+     O                                   67 '磅單小計：'
+     O                         QTY1  N   80
+     O                         AMT1  N  105
+     O                         AMT1  N  130
+     O        E 1              ET#L2
+9009 O                         TXACDT    59 '    /  /  '
+     O                                   67 '合計：'
+     O                         QTY2  N   80
+     O                         AMT2  N  105
+     O                         AMT2  N  130
+     O        E 1              ET#LR
+     O                                   20 '　筆數：'
+     O                         COUNT N   26
+     O                                   67 '　總合計：'
+     O                         QTY3  N   80
+     O                         AMT3  N  105
+     O                         AMT3  N  130
+     O        E   64           ET#LR
+     O                                   30 '副總經理：'
+     O                                   50 '　　經理：'
+     O                                   70 '　　複核：'
+     O                                   90 '　　經辦：'
+     O                                  110 '　　入帳：'
+

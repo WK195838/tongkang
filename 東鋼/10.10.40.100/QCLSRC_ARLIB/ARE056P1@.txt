@@ -1,0 +1,51 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARE056P1                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CSF                                  */
+     /*     4.FUNCTION     營業發票作廢申請作業                   */
+     /*     5.DATE-WRITTEN  93/12/27                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM        PARM(&DLNO)
+
+             DCL        VAR(&DLNO)    TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&TYPE)    TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&S#DEVN)  TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&S#USER)  TYPE(*CHAR)  LEN(10)
+
+             RTVJOBA    JOB(&S#DEVN) USER(&S#USER) +
+                        TYPE(&TYPE)
+
+             IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+   START:
+              CHGDTAARA  DTAARA(*LDA (300   6))   VALUE(&DLNO)
+              SBMJOB     JOB(ARE056P1)  JOBD(ARJOBD) +
+                         RQSDTA('CALL ARE056P1 ' || 'PARM(' || &DLNO || ')')
+              RETURN
+   BATCH:
+              RTVDTAARA  DTAARA(*LDA (300  6))   RTNVAR(&DLNO)
+
+             /*寫入暫存檔*/
+             OVRPRTF    FILE(ARE056T) TOFILE(ARLIB/ARE056T) +
+                        PAGESIZE(*N 198) +
+                        CPI(15)  HOLD(*YES) USRDTA('發票作廢')
+             OVRDBF    FILE(DELMSTL1) TOFILE(DALIB/DELMSTL1) +
+                       SHARE(*YES)
+             OPNQRYF   FILE(DELMSTL1) QRYSLT(' +
+                            (DMDLNO *EQ "' || &DLNO || '") *AND +
+                            (DMFLAG *NE "D")')  +
+                        KEYFLD((DMINDT) (DMINNO))
+             CALL      PGM(ARLIB/ARE056R1)
+             DLTOVR    FILE(*ALL)
+             CLOF      OPNID(DELMSTL1)
+
+             SNDBRKMSG  MSG('<< 發票作廢申請單已處理完成+
+                              ，請列印......>>') +
+                        TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+
+ ENDCLPGM:   ENDPGM
+

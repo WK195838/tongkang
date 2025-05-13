@@ -1,0 +1,168 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP101R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     銷貨利息計算─計算繳款書加權兌現日
+     H*            5.DATE-WRITTEN  92/04/14
+     H*            6.DATE-UPDATE
+     H*
+     H* **計算繳款書的加權兌現日，其公式如下
+     H*１（Σ（款款日─兌現日）X金額）／總金額＝加權兌現天數
+     H*２　繳款日＋加權兌現天數＝加權兌現日
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FRCVDTL  IP  E           K        DISK
+     FARP101F1UF  E           K        DISK                      A
+     E                    ARY1       99 51
+     E*****************************************************************
+     IRVREC
+     I                                              RVNO  L1
+     I            DS
+     I                                        1  35 D#ARY1
+     I                                        1   6 D#RVNO
+     I                                        7   80D#ITEM
+     I                                        9  160D#DATE
+     I                                       17  240D#DUDT
+     I                                       25  350D#RAMT
+     I                                       36  41 D#CUNO
+     I                                       42  51 D#CUNM
+     C*****************************************************************
+     C*       KEY LIST
+     C*****************************************************************
+     C*FILE==>ARP101F1
+     C           W#ARF1    KLIST
+     C                     KFLD           A1RVNO
+     C                     KFLD           A1ITEM
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ALL'9'   ARY1
+     C                     Z-ADD0         I       40
+     C                     Z-ADD0         W#RAMT 110
+     C                     Z-ADD0         W#AMT  110
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVELRVNO      D#RVNO           繳款單號
+     C                     Z-ADDRVITEM    D#ITEM           繳款項次
+     C                     Z-ADDRVDATE    D#DATE           繳款日期
+     C                     Z-ADDRVDUDT    D#DUDT           兌現日
+     C                     Z-ADDRVRAMT    D#RAMT           繳款金額
+     C                     MOVELRVCUNO    D#CUNO           客戶代號
+     C                     MOVELRVCUNM    D#CUNM           客戶名稱
+     C                     ADD  1         I
+     C                     MOVE D#ARY1    ARY1,I
+     C*計算加權兌現天數
+     C                     EXSR SR1000
+     C*
+     C                     ADD  RVRAMT    W#RAMT           收款總金額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*ARY初始值
+     C                     SORTAARY1                       排序
+     C                     Z-ADD1         I
+     C           1         DO   20        I
+     C                     MOVE ARY1,I    D#ARY1
+     C           D#RVNO    IFEQ '999999'
+     C                     LEAVE
+     C                     ELSE
+     C*計算加權兌現日
+     C                     EXSR SR2000
+     C*寫入
+     C                     MOVELD#RVNO    A1RVNO           繳款單號
+     C                     Z-ADDD#ITEM    A1ITEM           繳款項次
+     C           W#ARF1    CHAINRAR101F1             40
+     C                     MOVELD#RVNO    A1RVNO           繳款單號
+     C                     Z-ADDD#ITEM    A1ITEM           繳款項次
+     C                     Z-ADDD#DATE    A1DAT1           繳款日期
+     C                     MOVELD#CUNO    A1CUNO           客戶代號
+     C                     MOVELD#CUNM    A1CUNM           客戶簡稱
+     C*
+     C  N40                UPDATRAR101F1
+     C   40                WRITERAR101F1
+     C*
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR                           計算天數
+     C*****************************************************************
+     C*若繳款日大於兌現日，則以兌現日當天為繳款日
+     C           D#DATE    IFGT D#DUDT
+     C                     MOVE D#DUDT    W#DATE
+     C                     ELSE
+     C                     MOVE D#DATE    W#DATE  8        繳款日期
+     C                     ENDIF
+     C*兌現日若為空白,則繳款日＝兌現日
+     C           D#DUDT    IFEQ 0
+     C                     MOVE D#DATE    W#DUDT
+     C                     ELSE
+     C                     MOVE D#DUDT    W#DUDT  8        兌現日
+     C                     ENDIF
+     C                     MOVE W#DATE    P#PDAT
+     C                     MOVE W#DUDT    P#RDAT
+     C*
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT  8        起始日期
+     C                     PARM           P#RDAT  8        終止日期
+     C                     PARM '1'       P#MODE  1        民國年
+     C                     PARM           P#DIF   50       相距天數
+     C                     PARM           P#ERR   1        錯誤碼
+     C*
+     C           P#ERR     IFEQ '0'
+     C                     Z-ADDP#DIF     W#DAY   40       天數
+     C           W#DAY     MULT D#RAMT    W#AMT
+     C                     ELSE
+     C                     Z-ADD0         W#DAY
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C           W#AMT     DIV  W#RAMT    W#DAYS  40H      加權兌現天數
+     C*
+     C                     MOVE D#DATE    W#DATE  8        繳款日期
+     C                     MOVE W#DATE    P#PDAT
+     C                     MOVE W#DAYS    P#DAYS  4        天數
+     C*
+     C                     CALL 'UTS104R'
+     C                     PARM           P#PDAT  8        起始日期
+     C                     PARM '1'       P#MODE  1        民國年
+     C                     PARM '2'       P#OMOD  1        向後
+     C                     PARM           P#DAYS  4        天數
+     C                     PARM           P#RDAT  8        目的日期
+     C                     PARM           P#ERR   1        錯誤碼
+     C*
+     C           P#ERR     IFEQ '0'
+     C                     MOVE P#RDAT    A1DAT2           加權兌現日
+     C                     ELSE
+     C                     Z-ADD0         A1DAT2
+     C                     ENDIF
+     C*
+     C                     ENDSR
+

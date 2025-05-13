@@ -1,0 +1,208 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE  99/08/17  2010AR517 S00WCJ (9908A) */
+    /*                           99/12/06  2010ARXXX S00WCJ (9912A) */
+    /*                           增加U廠選項                    */
+    /*                          100/08/05  S00WCJ (0008A)          */
+    /*                           增加D廠選項                   */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCLF       FILE(ARLIB/ARR085S)
+
+             DCL        VAR(&DSPID)   TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&INT)     TYPE(*CHAR)  LEN(1)
+    /*9908A  START */
+           /*DCL        VAR(&QDATE)   TYPE(*CHAR)  LEN(6)  */
+             DCL        VAR(&QDATE)   TYPE(*CHAR)  LEN(8)
+           /*DCL        VAR(&C#DATE)  TYPE(*CHAR)  LEN(4) */
+             DCL        VAR(&C#DATE)  TYPE(*CHAR)  LEN(6)
+          /* DCL        VAR(&D#DATE)  TYPE(*DEC)   LEN(6 0) */
+             DCL        VAR(&D#DATE)  TYPE(*DEC)   LEN(8 0)
+    /*9908A  END */
+             DCL        VAR(&W#DAY)   TYPE(*DEC)   LEN(8 0)
+             DCL        VAR(&W#LDAY)  TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&W#CDAY)  TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&W#ERR)   TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&W#MOD)   TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&W#CNT)   TYPE(*CHAR)  LEN(4)
+             DCL        VAR(&W#FUN)   TYPE(*CHAR)  LEN(1)
+    /*9908A  START */
+         /*  DCL        VAR(&DATES)   TYPE(*CHAR)  LEN(6) */
+         /*  DCL        VAR(&DATEE)   TYPE(*CHAR)  LEN(6) */
+             DCL        VAR(&DATES)   TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&DATEE)   TYPE(*CHAR)  LEN(8)
+    /*9908A  END */
+             DCL        VAR(&AREAS)   TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&AREAE)   TYPE(*CHAR)  LEN(1)
+
+             RTVJOBA    JOB(&DSPID) OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+       /*           */
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+             RTVDTAARA  DTAARA(*LDA (1021  1)) RTNVAR(&S#AREA)
+       /*  取得銷貨年月之預設值   */
+    /*9908A  START */
+          /* RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&QDATE)    */
+             RTVJOBA    CYMDDATE(&QDATE)
+             CHGVAR     VAR(&QDATE)   VALUE('0' *CAT &QDATE)
+          /* CHGVAR     VAR(&C#DATE)  VALUE(%SST(&QDATE 1 4)) */
+             CHGVAR     VAR(&C#DATE)  VALUE(%SST(&QDATE 1 6))
+    /*9908A  END */
+             CHGVAR     VAR(&QDATE)   VALUE(&C#DATE || '01')
+             CHGVAR     VAR(&D#DATE)  VALUE(&QDATE)
+             CHGVAR     VAR(&W#DAY)   VALUE(&D#DATE)
+             CHGVAR     VAR(&W#LDAY)  VALUE(&W#DAY)
+             CHGVAR     VAR(&W#MOD)   VALUE('1') /*中國年*/
+             CHGVAR     VAR(&W#CNT)   VALUE('0001') /*天數*/
+             CHGVAR     VAR(&W#FUN)   VALUE('1') /* 1:往前, 2:往後 */
+             CALL       PGM(UTS104R) PARM(&W#LDAY  &W#MOD  &W#FUN &W#CNT +
+                                          &W#CDAY &W#ERR)
+             CHGVAR     VAR(&D#DATE)  VALUE(&W#CDAY)
+             CHGVAR     VAR(&QDATE)   VALUE(&D#DATE)
+    /*9908A  CHGVAR     VAR(&C#DATE)  VALUE(%SST(&QDATE 1 4)) */
+    /*9908A*/CHGVAR     VAR(&C#DATE)  VALUE(%SST(&QDATE 1 6))
+             CHGVAR     VAR(&S#YYMM)  VALUE(&C#DATE)
+
+  START:
+             SNDRCVF
+             IF         COND(&IN03 *EQ '1')   THEN(RETURN)
+             IF         COND(&IN03 *EQ '1')   THEN(RETURN)
+
+             CHGVAR     VAR(&IN30)    VALUE('0')
+             CHGVAR     VAR(&IN31)    VALUE('0')
+             CHGVAR     VAR(&S#ERR)   VALUE(' ')
+
+       /* 檢核銷貨廠區 */
+             IF         COND((&S#AREA *NE ' ')  *AND +
+                             (&S#AREA *NE 'T')  *AND +
+                             (&S#AREA *NE 'U')  *AND +
+                             (&S#AREA *NE 'H')  *AND +
+                             (&S#AREA *NE 'M')  *AND +
+                             (&S#AREA *NE 'D')  *AND +
+                             (&S#AREA *NE 'K')) THEN(DO)
+             CHGVAR     (&IN30)       VALUE('1')
+             CHGVAR     (&S#ERR)      VALUE('銷貨廠區輸入錯誤!')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+       /* 檢核銷貨年月 */
+             IF         COND(&S#YYMM *EQ 0)   THEN(DO)
+             CHGVAR     (&IN31)       VALUE('1')
+             CHGVAR     (&S#ERR)      VALUE('銷貨年月不得為0 !')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             CHGVAR     VAR(&C#DATE)  VALUE(&S#YYMM)
+             CHGVAR     VAR(&QDATE)   VALUE(&C#DATE || '01')
+             CHGVAR     VAR(&D#DATE)  VALUE(&QDATE)
+             CHGVAR     VAR(&W#DAY)   VALUE(&D#DATE)
+             CHGVAR     VAR(&W#LDAY)  VALUE(&W#DAY)
+             CHGVAR     VAR(&W#MOD)   VALUE('1') /*中國年*/
+             CHGVAR     VAR(&W#CNT)   VALUE('0000') /*天數*/
+             CHGVAR     VAR(&W#FUN)   VALUE('1') /* 1:往前, 2:往後 */
+             CALL       PGM(UTS104R) PARM(&W#LDAY  &W#MOD  &W#FUN &W#CNT +
+                                          &W#CDAY &W#ERR)
+             IF         COND(&W#ERR *EQ '1')   THEN(DO)
+             CHGVAR     (&IN31)       VALUE('1')
+             CHGVAR     (&S#ERR)      VALUE('銷貨年月輸入錯誤!')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+       /* 紀錄輸入值 */
+             CHGVAR     VAR(&C#DATE)  VALUE(&S#YYMM)
+             CHGVAR     VAR(&DATES)   VALUE(&C#DATE || '01')
+     /*9908A CHGDTAARA  DTAARA(*LDA (500 6))  VALUE(&DATES) */  /*起始*/
+   /*9908A*/ CHGDTAARA  DTAARA(*LDA (500 8))  VALUE(&DATES)  /*起始*/
+             CHGVAR     VAR(&DATEE)   VALUE(&C#DATE || '31')
+    /*9908A  START */
+         /*  CHGDTAARA  DTAARA(*LDA (506 6))  VALUE(&DATEE)  */ /*終止*/
+         /*  CHGDTAARA  DTAARA(*LDA (512 1))  VALUE(&S#AREA) */
+         /*  CHGDTAARA  DTAARA(*LDA (513 10)) VALUE(&DSPID)  */
+
+             CHGDTAARA  DTAARA(*LDA (508 8))  VALUE(&DATEE)  /*終止*/
+             CHGDTAARA  DTAARA(*LDA (516 1))  VALUE(&S#AREA)
+             CHGDTAARA  DTAARA(*LDA (517 10)) VALUE(&DSPID)
+    /*9908A  END */
+
+             SBMJOB     CMD(CALL PGM(ARR085P)) JOB(ARR085P) +
+                        JOBD(ARJOBD)
+             SNDBRKMSG  MSG('<<他廠出貨本廠開立發票明細表開始處理+
+                             ，請稍待...>>') +
+                          TOMSGQ(&DSPID) MSGTYPE(*INFO)
+             RETURN     /* INTERACTIVE JOB */
+ BATCH:
+    /*9908A  START */
+         /*  RTVDTAARA  DTAARA(*LDA (500 6))  RTNVAR(&DATES) */
+         /*  RTVDTAARA  DTAARA(*LDA (506 6))  RTNVAR(&DATEE) */
+         /*  RTVDTAARA  DTAARA(*LDA (512 1))  RTNVAR(&S#AREA) */
+         /*  RTVDTAARA  DTAARA(*LDA (513 10)) RTNVAR(&DSPID)  */
+
+             RTVDTAARA  DTAARA(*LDA (500 8))  RTNVAR(&DATES)
+             RTVDTAARA  DTAARA(*LDA (508 8))  RTNVAR(&DATEE)
+             RTVDTAARA  DTAARA(*LDA (516 1))  RTNVAR(&S#AREA)
+             RTVDTAARA  DTAARA(*LDA (517 10)) RTNVAR(&DSPID)
+    /*9908A  END  */
+
+             IF         COND(&S#AREA *EQ ' ') THEN(DO)
+             CHGVAR     VAR(&AREAS)   VALUE(' ')
+             CHGVAR     VAR(&AREAE)   VALUE('9')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&AREAS)   VALUE(&S#AREA)
+             CHGVAR     VAR(&AREAE)   VALUE(&S#AREA)
+             ENDDO
+
+
+        /* 處理開始 */
+
+             DLTF       FILE(QTEMP/TRNDTLX)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(TRNDTLX) FROMLIB(DALIB) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(TRNDTLX)
+
+             OVRDBF     FILE(TRNDTL)  TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OVRDBF     FILE(TRNDTLX) TOFILE(QTEMP/TRNDTLX)
+             OVRDBF     FILE(INVMST)  TOFILE(DALIB/INVMST)
+             OVRPRTF    FILE(ARR085T) TOFILE(ARR085T) +
+                        USRDTA('本出他開') HOLD(*YES) +
+                        PAGESIZE(*N 198) CPI(15)
+    /*9908A  START */
+
+             OPNQRYF    FILE(TRNDTL) QRYSLT(' +
+                        (((TXCODE *EQ "SA04") *AND +
+                          (TXFL01 *GE "' || &AREAS || '") *AND +
+                          (TXFL01 *LE "' || &AREAE || '")) *OR +
+                         ((TXCODE *EQ "AR05") *AND +
+                          (TXFL02 *GE "' || &AREAS || '") *AND +
+                          (TXFL02 *LE "' || &AREAE || '"))) *AND +
+                        (DATE1  *GE "' || &DATES || '") *AND +
+                        (DATE1  *LE "' || &DATEE || '") *AND +
+                        (CHAR4  *NE "000000") *AND +
+                        (CHAR2 *NE "*") *AND +
+                        (CHAR2 *NE "#")') +
+                        MAPFLD((TXFL01 '%SST(TXNO 1 1)') +
+                               (TXFL02 '%SST(TXPCNO 1 1)') +
+                               (DATE1 TXDATE *CHAR 8) +
+                               (CHAR2 '%SST(TXIVNO 1 1)' *CHAR 1) +
+                               (CHAR4 '%SST(TXIVNO 1 6)' *CHAR 8))
+    /*9908A  END */
+             CALL       PGM(ARR085R1)
+             CLOF       OPNID(TRNDTL)
+
+             OPNQRYF    FILE(TRNDTLX) +
+                        KEYFLD((TXFL01) (TXCUNO) (TXNO) (TXTXAR) (TXIVNO)) +
+                        MAPFLD((TXFL01 '%SST(TXNO 1 1)'))
+             CALL       PGM(ARR085R)
+             CLOF       OPNID(TRNDTLX)
+
+             DLTOVR     FILE(*ALL)
+
+             SNDBRKMSG  MSG('<<本廠出貨他廠開立發票明細表處理完畢+
+                             ，請列印...>>') +
+                          TOMSGQ(&DSPID) MSGTYPE(*INFO)
+             ENDPGM
+

@@ -1,0 +1,172 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP095R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     現金流量預估兌現日期分析表
+     H*            5.DATE-WRITTEN  91/03/07
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FDISMST  IP  E           K        DISK
+     FDISDTL  IF  E           K        DISK
+     FARSAID  IF  E           K        DISK
+     FARR094T O   E             69     PRINTER
+     E                    ARY        50 12               類別數量金額
+     IRDISMST     01
+     I                                              DMCUNOL1
+     I            DS
+     I                                        1  12 D#ARY
+     I                                        1   3 D#PROD
+     I                                        4  120D#QTY
+     I           UDS
+     I                                     10011010 T#USID
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C* KEY LIST
+     C*FILE=> DISDTL
+     C           K#DISD    KLIST
+     C                     KFLD           DSORNO
+     C                     KFLD           DSYYMM
+     C                     KFLD           DSINNO
+     C                     KFLD           DSPROD
+     C*初始報表
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C                     SETON                     6999
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     SETOF                     60
+     C                     MOVE *BLANK    W#CUNO
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVE DMSALE    T#SAID           業務代號
+     C           DMSALE    CHAINRARSAID             N40
+     C  N40                MOVELSANAME    T#SANM           業務姓名
+     C   40                MOVE *BLANK    T#SANM
+     C*
+     C           DMCUNO    IFNE W#CUNO
+     C                     MOVE *OFF      *IN60
+     C                     MOVE DMCUNO    W#CUNO  6
+     C                     ELSE
+     C                     MOVE *ON       *IN60
+     C                     ENDIF
+     C*
+     C                     MOVE DMCUNO    T#CUNO           客戶代號
+     C                     MOVE DMCUNM    T#CUNM           客戶名稱
+     C                     MOVE DMORNO    T#ORNO           訂單號碼
+     C                     MOVE DMAREA    T#AREA           廠區
+     C                     Z-ADDDMYYMM    T#YYMM           處理年月
+     C                     Z-ADDDMQTY1    T#QTY1           出貨量
+     C                     Z-ADDDMAMT1    T#AMT1           出貨金額
+     C                     Z-ADDDMAMT2    T#AMT2           其他折讓
+     C                     Z-ADDDMAMT3    T#AMT3           繳款金額
+     C                     Z-ADDDMAMT4    T#AMT4           折讓單價
+     C                     Z-ADDDMAMT5    T#AMT5           折讓總價
+     C                     SELEC
+     C           DMCOD1    WHEQ *BLANK
+     C                     MOVE *BLANK    T#COD1           折讓方式
+     C           DMCOD1    WHEQ '1'
+     C                     MOVE '扣抵'  T#COD1           折讓方式
+     C           DMCOD1    WHEQ '2'
+     C                     MOVE '開票'  T#COD1           折讓方式
+     C                     ENDSL
+     C*計算類別數量
+     C                     MOVE *ALL'9'   ARY
+     C*
+     C                     MOVE DMORNO    DSORNO
+     C                     Z-ADDDMYYMM    DSYYMM
+     C                     MOVE *LOVAL    DSINNO
+     C                     MOVE *LOVAL    DSPROD
+     C           K#DISD    SETLLRDISDTL
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RDISDTL                  40
+     C   40                LEAVE
+     C*
+     C           DSORNO    IFNE DMORNO
+     C           DSYYMM    ORNE DMYYMM
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           DSAREA    IFNE DMAREA
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     SORTAARY
+     C           1         DO   50        I       20
+     C                     MOVE ARY,I     D#ARY
+     C*
+     C           DSPROD    IFEQ D#PROD                     相等
+     C                     ADD  DSQTY1    D#QTY
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           D#PROD    IFEQ '999'                      初始值
+     C                     MOVE DSPROD    D#PROD
+     C                     Z-ADDDSQTY1    D#QTY
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     ENDDO
+     C*
+     C   69                WRITEAR094TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR094T1
+     C*列印類別數量
+     C                     SORTAARY
+     C           1         DO   50        I
+     C                     MOVE ARY,I     D#ARY
+     C*
+     C           D#PROD    IFNE '999'                      初始值
+     C                     MOVE D#PROD    T#PROD
+     C                     Z-ADDD#QTY     T#QTYX
+     C*
+     C   69                WRITEAR094TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR094T2
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR094TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR094TM
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C   69                WRITEAR094TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR094TR
+     C*
+     C                     ENDSR
+

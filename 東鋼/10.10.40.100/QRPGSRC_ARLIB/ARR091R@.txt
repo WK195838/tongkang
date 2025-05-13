@@ -1,0 +1,216 @@
+     H*****************************************************************
+     H*
+     H*            1.PROGRAM-ID    ARR091R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION      應收款項檢核表　　　　
+     H*            5.DATE-WRITTEN  90/11/13
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARP079F IP  E           K        DISK
+     FARR092F IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FARR091T O   E             69     PRINTER
+     E                    MSG     1   1 10
+     IRARP079     01
+     I                                              WFDATEL1
+     I           UDS
+     I                                      101 1080R#DATS
+     I                                      111 1180R#DATE
+     I                                      398 398 D#AREA
+     I                                      399 399 D#KIND
+     I                                      400 400 D#TYPE
+     I                                      401 4040D#DATB
+     I                                      405 4080D#DATC
+     I                                      409 4120D#DATD
+     I                                      413 413 D#REPT
+     I                                     10011010 U#USID
+     I                                     10111020 S#DEVN
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C           *IN99     IFEQ *OFF
+     C                     EXSR INISR
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR                   EXSR LRSR
+     C**************************** ************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C*INITIAL設定
+     C                     MOVE *ALL'='   T#LIN1           * ====
+     C                     MOVE *ALL'='   T#LIN2           * ====
+     C                     MOVE *ON       *IN69            *表頭
+     C                     SELEC
+     C           D#TYPE    WHEQ 'A'
+     C                     MOVE *ON       *IN50
+     C           D#TYPE    WHEQ 'B'
+     C                     MOVE *ON       *IN51
+     C                     Z-ADDD#DATB    T#DAT1
+     C           D#TYPE    WHEQ 'C'
+     C                     MOVE *ON       *IN52
+     C                     Z-ADDD#DATC    T#DAT2
+     C           D#TYPE    WHEQ 'D'
+     C                     MOVE *ON       *IN53
+     C                     Z-ADDD#DATD    T#DAT3
+     C           D#TYPE    WHEQ ' '
+     C                     MOVE *ON       *IN54
+     C                     ENDSL
+     C*
+     C           D#REPT    IFEQ 'B'
+     C                     MOVE *OFF      *IN48
+     C                     ELSE
+     C                     MOVE *ON       *IN48
+     C                     ENDIF
+     C*廠區
+     C                     SELEC
+     C           D#AREA    WHEQ ' '
+     C                     MOVE '全部'  R#AREA
+     C           D#AREA    WHEQ 'P'
+     C                     MOVE '台北'  R#AREA
+     C           D#AREA    WHEQ 'T'
+     C                     MOVE '桃園'  R#AREA
+     C           D#AREA    WHEQ 'M'
+     C                     MOVE '台中'  R#AREA
+     C           D#AREA    WHEQ 'H'
+     C                     MOVE '苗栗'  R#AREA
+     C           D#AREA    WHEQ 'K'
+     C                     MOVE '高雄'  R#AREA
+     C                     ENDSL
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C*預計年月
+     C                     Z-ADD0         T#AMT1
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*MOVE DATA
+     C**
+     C           WFDATE    IFLT R#DATS
+     C           WFDATE    ORGT R#DATE
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C*
+     C                     CLEARAR091T1                    *明細
+     C*
+     C           D#KIND    IFEQ *BLANK                     鋼筋
+     C                     MOVE *ON       *IN49
+     C                     ELSE
+     C                     MOVE *OFF      *IN49
+     C                     ENDIF
+     C*
+     C*
+     C           WFDATE    IFNE T#DATE
+     C                     MOVE *OFF      *IN40            顯示日期
+     C                     ELSE
+     C                     MOVE *ON       *IN40            不顯日期
+     C                     ENDIF
+      *
+     C                     Z-ADDWFDATE    T#DATE           預計兌現日
+     C                     MOVE WFCUNO    T#CUNO           客戶代號
+     C                     MOVE WFCUNM    T#CUNM           客戶簡稱
+     C                     MOVE WFORNO    T#ORNO           訂單號碼
+     C           WFNOTP    IFEQ 'TN'                       單據類別
+     C                     MOVE '磅單'  T#NOTP
+     C                     ELSE
+     C                     MOVE '發票'  T#NOTP
+     C                     ENDIF
+     C                     MOVE WFNO      T#NO             單據號碼
+     C                     Z-ADDWFNODT    T#NODT           單據日期
+     C                     Z-ADDWFAMT     T#AMT            兌現金額
+     C*
+     C                     SELEC
+     C           WFCODE    WHEQ '1'
+     C           WFNOTP    IFEQ 'TN'                       單據類別
+     C                     MOVELMSG,1     T#MARK
+     C                     ELSE
+     C                     MOVEL'未請款'T#MARK
+     C                     ENDIF
+     C           WFCODE    WHEQ '2'
+     C                     MOVEL'已請款'T#MARK
+     C           WFCODE    WHEQ '3'
+     C                     MOVEL'轉催收'T#MARK
+     C                     ENDSL
+     C*
+     C           WFCODE    IFEQ '2'
+     C           WFNO      CHAININREC               N98    單據號碼
+     C                     MOVELINAPNO    T#APNO
+     C                     Z-ADDINAPDT    T#APDT
+     C                     ENDIF
+     C           T#APDT    IFNE 0
+     C                     MOVE *ON       *IN55
+     C                     ENDIF
+     C**
+     C   50                Z-ADD0         T#DATS
+     C  N50      D#REPT    IFEQ 'B'                        應收檢核
+     C                     MOVE WFNODT    P#PDAT
+     C                     MOVE UDATE     W#DATE  60
+     C                     Z-ADDW#DATE    W#DAT   80
+     C                     MOVE W#DAT     P#EDAT
+     C*
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT  8
+     C                     PARM           P#EDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#DIF   50
+     C                     PARM *BLANK    P#ERR   1
+     C                     Z-ADDP#DIF     T#DATS
+     C                     ELSE
+     C                     Z-ADDWFDATS    T#DATS
+     C                     ENDIF
+     C*
+     C           *IN49     IFEQ *OFF                       型鋼
+     C           WFCUNO    CHAINRARR092              30
+     C  N30                Z-ADDA9DATS    T#DATX           銷貨帳齡
+     C  N30                Z-ADDA9DAT2    T#DATY           發票帳齡
+     C   30                Z-ADD45        T#DATX           加權兌現
+     C   30                Z-ADD45        T#DATY
+     C                     ENDIF
+     C*列印
+     C   69                WRITEAR091TH                    *表頭
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR091T1                    *明細
+     C*
+     C                     ADD  WFAMT     T#AMT1           兌現金額
+     C                     ADD  WFAMT     T#AMT2           兌現金額
+     C*
+     C           DTLEND    ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*合計列印
+     C*
+     C           T#AMT1    IFNE 0
+     C   69                WRITEAR091TH                    *表頭
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR091T2                    *合計
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C           D#KIND    IFEQ *BLANK                     鋼筋
+     C                     MOVE *ON       *IN49
+     C                     ELSE
+     C                     MOVE *OFF      *IN49
+     C                     ENDIF
+     C*總計列印
+     C  N99                EXSR INISR
+     C*
+     C   69                WRITEAR091TH                    *表頭
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR091T3                    *總計
+     C*
+     C                     ENDSR
+** MSG
+未開發票
+

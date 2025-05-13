@@ -1,0 +1,180 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR119R
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     折讓單開立統計表
+     H*            5.DATE-WRITTEN  94/07/22
+     H*            6.DATE-MODIFY   104/10/08  2015AR953  S00WCJ (0409A)
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTLL3IP  E           K        DISK
+     FARR119T O   E             69     PRINTER
+     E                    TABA1   1   4  1   TABA2  10
+     E                    TABA3   1   2  1   TABA4  10
+     E*****************************************************************
+     ITXREC
+     I                                              TXPCNOL2
+     I                                              TXCUNOL1
+     I            DS
+0409AI                                        1  30 TXRESV
+     I                                       15  15 D#RESV
+     I           UDS
+     I                                     10011010 U#USID
+     I                                      300 300 U#ARE1
+     I                                      314 321 U#DAT1
+     I                                      322 329 U#DAT2
+     C*****************************************************************
+     C*          KET  LIST
+     C*****************************************************************
+     C*FILE==>HIPROD(產品規格基本資料檔)
+     C*          K#PROD    KLIST
+     C*                    KFLD           F4NAME           產品類別
+     C*                    KFLD           F4STND           規範別
+     I*****************************************************************
+     C  N99                EXSR INISR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN69
+     C*
+     C                     MOVEL*ALL'='   T#LIN1
+     C                     MOVEL*ALL'='   T#LIN2
+     C*搬表頭
+     C           U#ARE1    IFEQ *BLANK
+     C                     MOVEL'全部'  T#AREA
+     C                     ELSE
+     C                     MOVELU#ARE1    T#AREA
+     C                     ENDIF
+     C*
+     C                     MOVE U#DAT1    T#DAT1
+     C                     MOVE U#DAT2    T#DAT2
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR119T1T
+     C*
+     C*                    MOVELA6CUNO    T#CUNO           客戶代號
+     C*                    MOVELA6CUNM    T#CUNM           客戶名稱
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR119T1S
+     C                     MOVEL*BLANK    W#CUNO  6
+     C                     MOVEL*BLANK    W#ORNO  6
+     C                     MOVEL*ALL'-'   T#LIN3
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR119T1D
+     C*
+     C                     MOVELTXCUNO    T#CUNO           客戶代號
+     C                     MOVELTXCUNM    T#CUNM           客戶名稱
+     C                     MOVELTXORNO    T#ORNO           訂單編號
+     C                     MOVELTXNO      T#NO             折讓單號
+     C                     Z-ADDTXDATE    T#DATE           開立日期
+     C                     Z-ADDTXACDT    T#ACDT           確認日期
+     C                     MOVELTXIVNO    T#INNO           發票號碼
+     C                     MOVELTXPDNM    T#PDNM           品名
+     C                     Z-ADDTXQTY     T#QTY            數量
+     C                     Z-ADDTXAMT     T#AMT            金額
+     C                     Z-ADDTXTAX     T#TAX            稅額
+     C                     Z-ADDTXUPRC    T#UPRC           單價
+     C           TXACNT    LOKUPTABA1     TABA2          60
+     C   60                MOVELTABA2     T#ACNT
+     C           D#RESV    LOKUPTABA3     TABA4          60
+     C   60                MOVELTABA4     T#RESV
+     C*客戶代號相同不印
+     C           TXCUNO    IFNE W#CUNO
+     C                     MOVELTXCUNO    W#CUNO
+     C                     MOVE *OFF      *IN50
+     C                     ELSE
+     C                     MOVE *ON       *IN50
+     C                     ENDIF
+     C*訂單號碼相同不印
+     C           TXORNO    IFNE W#ORNO
+     C                     MOVELTXORNO    W#ORNO
+     C                     MOVE *OFF      *IN51
+     C                     ELSE
+     C                     MOVE *ON       *IN51
+     C                     ENDIF
+     C*
+     C   69                WRITEAR119T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR119T1D
+     C*客戶小計
+     C                     ADD  T#QTY     T#QTYS
+     C                     ADD  T#AMT     T#AMTS
+     C                     ADD  T#TAX     T#TAXS
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR119T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR119T1S
+     C*月份合計
+     C                     ADD  T#QTYS    T#QTYT
+     C                     ADD  T#AMTS    T#AMTT
+     C                     ADD  T#TAXS    T#TAXT
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR119T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR119T1T
+     C*總計
+     C                     ADD  T#QTYT    T#QTYA
+     C                     ADD  T#AMTT    T#AMTA
+     C                     ADD  T#TAXT    T#TAXA
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR119T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR119T1A
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*
+     C   69                WRITEAR119T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR119T1M
+     C*
+     C                     ENDSR
+     C*****************************************************************
+**  TABA1 TABA2
+2銷貨退回
+3銷貨折讓
+4預收折讓
+**  TABA3 TABA4
+1磅差折讓
+3價差折讓
+

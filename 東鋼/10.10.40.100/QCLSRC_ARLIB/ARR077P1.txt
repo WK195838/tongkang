@@ -1,0 +1,62 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR077P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     銷貨帳款客戶帳齡分析表                 */
+     /*     5.DATE-WRITTEN  88/06/17                                */
+     /*     6.UPDATE  DATE  99/05/06 2010AR476 S00WCJ (9905A)       */
+     /*                                                             */
+     /*  <說明:>                                                  */
+     /*            依客戶訂單別小計一筆明細。                     */
+     /*                                                             */
+     /*  *LDA       1 --> 領款日數                                */
+     /*             5 --> 逾期日數                                */
+     /*             9 --> 催收日數                                */
+     /*                   指定之區間 16, 17, 18, 19               */
+     /*                   指定之狀態 21, 22, 23, 24               */
+     /*            31 --> 統計截止日                              */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&USER)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+
+             DCL        VAR(&W#ETXD) TYPE(*CHAR) LEN(8)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+INPUT:
+             CALL       PGM(ARR077RS) PARM(&IN03)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             SBMJOB     JOB(ARR077P1) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARR077P1')
+    /*9905A  START */
+        /*   CHGDTAARA  DTAARA(*LDA (801 70)) +
+             VALUE('銷貨帳款客戶帳齡分析表已匯入排程中。') */
+             CHGDTAARA  DTAARA(*LDA (601 70)) +
+             VALUE('銷貨帳款客戶帳齡分析表已匯入排程中。')
+    /*9905A  END */
+             RETURN
+
+BATCH:
+             RTVDTAARA  DTAARA(*LDA (31 8)) RTNVAR(&W#ETXD)
+             OVRPRTF    FILE(ARR077T) USRDTA('應收客齡') HOLD(*YES)
+             OVRDBF     FILE(ARSTTX) TOFILE(DALIB/ARSTTX) SHARE(*YES)
+             OPNQRYF    FILE(ARSTTX) +
+                        QRYSLT('AXTXDT *LE ' || &W#ETXD || ' *AND +
+                                AXTXCD *NE "    "') +
+                        KEYFLD((AXDEPT) (AXRVID) (AXCUNO) (AXORNO))
+             CALL       ARR077R
+             CLOF       OPNID(ARSTTX)
+             DLTOVR     *ALL
+
+             ENDPGM
+

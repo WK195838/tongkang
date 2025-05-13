@@ -1,0 +1,163 @@
+     A*****************************************************************
+     A*
+     A*            *****   PROGRAM INTRODUCTION   *****
+     A*
+     A*            1.PROGRAM-ID    CNVARBTAXR
+     A*            2.PROGRAM-TYPE  RPG
+     A*            3.AUTHOR        S00WCJ
+     A*            4.FUNCTION     110跨年度發票作廢補寫ARBTAX
+     A*            5.DATE-WRITTEN  111/01/06
+     A*
+     A*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  IP  E                    DISK
+     FTRNDTLL2IF  E           K        DISK
+     FARBTAX  UF  E           K        DISK                      A
+     I            DS
+     I                                        1   80D#ACDT
+     I                                        1   40D#YY
+     I                                        5   60D#MM
+     I                                        7   80D#DD
+     I            DS
+     I                                        1   80D#VUNO
+     I                                        1   40D#YY1
+     I                                        5   60D#MM1
+     I                                        7   80D#DD1
+     I                                        1   60D#YYMM
+     I*
+     I            DS
+     I                                        1  10 D#INNO
+     I                                        1   1 D#INN1
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10011010 U#USID
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C*----------------------------------------------------
+     C*
+     C           *ENTRY    PLIST
+     C                     PARM           P#CHYN  1
+     C*
+     C           P#CHYN    IFNE 'Y'
+     C                     MOVEL*ON       *INLR
+     C                     ENDIF
+     C*
+     C  N90      *DATE     SUB  19000000  U#SYSD  80
+     C  N90                SETON                     90
+     C           K#BTAX    KLIST
+     C                     KFLD           AXAREA
+     C                     KFLD           AXORNO
+     C                     KFLD           AXYYMM
+     C                     KFLD           AXITEM
+     C           TXAR      IFEQ 'P'
+     C           INAREA    ANDEQ'P'
+     C           TXAR      OREQ 'P'
+     C           INAREA    ANDEQ'M'
+     C           TXAR      OREQ INAREA
+     C*報稅日期
+     C                     Z-ADDININDT    D#ACDT
+     C                     SELEC
+     C           D#MM      WHEQ 1
+     C           D#MM      OREQ 2
+     C                     Z-ADD3         D#MM
+     C           D#MM      WHEQ 3
+     C           D#MM      OREQ 4
+     C                     Z-ADD5         D#MM
+     C           D#MM      WHEQ 5
+     C           D#MM      OREQ 6
+     C                     Z-ADD7         D#MM
+     C           D#MM      WHEQ 7
+     C           D#MM      OREQ 8
+     C                     Z-ADD9         D#MM
+     C           D#MM      WHEQ 9
+     C           D#MM      OREQ 10
+     C                     Z-ADD11        D#MM
+     C           D#MM      WHEQ 11
+     C           D#MM      OREQ 12
+     C                     Z-ADD1         D#MM
+     C                     ADD  1         D#YY
+     C*
+     C                     ENDSL
+     C                     Z-ADD5         D#DD
+     C*
+     C                     MOVE U#SYSD    W#UDAT  80       作廢當日
+     C*
+     C           W#UDAT    IFGT D#ACDT
+911220*判斷該張發票之歸屬年月
+     C*若該張發票的作廢日小於當月15號，則歸屬年月為上個月
+     C*若該張發票的作廢日大於當月15號，則歸屬年月為這個月
+     C                     Z-ADDU#SYSD    D#VUNO
+     C           D#DD1     IFLT 7
+     C           D#MM1     IFEQ 1
+     C                     SUB  1         D#YY1
+     C                     Z-ADD12        D#MM1
+     C                     ELSE
+     C                     SUB  1         D#MM1
+     C                     ENDIF
+     C                     ENDIF
+911220*
+     C*取得正確的資料項次
+     C                     MOVELINAREA    AXAREA
+     C                     MOVELINORNO    AXORNO
+     C                     MOVELD#YYMM    W#YYMM  6
+     C                     MOVE W#YYMM    AXYYMM           歸屬年月
+     C                     Z-ADD999       AXITEM
+     C*
+     C           K#BTAX    SETGTRARBTAX                    移至檔尾
+     C                     READPRARBTAX             N    97
+     C           *IN97     IFEQ *ON
+     C           INAREA    ORNE AXAREA
+     C           INORNO    ORNE AXORNO
+     C                     Z-ADD1         W#AXTM  30       新資料項次
+     C                     ELSE
+     C           AXITEM    ADD  1         W#AXTM           該訂單項次
+     C                     ENDIF
+     C*開始寫入
+     C                     MOVELINAREA    AXAREA
+     C                     MOVELINORNO    AXORNO
+     C                     MOVELD#YYMM    W#YYMM  6
+     C                     MOVE W#YYMM    AXYYMM           歸屬年月
+     C                     Z-ADDW#AXTM    AXITEM
+     C*
+     C           K#BTAX    CHAINRARBTAX              97
+     C                     CLEARRARBTAX
+     C                     MOVE 'Y'       AXTRFL           傳輸碼
+     C                     MOVE 'C'       AXFLAG           處理代碼
+     C                     MOVE INAREA    AXAREA           作廢廠區
+ 9112C                     MOVELD#YYMM    W#YYMM  6
+     C                     MOVE W#YYMM    AXYYMM           歸屬年月
+     C                     MOVE INCUNO    AXCUNO           客戶編號
+     C                     MOVE INCUNM    AXCUNM           客戶名稱
+     C                     MOVELINORNO    AXORNO           訂單號碼
+ 9201C                     Z-ADDW#AXTM    AXITEM           資料項次
+     C                     MOVELINNO      AXIVNO           作廢發票
+     C                     MOVE ININDT    AXDLDT           開立日期
+     C                     MOVE INATAX    AXATTX           銷項稅額
+     C*
+     C                     MOVELINNO      D#INNO
+     C                     MOVEL'*'       D#INN1
+     C*
+     C           D#INNO    CHAINTXREC               N98    一定找到
+     C*
+     C           TXCODE    IFEQ 'SA04'
+     C                     MOVE '1'       AXCODE           單據別
+     C                     ELSE
+     C                     MOVE '2'       AXCODE
+     C                     ENDIF
+     C*
+     C                     MOVE TXNO      AXVNNO           單據號碼
+ 9201C                     MOVELD#ACDT    W#ACDT  8
+ 9201C                     MOVE W#ACDT    AXVUNO           資料年月
+     C                     MOVE U#USID    AXADDM           建立人員
+9908AC                     MOVE U#SYSD    AXADDD           建立日期
+     C                     TIME           AXADDT           建立時間
+     C                     MOVE U#USID    AXUPDM           異動人員
+9908AC                     MOVE U#SYSD    AXUPDD           異動日期
+     C                     TIME           AXUPDT           異動時間
+     C*
+     C   97                WRITERARBTAX
+     C  N97                UPDATRARBTAX
+     C                     ENDIF
+     C*
+     C                     ENDIF
+

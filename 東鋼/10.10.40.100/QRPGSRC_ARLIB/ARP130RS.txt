@@ -1,0 +1,223 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP130RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     空白發票上送電子發票平台(畫面)
+     H*            5.DATE-WRITTEN  107/03/27 2017AR1112
+     H*            6.UPDATE  DATE  107/06/19 2018AR1162 S00WCJ (0706A)
+     H*                            電子發票介面檔增加處理代號及廠區
+     H*                            108/05/09 S00WCJ (0805A)
+     H*                            增加寫入電子發票介面LOG異動資訊
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARP130S CF  E                    WORKSTN
+     FINENBU  UF  E           K        DISK
+     FINENBUG O   E           K        DISK
+     F            RINENBU                           KRENAMEINENUG
+     FGENSEQ  IF  E           K        DISK
+     E*************************************************************
+     E                    T#ERR   1   8 70
+     I*************************************************************
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1   80W#DATE
+     I                                        1   60D#YYMM
+     I                                        1   40D#YY
+     I                                        5   60D#MM
+     I                                        7   80D#DD
+     I            DS
+     I                                        1   80U#SYSD
+     I                                        1   60D#USYY
+     I            DS
+     I                                        1   8 P#PDAT
+     I                                        7   8 D#PDDD
+     I            DS
+     I                                        1  10 GRP
+     I                                        1   1 GE1
+     I                                        2   7 GE2
+     I                                        8  10 GE3
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C                     PARM           P#YMD   6
+     C*
+     C           GEKEY     KLIST
+     C                     KFLD           GEKIND
+     C                     KFLD           GEPRIN
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           W#AREA  1
+     C                     KFLD           S#YMD
+     C**************************************************************
+     C           *DATE     SUB  19000000  U#SYSD  80
+     C                     Z-ADDU#SYSD    W#DATE
+     C                     MOVELU#AREA    W#AREA
+     C           D#MM      IFNE 1
+     C                     SUB  1         D#MM
+     C                     ELSE
+     C                     SUB  1         D#YY
+     C                     Z-ADD12        D#MM
+     C                     ENDIF
+     C                     Z-ADDD#YYMM    S#YMD
+     C*
+     C           1         DOWEQ1
+     C                     EXFMTAR130F1
+     C                     MOVEL*BLANKS   S#MSG1
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03
+     C                     LEAVE
+     C                     ELSE
+     C                     EXSR SR1000
+     C           W#RTNV    IFEQ 'T'
+     C           S#CHYN    ANDEQ'Y'
+     C                     EXSR SR2000
+     C                     MOVELT#ERR,6   S#MSG1
+     C                     ENDIF
+     C*
+     C           W#RTNV    IFEQ 'T'
+     C           S#CHYN    ANDEQ*BLANKS
+     C                     MOVEL'0'       P#IN03
+     C                     MOVELS#YMD     P#YMD
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C                     SETON                     LR
+     C*
+     C************************************
+     C*  檢核所輸入年月是否正確
+     C************************************
+     CSR         SR1000    BEGSR
+     C                     MOVEL'F'       W#RTNV  1
+     C                     MOVELS#YMD     P#PDAT
+     C                     MOVEL'01'      D#PDDD
+     C                     CALL 'UTS102R'
+     C                     PARM           P#PDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM '0'       P#FLAG  1
+     C*
+     C           P#FLAG    IFNE '0'
+     C                     SETON                     42
+     C                     MOVELT#ERR,1   S#MSG1
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C           S#YMD     IFGE D#USYY
+     C                     SETON                     42
+     C                     MOVELT#ERR,8   S#MSG1
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C           D#DD      IFLE 5
+     C                     SETON                     42
+     C                     MOVELT#ERR,7   S#MSG1
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C                     MOVEL'01'      GEKIND
+     C                     MOVEL*BLANK    GEPRIN
+     C                     MOVEL*BLANK    GRP
+     C                     MOVELU#AREA    GE1
+     C                     MOVELS#YMD     GE2
+     C                     MOVELGRP       GEPRIN
+     C           GEKEY     CHAINGENSEQ              N96
+     C           *IN96     IFEQ *ON
+     C                     MOVEL'02'      GEKIND
+     C           GEKEY     CHAINGENSEQ              N96
+     C                     ENDIF
+     C   96                SETON                     42
+     C   96                MOVELT#ERR,3   S#MSG1
+     C   96                GOTO ES1000
+     C*
+     C           KEY01     CHAININENBU              N96
+     C  N96      S#CHYN    IFNE 'Y'
+     C           NUTMDT    IFEQ 0
+     C           NUSTCL    OREQ *BLANKS
+0706AC           NUFLAG    IFNE 'D'
+     C                     SETON                     4243
+     C                     MOVELT#ERR,2   S#MSG1
+     C                     GOTO ES1000
+0706AC                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C           S#CHYN    IFEQ 'Y'
+     C   96                MOVELT#ERR,4   S#MSG1
+     C   96                SETON                     43
+     C   96                GOTO ES1000
+     C  N96      NUTMDT    IFNE 0
+     C           NUSTCL    ORNE *BLANKS
+     C                     MOVELT#ERR,5   S#MSG1
+     C                     SETON                     43
+     C                     GOTO ES1000
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVEL'T'       W#RTNV
+     CSR         ES1000    ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C****************************************************************
+     C*
+     C                     MOVEL*OFF      *IN50
+     C           KEY01     SETLLRINENBU
+     C           *IN50     DOWEQ*OFF
+     C           KEY01     READERINENBU                  50
+     C   50                LEAVE
+0706AC  N50                MOVEL'D'       NUFLAG
+     C                     Z-ADDU#SYSD    NUXPDD
+     C                     TIME           NUXPDT
+     C                     MOVELU#USID    NUXUSR
+0706AC*                    MOVEL'D'       NUMAR1
+0805AC                     MOVEL'ARP130RS'NUAPNM
+0805AC                     Z-ADDU#SYSD    NUCHDD
+0805AC                     TIME           NUCHDT
+0805AC                     MOVELU#USID    NUCUSR
+     C                     WRITEINENUG
+0706AC                     UPDATRINENBU
+     C                     ENDDO
+     C           W#AREA    IFEQ 'P'
+     C                     MOVEL'M'       W#AREA
+     C                     MOVEL*OFF      *IN50
+     C           KEY01     SETLLRINENBU
+     C           *IN50     DOWEQ*OFF
+     C           KEY01     READERINENBU                  50
+     C   50                LEAVE
+0706AC  N50                MOVEL'D'       NUFLAG
+     C                     Z-ADDU#SYSD    NUXPDD
+     C                     TIME           NUXPDT
+     C                     MOVELU#USID    NUXUSR
+0706AC*                    MOVEL'D'       NUMAR1
+0805AC                     MOVEL'ARP130RS'NUAPNM
+0805AC                     Z-ADDU#SYSD    NUCHDD
+0805AC                     TIME           NUCHDT
+0805AC                     MOVELU#USID    NUCUSR
+0706AC                     WRITEINENUG
+0706AC                     UPDATRINENBU
+     C                     ENDDO
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+** T#ERR
+０１－所輸入之年月錯誤
+０２－輸入之年月已上送，若要再上送，請先還原
+０３－輸入之年月沒有發票號碼資料，請確認
+０４－空白發票號碼未上送，不可還原
+０５－空白發票號碼已傳輸至發票平台，不可還原
+０６－輸入之年月已還原上送資料
+０７－尚在結帳期間，不可上傳空白發票號碼
+０８－上送年月不可大於等於系統年月
+

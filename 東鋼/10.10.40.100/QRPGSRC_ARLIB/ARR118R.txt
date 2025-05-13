@@ -1,0 +1,172 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR118R
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     應收票據資負同在查核明細表
+     H*            5.DATE-WRITTEN  94/04/13
+     H*            6.DATE-MODIFY
+     H*                           101/09/25  2012AR682  S00WCJ (0109A)
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR118F IP  E           K        DISK
+     FINVDTLL1IF  E           K        DISK
+     FRCVDTL  IF  E           K        DISK
+     FARR118T O   E             69     PRINTER
+     E*****************************************************************
+     IRAR118F
+     I                                              A8CUNML2
+     I                                              A8RVNOL1
+     I           UDS
+     I                                     10011010 U#USID
+     I                                      300 3070U#DUDT
+     C*****************************************************************
+     C*          KET  LIST
+     C*****************************************************************
+     C*FILE==>RCVDTL(繳款明細檔)
+     C           K#RCVD    KLIST
+     C                     KFLD           RVNO
+     C                     KFLD           RVITEM
+     C*FILE==>INVDTL(發票明細檔)
+     C           K#INVD    KLIST
+     C                     KFLD           IVACNT
+     C                     KFLD           IVAPNO
+     C                     KFLD           IVNO
+     C                     KFLD           IVITEM
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN69
+     C*
+     C                     MOVEL*ALL'='   T#LIN1
+     C                     MOVEL*ALL'='   T#LIN2
+     C*
+     C                     Z-ADDU#DUDT    T#DUDH
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR118T1S
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           A8RVNO    IFEQ 'K52835'
+     C                     Z-ADD0         W#TMP   10
+     C                     ENDIF
+     C*
+     C                     MOVELA8RVNO    RVNO
+     C                     Z-ADD0         RVITEM
+     C           K#RCVD    SETLLRVREC
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RVREC                    40
+     C   40                LEAVE
+     C*
+     C           RVNO      IFNE A8RVNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           RVACNO    IFEQ '1131'
+     C           RVDUDT    ANDLEU#DUDT
+0109AC           RVACNO    OREQ '111001'
+0109AC           RVDUDT    ANDLEU#DUDT
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVELRVCUNO    T#CUNO
+     C                     MOVELRVCUNM    T#CUNM
+     C                     MOVELRVRLNO    T#ORNO
+     C                     Z-ADDRVDATE    T#RVDT
+     C                     MOVELRVACTP    T#ACTP
+     C                     MOVELRVACNO    T#ACNO
+     C                     MOVELRVNO      T#RVNO
+     C                     MOVELRVUSTP    T#USTP
+     C                     MOVELRVVNO1    T#VNO1
+     C                     MOVELRVNTNO    T#NTNO
+     C                     Z-ADDRVDUDT    T#DUDT
+     C                     Z-ADDRVRAMT    T#AMT
+     C*
+     C           RVRLNO    IFEQ *BLANK
+     C                     MOVEL'6'       IVACNT
+     C                     MOVELRVNO      IVAPNO
+     C                     MOVEL*HIVAL    IVNO
+     C                     Z-ADD99        IVITEM
+     C           K#INVD    SETGTIVREC
+     C                     READPIVREC                    41
+     C*
+     C           IVACNT    IFEQ '6'
+     C           IVAPNO    ANDEQRVNO
+     C           IVITEM    ANDEQ1
+     C                     MOVELIVORNO    T#ORNO
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C   69                WRITEAR118T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR118T1D
+     C*金額小計
+     C           T#ACTP    IFEQ 'D'
+     C                     ADD  T#AMT     T#AMTS
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR118T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR118T1S
+     C*金額合計
+     C                     ADD  T#AMTS    T#AMTT
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR118T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR118T1T
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*
+     C   69                WRITEAR118T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR118T1M
+     C*
+     C                     ENDSR
+

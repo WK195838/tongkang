@@ -1,0 +1,1148 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR001R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ（原作者不可考）
+     H*            4.FUNCTION     請款單列印作業（出表）
+     H*            5.DATE-WRITTEN  88/10/12
+     H*            6.DATE-UPDATED  89/05/10 加入類別合計
+     H*                            89/07/18  DOWNLOAD  TO NOTES
+     H*                            98/03/27 2009AR282 S00WCJ (9803A)
+     H*                            98/04/02 2009ARXXX S00WCJ (9804A)
+     H*                            98/12/04 2009AR391 S00WCJ (9812A)
+     H*                            99/12/22 2010AR    S00WCJ (9912A)
+     H*                            99/12/23 2010AR    S00WCJ (9912B)
+     H*                           100/01/10 2010AR567 S00WCJ (0001A)
+     H*                           100/03/07 S00WCJ (0003A)
+     H*                            當退貨時，列印鋼筋角徑度明細，須以
+     H*                            訂單編號再讀回過帳檔中，將退貨數量
+     H*                            及金額扣除，但由於廠區前端資料輸入
+     H*                            造成出貨訂單、產品類別、角徑度與退
+     H*                            貨訂單、產品類別、角徑度不同，而造
+     H*                            鋼筋明細合計有問題此部份與李副理、
+     H*                            及營業淑娟確認過後修改。
+     H*                           100/03/15 S00WCJ (0003B)
+     H*                             100/03/07修改後發生無退貨資料，但
+     H*                            卻出現扣退貨之情形，原因為只讀取退
+     H*                            貨資料，無日期管控所造成，與李副理
+     H*                            討論後，將退貨資料在出貨日期區間內
+     H*                            之資料才列入計算
+     H*                           101/01/02 S00WCJ (0101A)
+     H*                            磅單日期小於980101之資料不讀
+     H*                           101/06/13 S00WCJ (0106A)
+     H*                            請款單P38869無退貨，但因有符合
+     H*                            之退貨資料，造成誤扣退貨，與梅蘭
+     H*                            討論後，增加判斷，出貨地點須與磅
+     H*                            單之出貨地點相同，才可扣退貨，若
+     H*                            數量不符，則另外表示
+     H*                           101/10/23 2012AR691 S00WCJ (0110A)
+     H*                            同一張發票若有二張以上折讓單，通通
+     H*                            列印出來。
+     H*                           101/12/13 S00WCJ (0112A)
+     H*                            同一張磅單，金額不同拆成二張發票後
+     H*                            造成鋼種角徑度合計重覆計算
+     H*                           102/06/03 S00WCJ (0206A)
+     H*                            折讓單若異動碼為D，則不列印
+     H*                           102/06/28 S00WCJ (0206B)
+     H*                            計算差額時，變數欄位長度不夠，造成
+     H*                            計算錯誤
+     H*                           102/10/16 S00WCJ (0210A)
+     H*                            磅單日期小於990101之資料不讀
+     H*                           103/02/20 S00WCJ (0302A)
+     H*                            出貨地點未清空，造成重覆列印
+     H*
+     H*  <說明> 本程式從原請款單列印作業 ARR001R複製再加以修改。
+     H*           本程式將原來之全手動改成RPG CYCLE 的寫法，並且
+     H*           依訂單別不同而換頁，同一張發票可有多筆磅單。
+     H*
+     H*
+     H* 0004A，請款單抓磅單資料寫入測試檔
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR001F IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FARR001N UF  E           K        DISK                      A
+     FARCUDT  IF  E           K        DISK
+     FHIPROD  IF  E           K        DISK
+     FSAMAST  IF  E           K        DISK
+     FHSMAST  IF  E           K        DISK
+     FSAVOURL5IF  E           K        DISK
+0003AFSRVOURL2IF  E           K        DISK
+0003AF            RSRVOUR                           KRENAMESRVL2
+0004AF*SRVOURT O   E           K        DISK
+0004AF*            RSRVOUR                           KRENAMESRVT
+0110AFTRNDTLL3IF  E           K        DISK
+9803AF*ARR001T O   E             66     PRINTER
+9803AF*
+9803AF*利用INFDS取得實際印表機列印行數，來計算是否該做接下頁程式之
+9803AF*處理。
+9803AF*
+9803AFARR001T O   E             66     PRINTER      KINFDS PRTCTL
+     E*------------------------------------------------------------
+     E                    ARY        30 21
+     E                    ARY1       30 54
+     E                    ARY2       30 58
+0003BE                    ARY3       30  8
+0112AE                    ARY4      300  8
+     I*************************************************************
+     IARREC
+     I                                              ARORNOL2
+     I                                              ARINNOL1
+     I*
+     IRHSMAST
+     I              S1SALE                          F#SALE
+     I              S1SND                           F#SND
+     I              S1RECV                          F#RECV
+     I              S1CTNO                          F#CTNO
+     I*------------------------------------------------------------
+9803AI*配合INFDS使用，CURLIN讀取系統值對應目前印表機所列印之行數
+9803AI* CURPAG讀取系統值印表機目前所列印之頁數
+9803AI*
+9803AIPRTCTL      DS
+9803AI                                    B 367 3680CURLIN
+9803AI                                    B 369 3720CURPAG
+     I            DS
+     I                                        1  21 D#ARY
+     I                                        1   1 D#PDN
+     I                                        1   3 D#PDN1
+     I                                        4   6 D#PDS1
+     I                                        7  130D#QTY
+     I                                       14  210D#AMT
+     I            DS
+     I                                        1  54 D#ARY1
+     I                                        1   6 D#ORN1
+     I                                        7  130D#OQTY
+     I                                       14  220D#OAMT
+     I                                       23  290D#OBMT
+     I                                       30  370D#OCMT
+     I                                       38  450D#ODMT
+     I                                       46  540D#OEMT
+     I            DS
+     I                                        1  58 D#ARY2
+     I                                        1   6 D#CTN1
+     I                                        7  10 D#CTN2
+     I                                       11  170D#CQTY
+     I                                       18  260D#CAMT
+     I                                       27  330D#CBMT
+     I                                       34  410D#CCMT
+     I                                       42  490D#CDMT
+     I                                       50  580D#CEMT
+0003BI            DS
+0003BI                                        1   8 D#ARY3
+0003BI                                        1   1 D1VREA
+0003BI                                        2   60D1VRNO
+0003BI                                        7   80D1VRTM
+0112AI            DS
+0112AI                                        1   8 D#ARY4
+     I            DS
+     I                                        1   80D#DAT1
+     I                                        1   40D#DAT2
+     I                                        5   60D#DAT3
+     I                                        7   80D#DAT4
+     I            DS
+     I                                        1  10 D#DAT5
+     I                                        1   4 D#DAT6
+     I                                        5   5 D#DAT7
+     I                                        6   7 D#DAT8
+     I                                        8   8 D#DAT9
+     I                                        9  10 D#DAT0
+     I            DS
+     I                                        1   9 D#ORNO
+     I                                        1   1 S1OREA
+     I                                        2   60S1ORNO
+     I                                        7   90S1ORTM
+     I            DS
+     I                                        1  10 D#WTNO
+     I                                        1   1 D#VREA
+     I                                        2   3 D#PCOD
+     I                                        4   80D#VRNO
+     I                                        9  100D#VRTM
+     I            DS
+     I                                        1   6 ARORNO
+     I                                        1   1 D#AREA
+     I            DS
+     I                                        1   6 D#CUNO
+     I                                        1   1 S1KIND
+     I                                        2   2 S1CUN1
+     I                                        3   5 S1CUN2
+     I                                        6   6 S1CUN3
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                      300 300 U#OPT
+0003BI                                      311 3180D#DATS
+0003BI                                      321 3280D#DATE
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#YN    1
+     C                     PARM           P#CODE  1
+     C*****************************************************************
+     C*          KEY     LIST
+     C*****************************************************************
+     C*FILE-->SAVOURL3(磅單檔)
+     C           K#SVUR    KLIST
+     C                     KFLD           S4VREA
+     C                     KFLD           S4PCOD
+     C                     KFLD           S4VRNO
+     C                     KFLD           S4VRTM
+     C*
+     C*FILE==>INVDTL(發票明細檔)
+     C           K#DTL     KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*
+     C*FILE==>SAMAST(訂單主檔)
+     C           K#SAMT    KLIST
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C                     KFLD           S1ORTM
+     C*
+     C*FILE==>ARR001N(請款單下傳檔)
+     C           K#01RN    KLIST
+     C                     KFLD           ANAPNO
+     C                     KFLD           ANAPIT
+     C*
+     C*FILE==>HIPROD(產品規格基本資料檔)
+     C           K#PROD    KLIST
+     C                     KFLD           F4NAME
+     C                     KFLD           F4STND
+     C*
+     C*FILE==>SAMAST、HSMAST(訂單檔)
+     C           K#MAST    KLIST
+     C                     KFLD           K#AREA  1        訂單廠區
+     C                     KFLD           K#ORNO  50       訂單流水號
+0003AC           KEY01     KLIST
+0003AC                     KFLD           W1ORNO  9
+0003AC                     KFLD           W#PDNM  3
+0003AC                     KFLD           W#PDS1  3
+0003BC*
+0003BC           KEY02     KLIST
+0003BC                     KFLD           W#CODE  4
+0003BC                     KFLD           W#TXNO  8
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C**************************************************************
+     CSR         INISR     BEGSR
+     C**************************************************************
+     C                     Z-ADD40        N#TCNT  30       頁內總筆數
+     C                     Z-ADD0         W#LCNT  30       已印筆數
+     C*
+9802 C           P#YN      IFEQ 'Y'
+ .   C           P#CODE    OREQ 'Y'
+ .   C                     Z-ADD28        N#TCNT  30       頁內總筆數
+ .   C                     ENDIF
+9802 C*
+     C                     MOVE *ALL'9'   ARY
+     C                     MOVE *ALL'9'   ARY1
+     C                     MOVE *ALL'9'   ARY2
+0003BC                     MOVEL*ALL'9'   ARY3
+0112AC                     MOVEL*ALL'9'   ARY4
+     C                     Z-ADD0         ANAPIT
+     C                     MOVE *ALL'9'   W#ORNO  6
+     C                     Z-ADD0         W#AMT  110
+     C* INISR訂單小計
+     C                     Z-ADD0         W#OQTY  70       出貨數量
+     C                     Z-ADD0         W#OAMT  90       出貨金額
+     C                     Z-ADD0         W#OBMT  70       折退金額
+     C                     Z-ADD0         W#OCMT  80       預收金額
+     C                     Z-ADD0         W#ODMT  80       銷項稅額
+     C                     Z-ADD0         W#OEMT  90       請款金額
+     C* INISR工程合計
+     C                     Z-ADD0         W#CQTY  70       出貨數量
+     C                     Z-ADD0         W#CAMT  90       出貨金額
+     C                     Z-ADD0         W#CBMT  70       折退金額
+     C                     Z-ADD0         W#CCMT  80       預收金額
+     C                     Z-ADD0         W#CDMT  80       銷項稅額
+     C                     Z-ADD0         W#CEMT  90       請款金額
+     C*
+0001AC                     Z-ADD0         W#AMT1  80
+0001AC                     Z-ADD0         W#AMT2  80
+0106AC                     MOVEL*OFF      *IN89
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         L2CLR     BEGSR
+     C**************************************************************
+     C*表頭
+     C           ARINNO    CHAININREC                69
+     C                     MOVELINCUNO    R#CUNO           客戶代號
+     C                     MOVELINORNO    R#ORNO           訂單編號
+     C                     Z-ADDINAPDT    R#APDT           請款日期
+     C                     MOVELINCUNM    R#CUNM           客戶名稱
+     C                     MOVELINRVID    R#RVID           收款業務員
+     C                     MOVELINAPNO    R#APNO           請款單號
+     C*
+     C*用客戶代號前五碼去CHAIN ARCUDT,
+     C*如果該客戶辦理承購，則在表頭印-->應收帳款轉讓申請書
+     C*如果該客戶未辦理承購，則在表頭印-->請款單
+     C*
+     C                     MOVELINCUNO    W#CUNO  5
+     C                     MOVELW#CUNO    ACCUNO
+     C           ACCUNO    CHAINRARCUDT              60
+     C*
+     C   60                MOVE *ON       *IN70            非承購
+     C  N60      ACCOD1    IFEQ 'Y'                        承購合併
+     C                     MOVE *ON       *IN70
+     C                     ELSE
+     C                     MOVE *OFF      *IN70            承購不合併
+     C                     ENDIF
+     C*
+     C                     MOVEL*OFF      *IN30
+     C                     MOVELINORNO    K#AREA           訂單地區
+     C                     MOVE INORNO    K#ORNO           訂單流水號
+     C           K#MAST    CHAINSAMAST               30
+     C  N30                MOVELS1CTNO    R#CTNO           工程編號
+     C           *IN30     IFEQ *ON
+     C           K#MAST    CHAINHSMAST               30
+     C  N30                MOVELF#CTNO    R#CTNO           工程編號
+     C   30                MOVEL'******'  R#CTNO
+     C                     ENDIF
+     C*
+     C           W#LCNT    IFEQ 0
+     C                     WRITEAR001T1H                   印出表頭
+     C                     Z-ADD0         W#LCNT  30       已印筆數
+     C                     ELSE
+9804AC           CURLIN    IFLT 54
+9804AC           55        SUB  CURLIN    CONT
+9804AC                     ELSE
+9804AC                     Z-ADD1         CONT    20
+9804AC                     ENDIF
+9804AC           1         DO   CONT      I       20
+9804AC                     WRITEAR001T1L
+9804AC                     ENDDO
+     C                     EXSR PR0001                     接下一頁
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         L1CLR     BEGSR
+     C**************************************************************
+     C*合計
+     C                     ADD  ARQTY     R#QTYT           出貨數量
+     C                     ADD  ARAAMT    R#TAAM           出貨金額
+     C                     ADD  ARBAMT    R#TBAM           折退金額
+     C                     ADD  ARCAMT    R#TCAM           預收金額
+     C                     ADD  ARDAMT    R#TDAM           銷項稅額
+     C                     ADD  AREAMT    R#TEAM           請款金額
+     C                     ADD  1         R#NUMS
+     C*
+     C                     SETON                     51
+     C*
+     C           *INL2     IFEQ '1'                        第一筆不用
+     C                     GOTO L1ECL
+     C                     ENDIF
+     C*
+9803AC*          W#LCNT    IFLT N#TCNT
+9803AC           CURLIN    IFLE 55
+     C                     WRITEAR001T1L
+     C                     ADD  1         W#LCNT           已印一筆
+     C                     ELSE
+     C                     EXSR PR0001                     接下一頁
+     C                     ENDIF
+     C*
+     CSR         L1ECL     ENDSR
+     C**************************************************************
+     CSR         DTLSR     BEGSR
+     C**************************************************************
+     C           ARAAMT    IFNE 0
+     C                     Z-ADDARINDT    R#INDT           發票日期
+     C                     MOVELARINNO    R#INNO           發票號碼
+     C                     MOVELARWTNO    R#WTNO           磅單編號
+     C                     Z-ADDARQTY     R#QTY            出貨數量
+     C                     Z-ADDARAAMT    R#AAMT           出貨金額
+     C                     Z-ADDARBAMT    R#BAMT           折退金額
+     C                     Z-ADDARCAMT    R#CAMT           預收金額
+     C                     Z-ADDARDAMT    R#DAMT           銷項稅額
+     C                     Z-ADDAREAMT    R#EAMT           請款金額
+     C*
+     C           P#YN      IFEQ 'Y'
+     C           ARWTNO    ANDNE*BLANK
+     C                     MOVEL*ON       *IN61
+     C                     MOVELARPLE1    R#PLE1
+0302AC                     ELSE
+0302AC                     MOVEL*BLANKS   R#PLE1
+     C                     ENDIF
+     C*
+     C           P#CODE    IFEQ 'Y'
+9803AC*          ARNO      ANDNE*BLANK
+     C                     MOVEL*ON       *IN62
+     C                     MOVELARNO      R#NO
+     C                     ELSE
+     C                     MOVEL*BLANK    R#NO
+     C                     ENDIF
+     C*
+9803AC*          W#LCNT    IFGE N#TCNT
+9803AC           CURLIN    IFGE 55
+     C                     EXSR PR0001                     接下一頁
+     C                     ENDIF
+     C*
+     C                     WRITEAR001T1D
+     C   61
+     COR 62                WRITEAR001T1A
+     C                     ADD  1         W#LCNT
+0110AC*
+0110AC           *IN62     IFEQ *ON
+0110AC           ARINNO    SETLLTRNDTLL3
+0110AC                     MOVEL*OFF      *IN50
+0110AC           *IN50     DOWEQ*OFF
+0110AC           ARINNO    READETRNDTLL3                 50
+0110AC   50                LEAVE
+0110AC           TXNO      IFEQ ARNO
+0206AC           TXFLAG    OREQ 'D'
+0110AC                     ITER
+0110AC                     ELSE
+0110AC           CURLIN    IFGE 55
+0110AC                     EXSR PR0001                     接下一頁
+0110AC                     ENDIF
+0110AC*
+0110AC                     MOVELTXNO      R#NO
+0110AC                     MOVEL*BLANKS   R#PLE1
+0110AC                     WRITEAR001T1A
+0110AC                     ADD  1         W#LCNT
+0110AC                     ENDIF
+0110AC                     ENDDO
+0110AC                     ENDIF
+     C*
+     C**寫入請款單下傳檔STRAT
+     C                     MOVE R#APNO    ANAPNO           請款單號
+     C                     ADD  1         ANAPIT           請款單項次
+     C           K#01RN    CHAINRARR001N             50
+     C                     EXSR SR1000
+     C                     MOVELANORNO    W#NO    1
+     C           W#NO      IFEQ 'H'                        型鋼
+     C   50                WRITERARR001N
+     C  N50                UPDATRARR001N
+     C                     ENDIF
+     C**  END
+     C*
+     C   51                EXSR SR3000
+     C*
+     C                     SETOF                     51
+     C           ARWTNO    IFNE *BLANK
+0112AC*
+0112AC*將類別分別合計至ARY中
+0112AC                     Z-ADD1         L
+0112AC                     SORTAARY4                       排序
+0112AC           1         DO   300       L       30
+0112AC                     MOVE ARY4,L    D#ARY4
+0112AC*
+0112AC           D#ARY4    IFEQ '99999999'                 第一次初始
+0112AC                     MOVE ARWTNO    D#ARY4
+0112AC                     MOVE D#ARY4    ARY4,L
+0112AC                     LEAVE
+0112AC                     ELSE
+0112AC           ARWTNO    IFEQ D#ARY4                     類別
+0112AC                     MOVEL*ON       *IN65
+0112AC                     LEAVE
+0112AC                     ENDIF                           類別
+0112AC                     ENDIF                            D#PDN1
+0112AC*
+0112AC                     ENDDO
+0112AC*
+0112AC  N65                EXSR SR2000                     分類合計
+0112AC                     MOVEL*OFF      *IN65
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         L1SR      BEGSR
+     C**************************************************************
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         L2SR      BEGSR
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         LRSR      BEGSR
+     C**************************************************************
+     C           N#TCNT    SUB  3         W#TMP1  30
+     C           N#TCNT    ADD  1         W#TMP2  30
+     C*
+9803AC*          W#LCNT    IFGT W#TMP1
+9803AC*                    EXSR PR0001
+9803AC*                    ENDIF
+     C*
+9803AC*          W#LCNT    IFNE 0
+9803AC           CURLIN    IFLT 55
+     C                     WRITEAR001T1M
+9803AC*                    ADD  1         W#LCNT
+9803AC                     ELSE
+9803AC                     EXSR PR0001
+9803AC                     WRITEAR001T1M
+     C                     ENDIF
+     C*
+9803AC           CURLIN    IFLE 54
+     C                     WRITEAR001T1T
+9803AC                     ELSE
+9803AC                     EXSR PR0001
+9803AC                     WRITEAR001T1T
+9803AC                     ENDIF
+9803AC*                    ADD  3         W#LCNT
+     C*
+     C* 8905 列印類別分類合計 START------------
+     C*
+0106AC                     SORTAARY
+0106AC                     Z-ADD0         W#AMT3  80
+0106AC                     Z-ADD0         W#QTY1
+0016AC                     MOVEL*OFF      *IN89
+0106AC           1         DO   30        I
+0106AC                     MOVE ARY,I     D#ARY
+0106AC           D#PDN1    IFNE '999'
+0106AC                     ADD  D#AMT     W#AMT3
+0206AC                     ADD  D#QTY     W#QTY1  80
+0106AC                     ENDIF
+0106AC                     ENDDO
+0206AC           R#QTYT    SUB  W#QTY1    W#QTY2  80
+0106AC           W#QTY2    IFNE 0
+0106AC           R#TAAM    SUB  W#AMT3    W#AMT4  80
+0106AC                     MOVEL*ON       *IN89
+0106AC                     ENDIF
+     C*
+     C                     SORTAARY
+     C           1         DO   30        I
+     C                     MOVE ARY,I     D#ARY
+     C*
+     C*型鋼與鋼板不印分類合計
+     C*
+     C           D#PDN     IFEQ '3'                        型鋼
+     C           D#PDN     OREQ '4'                        鋼板
+     C                     MOVE *ON       *IN41
+     C                     ENDIF
+     C*
+     C           D#PDN1    IFNE '999'                      未經合計
+     C                     MOVE D#PDN1    R#PDN1           類別
+     C                     MOVELD#PDN1    F4NAME
+     C                     MOVEL'*'       F4STND
+     C           K#PROD    CHAINRHIPROD              52
+     C  N52                MOVELF4CHIN    R#NAME
+     C*
+     C           D#PDS1    IFNE '999'
+     C                     MOVELD#PDS1    R#PDS1           徑度
+     C                     ELSE
+     C                     MOVE *BLANK    R#PDS1
+     C                     ENDIF
+9912AC*
+9912AC           ARORNO    IFEQ 'P05395'
+9912AC           R#APNO    ANDEQ'P35306'
+9912AC           R#PDS1    ANDEQ'D13'
+9912BC           ARORNO    OREQ 'P05687'
+9912BC           R#APNO    ANDEQ'P35359'
+9912BC           R#PDS1    ANDEQ'D10'
+9912AC                     SUB  1         D#AMT
+9912AC                     ENDIF
+9912AC*
+0106AC*
+0106AC           *IN89     IFEQ *OFF
+0001AC                     Z-ADDD#AMT     W#AMT2
+0001AC           W#AMT1    IFEQ 0
+0001AC           R#TAAM    SUB  D#AMT     W#AMT1
+0001AC                     ELSE
+0001AC                     SUB  D#AMT     W#AMT1
+0001AC                     ENDIF
+0001AC           W#AMT1    IFLT 0
+0001AC           W#AMT2    ADD  W#AMT1    D#AMT
+0001AC                     ENDIF
+0106AC                     ENDIF
+0001AC*
+     C*
+     C                     Z-ADDD#QTY     R#QTYP           數量
+     C                     Z-ADDD#AMT     R#TAAP           金額
+     C*
+     C                     ADD  D#QTY     R#QTYQ           數量
+     C                     ADD  D#AMT     R#TAAQ           金額
+     C*
+9803AC           CURLIN    IFLE 55
+     C  N41                WRITEAR001T1P
+9803AC* N41                ADD  1         W#LCNT
+9803AC                     ELSE
+9803AC                     EXSR PR0001
+9803AC                     WRITEAR001T1P
+9803AC                     ENDIF
+     C*
+     C                     ELSE
+     C*
+0106AC           *IN89     IFEQ *ON
+0106AC                     Z-ADDW#QTY2    R#STYQ
+0106AC                     Z-ADDW#AMT4    R#SAAQ
+0106AC                     ADD  R#SAAQ    R#TAAQ
+0016AC                     ADD  R#STYQ    R#QTYQ
+0106AC                     ENDIF
+     C*
+     C           R#QTYQ    IFNE 0
+     C           R#TAAP    ANDNE0
+9803AC           CURLIN    IFLE 55
+     C  N41                WRITEAR001T1Q
+9803AC* N41                ADD  1         W#LCNT
+9803AC                     ELSE
+9803AC                     EXSR PR0001
+9803AC                     WRITEAR001T1Q
+9803AC                     ENDIF
+9803AC*
+     C                     ENDIF
+     C                     LEAVE
+     C*
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C* 8905 列印類別分類合計 END  ------------
+     C*
+9803AC*          W#LCNT    IFGE N#TCNT
+9803AC*                    EXSR PR0001                     接下一頁
+9803AC*                    ENDIF
+     C*
+     C* 9709 列印訂單合計 START------------
+     C*
+     C                     Z-ADD1         I
+     C                     SORTAARY1
+     C           1         DO   30        I
+     C                     MOVE ARY1,I    D#ARY1
+     C*
+     C           D#ORN1    IFNE '999999'
+     C           D#OQTY    ANDNE0
+     C           D#OAMT    ANDNE0
+     C                     MOVEL'訂單:' R#OCNM           名稱
+     C                     MOVELD#ORN1    R#OCNO           訂單編號
+     C                     Z-ADDD#OQTY    R#OQTY           出貨數量
+     C                     Z-ADDD#OAMT    R#OAMT           出貨金額
+     C                     Z-ADDD#OBMT    R#OBMT           折退金額
+     C                     Z-ADDD#OCMT    R#OCMT           預收金額
+     C                     Z-ADDD#ODMT    R#ODMT           銷項稅額
+     C                     Z-ADDD#OEMT    R#OEMT           請款金額
+     C                     ADD  1         W#LCNT
+     C           I         IFEQ 1
+9803AC*
+9803AC           CURLIN    IFLE 55
+     C                     WRITEAR001T1F
+9830AC                     ELSE
+9803AC                     EXSR PR0001
+9803AC                     WRITEAR001T1F
+9803AC                     ENDIF
+9803AC*
+     C                     ENDIF
+     C*
+     C*訂單合計
+     C                     ADD  D#OQTY    W#OQTY           出貨數量
+     C                     ADD  D#OAMT    W#OAMT           出貨金額
+     C                     ADD  D#OBMT    W#OBMT           折退金額
+     C                     ADD  D#OCMT    W#OCMT           預收金額
+     C                     ADD  D#ODMT    W#ODMT           銷項稅額
+     C                     ADD  D#OEMT    W#OEMT           請款金額
+9803AC*
+9803AC           CURLIN    IFLE 55
+     C                     WRITEAR001T1G
+9803AC                     ELSE
+9803AC                     EXSR PR0001
+9803AC                     WRITEAR001T1G
+9803AC                     ENDIF
+9803AC*
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C*寫入訂單合計
+     C*
+     C           W#OQTY    IFNE 0
+     C                     Z-ADDW#OQTY    R#TQTY           出貨數量
+     C                     Z-ADDW#OAMT    R#TAMT           出貨金額
+     C                     Z-ADDW#OBMT    R#TBMT           折退金額
+     C                     Z-ADDW#OCMT    R#TCMT           預收金額
+     C                     Z-ADDW#ODMT    R#TDMT           銷項稅額
+     C                     Z-ADDW#OEMT    R#TEMT           請款金額
+     C                     ADD  1         W#LCNT
+9803AC*
+9803AC           CURLIN    IFLE 55
+     C                     WRITEAR001T1W
+9803AC                     ELSE
+9803AC                     EXSR PR0001
+9803AC                     WRITEAR001T1W
+9803AC                     ENDIF
+9803AC*
+     C                     ENDIF
+     C*
+     C* 9709 列印訂單合計 END  ------------
+     C*
+9803AC*          W#LCNT    IFGE N#TCNT
+9803AC*                    EXSR PR0001                     接下一頁
+9803AC*                    ENDIF
+     C*
+     C* 9709 列印工程合計 START------------
+     C*
+     C                     Z-ADD1         I
+     C                     SORTAARY2
+     C           1         DO   30        I
+     C                     MOVE ARY2,I    D#ARY2
+     C*
+     C           D#CTN1    IFNE '999999'
+     C           D#CTN2    ANDNE'9999'
+     C           D#CQTY    ANDNE0
+     C           D#CAMT    ANDNE0
+     C                     MOVEL'工程:' R#OCNM           名稱
+     C                     MOVELD#CTN1    R#OCNO           工程編號１
+     C                     MOVE D#CTN2    R#OCNO           工程編號２
+     C                     Z-ADDD#CQTY    R#OQTY           出貨數量
+     C                     Z-ADDD#CAMT    R#OAMT           出貨金額
+     C                     Z-ADDD#CBMT    R#OBMT           折退金額
+     C                     Z-ADDD#CCMT    R#OCMT           預收金額
+     C                     Z-ADDD#CDMT    R#ODMT           銷項稅額
+     C                     Z-ADDD#CEMT    R#OEMT           請款金額
+     C                     ADD  1         W#LCNT
+     C           I         IFEQ 1
+9803AC*
+9803AC           CURLIN    IFLE 55
+     C                     WRITEAR001T1F
+9803AC                     ELSE
+9803AC                     EXSR PR0001
+9803AC                     WRITEAR001T1F
+9803AC                     ENDIF
+9803AC*
+     C                     ENDIF
+     C*
+9803AC           CURLIN    IFLE 55
+     C                     WRITEAR001T1G
+9803AC                     ELSE
+9803AC                     EXSR PR0001
+9803AC                     WRITEAR001T1G
+9803AC                     ENDIF
+9803AC*
+     C                     ADD  D#CQTY    W#CQTY           出貨數量
+     C                     ADD  D#CAMT    W#CAMT           出貨金額
+     C                     ADD  D#CBMT    W#CBMT           折退金額
+     C                     ADD  D#CCMT    W#CCMT           預收金額
+     C                     ADD  D#CDMT    W#CDMT           銷項稅額
+     C                     ADD  D#CEMT    W#CEMT           請款金額
+     C                     ENDIF
+     C                     ENDDO
+     C*寫入工程合計
+     C*
+     C           W#CQTY    IFNE 0
+     C                     Z-ADDW#CQTY    R#TQTY           出貨數量
+     C                     Z-ADDW#CAMT    R#TAMT           出貨金額
+     C                     Z-ADDW#CBMT    R#TBMT           折退金額
+     C                     Z-ADDW#CCMT    R#TCMT           預收金額
+     C                     Z-ADDW#CDMT    R#TDMT           銷項稅額
+     C                     Z-ADDW#CEMT    R#TEMT           請款金額
+     C                     ADD  1         W#LCNT
+9803AC*
+9803AC           CURLIN    IFLE 55
+     C                     WRITEAR001T1W
+9803AC                     ELSE
+9803AC                     EXSR PR0001
+9803AC                     WRITEAR001T1W
+9803AC                     ENDIF
+9803AC*
+     C                     ENDIF
+     C*
+     C* 9709 列印工程合計 END  ------------
+     C*
+     C*          P#CODE    IFEQ 'Y'
+     C*          P#YN      OREQ 'Y'
+     C*          41        SUB  W#LCNT    W#TMP1
+     C*                    ELSE
+     C           W#TMP2    SUB  W#LCNT    W#TMP1
+     C*                    ENDIF
+     C*
+9803AC*          1         DO   W#TMP1    I       20
+9803AC           CURLIN    IFLT 54
+9803AC           55        SUB  CURLIN    CONT
+9803AC                     ELSE
+9803AC                     Z-ADD1         CONT    20
+9803AC                     ENDIF
+9803AC           1         DO   CONT      I       20
+     C                     WRITEAR001T1L
+     C                     ENDDO
+     C*
+     C                     WRITEAR001T1Y
+     C                     WRITEAR001T1Z
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         MSGSR     BEGSR
+     C**************************************************************
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C*  子函式集
+     C*****************************************************************
+     C*--------------------------------------------
+     C*    接下一頁（印表尾再印表頭）
+     C*--------------------------------------------
+     CSR         PR0001    BEGSR
+9803AC*          N#TCNT    ADD  2         W#TMP3  30
+     C*
+9803AC*          W#TMP3    SUB  W#LCNT    W#TMP4  30
+9803AC*          1         DO   W#TMP4    I       20
+9803AC*                    WRITEAR001T1L
+9803AC*                    ENDDO
+     C*
+     C                     WRITEAR001T1X
+9803AC*                    WRITEAR001T1Z
+9803AC  N95                WRITEAR001T1Z
+     C*
+     C                     WRITEAR001T1H
+9803AC   95                MOVEL*OFF      *IN95
+     C                     Z-ADD0         W#LCNT
+     CSR                   ENDSR
+     C*****************************************************************
+8906 CSR         SR1000    BEGSR
+ .   C                     MOVE *BLANK    ANFLAG
+ .   C   50                MOVE 'A'       ANCODE
+ .   C  N50                MOVE 'C'       ANCODE
+ .   C                     MOVE R#CUNO    ANCUNO           客戶編號
+9008 C                     MOVELR#ORNO    ANORNO           訂單編號
+8906 C                     Z-ADDR#APDT    D#DAT1
+ .   C                     ADD  1911      D#DAT2
+ .   C                     MOVE D#DAT2    D#DAT6
+ .   C                     MOVE '/'       D#DAT7
+ .   C                     MOVE D#DAT3    D#DAT8
+ .   C                     MOVE '/'       D#DAT9
+ .   C                     MOVE D#DAT4    D#DAT0
+ .   C                     MOVE D#DAT5    ANAPDT           請款日期
+ .   C                     MOVE R#RVID    ANSALE           收款業務
+ .   C   51                MOVE R#INNO    ANINNO           發票號碼
+ .   C  N51                MOVE *BLANK    ANINNO           發票號碼
+ .   C                     Z-ADDR#INDT    D#DAT1
+ .   C                     ADD  1911      D#DAT2
+ .   C                     MOVE D#DAT2    D#DAT6
+ .   C                     MOVE '/'       D#DAT7
+ .   C                     MOVE D#DAT3    D#DAT8
+ .   C                     MOVE '/'       D#DAT9
+ .   C                     MOVE D#DAT4    D#DAT0
+ .   C   51                MOVE D#DAT5    ANINDT           發票日期
+ .   C  N51                MOVE *BLANK    ANINDT
+ .   C  N51                MOVEL'　'    ANINDT           發票日期
+ .   C                     MOVE R#WTNO    ANWTNO           磅單號碼
+ .   C                     Z-ADDR#QTY     ANQTY            出貨數量
+ .   C                     Z-ADDR#AAMT    ANAAMT           出貨金額
+ .   C   51                Z-ADDR#BAMT    ANBAMT           折退金額
+ .   C  N51                Z-ADD0         ANBAMT           折退金額
+ .   C   51                Z-ADDR#CAMT    ANCAMT           預收貨款
+ .   C  N51                Z-ADD0         ANCAMT           預收貨款
+ .   C   51                Z-ADDR#DAMT    ANDAMT           銷貨稅額
+ .   C  N51                Z-ADD0         ANDAMT           銷貨稅額
+ .   C   51                Z-ADDR#EAMT    ANEAMT           請款金額
+ .   C  N51                Z-ADD0         ANEAMT           請款金額
+ .   C           ANORNO    IFEQ W#ORNO
+ .   C                     MOVE *BLANK    ANORN1
+ .   C                     ELSE
+9008 C                     MOVELANORNO    ANORN1
+LYW  C                     MOVELANORNO    W#ORNO
+8906 C                     ENDIF
+ .   CSR                   ENDSR
+     C*****************************************************************
+     CSR         SR2000    BEGSR
+     C*****************************************************************
+     C           ARWTNO    IFEQ 'T1102685'
+     C                     ADD  1         W#CONT  10
+     C                     ENDIF
+     C*
+     C           W#CONT    IFGT 1
+     C                     GOTO END200
+     C                     ENDIF
+     C*分類別合計
+     C                     MOVELARWTNO    D#WTNO           磅單編號
+     C*
+     C*若若該張發票為出貨發票，則須找出銷貨品名之徑度
+     C           D#PCOD    IFEQ '11'
+     C           D#PCOD    OREQ '1E'
+     C*
+     C                     MOVELD#VREA    S4VREA
+     C                     MOVELD#PCOD    S4PCOD
+     C                     Z-ADDD#VRNO    S4VRNO
+     C                     Z-ADD0         S4VRTM
+     C           K#SVUR    SETLLRSRVOUR
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RSRVOUR                  40
+     C*
+     C   40                LEAVE
+     C*
+     C           S4VREA    IFNE D#VREA
+     C           S4PCOD    ORNE D#PCOD
+     C           S4VRNO    ORNE D#VRNO
+     C                     LEAVE
+     C                     ENDIF
+9507 C*
+0101AC*          S4DATE    IFLT 980101
+0210AC           S4DATE    IFLT 990101
+ .   C                     ITER
+ .   C                     ENDIF
+9507 C*
+     C                     MOVELS4ORNO    D#ORNO
+     C           K#SAMT    CHAINRSAMAST              45
+     C*
+     C*將類別分別合計至ARY中
+     C                     SORTAARY                        排序
+     C           1         DO   30        I
+     C                     MOVE ARY,I     D#ARY
+     C*
+     C           D#PDN1    IFEQ '999'                      第一次初始
+     C                     MOVE S4PDNM    D#PDN1
+     C                     MOVELS4PDS1    D#PDS1
+     C                     Z-ADDS4NWGT    D#QTY
+     C           S4NWGT    MULT S1UPRC    W#AMT     H
+     C                     Z-ADDW#AMT     D#AMT
+     C                     MOVE D#ARY     ARY,I
+0004AC*                     WRITESRVT
+     C                     LEAVE
+     C                     ELSE
+     C           S4PDNM    IFEQ D#PDN1                     類別
+     C           S4PDS1    ANDEQD#PDS1
+     C                     ADD  S4NWGT    D#QTY            數量
+     C           S4NWGT    MULT S1UPRC    W#AMT     H      金額
+     C                     ADD  W#AMT     D#AMT
+     C                     MOVE D#ARY     ARY,I
+0004AC*                     WRITESRVT
+     C                     LEAVE
+     C                     ENDIF                           類別
+     C                     ENDIF                            D#PDN1
+     C*
+     C                     ENDDO
+0003AC*
+0003AC                     MOVEL*OFF      *IN55
+0003AC                     MOVELS4ORNO    W1ORNO
+0003AC                     MOVELS4PDNM    W#PDNM
+0003AC                     MOVELS4PDS1    W#PDS1
+0003AC                     Z-ADDS4VRNO    W#VRNO  50
+0003AC                     Z-ADDS4VRTM    W#VRTM  20
+0003AC                     MOVELS4PCOD    W#PCOD  2
+0106AC                     MOVELS4DIST    W#DIST 14
+0003AC           KEY01     SETLLSRVL2
+0003AC           *IN55     DOWEQ*OFF
+0003AC           KEY01     READESRVL2                    55
+0003AC   55                LEAVE
+0003BC*
+0003BC           S4DATE    IFLT D#DATS
+0003BC           S4DATE    ORGT D#DATE
+0003BC                     ITER
+0003BC                     ENDIF
+     C*
+0106AC           S4DIST    IFNE W#DIST
+0106AC                     ITER
+0106AC                     ENDIF
+0003BC*
+0003BC                     SORTAARY3
+0003BC           1         DO   30        X       20
+0003BC                     MOVE ARY3,X    D#ARY3
+0003BC           D1VREA    IFEQ '9'
+0003BC           D1VRNO    ANDEQ99999
+0003BC                     MOVELS4VREA    D1VREA
+0003BC                     Z-ADDS4VRNO    D1VRNO
+0003BC                     Z-ADDS4VRTM    D1VRTM
+0003BC                     MOVE D#ARY3    ARY3,X
+0004AC*                     WRITESRVT
+0003BC                     LEAVE
+0003BC                     ENDIF
+0003BC           S4VREA    IFNE D1VREA
+0003BC           S4VRNO    ORNE D1VRNO
+0003BC           S4VRTM    ORNE D1VRTM
+0003BC                     MOVELS4VREA    D1VREA
+0003BC                     Z-ADDS4VRNO    D1VRNO
+0003BC                     Z-ADDS4VRTM    D1VRTM
+0003BC                     ADD  1         X
+0003BC                     MOVE D#ARY3    ARY3,X
+0004AC*                     WRITESRVT
+0003BC                     LEAVE
+0003BC                     ELSE
+0003BC                     GOTO ENDSRV
+0003BC                     ENDIF
+0003BC                     ENDDO
+0003AC*
+0003AC                     MOVELS4ORNO    D#ORNO
+0003AC           K#SAMT    CHAINRSAMAST              45
+     C*
+     C*將類別分別合計至ARY中
+0003AC                     SORTAARY                        排序
+0003AC           1         DO   30        I
+0003AC                     MOVE ARY,I     D#ARY
+     C*
+0003AC           D#PDN1    IFEQ '999'                      第一次初始
+0003AC                     MOVE S4PDNM    D#PDN1
+0003AC                     MOVELS4PDS1    D#PDS1
+0003AC                     Z-ADDS4NWGT    W#QTY   70
+0003AC                     MULT -1        W#QTY
+0003AC                     Z-ADDW#QTY     D#QTY
+0003AC           S4NWGT    MULT S1UPRC    W#AMT     H
+0003AC                     MULT -1        W#AMT
+0003AC                     Z-ADDW#AMT     D#AMT
+0003AC                     MOVE D#ARY     ARY,I
+0003AC                     LEAVE
+0003AC                     ELSE
+0003AC           S4PDNM    IFEQ D#PDN1                     類別
+0003AC           S4PDS1    ANDEQD#PDS1
+0003AC                     Z-ADDS4NWGT    W#QTY            數量
+0003AC                     MULT -1        W#QTY
+0003AC                     ADD  W#QTY     D#QTY
+0003AC           S4NWGT    MULT S1UPRC    W#AMT     H      金額
+0003AC                     MULT -1        W#AMT
+0003AC                     ADD  W#AMT     D#AMT
+0003AC                     MOVE D#ARY     ARY,I
+0003AC                     LEAVE
+0003AC                     ENDIF                           類別
+0003AC                     ENDIF                            D#PDN1
+0003AC                     ENDDO
+     C*
+0003AC                     ENDDO
+0003BC           ENDSRV    TAG
+0003AC*將指標指回原來位置
+0003AC*
+0003AC                     Z-ADDW#VRNO    S4VRNO
+0003AC                     Z-ADDW#VRTM    S4VRTM
+0003AC                     MOVELW#PCOD    S4PCOD
+0003AC*
+     C                     ENDDO
+     C*
+     C                     ELSE
+     C*
+     C                     MOVE ARINNO    IVNO             發票號碼
+     C                     MOVE '1'       IVACNT           類別
+     C                     Z-ADD0         IVITEM           項次
+     C*
+     C           K#DTL     SETLLIVREC
+     C                     READ IVREC                    40
+     C           *IN40     DOWEQ*OFF
+     C*          ARINNO    ANDNEW#INNO
+     C*
+     C           IVNO      IFNE ARINNO
+     C                     LEAVE
+     C                     ENDIF
+     C*將類別分別合計至ARY中
+     C           IVACNT    IFEQ '1'                        出貨
+     C                     SORTAARY                        排序
+     C           1         DO   30        I
+     C                     MOVE ARY,I     D#ARY
+     C*
+     C           D#PDN1    IFEQ '999'                      第一次初始
+     C                     MOVE IVPDCD    D#PDN1
+     C                     Z-ADDIVQTY     D#QTY
+     C                     Z-ADDIVAMT     D#AMT
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ELSE
+     C           IVPDCD    IFEQ D#PDN1                     類別
+     C                     ADD  IVQTY     D#QTY            數量
+     C                     ADD  IVAMT     D#AMT            金額
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ENDIF                           類別
+     C                     ENDIF                            D#PDN1
+     C*
+     C                     ENDDO
+     C                     ENDIF                            IVACTP
+     C*
+     C                     READ IVREC                    40
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDIF
+     C*
+     C           END200    ENDSR
+     C*****************************************************************
+     CSR         SR3000    BEGSR
+     C*****************************************************************
+     C*僅型鋼需做訂單編號小計
+     C*
+     C                     MOVEL*OFF      *IN30
+     C                     MOVEL*BLANK    W#CTN1  6        工程編號１
+     C                     MOVEL*BLANK    W#CTN2  4        工程編號２
+     C                     MOVELARORNO    K#AREA           訂單地區
+     C                     MOVE ARORNO    K#ORNO           訂單流水號
+     C           K#MAST    CHAINHSMAST               30
+     C  N30                MOVELS1CTNO    W#CTN1           工程編號１
+     C  N30                MOVE S1CTNO    W#CTN2           工程編號２
+     C*
+     C*僅東鋼構需做工程案號小計
+     C*
+     C           D#CUNO    IFNE 'DH043'
+     C           D#AREA    ORNE 'H'
+     C                     GOTO EN3000
+     C                     ENDIF
+     C*
+     C                     Z-ADD1         J       20
+     C                     Z-ADD1         K       20
+     C*
+     C*將訂單分別合計至ARY中
+     C*
+     C                     SORTAARY1                       排序
+     C           1         DO   30        J
+     C                     MOVE ARY1,J    D#ARY1
+     C*
+     C           ARORNO    IFEQ D#ORN1                     訂單號碼
+     C                     ADD  ARQTY     D#OQTY           出貨數量
+     C                     ADD  ARAAMT    D#OAMT           出貨金額
+     C                     ADD  ARBAMT    D#OBMT           折退金額
+     C                     ADD  ARCAMT    D#OCMT           預收金額
+     C                     ADD  ARDAMT    D#ODMT           銷項稅額
+     C                     ADD  AREAMT    D#OEMT           請款金額
+     C                     MOVE D#ARY1    ARY1,J
+     C                     LEAVE
+     C                     ELSE
+     C           D#ORN1    IFEQ '999999'                   訂單號碼
+     C                     MOVELARORNO    D#ORN1           訂單號碼
+     C                     Z-ADDARQTY     D#OQTY           出貨數量
+     C                     Z-ADDARAAMT    D#OAMT           出貨金額
+     C                     Z-ADDARBAMT    D#OBMT           折退金額
+     C                     Z-ADDARCAMT    D#OCMT           預收金額
+     C                     Z-ADDARDAMT    D#ODMT           銷項稅額
+     C                     Z-ADDAREAMT    D#OEMT           請款金額
+     C                     MOVE D#ARY1    ARY1,J
+     C                     LEAVE
+     C                     ENDIF                           類別
+     C*
+     C                     ENDIF                            D#ORN1
+     C                     ENDDO
+     C*
+     C*將工程分別合計至ARY中
+     C*
+     C                     SORTAARY2                       排序
+     C           1         DO   30        K
+     C                     MOVE ARY2,K    D#ARY2
+     C*
+     C           W#CTN1    IFEQ D#CTN1                     工程案號１
+     C           W#CTN2    ANDEQD#CTN2                     工程案號２
+     C                     ADD  ARQTY     D#CQTY           出貨數量
+     C                     ADD  ARAAMT    D#CAMT           出貨金額
+     C                     ADD  ARBAMT    D#CBMT           折退金額
+     C                     ADD  ARCAMT    D#CCMT           預收金額
+     C                     ADD  ARDAMT    D#CDMT           銷項稅額
+     C                     ADD  AREAMT    D#CEMT           請款金額
+     C                     MOVE D#ARY2    ARY2,K
+     C                     LEAVE
+     C                     ELSE
+     C           D#CTN1    IFEQ '999999'                   工程案號１
+     C           D#CTN2    ANDEQ'9999'                     工程案號２
+     C                     MOVELW#CTN1    D#CTN1           工程案號１
+     C                     MOVELW#CTN2    D#CTN2           工程案號２
+     C                     Z-ADDARQTY     D#CQTY           出貨數量
+     C                     Z-ADDARAAMT    D#CAMT           出貨金額
+     C                     Z-ADDARBAMT    D#CBMT           折退金額
+     C                     Z-ADDARCAMT    D#CCMT           預收金額
+     C                     Z-ADDARDAMT    D#CDMT           銷項稅額
+     C                     Z-ADDAREAMT    D#CEMT           請款金額
+     C                     MOVE D#ARY2    ARY2,K
+     C                     LEAVE
+     C                     ENDIF                           類別
+     C*
+     C                     ENDIF                            D#CTN1,2
+     C                     ENDDO
+     C*
+     C           EN3000    ENDSR
+     C*****************************************************************
+

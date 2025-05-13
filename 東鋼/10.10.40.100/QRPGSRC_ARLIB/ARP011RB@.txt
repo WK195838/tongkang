@@ -1,0 +1,344 @@
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E                    DISK
+     FTRNDTLUPUF  E           K        DISK
+     F            TXREC                             KRENAMETXW
+     FACTRAN  UF  E           K        DISK                      A
+     FHIPROD  IF  E           K        DISK
+     FQPRINT  O   F     156            PRINTER
+     ****
+     E                    TAB1    1   5  1   TABR1  18
+     ITXREC
+     I                                              TXACDTL3
+     I                                              TXIVNOL2
+     I                                              TXCUNOL2
+     I                                              TXUPRCL1
+     I                                              TXPDNML1
+     ****
+     I            DS
+     I                                        1  18 KGRP
+     I                                        1   4 KACNO
+     I                                        5  14 KACNON
+     I                                       15  18 KDPNO
+     I                                       19  26 TXNO
+     I                                       19  19 TXAREA
+     I            DS
+     I                                        1   4 VRNOX
+     I                                        2   40NO1
+     I                                       11  14 VRNON
+     I                                       12  140NO3
+     I            DS
+     I                                        1   4 VRNOY
+     I                                        2   40NO2
+     I            DS
+     I                                        1   7 TXVUNO
+     I                                        1   1 TTT1
+     I                                        2   2 TTT2
+     I                                        3   6 TTT3
+CLJ  I*
+     I            DS
+     I                                        1   2 W#OEOF
+     I                                        1   1 D#OE
+     I                                        2   2 D#OF
+     I            DS
+     I                                        1  12 NAME1
+     I                                       12  12 D#NOF
+---  I*
+     I           UDS
+     I                                        1   6 YMD
+     I                                        7   7 TXAR
+     C*****
+     C  N10                EXSR IN#01
+     C   L3                EXSR DL#03
+     C   L2                EXSR DL#02
+     C   L1                EXSR DL#01
+     C                     EXSR DP#01
+     CL1                   EXSR TL#01
+     CL2                   EXSR TL#02
+     CL3                   EXCPTET#LR
+     C**--------------------------------------------------**
+     CSR         IN#01     BEGSR
+     C           ACKEY1    KLIST
+     C                     KFLD           ACVRNO
+     C                     KFLD           ACITEM
+     C           TXKEY     KLIST
+     C                     KFLD           TXCODE
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+     C                     MOVE YMD       DATEA   60
+     C                     Z-ADD80        LCNT    20
+     C                     Z-ADD58        TCNT    20
+     C                     Z-ADD0         PAG     30
+     C                     MOVE *BLANK    KGRP
+     C           TXAR      LOKUPTAB1      TABR1          31
+     C   31                MOVELTABR1     KGRP
+     C                     SETON                     10
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C**  FIND LAST NO                                **
+     C**----------------------------------------------**
+     CSR         @FDNO     BEGSR
+     C                     MOVEL'C999'    ACVRNO
+     C                     Z-ADD99        ACITEM
+     C                     SETOF                     95
+     C           ACKEY1    SETGTACTRAN
+     C                     READPACTRAN                   95
+     C  N95                MOVELACVRNO    TYPE    1
+     C  N95      TYPE      COMP 'C'                  9595
+     C  N95                MOVELACVRNO    VRNON
+     C  N95                ADD  1         NO3
+     C  N95                MOVELVRNON     VRNOX
+     C   95                MOVEL'C001'    VRNOX
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C**    L3 DETAIL TIME                            **
+     C**----------------------------------------------**
+     CSR         DL#03     BEGSR
+     C                     Z-ADDTCNT      LCNT
+      *
+     C                     EXSR @FDNO
+     C                     MOVELVRNOX     VRNOY
+     C           NO1       ADD  1         NO2
+     C                     Z-ADD0         AMTT   132
+     C                     Z-ADD0         AMTTT  110
+     C                     Z-ADD1         ITEM1   20
+     C                     Z-ADD1         ITEM2   20
+     C                     Z-ADD0         COUNT   40
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C**    L2 DETAIL TIME                            **
+     C**----------------------------------------------**
+     CSR         DL#02     BEGSR
+     C                     Z-ADD0         AMT2   132
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C**    L1 DETAIL TIME                            **
+     C**----------------------------------------------**
+     CSR         DL#01     BEGSR
+     C           TXPDNM    CHAINHIPROD               31
+CLJ  C   31                MOVE *BLANK    NAME1
+     C           *IN31     IFEQ '0'
+     C                     MOVE ''      W#OEOF
+     C                     MOVELF4CHIN    NAME1
+     C                     MOVE D#OF      D#NOF
+---  C                     ENDIF
+     C                     Z-ADD0         AMT1   132
+     C                     Z-ADD0         QTY1    80
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C**       DETAIL TIME                            **
+     C**----------------------------------------------**
+     CSR         DP#01     BEGSR
+     C                     MOVELTXAREA    TXARA   1
+     C           TXARA     IFEQ 'A'
+     C                     MOVELTXAR      TXARA
+     C                     ENDIF
+     C                     ADD  TXAMT     AMT1
+     C                     ADD  TXAMT     AMT2
+     C                     ADD  TXQTY     QTY1
+     C***
+     C                     ADD  TXAMT     AMTT
+     C                     ADD  1         COUNT
+      *
+     C           TXKEY     CHAINTRNDTLUP             31
+     C  N31                MOVELTXAR      TTT1
+     C  N31                MOVELTXARA     TTT2
+     C  N31                MOVELVRNOY     TTT3
+     C  N31                UPDATTXW
+     CSR                   ENDSR
+     C**----------------------------------**
+     C**   L1 BREAK PROCESS TOTAL TIME    **
+     C**----------------------------------**
+     CSR         TL#01     BEGSR
+     C           AMT1      IFNE 0
+     C                     ADD  1         ITEM1
+     C           AMT1      IFLT 0
+     C                     Z-SUBAMT1      AMT1
+     C                     Z-SUBQTY1      QTY1
+     C                     MOVEL'0'       *IN,51
+     C                     ELSE
+     C                     MOVEL'1'       *IN,51
+     C                     ENDIF
+     C                     EXSR WR#01
+     C                     EXSR PR#01
+     C                     ENDIF
+     CSR                   ENDSR
+     C**----------------------------------**
+     C**   L2 BREAK PROCESS TOTAL TIME    **
+     C**----------------------------------**
+     CSR         TL#02     BEGSR
+     C           AMT2      IFNE 0
+     C                     ADD  1         ITEM2
+     C           AMT2      IFLT 0
+     C                     Z-SUBAMT2      AMT2
+     C                     MOVEL'0'       *IN,51
+     C                     ELSE
+     C                     MOVEL'1'       *IN,51
+     C                     ENDIF
+     C                     EXSR WR#02
+     C                     EXSR PR#02
+     C                     ENDIF
+     CSR                   ENDSR
+     C**------------------------------------------**
+     C**    TOTAL  TIME  WRITE DATA TO ACTRAN     **
+     C**------------------------------------------**
+     CSR         WR#01     BEGSR
+     C****  WRITE  TO NON-TAIPEI "4111" 銷貨收入
+     C                     CLEARRACVOUR
+     C                     MOVEL'N'       ACVRTY
+     C                     MOVE TXAR      ACDM03
+     C                     MOVELTXARA     ACCARD
+     C                     MOVEL'A'       ACKIND
+     C                     Z-ADDTXACDT    ACYMD
+     C                     MOVELVRNOY     ACVRNO
+     C                     Z-ADDITEM1     ACITEM
+     C   51                MOVEL'C'       ACDC
+     C  N51                MOVEL'D'       ACDC
+     C                     MOVEL'4111'    ACNO
+     C                     MOVEL'L'       ACTYCO
+     C                     MOVE *BLANK    KGRP
+     C           TXAREA    LOKUPTAB1      TABR1          31
+     C   31                MOVELTABR1     KGRP
+     C                     MOVELKDPNO     ACDPNO
+     C                     MOVELTXORNO    KORNO   5
+     C                     MOVELKORNO     ACRLNO
+     C                     MOVELTXCUNM    ACCSNM
+     C                     Z-ADDAMT1      ACAMT
+     C                     MOVELTXPDNM    ACDSC1
+     C           TXACNT    IFEQ '3'
+     C                     Z-ADD0         QTY1
+     C                     END
+     C                     MOVE QTY1      ACDSC2
+     C                     MOVEL'A'       ACSEPT
+     C                     WRITERACVOUR
+     CSR                   ENDSR
+     C**------------------------------------------**
+     C**    DETAIL TIME  WRITE DATA TO ACTRAN     **
+     C**------------------------------------------**
+     CSR         WR#02     BEGSR
+     C****  WRITE  TO TAIPEI  "1134"應收帳款
+     C                     CLEARRACVOUR
+     C                     MOVEL'N'       ACVRTY
+     C                     MOVE TXAR      ACDM03
+     C                     MOVEL'P'       ACCARD
+     C                     MOVEL'A'       ACKIND
+     C                     Z-ADDTXACDT    ACYMD
+     C                     MOVELVRNOX     ACVRNO
+     C                     Z-ADDITEM2     ACITEM
+     C  N51                MOVEL'C'       ACDC
+     C   51                MOVEL'D'       ACDC
+     C                     MOVEL'1134'    ACNO
+     C                     MOVEL'G'       ACTYCO
+     C                     MOVELKORNO     ACRLNO
+     C                     MOVELTXCUNM    ACCSNM
+     C                     Z-ADDAMT2      ACAMT
+     C                     MOVEL'A'       ACSEPT
+     C                     WRITERACVOUR
+     CSR                   ENDSR
+     C**--------------------------------------**
+     C**  PRINT OUT DETAIL RECORD             **
+     C**--------------------------------------**
+     CSR         PR#01     BEGSR
+     C           LCNT      COMP TCNT                 75  75
+     C   75                ADD  1         PAG
+     C   75                Z-ADD8         LCNT
+     C   75                EXCPTEH#01
+     C                     EXCPTED#01
+     C                     ADD  1         LCNT
+     CSR                   ENDSR
+     C**--------------------------------------**
+     C**  PRINT OUT DETAIL RECORD             **
+     C**--------------------------------------**
+     CSR         PR#02     BEGSR
+     C           LCNT      COMP TCNT                 75  75
+     C   75                ADD  1         PAG
+     C   75                Z-ADD8         LCNT
+     C   75                EXCPTEH#01
+     C                     EXCPTED#02
+     C                     ADD  1         LCNT
+     CSR                   ENDSR
+      *
+     OQPRINT  E   03           EH#01
+     O                                   12 '報表編號：'
+     O                                   18 'ARP011'
+     O                                   81 '銷貨收入入帳清單'
+     O                                  140 '列表日期:'
+     O                         UDATE Y  148
+     O        E 1              EH#01
+     O                                   82 '********************'
+     O                                  140 '頁　　數:'
+     O                         PAG   Z  143
+     O        E 1              EH#01
+     O                                   70 '日期:'
+     O                         DATEA Y   79
+     O        E 1              EH#01
+     O                                   41 '借'
+     O        E 1              EH#01
+     O                                   10 '入帳日期'
+     O                                   20 '磅單編號'
+     O                                   26 '訂單'
+     O                                   35 '客　戶'
+     O                                   41 '貸'
+     O                                   51 '會計科目'
+     O                                   65 '品　名'
+     O                                   87 '數量'
+     O                                   97 '單價'
+     O                                  114 '借方金額'
+     O                                  131 '貸方金額'
+     O                                  138 '部門'
+     O                                  149 '傳票編號'
+     O        E 1              EH#01
+     O                                   20 '--------------------'
+     O                                   40 '--------------------'
+     O                                   60 '--------------------'
+     O                                   80 '--------------------'
+     O                                  100 '--------------------'
+     O                                  120 '--------------------'
+     O                                  132 '--------------------'
+     O                                  150 '--------------------'
+     O        E 1              ED#01
+     O                         ACYMD Y    9
+     O                         TXNO      20
+     O                         KORNO     26
+     O                         ACCSNM    37
+     O                    51             56 'C 4111銷貨收入L'
+     O                   N51             56 'D 4111銷貨收入L'
+     O                         TXPDNM    61
+     O                         NAME1   +  1
+     O                         QTY1  K   87
+     O                         TXUPRCK   97
+     O                   N51   ACAMT K  114
+     O                    51   ACAMT K  131
+     O                         ACDPNO   137
+     O                         TXAR     141
+     O                         TXARA    142
+     O                         VRNOY    146
+     O                                      '-'
+     O                         ACITEM   149
+     O        E 1              ED#02
+     O                         ACYMD Y    9
+     O*                        TXNO      20
+     O                         KORNO     26
+     O                         ACCSNM    37
+     O                   N51             56 'C 1134應收帳款G'
+     O                    51             56 'D 1134應收帳款G'
+     O                    51   ACAMT K  114
+     O                   N51   ACAMT K  131
+     O                         TXAR     141
+     O                                  142 'P'
+     O                         VRNOX    146
+     O                                      '-'
+     O                         ACITEM   149
+     O        E 2              ET#LR
+     O                                   60 '入帳筆數'
+     O                         COUNT K +  1
+     O                N51                96 '銷貨金額合計'
+     O                N51      AMTT  K  114
+     O                 51               113 '銷貨金額合計'
+     O                 51      AMTT  K  131
+** TAB1
+K3512高雄往來K080
+T3513桃園往來T080
+H3514苗栗往來H800
+M3515台中往來W040
+L3516林口往來L080
+

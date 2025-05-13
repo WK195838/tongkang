@@ -1,0 +1,57 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR110P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02CSF                                    */
+        /*        4.FUNCTION      應收帳款發票異常檢核表                   */
+        /*        5.DATE-WRITTEN   92/03/05                                  */
+        /*        6.DATE-MODIFY                                              */
+        /*                                                                   */
+        /*********************************************************************/
+            PGM
+            DCLF       FILE(ARR110S)
+            DCL        VAR(&TYPE)   TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&DAT1)   TYPE(*CHAR)  LEN(3)
+
+            RTVJOBA    JOB(&S#DEVN) USER(&S#USER) +
+                       TYPE(&TYPE)
+
+            IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+            RTVDTAARA  DTAARA(*LDA (1011 10))   RTNVAR(&S#DEVN)
+            CHGVAR     VAR(&S#DATE)   VALUE('120')
+
+ START:     SNDRCVF
+
+            IF         COND(&IN03 *EQ '1') THEN(RETURN)
+            IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+            CHGVAR     VAR(&DAT1)      VALUE(&S#DATE)
+            CHGDTAARA  DTAARA(*LDA (300 3))   VALUE(&DAT1)
+
+            SBMJOB     CMD(CALL PGM(ARR110P)) JOB(ARR110P) +
+                       JOBD(ARJOBD)
+            SNDBRKMSG  MSG('<<應收帳款發票異常檢核表 +
+                         已開始處理,請稍待.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+            RETURN
+
+ BATCH:      RTVDTAARA  DTAARA(*LDA (300 3)) RTNVAR(&DAT1)
+
+   /* 開始處理 */
+
+            OVRPRTF    FILE(ARR110T) TOFILE(ARR110T) PAGESIZE(*N 198)   +
+                       CPI(15) HOLD(*YES) USRDTA('應收逾齡')
+            OVRDBF     FILE(ARSTTX) TOFILE(DALIB/ARSTTX) +
+                       SHARE(*YES)
+            OPNQRYF    FILE(ARSTTX)  +
+                       KEYFLD((AXCUNO) (AXORNO) (AXINNO))
+            CALL       PGM(ARR110R)
+            DLTOVR     FILE(*ALL)
+
+            SNDBRKMSG  MSG('<<應收帳款發票異常檢核表 +
+                         已處理完成,請列印.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+            ENDPGM
+

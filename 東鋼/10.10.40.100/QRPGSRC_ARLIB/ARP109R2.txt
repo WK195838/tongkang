@@ -1,0 +1,238 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP109R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     電子商務--出貨資料下載處理
+     H*            5.DATE-WRITTEN  93/08/09
+     H*            6.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FTRNDTL  IP  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FTNDLOG  UF  E           K        DISK                      A
+     FTNDLOGL2IF  E           K        DISK
+     F            RTNDLOG                           KRENAMETNDLOG2
+     FARCBDW  UF  E           K        DISK
+     FARTXDW  UF  E           K        DISK                      A
+     ITXREC
+     I                                              TXCUNOL1
+     I*****************************************************************
+     ITNDLOG2
+     I              TWFLAG                          F#FLAG
+     I              TWCODE                          F#CODE
+     I              TWNO                            F#NO
+     I              TWITEM                          F#ITEM
+     I              TWACNT                          F#ACNT
+     I              TWDATE                          F#DATE
+     I              TWCUNO                          F#CUNO
+     I              TWCUNM                          F#CUNM
+     I              TWORNO                          F#ORNO
+     I              TWIVNO                          F#IVNO
+     I              TWPCNO                          F#PCNO
+     I              TWSALE                          F#SALE
+     I              TWPDNM                          F#PDNM
+     I              TWQTY                           F#QTY
+     I              TWUPRC                          F#UPRC
+     I              TWAMT                           F#AMT
+     I              TWTAX                           F#TAX
+     I              TWVNNO                          F#VNNO
+     I              TWSEQN                          F#SEQN
+     I              TWFILE                          F#FILE
+     C*****************************************************************
+     C*          KEY   LIST
+     C*****************************************************************
+     C*FILE==>ARTXDW(銷貨明細檔下載)
+     C           K#TXDW    KLIST
+     C                     KFLD           AXVNNO           客戶統編
+     C                     KFLD           AXFILE           檔案序號
+     C                     KFLD           AXSEQN           資料處理序號
+     C*
+     C*FILE==>ARTXDW(銷貨明細檔下載)
+     C           K#TDLG    KLIST
+     C                     KFLD           TWVNNO           客戶統編
+     C                     KFLD           TWFILE           檔案序號
+     C                     KFLD           TWSEQN           資料處理序號
+     C*
+     C*FILE==>TRNDTL(銷貨下載ＬＯＧ檔)
+     C           K#TDG2    KLIST
+     C                     KFLD           F#CODE
+     C                     KFLD           F#NO
+     C                     KFLD           F#ITEM
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#TXSQ  50
+     C                     Z-ADD0         W#SEQ5  60
+     C                     MOVEL*BLANK    W#MUID 10
+     C*
+     C*先判斷該客戶是否要做資料交換
+     C*
+     C           TXCUNO    CHAINCBREC                40
+     C           *IN40     IFEQ *OFF
+     C                     MOVELCBMUID    W#MUID
+     C           W#MUID    CHAINRARCBDW              41
+     C  N41      ADFLE5    IFEQ 'Y'
+     C           ADSEQ5    ADD  1         W#SEQ5
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C* 1.先判斷此筆銷貨是否已下載（已存於TNDLOG檔）
+     C* 2.若此筆銷貨未下載，將該筆資料寫入ＬＯＧ檔，並且也寫入下載檔
+     C* 3.用*IN50來判斷資料是否需下載
+     C*
+     C  N41      ADFLE5    IFEQ 'Y'                        銷貨下載
+     C                     MOVELTXCODE    F#CODE
+     C                     MOVELTXNO      F#NO
+     C                     Z-ADDTXITEM    F#ITEM
+     C           K#TDG2    CHAINTNDLOG2              42
+     C*
+     C           *IN42     IFEQ *ON
+     C                     EXSR TXDSR                      寫入銷貨下載檔
+     C                     EXSR LOGSR                      寫入ＬＯＧ
+     C                     ELSE
+     C                     EXSR CHKSR
+     C  N50                EXSR TXDSR                      寫入銷貨下載檔
+     C  N50                EXSR LOGSR                      寫入ＬＯＧ
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           W#TXSQ    IFNE 0
+     C*
+     C           TXCUNO    CHAINCBREC                45
+     C           *IN45     IFEQ *OFF
+     C                     MOVELCBMUID    W#MUID
+     C           W#MUID    CHAINRARCBDW              46
+     C  N46      ADFLE5    IFEQ 'Y'
+     C                     ADD  1         ADSEQ5
+     C                     UPDATRARCBDW
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           CHKSR     BEGSR
+     C*****************************************************************
+     C*用*IN50來判斷資料是否已下載
+     C* ==>當欲下載資料與ＬＯＧ檔內的資料完全相同時，則不下載
+     C*
+     C                     MOVE *OFF      *IN50
+     C                     Z-ADD0         W#DATE  80
+     C           19110000  ADD  TXDATE    W#DATE
+     C           TXCODE    IFEQ F#CODE                     單據代號
+     C           TXNO      ANDEQF#NO                       單據號碼
+     C           TXITEM    ANDEQF#ITEM                     項次
+     C           TXACNT    ANDEQF#ACNT                     原因別
+     C           W#DATE    ANDEQF#DATE                     單據日期
+     C           TXCUNO    ANDEQF#CUNO                     客戶代號
+     C           TXCUNM    ANDEQF#CUNM                     客戶名稱
+     C           TXORNO    ANDEQF#ORNO                     訂單編號
+     C           TXIVNO    ANDEQF#IVNO                     發票號碼
+     C           TXPCNO    ANDEQF#PCNO                     磅單號碼
+     C           TXSALE    ANDEQF#SALE                     出貨業務員
+     C           TXPDNM    ANDEQF#PDNM                     品名代號
+     C           TXQTY     ANDEQF#QTY                      數量
+     C           TXUPRC    ANDEQF#UPRC                     平均單價
+     C           TXAMT     ANDEQF#AMT                      金額
+     C           TXTAX     ANDEQF#TAX                      稅額
+     C                     MOVE *ON       *IN50
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           TXDSR     BEGSR
+     C*****************************************************************
+     C*寫入銷貨下載檔
+     C                     ADD  1         W#TXSQ
+     C                     MOVELW#MUID    AXVNNO
+     C                     Z-ADDW#SEQ5    AXFILE
+     C                     Z-ADDW#TXSQ    AXSEQN
+     C           K#TXDW    CHAINRARTXDW              43
+     C                     CLEARRARTXDW
+     C   42                MOVEL'A'       AXFLAG
+     C  N42N50             MOVEL'C'       AXFLAG           處理代碼
+     C*                    MOVEL'C'       AXFLAG           處理代碼
+     C                     MOVELTXCODE    AXCODE           單據代碼
+     C                     MOVELTXNO      AXNO             單據號碼
+     C                     Z-ADDTXITEM    AXITEM           項次
+     C                     MOVELTXACNT    AXACNT           原因別
+     C           19110000  ADD  TXDATE    AXDATE           單據日期
+     C                     MOVELTXCUNO    AXCUNO           客戶代號
+     C                     MOVELTXCUNM    AXCUNM           客戶名稱
+     C                     MOVELTXORNO    AXORNO           訂單編號
+     C                     MOVELTXIVNO    AXIVNO           發票號碼
+     C                     MOVELTXPCNO    AXPCNO           磅單號碼
+     C                     MOVELTXSALE    AXSALE           出貨業務
+     C                     MOVELTXPDNM    AXPDNM           品名
+     C                     Z-ADDTXQTY     AXQTY            數量
+     C                     Z-ADDTXUPRC    AXUPRC           單價
+     C                     Z-ADDTXAMT     AXAMT            金額
+     C                     Z-ADDTXTAX     AXTAX            稅額
+     C                     MOVELW#MUID    AXVNNO           客戶統編
+     C                     Z-ADDW#TXSQ    AXSEQN           資料處理序號
+     C                     Z-ADDW#SEQ5    AXFILE           檔案序號
+     C   43                WRITERARTXDW
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LOGSR     BEGSR
+     C*****************************************************************
+     C*寫入銷貨ＬＯＧ檔
+     C                     MOVELW#MUID    TWVNNO
+     C                     Z-ADDW#SEQ5    TWFILE
+     C                     Z-ADDW#TXSQ    TWSEQN
+     C           K#TDLG    CHAINRTNDLOG              44
+     C                     CLEARRTNDLOG
+     C   42                MOVEL'A'       TWFLAG
+     C  N42N50             MOVEL'C'       TWFLAG           處理代碼
+     C*                    MOVEL'C'       TWFLAG           處理代碼
+     C                     MOVELTXCODE    TWCODE           單據代碼
+     C                     MOVELTXNO      TWNO             單據號碼
+     C                     Z-ADDTXITEM    TWITEM           項次
+     C                     MOVELTXACNT    TWACNT           原因別
+     C           19110000  ADD  TXDATE    TWDATE           單據日期
+     C                     MOVELTXCUNO    TWCUNO           客戶代號
+     C                     MOVELTXCUNM    TWCUNM           客戶名稱
+     C                     MOVELTXORNO    TWORNO           訂單編號
+     C                     MOVELTXIVNO    TWIVNO           發票號碼
+     C                     MOVELTXPCNO    TWPCNO           磅單號碼
+     C                     MOVELTXSALE    TWSALE           出貨業務
+     C                     MOVELTXPDNM    TWPDNM           品名
+     C                     Z-ADDTXQTY     TWQTY            數量
+     C                     Z-ADDTXUPRC    TWUPRC           單價
+     C                     Z-ADDTXAMT     TWAMT            金額
+     C                     Z-ADDTXTAX     TWTAX            稅額
+     C                     MOVELW#MUID    TWVNNO           客戶統編
+     C                     Z-ADDW#TXSQ    TWSEQN           資料處理序號
+     C                     Z-ADDW#SEQ5    TWFILE           檔案序號
+     C   44                WRITERTNDLOG
+     C*
+     C                     ENDSR
+

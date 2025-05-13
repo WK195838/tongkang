@@ -1,0 +1,101 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP065R5
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     銷貨明細一正一負處理
+     H*            5.DATE-WRITTEN  89/02/29
+     H*
+     H* 說明：   1.將一正一負對應項次之發票號碼填入'000000'+"
+     H*              入帳年月",過發票碼填入'Y'
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTLX IP  E           K        DISK
+     F            TXREC                             KRENAMETXRECX
+     FTRNDTL  UF  E           K        DISK
+     ITXRECX
+     I              TXFLAG                          F#FLAG
+     I              TXCODE                          F#CODE
+     I              TXNO                            F#NO
+     I              TXITEM                          F#ITEM
+     I              TXACNT                          F#ACNT
+     I              TXIVNO                          F#IVNO
+     I              TXAMT                           F#AMT
+     I              TXFL02                          F#FL02
+     I              TXCUNO                          F#CUNO
+     I              TXORNO                          F#ORNO
+     I              TXACDT                          F#ACDT
+     I            DS
+     I                                        1  10 D#IVNO
+     I                                        1   6 D#IVN1
+     I                                        7  10 D#IVN2
+     I            DS
+     I                                        1   60D#ACD1
+     I                                        1   40D#ACD2
+     I                                        1   4 D#ACD3
+     I            DS
+     I                                        1   60D#ACD4
+     I                                        1   40D#ACD5
+     I                                        1   4 D#ACD6
+     C*****************************************************************
+     C*      KLIST
+     C*****************************************************************
+     C           K#DTLX    KLIST
+     C                     KFLD           TXCODE
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+     C***********
+     C                     MOVE F#CODE    TXCODE           單據代號
+     C                     MOVE F#NO      TXNO             單據號碼
+     C                     Z-ADD0         TXITEM
+     C           K#DTLX    SETLLTXREC
+     C                     READ TXREC                    41 *ON -> EOF
+     C           *IN41     DOWEQ*OFF
+     C           TXCODE    IFNE F#CODE                     單據代號
+     C           TXNO      ORNE F#NO                       單據號碼
+     C                     MOVE *ON       *IN41
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           TXAMT     ADD  F#AMT     W#AMT  110
+     C           W#AMT     IFEQ 0                          金額為0
+     C           TXCUNO    ANDEQF#CUNO                     客戶編號
+     C           TXORNO    ANDEQF#ORNO                     訂單編號
+     C           TXACNT    ANDEQF#ACNT                     訂單編號
+     C                     MOVE *ALL'0'   D#IVN1
+     C*此段之主要用意再判斷一正一負之入帳年月是否相同
+     C*若不同則紀錄入帳年月, 反之則'0000'
+     C*用於新版之未開發票明細表ARR036P1
+     C                     Z-ADDF#ACDT    D#ACD1
+     C                     Z-ADDTXACDT    D#ACD4
+     C           D#ACD2    IFNE D#ACD5
+     C                     MOVE *ON       *IN50
+     C                     ELSE
+     C                     MOVE *OFF      *IN50
+     C                     ENDIF
+     C   50                MOVE D#ACD6    D#IVN2
+     C  N50                MOVE '0000'    D#IVN2
+     C*
+     C                     MOVE D#IVNO    TXIVNO           發票號碼
+     C                     MOVE 'Y'       TXFL02           過發票碼
+     C                     UPDATTXREC
+     C*
+     C                     Z-ADDF#ITEM    TXITEM
+     C           K#DTLX    CHAINTXREC                41
+     C   50                MOVE D#ACD3    D#IVN2
+     C  N50                MOVE '0000'    D#IVN2
+     C                     MOVE D#IVNO    TXIVNO           發票號碼
+     C                     MOVE 'Y'       TXFL02           過發票碼
+     C                     UPDATTXREC
+     C*
+     C                     LEAVE
+     C*
+     C                     ENDIF
+     C*
+     C                     READ TXREC                    41 *ON -> EOF
+     C                     ENDDO
+     CLR                   RETRN
+

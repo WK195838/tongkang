@@ -1,0 +1,333 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR142R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     折讓開立鋼種分攤未確認檢核表
+     H*            5.DATE-WRITTEN  104/08/28 2015AR951
+     H*            6.UPDATE  DATE  104/10/02 S00WCJ (0410A)
+     H*                             由於同一張磅單同鋼種會有二個不同
+     H*                             產品代碼，計算數量、單價時將產品
+     H*                             代碼加入判斷
+     H*                            104/10/05 2015AR953 S00WCJ (0409A)
+     H*                             產品代碼3碼擴5碼
+     H*                            104/10/07 S00WCJ (0410A)
+     H*                             增加簽核欄位
+     H*                            105/12/13 2016AR931 S00WCJ (0512A)
+     H*                             增加稅額欄位
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FTRNDTS  IF  E           K        DISK
+     FHSVOUR  IF  E           K        DISK
+     FTRNDTLLGIF  E           K        DISK
+     F            TXREC                             KRENAMETRNDLG
+     FARR142T O   E             69     PRINTER
+     F*
+     ITXREC       01
+     I                                              TXNO  L1
+     ITRNDLG
+     I              TXDATE                          T2DATE
+     I              TXNO                            T2TXNO
+     I              TXITEM                          T2ITEM
+     I              TXCUNO                          T2CUNO
+     I              TXCUNM                          T2CUNM
+     I              TXORNO                          T2ORNO
+     I              TXIVNO                          T2IVNO
+     I              TXPDNM                          T2PDNM
+     I              TXUPRC                          T2UPRC
+     I              TXQTY                           T2QTY
+     I              TXTAX                           T2TAX
+     I              TXAMT                           T2AMT
+     I              TXTXAR                          T2TXAR
+     I              TXRESV                          T2RESV
+     I            DS
+     I                                        1   8 T2TXNO
+     I                                        1   1 D2AREA
+     I                                        2   3 D2VNO1
+     I                                        4   80D2VNO2
+     I            DS
+     I                                        1   7 S4SPE5
+     I                                        1   6 D#SPE5
+     I           UDS
+     I                                      501 506 T#TXN1
+     I                                      507 512 T#TXN2
+     I                                     10011010 T#USID
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*              MAIN  PROGRAM
+     C*****************************************************************
+     C           KEY01     KLIST
+     C                     KFLD           D2AREA
+     C                     KFLD           D2VNO1
+     C                     KFLD           D2VNO2
+     C*
+     C           KEY02     KLIST
+     C                     KFLD           TXCODE
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+     C*
+0410AC           KEY03     KLIST
+0410AC                     KFLD           T#IVNO
+0410AC                     KFLD           T#PDNM
+     C*
+     C           *IN99     IFEQ *OFF
+     C                     EXSR INISR
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLRN99                EXSR MSGSR
+     CLR 99                EXSR LRSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C*
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C                     Z-ADD0         T#QTY4
+     C                     Z-ADD0         T#AMT4
+0512AC                     Z-ADD0         T#TAX4
+     C                     MOVEL*ON       *IN36
+     C                     MOVEL*BLANKS   W#CHK   1
+     C                     WRITEAR142TH
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C*折讓單小計
+     C                     Z-ADD0         T#QTY1
+     C                     Z-ADD0         T#AMT1
+0512AC                     Z-ADD0         T#TAX1
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*
+     C           KEY02     CHAINTRNDTS               51
+     C           TSCHYN    IFEQ 'Y'
+     C                     MOVEL'Y'       W#CHK
+     C                     MOVELTXNO      T#TXNO
+     C                     MOVELTXCUNO    T#CUNO
+     C                     MOVELTXORNO    T#ORNO
+     C                     MOVELTXIVNO    T#IVNO
+0410AC                     MOVELTXPDNM    T#PDNM
+     C                     MOVELTSMETL    T#METL
+     C                     MOVELTSSPE1    T#SPE1
+     C                     MOVELTSSPE2    T#SPE2
+     C                     MOVELTSSPE5    T#SPE5
+     C                     Z-ADDTXAMT     T#AMT
+0512AC                     Z-ADDTXTAX     T#TAX
+     C                     EXSR SR1000                     計算數量
+     C                     Z-ADDW#VQTY    T#QTY
+     C*
+     C*計算折讓單價(折讓金額/磅單符合條件之數量)
+     C*
+     C           T#AMT     DIV  W#VQTY    T#UPRC  53H
+     C*
+     C                     WRITEAR142T1
+     C                     MOVEL*OFF      *IN36
+     C                     ADD  T#QTY     T#QTY1
+     C                     ADD  T#QTY     T#QTY4
+     C                     ADD  T#AMT     T#AMT1
+     C                     ADD  T#AMT     T#AMT4
+0512AC                     ADD  T#TAX     T#TAX1
+0512AC                     ADD  T#TAX     T#TAX4
+     C                     ENDIF
+0512AC*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           T#QTY1    IFNE 0
+     C           T#AMT1    ANDNE0
+     C                     MOVEL*ALL'-'   T#LIN2
+     C   69                WRITEAR142TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR142T2
+     C                     MOVEL*ON       *IN36
+     C*
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C   69                WRITEAR142TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR142T6
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C           W#CHK     IFEQ *BLANKS
+     C                     EXSR MSGSR
+     C                     ELSE
+     C           T#QTY4    IFNE 0
+     C           T#AMT4    ANDNE0
+     C   69                WRITEAR142TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR142T5
+0410AC                     WRITEAR142T7
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C                     MOVEL*BLANKS   W#TXNO  8
+0409AC                     MOVEL*BLANKS   W#PDNM  5
+     C                     Z-ADD0         W#VQTY  80
+     C                     MOVEL*OFF      *IN97
+0410AC           KEY03     SETLLTRNDLG
+     C           *IN97     DOWEQ*OFF
+     C           KEY03     READETRNDLG              N    97
+     C   97                LEAVE
+0410AC*          T2TXNO    IFEQ W#TXNO                     同磅單只做一次
+0410AC*          T2PDNM    ANDEQW#PDNM
+0410AC*                    ITER
+0410AC*                    ELSE
+0410AC*                    MOVELT2TXNO    W#TXNO
+0410AC*                    MOVELT2PDNM    W#PDNM
+0410AC*                    ENDIF
+     C                     MOVEL*OFF      *IN96
+     C           KEY01     SETLLHSVOUR
+     C           *IN96     DOWEQ*OFF
+     C           KEY01     READERHSVOUR                  96
+     C   96                LEAVE
+0410AC           S4ORNO    IFNE T2ORNO
+0410AC                     ITER
+0410AC                     ENDIF
+     C*
+     C*計算分攤數量
+     C*
+     C                     SELEC
+     C*依鋼種分攤
+     C           T#METL    WHNE *BLANKS
+     C           T#SPE1    ANDEQ*BLANKS
+     C           T#SPE2    ANDEQ*BLANKS
+     C           T#SPE5    ANDEQ*BLANKS
+     C*
+     C           S4QULT    IFEQ T#METL
+     C           S4TYPE    IFEQ '0'
+     C                     ADD  S4STDW    W#VQTY
+     C                     ELSE
+     C                     ADD  S4NWGT    W#VQTY
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*依鋼種尺寸分攤
+     C           T#METL    WHNE *BLANKS
+     C           T#SPE1    ANDNE*BLANKS
+     C           T#SPE2    ANDNE*BLANKS
+     C           T#SPE5    ANDEQ*BLANKS
+     C*
+     C           S4QULT    IFEQ T#METL
+     C           S4SPE1    ANDEQT#SPE1
+     C           S4SPE2    ANDEQT#SPE2
+     C*
+     C           S4TYPE    IFEQ '0'
+     C                     ADD  S4STDW    W#VQTY
+     C                     ELSE
+     C                     ADD  S4NWGT    W#VQTY
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*依鋼種尺寸長度分攤
+     C           T#METL    WHNE *BLANKS
+     C           T#SPE1    ANDNE*BLANKS
+     C           T#SPE2    ANDNE*BLANKS
+     C           T#SPE5    ANDNE*BLANKS
+     C*
+     C           S4QULT    IFEQ T#METL
+     C           S4SPE1    ANDEQT#SPE1
+     C           S4SPE2    ANDEQT#SPE2
+     C           D#SPE5    ANDEQT#SPE5
+     C*
+     C           S4TYPE    IFEQ '0'
+     C                     ADD  S4STDW    W#VQTY
+     C                     ELSE
+     C                     ADD  S4NWGT    W#VQTY
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*依鋼種長度分攤
+     C           T#METL    WHNE *BLANKS
+     C           T#SPE5    ANDNE*BLANKS
+     C           T#SPE1    ANDEQ*BLANKS
+     C           T#SPE2    ANDEQ*BLANKS
+     C*
+     C           S4QULT    IFEQ T#METL
+     C           D#SPE5    ANDEQT#SPE5
+     C*
+     C           S4TYPE    IFEQ '0'
+     C                     ADD  S4STDW    W#VQTY
+     C                     ELSE
+     C                     ADD  S4NWGT    W#VQTY
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*依尺寸分攤
+     C           T#SPE1    WHNE *BLANKS
+     C           T#SPE2    ANDNE*BLANKS
+     C           T#SPE5    ANDEQ*BLANKS
+     C           T#METL    ANDEQ*BLANKS
+     C*
+     C           S4SPE1    IFEQ T#SPE1
+     C           S4SPE2    ANDEQT#SPE2
+     C*
+     C           S4TYPE    IFEQ '0'
+     C                     ADD  S4STDW    W#VQTY
+     C                     ELSE
+     C                     ADD  S4NWGT    W#VQTY
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*依尺寸長度分攤
+     C           T#SPE1    WHNE *BLANKS
+     C           T#SPE2    ANDNE*BLANKS
+     C           T#SPE5    ANDNE*BLANKS
+     C           T#METL    ANDEQ*BLANKS
+     C*
+     C           S4SPE1    IFEQ T#SPE1
+     C           S4SPE2    ANDEQT#SPE2
+     C           D#SPE5    ANDEQT#SPE5
+     C*
+     C           S4TYPE    IFEQ '0'
+     C                     ADD  S4STDW    W#VQTY
+     C                     ELSE
+     C                     ADD  S4NWGT    W#VQTY
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*依長度分攤
+     C           T#SPE5    WHNE *BLANKS
+     C           T#SPE1    ANDEQ*BLANKS
+     C           T#SPE2    ANDEQ*BLANKS
+     C           T#METL    ANDEQ*BLANKS
+     C*
+     C           D#SPE5    IFEQ T#SPE5
+     C*
+     C           S4TYPE    IFEQ '0'
+     C                     ADD  S4STDW    W#VQTY
+     C                     ELSE
+     C                     ADD  S4NWGT    W#VQTY
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSL
+     C*
+     C                     ENDDO
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C****************************************************************
+

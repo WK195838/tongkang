@@ -1,0 +1,657 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP150R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     型鋼折讓單資料上傳處理作業
+     H*            5.DATE-WRITTEN  108/04/29 2019AR00025
+     H*            6.UPDATE DATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FTRNDA6  UP  E           K        DISK
+     FTRNDA6G O   E           K        DISK
+     F            RTRNDA6                           KRENAMETRND6G
+     FTRNDTL  O   E           K        DISK
+     FTRNDTLLBIF  E           K        DISK
+     F            TXREC                             KRENAMETRNDLB
+     FTRNDTS  O   E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FINVDTLL4IF  E           K        DISK
+     FGENSEQ  UF  E           K        DISK                      A
+     FHSVOUR  IF  E           K        DISK
+     FARP150T1O   E             69     PRINTER
+     FARP150T O   E             70     PRINTER
+     E                    TAB1    1  25  1   TAB2   30
+     IRTRNDA6
+     I                                              A6CUNOL1
+     I                                              A6ORNOL1
+     I                                              A6DATEL1
+     ITRNDLB
+     I              TXFLAG                          T#FLAG
+     I              TXCODE                          T#CODE
+     I              TXNO                            T#TXNO
+     I              TXITEM                          T#ITEM
+     I              TXACNT                          T#ACNT
+     I              TXDATE                          T#DATE
+     I              TXACDT                          T#ACDT
+     I              TXCUNO                          T#CUNO
+     I              TXCUNM                          T#CUNM
+     I              TXORNO                          T#ORNO
+     I              TXIVNO                          T#IVNO
+     I              TXPCNO                          T#PCNO
+     I              TXVUNO                          T#VUNO
+     I              TXRVID                          T#RVID
+     I              TXSALE                          T#SALE
+     I              TXSATP                          T#SATP
+     I              TXIVTP                          T#IVTP
+     I              TXPDNM                          T#PDNM
+     I              TXQTY                           T#QTY
+     I              TXUPRC                          T#UPRC
+     I              TXAMT                           T#AMT
+     I              TXTAX                           T#TAX
+     I              TXFL01                          T#FL01
+     I              TXFL02                          T#FL02
+     I              TXTXAR                          T#TXAR
+     I              TXTXDT                          T#TXDT
+     I              TXRESV                          T#RESV
+     I            DS
+     I                                        1   80ININDT
+     I                                        1   60YYMM
+     I            DS
+     I                                        1  10 GRP
+     I                                        1   1 GE1
+     I                                        2  10 GE2
+     I            DS
+     I                                        1   6 NOG
+     I                                        1   1 NOA
+     I                                        2   60NOB
+     I            DS
+     I                                        1   8 T#TXNO
+     I                                        1   1 D#AREA
+     I                                        2   3 D#VNO1
+     I                                        4   80D#VNO2
+     I            DS
+     I                                        1   9 A6ORNO
+     I                                        1   6 D#ORNO
+     I            DS
+     I                                        1  30 TXRESV
+     I                                       18  18 D#TYPE
+     I            DS
+     I                                        1  30 A6RESV
+     I                                       18  18 D1TYPE
+     I            DS
+     I                                        1  30 TSRESV
+     I                                        1   3 D#SPE3
+     I            DS
+     I                                        1   7 S4SPE5
+     I                                        1   6 D#SPE5
+     I            DS
+     I                                        1   7 A6SPE5
+     I                                        1   6 D1SPE5
+     I           UDS
+     I                                        1   1 AR#P
+     I                                        2  11 C#USER
+     I                                       12  12 W#ER
+     I                                       13  22 J#USER
+     I                                      801 8080W#DATE
+     I*                                    10011010 U#USER
+     I                                     10211021 TXAR
+     C*****************************************************************
+     C           KEY01     KLIST
+     C                     KFLD           A6IVNO
+     C                     KFLD           A6PDNM
+     C*
+     C           GEKEY     KLIST
+     C                     KFLD           GEKIND
+     C                     KFLD           GEPRIN
+     C*
+     C           KEY06     KLIST
+     C                     KFLD           D#AREA
+     C                     KFLD           D#VNO1
+     C                     KFLD           D#VNO2
+     C*
+     C*****************************************************************
+     C*INITIALIZE
+     C  N90                MOVEA'1111'    *IN,69
+     C  N90                MOVEL*BLANK    W#FLAG  1        *處理代碼
+     C  N90                CLEARAR50T14
+     C  N90                CLEARAR50T24
+     C  N90                Z-ADD0         W#ITEM  20
+     C  N90                SETON                     90
+     C*
+     C                     MOVEA'0000'    *IN,11
+     C                     MOVEA'0000000' *IN,42
+     C                     MOVEA'0'       *IN,50
+     C                     MOVEA'0000000' *IN,51
+     C                     MOVEA'0000000' *IN,58
+     C           A6FLAG    COMP 'A'                      11
+     C           A6FLAG    COMP 'C'                      12
+     C           A6FLAG    COMP 'D'                      13
+     C*寫入報表
+     C   69                WRITEAR50T11
+     C                     MOVE *OFF      *IN69
+     C   70                WRITEAR50T21
+     C                     MOVE *OFF      *IN70
+     C*
+     C                     WRITETRND6G
+     C           A6FLAG    IFNE ' '
+     C                     EXSR MOVE1
+     C*
+     C                     SETOF                     99
+     C*逐筆處理, ACD可連續處理上送
+     C*修改時，取消過入並列於上送清單
+     C   12                SETON                     9960  *取消過入
+     C*刪除時，取消過入並列於上送清單
+     C   13                SETON                     9961  *取消過入
+     C*檢核
+     C  N99                EXSR CKRTN
+     C  N99                EXSR CKDATE
+     C  N99 L1             EXSR GETNO
+     C  N99                EXSR MOVE2
+     C  N99                WRITETXREC
+     C  N99                WRITERTRNDTS
+     C   61                SETOF                     99    *取消過入
+     C   60                SETOF                     99    *取消過入
+     C                     ENDIF
+     C*
+     C           A6FLAG    IFEQ ' '
+     C                     MOVEL*ON       *IN99
+     C                     ENDIF
+     C*
+     C*傳輸資料正常CXSTCL='C'
+     C  N99                MOVEL'C'       A6CTRL           *執行碼
+     C  N99 61             MOVEL'D'       A6CTRL           *取消過入
+     C*傳輸資料異常CXSTCL='E' (未上傳HSCINV)
+     C   99                MOVEL'E'       A6CTRL           執行碼
+     C   99 42             MOVEL'V'       A6CTRL           發票不存在
+     C   99 43             MOVEL'U'       A6CTRL           折讓單號項次空白
+     C   99 44             MOVEL'T'       A6CTRL           客編不符
+     C   99 45             MOVEL'S'       A6CTRL           訂編不符
+     C   99 46             MOVEL'R'       A6CTRL           品名不符
+     C*  99 47             MOVEL'Q'       A6CTRL
+     C   99 48             MOVEL'O'       A6CTRL           鋼尺長未輸
+     C   99 51             MOVEL'P'       A6CTRL           尺寸不完整
+     C   99 52             MOVEL'F'       A6CTRL           鋼種不在磅單
+     C   99 53             MOVEL'G'       A6CTRL           尺寸不在磅單
+     C   99 54             MOVEL'H'       A6CTRL           鋼尺不在磅單
+     C   99 55             MOVEL'I'       A6CTRL           鋼尺長不在磅單
+     C   99 56             MOVEL'J'       A6CTRL           尺長不在磅單
+     C   99 57             MOVEL'K'       A6CTRL           長度不在磅單
+     C   99 58             MOVEL'L'       A6CTRL           鋼長不在磅單
+     C   99 59             MOVEL'M'       A6CTRL           單據日期
+     C   99 50             MOVEL'N'       A6CTRL           折讓種類
+     C   99 60             MOVEL' '       A6CTRL           *需重上送
+     C*
+     C*          *DATE     SUB  19000000  A6TMDT           *轉檔日期
+     C*                    TIME           A6TMTM           *轉檔時間
+     C*                    MOVELU#USER    A6TMUS           *轉檔人員
+     C*訊息說明
+     C           A6CTRL    LOKUPTAB1      TAB2           34
+     C   34                MOVELTAB2      S#STCL
+     C  N34                MOVEL*BLANK    S#STCL
+     C                     MOVEL'Y'       AR#P             *有資料
+     C*
+     C                     UPDATRTRNDA6
+     C*記錄處理完後寫介面LOG
+     C                     MOVELJ#USER    A6USER           *JOB
+     C                     MOVELC#USER    A6CUSR           *CUR
+     C                     Z-ADDW#DATE    A6XPDD
+     C                     TIME           A6CPDT
+     C                     WRITETRND6G
+     C*寫入報表
+     C           *IN99     IFEQ *OFF                       *上送清單
+     C                     ADD  A6AMT     R#AMTA
+     C                     WRITEAR50T12
+     C                     ELSE
+     C                     ADD  A6AMT     R#AMT1
+     C                     WRITEAR50T22                    *錯誤清單
+     C                     MOVEL'Y'       W#ER             *有錯誤
+     C                     ENDIF
+     C*
+     CLR 90                WRITEAR50T13
+     CLR 90                WRITEAR50T23
+     CLR 90                WRITEAR50T14
+     CLR 90                WRITEAR50T24
+     C*****************************************************************
+     C           MOVE1     BEGSR
+     C*****************************************************************
+     C*
+     C                     MOVELA6FLAG    TXFLAG           *處理代碼
+     C                     MOVEL'AR06'    TXCODE           *單據代號
+     C           A6NO      IFNE *BLANKS
+     C                     MOVELA6NO      S#NO
+     C                     ENDIF
+     C                     MOVELA6ACNT    TXACNT           *原因別
+     C                     Z-ADDA6DATE    TXDATE           *單據日期
+     C                     Z-ADDA6ACDT    TXACDT           *入帳日期
+     C                     MOVELA6CUNO    TXCUNO           *客戶代號
+     C                     MOVELA6ORNO    TXORNO           *訂單編號
+     C                     MOVELA6ORNO    S#ORNO
+     C                     MOVELA6IVNO    TXIVNO           *發票號碼
+     C           A6IVNO    CHAININVMST               26
+     C           *IN26     IFEQ *OFF
+     C                     MOVELINCUNM    TXCUNM           *客戶名稱
+     C                     MOVELINRVID    TXRVID           *收款業務員
+     C                     MOVELINSALE    TXSALE           *出貨業務員
+     C                     MOVELINSATP    TXSATP           *銷售別
+     C                     MOVELINKIND    TXIVTP           *發票別
+     C                     ENDIF
+     C*
+     C                     MOVELA6PDNM    TXPDNM           *品名
+     C                     Z-ADDA6QTY     TXQTY            *數量
+     C                     Z-ADDA6UPRC    TXUPRC           *單價
+     C                     Z-ADDA6AMT     TXAMT            *金額
+     C           TXAMT     MULT 0.05      TXTAX     H      *稅額
+     C                     MOVEL*BLANKS   TXFL01           *折讓確認碼
+     C                     MOVEL*BLANKS   TXFL02           *過發票碼
+     C                     MOVELTXAR      TXTXAR           *異動廠區
+     C                     Z-ADDW#DATE    TXTXDT           *異動日期
+     C                     MOVEL'2'       D#TYPE           *保留碼
+     C***
+     C                     MOVEL'A'       TSFLAG           *處理代碼
+     C                     MOVEL'AR06'    TSCODE           *單據代號
+     C                     MOVELA6METL    TSMETL           *鋼種
+     C                     MOVELA6SPE1    TSSPE1           * H/T/D
+     C                     MOVELA6SPE2    TSSPE2           * B/W
+     C                     MOVELA6SPE5    TSSPE5           *長度
+     C                     MOVEL'Y'       TSCHYN           *折讓分攤碼
+     C                     MOVEL'Y'       A6CHYN
+     C                     MOVELA6SPE3    D#SPE3           * T1
+     C                     MOVELTXAR      TSTXAR           *異動廠區
+     C                     MOVELC#USER    TSENTM           *建檔人員
+     C                     Z-ADDW#DATE    TSENTD           *建檔日期
+     C                     TIME           TSENTT           *建檔時間
+     C                     MOVELC#USER    TSUPDM           *異動人員
+     C                     Z-ADDW#DATE    TSUPDD           *異動日期
+     C                     TIME           TSUPDT           *異動時間
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MOVE2     BEGSR
+     C*****************************************************************
+     C*
+     C           W#ITEM    IFLT 10
+     C                     ADD  1         W#ITEM
+     C                     Z-ADDW#ITEM    A6ITEM
+     C                     Z-ADDW#ITEM    TXITEM
+     C                     Z-ADDW#ITEM    TSITEM
+     C                     MOVELTXNO      A6NO
+     C                     ELSE
+     C                     Z-ADD0         W#ITEM
+     C                     EXSR GETNO
+     C                     ADD  1         W#ITEM
+     C                     Z-ADDW#ITEM    A6ITEM
+     C                     Z-ADDW#ITEM    TXITEM
+     C                     Z-ADDW#ITEM    TSITEM
+     C                     MOVELTXNO      A6NO
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C****************************************************************
+     C           CKRTN     BEGSR
+     C***************************************************************
+     C*
+     C*IN26=*ON，CHAIN不到發票
+     C*
+     C           *IN26     IFEQ *ON
+     C                     SETON                     9942  *發票號碼
+     C                     ENDIF
+     C*檢核單據代號&項次須空白
+     C*
+     C           A6NO      IFNE *BLANKS
+     C           A6ITEM    ORNE 0
+     C                     SETON                     9943  *折讓單號
+     C                     ENDIF
+     C*
+     C*折讓種類
+     C*
+     C  N99      A6ACNT    IFNE '3'
+     C                     SETON                     9950  *折讓種類
+     C                     ENDIF
+     C*
+     C*檢核客戶訂單與發票資料
+     C*
+     C  N99      A6CUNO    IFNE INCUNO
+     C                     SETON                     9944  *客戶編號
+     C                     ENDIF
+     C*
+     C  N99      D#ORNO    IFNE INORNO
+     C                     SETON                     9945  *訂單編號
+     C                     ENDIF
+     C*
+     C*檢核產品代碼
+     C*
+     C           *IN99     IFEQ *OFF
+     C                     MOVEL'N'       W#CHK   1
+     C           KEY01     SETLLIVREC
+     C                     MOVEL*OFF      *IN27
+     C           *IN27     DOWEQ*OFF
+     C           KEY01     READEIVREC                    27
+     C   27                LEAVE
+     C           IVACNT    IFNE '1'
+     C                     ITER
+     C                     ELSE
+     C                     MOVEL'Y'       W#CHK
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C           W#CHK     IFNE 'Y'
+     C                     SETON                     9946  *產品代碼
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C*檢核金額
+     C*
+     C*          *IN99     IFEQ *OFF
+     C*          A6QTY     IFNE 0
+     C*          A6UPRC    ANDNE0
+     C*          A6QTY     MULT A6UPRC    W#AMT  110H
+     C*          A6AMT     IFNE W#AMT
+     C*                    SETON                     9947  *金額
+     C*                    ENDIF
+     C*                    ENDIF
+     C*                    ENDIF
+     C*
+     C*檢核鋼種、尺寸、長度
+     C*
+     C  N99      A6METL    IFEQ *BLANKS
+     C           A6SPE1    ANDEQ*BLANKS
+     C           A6SPE2    ANDEQ*BLANKS
+     C           D1SPE5    ANDEQ*BLANKS
+     C           A6METL    OREQ *BLANKS
+     C           A6SPE1    ANDEQ*ALL'0'
+     C           A6SPE2    ANDEQ*ALL'0'
+     C           D1SPE5    ANDEQ*ALL'0'
+     C           A6METL    OREQ *BLANKS
+     C           A6SPE1    ANDEQ*ALL'0'
+     C           A6SPE2    ANDEQ*ALL'0'
+     C           D1SPE5    ANDEQ*BLANKS
+     C           A6METL    OREQ *BLANKS
+     C           A6SPE1    ANDEQ*BLANKS
+     C           A6SPE2    ANDEQ*ALL'0'
+     C           D1SPE5    ANDEQ*BLANKS
+     C           A6METL    OREQ *BLANKS
+     C           A6SPE1    ANDEQ*BLANKS
+     C           A6SPE2    ANDEQ*ALL'0'
+     C           D1SPE5    ANDEQ*BLANKS
+     C           A6METL    OREQ *BLANKS
+     C           A6SPE1    ANDEQ*BLANKS
+     C           A6SPE2    ANDEQ*BLANKS
+     C           D1SPE5    ANDEQ*ALL'0'
+     C                     SETON                     9948  鋼種尺寸長度
+     C                     ENDIF
+     C*
+     C  N99      A6SPE1    IFNE *BLANKS
+     C           A6SPE2    ANDEQ*BLANKS
+     C           A6SPE1    OREQ *BLANKS
+     C           A6SPE2    ANDNE*BLANKS
+     C           A6SPE1    OREQ *BLANKS
+     C           A6SPE2    ANDEQ*ALL'0'
+     C           A6SPE1    OREQ *ALL'0'
+     C           A6SPE2    ANDEQ*BLANKS
+     C                     SETON                     9951
+     C                     ENDIF
+     C*
+     C           *IN99     IFEQ *OFF
+     C                     MOVEL'N'       W#CHK   1
+     C                     MOVEL*OFF      *IN97
+     C           A6IVNO    SETLLTRNDLB
+     C  N99      *IN97     DOWEQ*OFF
+     C           A6IVNO    READETRNDLB              N    97
+     C   97                LEAVE
+     C                     MOVEL*OFF      *IN96
+     C           KEY06     SETLLHSVOUR
+     C           *IN96     DOWEQ*OFF
+     C           KEY06     READERHSVOUR                  96
+     C   96                LEAVE
+     C*
+     C                     SELEC
+     C           A6METL    WHNE *BLANKS
+     C           A6SPE1    ANDEQ*BLANKS
+     C           A6SPE2    ANDEQ*BLANKS
+     C           A6SPE3    ANDEQ*BLANKS
+     C           D1SPE5    ANDEQ*BLANKS
+     C           W#CHK     ANDNE'Y'
+     C           S4QULT    IFNE A6METL
+     C                     SETON                     9952
+     C                     ITER
+     C                     ELSE
+     C                     MOVEL'Y'       W#CHK   1
+     C                     SETOF                     9952
+     C                     ENDIF
+     C           A6METL    WHNE *BLANKS
+     C           A6SPE1    ANDNE*BLANKS
+     C           A6SPE2    ANDNE*BLANKS
+     C           A6SPE3    ANDEQ*BLANKS
+     C           D1SPE5    ANDEQ*BLANKS
+     C           W#CHK     ANDNE'Y'
+     C           S4SPE1    IFNE A6SPE1
+     C           S4SPE2    ORNE A6SPE2
+     C           S4QULT    ORNE A6METL
+     C                     SETON                     9953
+     C                     ITER
+     C                     ELSE
+     C                     MOVEL'Y'       W#CHK
+     C                     SETOF                     9953
+     C                     ENDIF
+     C           A6METL    WHNE *BLANKS
+     C           A6SPE1    ANDNE*BLANKS
+     C           A6SPE2    ANDNE*BLANKS
+     C           A6SPE3    ANDNE*BLANKS
+     C           D1SPE5    ANDEQ*BLANKS
+     C           W#CHK     ANDNE'Y'
+     C           S4SPE1    IFNE A6SPE1
+     C           S4SPE2    ORNE A6SPE2
+     C           S4SPE3    ORNE A6SPE3
+     C           S4QULT    ORNE A6METL
+     C                     SETON                     9954
+     C                     ITER
+     C                     ELSE
+     C                     MOVEL'Y'       W#CHK
+     C                     SETOF                     9954
+     C                     ENDIF
+     C           A6METL    WHNE *BLANKS
+     C           A6SPE1    ANDNE*BLANKS
+     C           A6SPE2    ANDNE*BLANKS
+     C           A6SPE3    ANDEQ*BLANKS
+     C           D1SPE5    ANDNE*BLANKS
+     C           W#CHK     ANDNE'Y'
+     C           S4QULT    IFNE A6METL
+     C           S4SPE1    ORNE A6SPE1
+     C           S4SPE2    ORNE A6SPE2
+     C           D#SPE5    ORNE D1SPE5
+     C                     SETON                     9955
+     C                     ITER
+     C                     ELSE
+     C                     MOVEL'Y'       W#CHK
+     C                     SETOF                     9955
+     C                     ENDIF
+     C           A6METL    WHNE *BLANKS
+     C           A6SPE1    ANDNE*BLANKS
+     C           A6SPE2    ANDNE*BLANKS
+     C           A6SPE3    ANDNE*BLANKS
+     C           D1SPE5    ANDNE*BLANKS
+     C           W#CHK     ANDNE'Y'
+     C           S4QULT    IFNE A6METL
+     C           S4SPE1    ORNE A6SPE1
+     C           S4SPE2    ORNE A6SPE2
+     C           S4SPE3    ORNE A6SPE3
+     C           D#SPE5    ORNE D1SPE5
+     C                     SETON                     9955
+     C                     ITER
+     C                     ELSE
+     C                     MOVEL'Y'       W#CHK
+     C                     SETOF                     9955
+     C                     ENDIF
+     C           A6METL    WHEQ *BLANKS
+     C           A6SPE1    ANDNE*BLANKS
+     C           A6SPE2    ANDNE*BLANKS
+     C           A6SPE2    ANDEQ*BLANKS
+     C           D1SPE5    ANDEQ*BLANKS
+     C           W#CHK     ANDNE'Y'
+     C           S4SPE1    IFNE A6SPE1
+     C           S4SPE2    ORNE A6SPE2
+     C                     SETON                     9953
+     C                     ITER
+     C                     ELSE
+     C                     MOVEL'Y'       W#CHK
+     C                     SETOF                     9953
+     C                     ENDIF
+     C           A6METL    WHEQ *BLANKS
+     C           A6SPE1    ANDNE*BLANKS
+     C           A6SPE2    ANDNE*BLANKS
+     C           A6SPE3    ANDNE*BLANKS
+     C           D1SPE5    ANDEQ*BLANKS
+     C           W#CHK     ANDNE'Y'
+     C           S4SPE1    IFNE A6SPE1
+     C           S4SPE2    ORNE A6SPE2
+     C           S4SPE3    ORNE A6SPE3
+     C                     SETON                     9953
+     C                     ITER
+     C                     ELSE
+     C                     MOVEL'Y'       W#CHK
+     C                     SETOF                     9953
+     C                     ENDIF
+     C           A6METL    WHEQ *BLANKS
+     C           A6SPE1    ANDNE*BLANKS
+     C           A6SPE2    ANDNE*BLANKS
+     C           A6SPE3    ANDEQ*BLANKS
+     C           D1SPE5    ANDNE*BLANKS
+     C           W#CHK     ANDNE'Y'
+     C           S4SPE1    IFNE A6SPE1
+     C           S4SPE2    ORNE A6SPE2
+     C           D#SPE5    ORNE D1SPE5
+     C                     SETON                     9956
+     C                     ITER
+     C                     ELSE
+     C                     MOVEL'Y'       W#CHK
+     C                     SETOF                     9956
+     C                     ENDIF
+     C           A6METL    WHEQ *BLANKS
+     C           A6SPE1    ANDNE*BLANKS
+     C           A6SPE2    ANDNE*BLANKS
+     C           A6SPE3    ANDNE*BLANKS
+     C           D1SPE5    ANDNE*BLANKS
+     C           W#CHK     ANDNE'Y'
+     C           S4SPE1    IFNE A6SPE1
+     C           S4SPE2    ORNE A6SPE2
+     C           S4SPE3    ORNE A6SPE3
+     C           D#SPE5    ORNE D1SPE5
+     C                     SETON                     9956
+     C                     ITER
+     C                     ELSE
+     C                     MOVEL'Y'       W#CHK
+     C                     SETOF                     9956
+     C                     ENDIF
+     C           A6METL    WHEQ *BLANKS
+     C           A6SPE1    ANDEQ*BLANKS
+     C           A6SPE2    ANDEQ*BLANKS
+     C           A6SPE3    ANDEQ*BLANKS
+     C           D1SPE5    ANDNE*BLANKS
+     C           W#CHK     ANDNE'Y'
+     C           D#SPE5    IFNE D1SPE5
+     C                     SETON                     9957
+     C                     ITER
+     C                     ELSE
+     C                     MOVEL'Y'       W#CHK
+     C                     SETOF                     9957
+     C                     ENDIF
+     C           A6METL    WHNE *BLANKS
+     C           A6SPE1    ANDEQ*BLANKS
+     C           A6SPE2    ANDEQ*BLANKS
+     C           A6SPE3    ANDEQ*BLANKS
+     C           D1SPE5    ANDNE*BLANKS
+     C           W#CHK     ANDNE'Y'
+     C           S4QULT    IFNE A6METL
+     C           D#SPE5    ORNE D1SPE5
+     C                     SETON                     9958
+     C                     ITER
+     C                     ELSE
+     C                     MOVEL'Y'       W#CHK
+     C                     SETOF                     9958
+     C                     ENDIF
+     C                     ENDSL
+     C                     ENDDO
+     C                     ENDDO
+     C*
+     C                     ENDIF
+     C*
+     C           CHKED     ENDSR
+     C****************************************************************
+     C*檢核日期
+     C           CKDATE    BEGSR
+     C****************************************************************
+     C*單據日期
+     C                     Z-ADDA6DATE    W#DAY   80
+     C                     CALL 'C018'
+     C                     PARM           W#DAY
+     C                     PARM           W#ERR   1
+     C  N99      W#ERR     IFEQ '1'
+     C                     SETON                     9959  *日期錯誤
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C****************************************************************
+     C*前筆處理至D碼HSCINV未傳輸時
+     C*後面同單據需於下次再送並寫入錯誤清單中告知非資料錯誤
+     C           CKPASS    BEGSR
+     C           W#FLAG    IFEQ 'D'
+     C                     SETON                     9960  *需再上送
+     C                     ENDIF
+     C                     ENDSR
+     C****************************************************************
+     C           GETNO     BEGSR
+     C****************************************************************
+     C*
+     C                     MOVEL'06'      GEKIND
+     C                     MOVEL*BLANKS   GEPRIN
+     C                     MOVEL*BLANKS   GRP
+     C                     MOVELTXAR      GE1
+     C                     MOVELGRP       GEPRIN
+     C           GEKEY     CHAINGENSEQ               97
+     C   97                Z-ADD1         GECUNO
+     C   97                WRITEGEREC
+     C           *IN97     IFEQ *OFF
+     C           GECUNO    IFEQ 99999
+     C                     Z-ADD1         NOB
+     C                     ELSE
+     C                     ADD  1         GECUNO
+     C                     ENDIF
+     C                     UPDATGEREC
+     C                     ENDIF
+     C                     MOVELTXAR      NOA
+     C                     Z-ADDGECUNO    NOB
+     C                     MOVELNOG       A6NO
+     C                     MOVELNOG       TXNO
+     C                     MOVELNOG       TSNO
+     C  N99                MOVELNOG       S#NO
+     C                     Z-ADD0         W#ITEM
+     C*
+     C                     ENDSR
+     C****************************************************************
+** AR1
+CC-上送成功
+DD-上送取消(資料不存在)
+EE-資料異常不存在
+FF-發票對磅單無此鋼種
+GG-發票對磅單無此尺寸
+HH-發票對磅單無此鋼種尺寸
+II-發票對磅單無此鋼種尺寸長度
+JJ-發票對磅單無此尺寸長度
+KK-發票對磅單無此長度
+LL-發票對磅單無此鋼種長度
+MM-日期錯誤
+NN-折讓種類須是3
+OO-鋼種尺寸長度擇一輸入
+PP-尺寸H/W/D及B/T皆須輸入
+QQ-
+RR-產品名稱與發票內容不符
+SS-訂單編號與發票內容不符
+TT-客戶編號與發票內容不符
+UU-折讓單號及項次須空白
+VV-發票號碼不存在發票檔
+  -檔案傳輸中，請稍候再上傳
+

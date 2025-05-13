@@ -1,0 +1,493 @@
+     H*****************************************************************
+     H*
+     H*            >>  PROGRAM INTRODUCTION  <<
+     H*
+     H*            1.PROGRAM-ID      ARR097R2
+     H*            2.PROGRAM-TYPE    RPG
+     H*            3.AUTHOR          S02LBU
+     H*            4.FUNCTION       應收帳款明細表（查帳用）
+     H*            5.DATE-WRITTEN    91/09/04
+     H*
+     H*****************************************************************
+     H        1    Y                                    1
+     FW1STWF  IP  E           K        DISK
+     FW2STWF  O   E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FTRNDTL  IF  E           K        DISK
+     I*****************************************************************
+     IW1REC       01
+     I*----------------------------------------------------------------
+     I           UDS
+     I                                      304 3070D#YME
+     I*
+     I            DS
+     I                                        1   80D#DEDT
+     I                                        3   60D#DED1
+     I*
+     I            DS
+     I                                        1   80D#ACDT
+     I                                        3   60D#ACD1
+     I*
+     I            DS
+     I                                        1   80D#TXAD
+     I                                        3   60D#TXA1
+     I*
+     I            DS
+     I                                        1   80D#INDT
+     I                                        3   60D#IND1
+     I*
+     I            DS
+     I                                        1  10 D#IVNO
+     I                                        1   6 D#NO1
+     I                                        7  100D#NO2
+     I*
+     I            DS
+     I                                        1  10 D#W1NO
+     I                                        1   8 D#IV1
+     I                                        9  10 D#IV2
+     I                                        2   3 D#NX1
+     I                                        7  10 D#NX2
+     C*----------------------------------------------------------------
+     C*INVDTL
+     C           K#INVD    KLIST
+     C                     KFLD           IVNO             發票號碼
+     C                     KFLD           IVACNT           類別
+     C                     KFLD           IVITEM           項次
+     C*TRNDTL
+     C           K#TRND    KLIST
+     C                     KFLD           TXCODE
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+     C*
+     I*****************************************************************
+     C*   主程式
+     C*****************************************************************
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AAMT 110
+     C                     Z-ADD0         W#FAM1 110
+     C                     Z-ADD0         W#FAM2 110
+     C*
+     C                     MOVE *BLANK    W2CUNM
+     C                     MOVE *BLANK    W2CUNO
+     C                     MOVE *BLANK    W2ORNO
+     C                     MOVE *BLANK    W2RVID
+     C                     MOVE *BLANK    W2IVNO
+     C                     Z-ADD0         W2AAMT
+     C                     Z-ADD0         W2BAMT
+     C                     Z-ADD0         W2CAMT
+     C                     Z-ADD0         W2DAMT
+     C                     Z-ADD0         W2EAMT
+     C                     Z-ADD0         W2FAMT
+     C                     Z-ADD0         W2GAMT
+     C                     Z-ADD0         W2HAMT
+     C*
+     C                     MOVELASIVNO    D#W1NO
+     C                     MOVELASIVNO    W#INN1  2
+     C                     MOVE ASIVNO    W#INN2  8
+     C*
+     C           W#INN1    IFEQ 'NB'
+     C           W#INN2    ANDEQ'87871937'
+     C                     Z-ADD0         W#TEST  10
+     C                     GOTO EN1000
+     C                     ENDIF
+     C*
+     C*如後2碼不為空白--> SR2000 (發票)
+     C*
+     C           D#IV2     CASNE*BLANK    SR2000
+     C*
+     C* 2、3碼為'11'  --> SR3000 (磅單)
+     C*
+     C           D#NX1     CASEQ'11'      SR3000
+     C*
+     C* 7-10碼為空白    --> SR4000 (折讓、調整單)
+     C*
+     C           D#NX2     CASEQ*BLANK    SR4000
+     C*
+     C                     ENDCS
+     C*
+     C           EN1000    ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*發票
+     C           ASIVNO    CHAININREC                60
+     C   60                GOTO EN2000
+     C*
+     C*若作廢碼等於Ｄ，且作廢日在統計止日之後，
+     C*則將該筆資料寫入W2STDW
+     C*若未作廢，則依發票明細重新統計各項　　　　
+     C*金額（其入帳日須在統計止日前）
+     C*
+     C                     MOVELINDEDT    D#DEDT           作廢日期
+     C*
+     C           INDECD    IFEQ 'D'                        已作廢　
+     C                     EXSR SR2100
+     C                     ELSE                            未作廢
+     C                     EXSR SR2200
+     C                     ENDIF
+     C*
+     C           EN2000    ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C           D#DED1    IFLT D#YME                      發主作廢日
+     C                     GOTO EN2100
+     C                     ENDIF
+     C*
+     C                     MOVELASCUNM    W2CUNM           客戶名稱
+     C                     MOVELASCUNO    W2CUNO           客戶編號
+     C                     MOVELASORNO    W2ORNO           訂單號碼　
+     C                     MOVELASRVID    W2RVID           業務員
+     C                     MOVELASIVNO    W2IVNO           發票號碼
+     C                     Z-ADDINAAMT    W2AAMT           貨款
+     C                     Z-ADDINBAMT    W2BAMT           扣預收款
+     C                     Z-ADDINATAX    W2CAMT           銷項稅額
+     C           W2AAMT    ADD  W#AAMT    W2DAMT           發票金額
+     C                     Z-ADDINCAMT    W2EAMT           銷退／折讓
+     C           W2AAMT    ADD  W2BAMT    W#FAM1           應收貨款
+     C           W2CAMT    ADD  W2EAMT    W#FAM2
+     C           W#FAM1    ADD  W#FAM2    W2FAMT
+     C                     Z-ADDINEAMT    W2GAMT           已收金額
+     C           W2FAMT    ADD  W2GAMT    W2HAMT           應收帳款
+     C*
+     C                     WRITEW2REC
+     C*
+     C           EN2100    ENDSR
+     C*****************************************************************
+     C           SR2200    BEGSR
+     C*****************************************************************
+     C*給定INVDTL之KEY值
+     C                     MOVELASIVNO    IVNO             發票號碼
+     C                     MOVE *BLANK    IVACNT           類別
+     C                     Z-ADD0         IVITEM           項次
+     C*
+     C           K#INVD    SETLLIVREC
+     C                     MOVE *OFF      *IN60
+     C           *IN60     DOWEQ*OFF
+     C                     READ IVREC                    60
+     C*
+     C           ASIVNO    IFNE IVNO
+     C           *IN60     OREQ *ON
+     C                     LEAVE
+     C                     ELSE
+     C                     SETOF                     60
+     C                     ENDIF
+     C*
+     C                     EXSR SR2210                     重新統計
+     C*
+     C                     ENDDO
+     C*
+     C           W2HAMT    IFNE 0
+     C*          W2AAMT    ANDNE0
+     C                     WRITEW2REC
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2210    BEGSR
+     C*****************************************************************
+     C                     MOVELIVACDT    D#ACDT           入帳日期　
+     C                     MOVELIVRESV    W#IVRE  40
+     C*
+     C           D#ACD1    IFEQ 9999
+     C           W#IVRE    ANDGTD#YME
+     C                     GOTO EN2210
+     C                     ENDIF
+     C*
+     C           D#ACD1    IFNE 9999
+     C           D#ACD1    ANDGTD#YME                      發明入帳日
+     C                     GOTO EN2210
+     C                     ENDIF
+     C*
+     C                     MOVELASCUNM    W2CUNM           客戶名稱
+     C                     MOVELASCUNO    W2CUNO           客戶編號
+     C                     MOVELASORNO    W2ORNO           訂單號碼　
+     C                     MOVELASRVID    W2RVID           業務員
+     C                     MOVELASIVNO    W2IVNO           發票號碼
+     C*
+     C                     SELEC
+     C           IVACNT    WHEQ '1'
+     C                     ADD  IVAMT     W2AAMT           出貨金額
+     C           IVACNT    WHEQ '2'
+     C                     ADD  IVAMT     W2EAMT           退貨金額
+     C           IVACNT    WHEQ '3'
+     C                     ADD  IVAMT     W2EAMT           折讓金額
+     C           IVACNT    WHEQ '4'
+     C                     ADD  IVAMT     W2BAMT           預收
+     C           IVACNT    WHEQ '5'
+     C                     ADD  IVAMT     W2CAMT
+     C           IVPDCD    IFEQ '   '
+     C                     ADD  IVAMT     W#AAMT           稅額
+     C                     ENDIF
+     C           IVACNT    WHEQ '6'
+     C                     ADD  IVAMT     W2GAMT           繳款金額
+     C           IVACNT    WHEQ '7'
+     C                     ADD  IVAMT     W2GAMT           退票轉出
+     C           IVACNT    WHEQ '8'
+     C                     ADD  IVAMT     W2AAMT           勞務
+     C           IVACNT    WHEQ '9'
+     C                     ADD  IVAMT     W2AAMT           其他
+     C                     ENDSL
+     C*
+     C           W2AAMT    ADD  W#AAMT    W2DAMT           算發票金額
+     C           W2AAMT    ADD  W2BAMT    W#FAM1           算應收貨款
+     C           W2CAMT    ADD  W2EAMT    W#FAM2
+     C           W#FAM1    ADD  W#FAM2    W2FAMT
+     C           W2FAMT    ADD  W2GAMT    W2HAMT           算應收帳款
+     C*
+     C           EN2210    ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*磅單部分
+     C*
+     C*給定TRNDTL之KEY值
+     C*
+     C                     MOVEL'SA04'    TXCODE           單據代號
+     C                     MOVELASIVNO    TXNO             單據號碼
+     C                     Z-ADD0         TXITEM           項次
+     C*
+     C                     MOVELASIVNO    W#IVNO  8
+     C*
+     C           K#TRND    SETLLTXREC
+     C                     MOVE *OFF      *IN60
+     C           *IN60     DOWEQ*OFF
+     C                     READ TXREC                    60
+     C*
+     C           TXCODE    IFNE 'SA04'
+     C           TXNO      ORNE W#IVNO
+     C           *IN60     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           TXIVNO    CHAININREC                61
+     C*
+     C  N61                EXSR SR3100                     有效發票
+     C   61                EXSR SR3200                     還原正負沖
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3100    BEGSR
+     C*****************************************************************
+     C*發票開立日如在統計止日後，則納入統計
+     C*，否則不納入
+     C*
+     C                     MOVELININDT    D#INDT           發票開立日
+     C*
+     C           D#IND1    IFLT D#YME
+     C                     GOTO EN3100
+     C                     ENDIF
+     C*
+     C                     MOVELASCUNM    W2CUNM           客戶名稱
+     C                     MOVELASCUNO    W2CUNO           客戶編號
+     C                     MOVELASORNO    W2ORNO           訂單號碼　
+     C                     MOVELASRVID    W2RVID           業務員
+     C                     MOVELASIVNO    W2IVNO           發票號碼
+     C                     Z-ADDASAAMT    W2AAMT           貨款
+     C                     Z-ADDASBAMT    W2BAMT           扣預收款
+9208 C*          ASAAMT    MULT 0.05      W2CAMT           銷項稅額
+     C           W2AAMT    ADD  W#AAMT    W2DAMT           發票金額
+     C                     Z-ADDASEAMT    W2EAMT           銷退／折讓
+     C           W2AAMT    ADD  W2BAMT    W#FAM1           應收貨款
+     C           W2CAMT    ADD  W2EAMT    W#FAM2
+     C           W#FAM1    ADD  W#FAM2    W2FAMT
+     C                     Z-ADDASGAMT    W2GAMT           已收金額
+     C           W2FAMT    ADD  W2GAMT    W2HAMT           應收帳款
+     C*
+     C                     WRITEW2REC
+     C*
+     C           EN3100    ENDSR
+     C*****************************************************************
+     C           SR3200    BEGSR
+     C*****************************************************************
+     C                     MOVELTXIVNO    D#IVNO           銷貨發票
+     C*
+     C           D#NO1     IFNE '000000'
+     C           D#NO2     OREQ 0
+     C           D#NO2     ORGT D#YME
+     C                     GOTO EN3200
+     C                     ENDIF
+     C*
+     C                     MOVELTXCUNM    W2CUNM           客戶名稱
+     C                     MOVELTXCUNO    W2CUNO           客戶編號
+     C                     MOVELTXORNO    W2ORNO           訂單號碼　
+     C                     MOVELTXRVID    W2RVID           業務員
+     C                     MOVELTXNO      W2IVNO           發票號碼
+     C                     Z-ADDTXAMT     W2AAMT           貨款
+     C                     Z-ADD0         W2BAMT           扣預收款
+     C*          TXAMT     MULT 0.05      W2CAMT           銷項稅額
+     C           W2AAMT    ADD  W#AAMT    W2DAMT           發票金額
+     C           W2AAMT    ADD  W2BAMT    W#FAM1           應收貨款
+     C           W2CAMT    ADD  W2EAMT    W#FAM2
+     C           W#FAM1    ADD  W#FAM2    W2FAMT
+     C                     Z-ADD0         W2GAMT           已收金額
+     C           W2FAMT    ADD  W2GAMT    W2HAMT           應收帳款
+     C*
+     C                     WRITEW2REC
+     C*
+     C           EN3200    ENDSR
+     C*****************************************************************
+     C           SR4000    BEGSR
+     C*****************************************************************
+     C                     MOVE *OFF      *IN50
+     C                     EXSR SR4100                     折讓單
+     C  N50                EXSR SR4200                     調整單
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4100    BEGSR
+     C*****************************************************************
+     C*
+     C*入帳日期如不等於9999則排除，如果等
+     C*於，且保留碼前4碼在統計止日前，則
+     C*納入統計
+     C*
+     C*給定TRNDTL之KEY值
+     C*
+     C                     MOVEL'AR06'    TXCODE           單據代號
+     C                     MOVELASIVNO    TXNO             單據號碼
+     C                     Z-ADD0         TXITEM           單據項次
+     C*
+     C           K#TRND    SETLLTXREC
+     C                     MOVE *OFF      *IN60
+     C           *IN60     DOWEQ*OFF
+     C                     READETXREC                    60
+     C*
+     C                     Z-ADDTXACDT    D#TXAD           銷入帳日期
+     C                     MOVELASIVNO    W#IVNO
+     C*
+     C           TXCODE    IFNE 'AR06'
+     C           TXNO      ORNE W#IVNO
+     C           *IN60     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVE *ON       *IN50
+     C           D#TXA1    IFNE 9999
+     C                     ITER
+     C                     ELSE
+     C                     EXSR SR4110                     入日= 9999
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4110    BEGSR
+     C*****************************************************************
+     C                     MOVELTXRESV    W#RESV  40       銷貨保留碼
+     C*
+     C           W#RESV    IFGT D#YME                      保留碼
+     C                     GOTO EN4110
+     C                     ENDIF
+     C*
+     C                     MOVELTXCUNM    W2CUNM           客戶名稱
+     C                     MOVELTXCUNO    W2CUNO           客戶編號
+     C                     MOVELTXORNO    W2ORNO           訂單號碼　
+     C                     MOVELTXRVID    W2RVID           業務員
+     C                     MOVELTXNO      W2IVNO           發票號碼
+     C                     Z-ADD0         W2AAMT           貨款　　　
+     C                     Z-ADD0         W2BAMT           扣預收款　
+     C                     Z-ADDTXTAX     W2CAMT           銷項稅額
+     C           W2AAMT    ADD  W#AAMT    W2DAMT           發票金額
+     C                     Z-ADDTXAMT     W2EAMT           銷退／折讓
+     C           W2AAMT    ADD  W2BAMT    W#FAM1           應收貨款
+     C           W2CAMT    ADD  W2EAMT    W#FAM2
+     C           W#FAM1    ADD  W#FAM2    W2FAMT
+     C                     Z-ADD0         W2GAMT           已收金額
+     C           W2FAMT    ADD  W2GAMT    W2HAMT           應收帳款
+     C*
+     C                     WRITEW2REC
+     C*
+     C           EN4110    ENDSR
+     C*****************************************************************
+     C           SR4200    BEGSR
+     C*****************************************************************
+     C                     MOVELASIVNO    W#IVNO
+     C*
+     C*給定TRNDTL之KEY值
+     C                     MOVEL'AR05'    TXCODE           單據代號
+     C                     MOVELASIVNO    TXNO             單據號碼
+     C                     Z-ADD0         TXITEM           項次
+     C*
+     C           K#TRND    SETLLTXREC
+     C                     MOVE *OFF      *IN60
+     C           *IN60     DOWEQ*OFF
+     C                     READETXREC                    60
+     C*
+     C           TXCODE    IFNE 'AR05'
+     C           TXNO      ORNE W#IVNO
+     C           *IN60     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*未開發票（發票號碼為空白）則納入，已開發票
+     C*且發票開立日在統計止日前排除，反之則納入
+     C*
+     C           TXIVNO    IFEQ *BLANK                     　　　　
+     C                     EXSR SR4220                     未開發票
+     C                     ELSE
+     C                     EXSR SR4230                     已開發票
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4220    BEGSR
+     C*****************************************************************
+     C                     MOVELTXCUNM    W2CUNM           客戶名稱
+     C                     MOVELTXCUNO    W2CUNO           客戶編號
+     C                     MOVELTXORNO    W2ORNO           訂單號碼　
+     C                     MOVELTXRVID    W2RVID           業務員
+     C                     MOVELTXNO      W2IVNO           發票號碼
+     C                     Z-ADD0         W2AAMT           貨款
+     C                     Z-ADD0         W2BAMT           扣預收款
+     C                     Z-ADDTXTAX     W2CAMT           銷項稅額
+     C           W2AAMT    ADD  W#AAMT    W2DAMT           發票金額
+     C                     Z-ADDTXAMT     W2EAMT           銷退／折讓
+     C           W2AAMT    ADD  W2BAMT    W#FAM1           應收貨款
+     C           W2CAMT    ADD  W2EAMT    W#FAM2
+     C           W#FAM1    ADD  W#FAM2    W2FAMT
+     C                     Z-ADD0         W2GAMT           已收金額
+     C           W2FAMT    ADD  W2GAMT    W2HAMT           應收帳款
+     C*
+     C                     WRITEW2REC
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4230    BEGSR
+     C*****************************************************************
+     C           TXIVNO    CHAININREC                60
+     C*
+     C                     MOVELININDT    D#INDT           發票開立日
+     C           D#IND1    IFLT D#YME                      統計日前
+     C           *IN60     OREQ *ON
+     C                     GOTO EN4230
+     C                     ENDIF
+     C*
+     C                     MOVELASCUNM    W2CUNM           客戶名稱
+     C                     MOVELASCUNO    W2CUNO           客戶編號
+     C                     MOVELASORNO    W2ORNO           訂單號碼　
+     C                     MOVELASRVID    W2RVID           業務員
+     C                     MOVELASIVNO    W2IVNO           發票號碼
+     C                     Z-ADDASAAMT    W2AAMT           貨款
+     C                     Z-ADDASBAMT    W2BAMT           扣預收款
+     C                     Z-ADDASCAMT    W2CAMT           銷項稅額
+     C           W2AAMT    ADD  W#AAMT    W2DAMT           發票金額
+     C                     Z-ADDASDAMT    W2EAMT           銷退／折讓
+     C           W2AAMT    ADD  W2BAMT    W#FAM1           應收貨款
+     C           W2CAMT    ADD  W2EAMT    W#FAM2
+     C           W#FAM1    ADD  W#FAM2    W2FAMT
+     C                     Z-ADDASGAMT    W2GAMT           已收金額
+     C           W2FAMT    ADD  W2GAMT    W2HAMT           應收帳款
+     C*
+     C                     WRITEW2REC
+     C*
+     C           EN4230    ENDSR
+

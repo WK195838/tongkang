@@ -1,0 +1,161 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARQ017R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     發票別出貨明細查詢─ＦＯＲ型鋼
+     H*          5.DATE-WRITTEN  93/08/16
+     H*          6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARQ017S CF  E                    WORKSTN
+     F                                        RRN1  KSFILE AR017F1
+     FARQ017F IF  E           K        DISK
+     E                    ERR     1   2 70               *錯誤訊息
+     I           UDS
+     I                                      300 309 S#INNO
+     I                                     10011010 S#USID
+     I                                     10111020 S#DEVN
+     I                                     10211021 U#AREA
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*----------------------------------------------------------------
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVE *ALL'='   S#LIN3
+     C                     MOVEL'01'      W#PRID  2
+     C                     MOVE *OFF      *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*----------------------------------------------------------------
+     C*W#PRID='01'--->ARQ017S-1 畫面
+     C*
+     C                     Z-SUB2         S#NBR
+     C                     Z-ADD0         RRN1    50
+     C*
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN73            SFLCLR
+     C                     WRITEAR017F1C
+     C                     MOVE *OFF      *IN73
+     C*
+     C           *LOVAL    SETLLRAQ017F
+     C                     EXSR SR1100
+     C*
+     C           RRN1      IFEQ 0                          SFLDSP OFF
+     C                     MOVE *ON       *IN72
+     C                     MOVELERR,1     S#ERR2
+     C                     ELSE
+     C                     MOVE *OFF      *IN72
+     C                     ENDIF
+     C*顯示畫面
+     C           W#PRID    DOWEQ'01'
+     C*
+     C                     WRITEAR017T1H
+     C                     WRITEAR017F1M
+     C                     EXFMTAR017F1C
+     C                     MOVEL*BLANK    S#ERR2
+     C*結束作業
+     C*
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     MOVE '1'       P#IN03
+     C                     LEAVE
+     C                     ENDIF
+     C*回上頁
+     C           *IN12     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     MOVE '0'       P#IN03
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*F5=列印
+     C           *IN05     IFEQ *ON
+     C                     CALL 'ARQ017P1'
+     C                     MOVELERR,2     S#ERR2
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR                           讀入資料
+     C*****************************************************************
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RAQ017F                  40
+     C   40                LEAVE
+     C*
+     C                     CLEARAR017F1
+     C                     MOVELA7ORNO    S#ORNO           訂單編號
+     C                     Z-ADDA7ORTM    S#ORTM           訂單項次
+     C                     MOVELA7VRNO    S#VRNO           磅單編號
+     C                     MOVE A7VRTM    S#VRTM           磅單項次
+     C                     MOVELA7STND    S#STND           規範
+     C                     MOVELA7QULT    S#QULT           鋼種
+     C                     MOVELA7PDNM    S#PDNM           品名
+     C                     MOVELA7SPE1    S#SPE1           Ｈ／Ｔ／Ｄ
+     C           A7SPE2    IFEQ *BLANK
+     C           A7SPE2    OREQ '00000'
+     C                     MOVEL*BLANK    S#BNK2
+     C                     ELSE
+     C                     MOVEL'X'       S#BNK2
+     C                     MOVELA7SPE2    S#SPE2           Ｂ／Ｗ
+     C                     ENDIF
+     C           A7SPE3    IFEQ *BLANK
+     C           A7SPE3    OREQ '000  '
+     C                     MOVEL*BLANK    S#BNK3
+     C                     ELSE
+     C                     MOVEL'X'       S#BNK3
+     C                     MOVELA7SPE3    S#SPE3           Ｔ１
+     C                     ENDIF
+     C           A7SPE4    IFEQ *BLANK
+     C           A7SPE4    OREQ '000  '
+     C                     MOVEL*BLANK    S#BNK4
+     C                     ELSE
+     C                     MOVE 'X'       S#BNK4
+     C                     MOVELA7SPE4    S#SPE4           Ｔ２
+     C                     ENDIF
+     C                     Z-ADDA7SPE5    S#SPE5           長度
+     C                     Z-ADDA7PNUM    S#PNUM           支數
+     C                     Z-ADDA7WGHT    S#QTY            重量
+     C                     Z-ADDA7UPRC    S#UPRC           單價
+     C                     Z-ADDA7AMT     S#AMT            金額
+     C                     MOVELA7PLE1    S#PLE1           交貨地點
+     C                     MOVELA7NOTE    S#NOTE           備註
+     C                     ADD  1         RRN1
+     C                     WRITEAR017F1
+     C*
+     C                     ADD  S#QTY     S#QTYT
+     C                     ADD  S#AMT     S#AMTT
+     C*
+     C                     ENDDO
+     C*
+     C           RRN1      IFGT 0
+     C                     ADD  3         S#NBR
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+**  ERR
+01-無該張發票的出貨資料！
+02-出貨資料已送至批次佇列執行
+

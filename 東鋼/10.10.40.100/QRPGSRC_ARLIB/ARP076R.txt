@@ -1,0 +1,140 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP076R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     電子商務介面檔-請款單(ARLCDS)
+     H*            5.DATE-WRITTEN  90/09/27
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FHSINFO  IF  E           K        DISK
+     FARAPLG  IF  E           K        DISK
+     FARLCDS  O   E           K        DISK
+     I*****************************************************************
+     ITXREC       01
+     I                                              TXNO  L1
+L9205I                                              TXIVNOL1
+     C*****************************************************************
+     C*         KEY  LIST
+     C*****************************************************************
+     C           K#APLG    KLIST
+     C                     KFLD           A1APNO
+     C                     KFLD           A1ITEM
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1                   EXSR L1SR
+     CLR                   RETRN
+     C*********************************
+     C*  L1CLR       函式
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     CLEARRARLCDS
+     C                     ENDSR
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     ADD  TXQTY     ALWQTY           出貨重量
+     C                     ADD  TXAMT     ALWAMT           出貨金額
+     C                     ENDSR
+     C*********************************
+     C*  L1SR        函式
+     C*********************************
+     CSR         L1SR      BEGSR
+     C                     MOVE *BLANK    W#TXNO  8
+     C*
+     C                     MOVE TXNO      ALWTNO           磅單號碼
+     C*
+TEST C                     MOVELTXIVNO    W#INN1  2
+ .   C                     MOVE TXIVNO    W#INN2  8
+ .   C           W#INN1    IFEQ 'PZ'
+ .   C           W#INN2    ANDEQ'87867859'
+ .   C                     Z-ADD0         W#TEST  10
+ .   C                     ENDIF
+     C*
+     C           TXIVNO    CHAININREC                40
+     C   40                GOTO L1END
+     C*
+     C           INCUNO    CHAINCBREC                40
+     C  N40                MOVELCBMUID    ALVTNO           客戶統編
+     C                     MOVELINCUNM    ALCUNM           客戶簡稱
+     C                     MOVELINAPNO    ALAPNO           請款單號
+     C                     MOVELINORNO    ALORNO           訂單號碼
+     C                     MOVELINNO      ALIVNO           發票號碼
+     C           19110000  ADD  INAPDT    ALAPDT           請款日期
+     C           19110000  ADD  ININDT    ALIVDT           發票日期
+     C*
+     C*          INAAMT    ADD  INATAX    ALAMNT           請款金額
+     C*                    ADD  INBAMT    ALAMNT
+     C*                    ADD  INCAMT    ALAMNT
+     C*                    ADD  INCTAX    ALAMNT
+     C*                    ADD  INDAMT    ALAMNT
+     C*                    ADD  INDTAX    ALAMNT
+     C*                    ADD  INEAMT    ALAMNT
+     C*                    ADD  INFAMT    ALAMNT
+     C*
+     C*          INCAMT    ADD  INCTAX    W#CAMT 120       發票折讓
+     C*                    Z-SUBW#CAMT    ALSAMT
+     C*                    Z-SUBINBAMT    ALRAMT           扣預收
+     C*                    Z-ADDINATAX    ALITAX           稅額
+     C*
+     C*          INEAMT    MULT -1        ALXAMT           繳款金額
+     C*                    Z-ADDINNBAL    ALYAMT           發票餘額
+     C*
+     C                     MOVE '1'       ALAPST
+     C           INEAMT    IFEQ 0                          繳款金額
+     C                     MOVE '0'       ALAPST
+     C                     ENDIF
+     C           INNBAL    IFEQ 0                          發票餘額
+     C                     MOVE '2'       ALAPST
+     C                     ENDIF
+     C*
+     C           INRCDT    IFNE 0
+     C           19110000  ADD  INRCDT    ALPDAT           繳款日期
+     C                     ENDIF
+     C*920723  加入註解START
+     C                     MOVELINAPNO    A1APNO           請款單號
+     C                     Z-ADD1         A1ITEM           項次
+     C           K#APLG    CHAINRARAPLG             N70
+     C           *IN40     IFEQ *OFF                       無資料
+     C           A1FLAG    ANDNE'D'                        無資料
+     C*
+     C                     SELEC
+     C           A1CODE    WHEQ '1'
+     C                     MOVEL'信用狀'ALBHKD           單據種類
+     C           A1CODE    WHEQ '2'
+     C                     MOVEL'支票'  ALBHKD           單據種類
+     C           A1CODE    WHEQ '3'
+     C                     MOVEL'匯款'  ALBHKD           單據種類
+     C                     ENDSL
+     C*
+     C                     MOVELA1VNNO    ALBHNO           單據編號
+     C                     MOVELA1BANK    ALBHBK           開立銀行
+     C           A1DAT1    IFNE 0
+     C           19110000  ADD  A1DAT1    ALBHD1           開立日期
+     C                     ENDIF
+     C           A1DAT2    IFNE 0
+     C           19110000  ADD  A1DAT2    ALBHD2           押匯日期
+     C                     ENDIF
+     C                     MOVELA1CURY    ALCURY           幣別
+     C                     Z-ADDA1BAMT    ALBAMT           單據餘額
+     C                     ENDIF
+     C*920723  加入註解END
+     C*
+     C           ALVTNO    CHAINRHSINFO             N41
+     C  N40      INAPNO    IFNE *BLANK
+     C           *IN41     ANDEQ*OFF
+     C                     WRITERARLCDS
+     C                     ENDIF
+     CSR         L1END     ENDSR
+     C*
+

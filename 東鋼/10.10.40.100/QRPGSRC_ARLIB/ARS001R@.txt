@@ -1,0 +1,161 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARS001R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION      電子發票正本重印、補印副程式
+     H*            5.DATE-WRITTEN  107/11/11 2018AR00029
+     H*
+     H*****************************************************************
+     H            Y
+     FARS001S CF  E                    WORKSTN
+     FINEMST  UF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FINEMSTG O   E           K        DISK
+     F            RINEMST                           KRENAMEINMSTG
+     E                    ERR     1  10 40
+     I*
+     I           UDS
+     I                                       41  41 D#AREA
+     I                                      951 985 COMP
+     I                                     10011010 U#USID
+     I                                     10111020 DEVNM
+0706AI                                     10211021 TXAR
+0711AIINTR       UDS                             50
+0711AI                                        1   80D#INTR
+     C*****************************************************************
+     C*          Parameter List
+     C*****************************************************************
+     C*I:P#TKCD
+     C           *ENTRY    PLIST
+     C                     PARM           P#CLMD  1
+     C                     PARM           P#NNRB 10
+     C                     PARM           P#IN12  1
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C*SR0000 => Initialize Screen Number
+     C*SR1000 => Screen Number = '01' Process
+     C*SR2000 => Screen Number = '01' Process Subfile
+     C*
+     C                     EXSR SR0000
+     C           PRCID     DOUEQ'00'
+     C           PRCID     CASEQ'01'      SR1000
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*
+0711AC           *DATE     SUB  19000000  U#SYSD  80
+0711AC           *NAMVAR   DEFN ARINTRCTL INTR
+0711AC                     UNLCKINTR
+     C*Initialize Screen Number
+     C*
+     C                     MOVEL*BLANKS   S#NNRB
+     C                     MOVEL*BLANKS   W#CHK   1
+     C                     SELEC
+     C           P#CLMD    WHEQ '2'                        正本重印
+     C                     MOVEL*ON       *IN13
+     C           P#CLMD    WHEQ '3'
+     C                     MOVEL*ON       *IN23            補印
+     C                     ENDSL
+     C                     MOVE '01'      PRCID   2
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C*Screen Number = '01' Process
+     C*
+     C           PRCID     DOWEQ'01'
+     C                     EXFMTAR01F2
+     C                     MOVEL*BLANKS   S#ERR
+     C*
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVEL'00'      PRCID
+     C                     MOVEL'1'       P#IN12
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           *IN10     IFEQ *ON
+     C                     MOVEL'Y'       W#CHK
+     C                     ENDIF
+     C*
+     C                     EXSR SR1100
+     C  N99 10             EXSR SR1200
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*
+     C                     SETOF                     9941
+     C           S#NNRB    IFNE *BLANKS
+0711AC           W#CHK     ANDNE'Y'
+     C           S#NNRB    CHAININREC               N49
+     C  N49      ININDT    IFLT D#INTR
+     C                     MOVELERR,1     S#ERR
+     C                     SETON                     9941
+     C                     ENDIF
+     C   49                MOVELERR,2     S#ERR
+     C   49                SETON                     9941
+     C   99                GOTO END100
+     C*
+     C           S#NNRB    CHAINRINEMST             N50
+     C   50                SETON                     9941
+     C   50                MOVELERR,3     S#ERR
+     C   99                GOTO END100
+     C                     SELEC
+     C           EMPTMD    WHEQ *BLANKS
+     C                     SETON                     9941
+     C                     MOVELERR,4     S#ERR
+     C           EMPTMD    WHEQ '3'                        補印
+     C           P#CLMD    ANDEQ'2'                        重印
+     C                     SETON                     9941
+     C                     MOVELERR,5     S#ERR
+     C           EMPTAR    WHNE D#AREA                     檢核廠區
+     C                     SETON                     9941
+     C                     MOVELERR,8     S#ERR
+     C           S#ERR     CAT  EMPTAR:1  S#ERR
+     C                     ENDSL
+     C                     ENDIF
+     C  N99 13             MOVELERR,6     S#ERR
+     C  N99 23             MOVELERR,7     S#ERR
+     C*
+     C           END100    ENDSR
+     C*****************************************************************
+     C           SR1200    BEGSR
+     C*****************************************************************
+     C*
+     C                     MOVELS#NNRB    P#NNRB
+     C                     MOVEL'00'      PRCID
+     C           S#NNRB    CHAINRINEMST              50
+     C   13                MOVEL'2'       EMPTMD
+     C   23                MOVEL'3'       EMPTMD
+     C                     ADD  1         EMPTCN
+     C  N50                UPDATRINEMST
+     C*
+     C                     Z-ADDU#SYSD    EMXPDD
+     C                     TIME           EMXPDT
+     C                     MOVELU#USID    EMXUSR
+     C                     MOVEL'ARS001R' EMAPNM
+     C                     WRITEINMSTG
+     C                     ENDSR
+     C*****************************************************************
+**  ERR
+01為電子計算機發票，請用舊模式列印!
+02資料不存在
+03電子發票未上送介面檔，請檢核!
+04電子發票尚未列印，不可重新或補印!
+05電子發票已補印過，不可再正本重印!
+06請按F10執行正本重印
+07請按F10執行補印
+08發票列印廠區為
+

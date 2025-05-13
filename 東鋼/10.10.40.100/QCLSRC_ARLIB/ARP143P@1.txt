@@ -1,0 +1,136 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP143P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCJ                                  */
+     /*     4.FUNCTION      INENBU電子發票空白未使用字軌檔傳輸    */
+     /*                      P-->廠區                             */
+     /*     5.DATE-WRITTEN  107/12/10 2018AR00031                   */
+     /*     6.UPDATE  DATE  108/05/10 S00WCJ (0805A)                */
+     /*                                                             */
+     /*                                                             */
+     /***************************************************************/
+
+             PGM
+             DCL        VAR(&COUNTER) TYPE(*DEC) LEN(1 0)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&LOC)  TYPE(*CHAR) LEN(1)
+  /*0805A*/  DCL        VAR(&USER)    TYPE(*CHAR) LEN(10)
+
+             CHGJOB     LOGCLPGM(*YES)
+
+             MONMSG     MSGID(CPF0000)
+  /*0805A*/  RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+        IF   COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+ START:
+             CHGVAR     VAR(&LOC)     VALUE('P')
+             CHGDTAARA  DTAARA(*LDA (5 1))  VALUE(&LOC)
+             SBMJOB     JOB(ARP143P) JOBD(ARJOBD) JOBQ(QCTL) +
+                           RQSDTA('CALL ARLIB/ARP143P')
+             GOTO       CMDLBL(ENDCLPGM)
+ BATCH:
+  /*0805A*/  CHGDTAARA  DTAARA(*LDA (1001 10)) VALUE(&USER)
+             CHGVAR     VAR(&COUNTER) VALUE(0)
+ LOOP:
+             MONMSG     MSGID(CPF1002) EXEC(DO)
+             CHGVAR     VAR(&COUNTER) VALUE(&COUNTER  + 1)
+             IF   COND(&COUNTER *GE 5) THEN(GOTO CMDLBL(ENDCLPGM))
+             DLYJOB     DLY(60)
+             GOTO       CMDLBL(LOOP)
+             ENDDO
+        /*                                          */
+             RTVDTAARA  DTAARA(*LDA (5 1))  RTNVAR(&LOC)
+        /*  台北  DALIB/INENBU--> DALIB/INENBUT    */
+     /*      OVRDBF     FILE(INENBU) TOFILE(S00WCJ/INENBU) SHARE(*YES) */
+             OVRDBF     FILE(INENBU) TOFILE(DALIB/INENBU) SHARE(*YES)
+             OVRDBF     FILE(INENBUT) TOFILE(ARLIB/INENBUT)
+     /*      OVRDBF     FILE(INENBUT) TOFILE(S00WCJ/INENBUT) */
+
+             OPNQRYF    FILE(INENBU) OPTION(*ALL) +
+                          QRYSLT('(NUFLAG *NE " " *AND +
+                                   NUSTCL *NE " ")')
+
+             CALL       PGM(ARLIB/ARP143RA)
+             CLOF       OPNID(INENBU)
+             DLTOVR     FILE(*ALL)
+
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMK)
+             DLTF       FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(U01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMU)
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMH)
+
+        /*  台北　送廠區資料*/
+
+ /*         台北 ARLIB/INENBUT 送　新桃 DALIB/INENBU      */
+             IF         COND((&LOC *EQ 'P') *OR (&LOC *EQ ' ') *OR +
+                          (&LOC *EQ 'U')) THEN(DO)
+             CHGDTAARA  DTAARA(*LDA (6 1)) VALUE('U')
+    /*       CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(S00WCJ/INENBU) +
+                          LVLCHK(*NO)  */
+             CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(DALIB/INENBU) +
+                          LVLCHK(*NO)
+             OVRDBF     FILE(INENBUT) TOFILE(ARLIB/INENBUT) SHARE(*YES)
+    /*       OVRDBF     FILE(INENBUT) TOFILE(S00WCJ/INENBUT) SHARE(*YES) */
+
+             OPNQRYF    FILE(INENBUT) OPTION(*ALL) +
+                          QRYSLT('NUFACT *EQ "U"') +
+                                KEYFLD((NUFACT) (NUYYMM) (NUKIND))
+
+             OVRDBF     FILE(INENBU) TOFILE(QTEMP/DDMU)
+             CALL       PGM(ARLIB/ARP143RC)
+             CLOF       OPNID(INENBUT)
+             DLTOVR     FILE(*ALL)
+             ENDDO
+
+        /*  台北 ARLIB/INENBUT 送　苗栗 DALIB/INENBU      */
+             IF         COND((&LOC *EQ 'P') *OR (&LOC *EQ ' ') *OR +
+                          (&LOC *EQ 'H')) THEN(DO)
+             CHGDTAARA  DTAARA(*LDA (6 1)) VALUE('H')
+   /*        CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(S00WCJ/INENBU) +
+                          LVLCHK(*NO)   */
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(DALIB/INENBU) +
+                          LVLCHK(*NO)
+             OVRDBF     FILE(INENBUT) TOFILE(ARLIB/INENBUT) SHARE(*YES)
+   /*        OVRDBF     FILE(INENBUT) TOFILE(S00WCJ/INENBUT) SHARE(*YES) */
+             OPNQRYF    FILE(INENBUT) OPTION(*ALL) +
+                          QRYSLT('NUFACT *EQ "H"')       +
+                                KEYFLD((NUFACT) (NUYYMM) (NUKIND))
+             OVRDBF     FILE(INENBU) TOFILE(QTEMP/DDMH)
+             CALL       PGM(ARLIB/ARP143RC)
+             CLOF       OPNID(INENBUT)
+             DLTOVR     FILE(*ALL)
+             ENDDO
+
+
+        /*  台北 ARLIB/INENBUT 送　高雄 DALIB/INENBU      */
+             IF         COND((&LOC *EQ 'P') *OR (&LOC *EQ ' ') *OR +
+                          (&LOC *EQ 'K')) THEN(DO)
+             CHGDTAARA  DTAARA(*LDA (6 1)) VALUE('K')
+    /*       CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(S00WCJ/INENBU) +
+                          LVLCHK(*NO)   */
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(DALIB/INENBU) +
+                          LVLCHK(*NO)
+             OVRDBF     FILE(INENBUT) TOFILE(ARLIB/INENBUT) SHARE(*YES)
+    /*       OVRDBF     FILE(INENBUT) TOFILE(S00WCJ/INENBUT) SHARE(*YES) */
+             OPNQRYF    FILE(INENBUT) OPTION(*ALL) +
+                          QRYSLT('NUFACT *EQ "K"') +
+                                KEYFLD((NUFACT) (NUYYMM) (NUKIND))
+             OVRDBF     FILE(INENBU) TOFILE(QTEMP/DDMK)
+             CALL       PGM(ARLIB/ARP143RC)
+             CLOF       OPNID(INENBUT)
+             DLTOVR     FILE(*ALL)
+             ENDDO
+
+ ENDCLPGM:   ENDPGM
+

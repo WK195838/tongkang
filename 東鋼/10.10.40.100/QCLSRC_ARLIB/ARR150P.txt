@@ -1,0 +1,147 @@
+    /****************************************************************/
+    /*                                                              */
+    /*          >>   PROGRAM INTRODUCTION  <<                       */
+    /*            1.PROGRAM-ID     ARR150P                          */
+    /*            2.PROGRAM-TYPE   CLP                              */
+    /*            3.AUTHOR         S00WCJ                           */
+    /*            4.FUNCTION      勤美公司出貨補價差統計表        */
+    /*            5.DATE-WRITTEN   107/01/26 2018AR1126             */
+    /*            6.DATE-MODIFY                                     */
+    /*                                                            */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCLF       FILE(ARR150S)
+
+             DCL        VAR(&DSPID)   TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&INT)     TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&QDATE)   TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&W#DATS)  TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&W#DATE)  TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&W#ERR)  TYPE(*CHAR) LEN(1)
+
+             RTVJOBA    JOB(&DSPID) OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+       /*           */
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+
+             RTVJOBA    CYMDDATE(&QDATE)
+             CHGVAR     VAR(&QDATE)   VALUE('0' *CAT &QDATE)
+
+  START:
+             SNDRCVF
+             IF         COND(&IN03 *EQ '1')   THEN(RETURN)
+             IF         COND(&IN12 *EQ '1')   THEN(RETURN)
+
+             CHGVAR     VAR(&IN30)    VALUE('0')
+             CHGVAR     VAR(&IN32)    VALUE('0')
+             CHGVAR     VAR(&S#ERR)   VALUE(' ')
+
+       /* 檢核日期區間 */
+                 IF      COND(&S#DATS *EQ 0) THEN(DO)
+                      CHGVAR   VAR(&S#ERR)  VALUE('訊息-日期欄位+
+                             不可空白!')
+                      CHGVAR   VAR(&IN30)   VALUE('1')
+                      GOTO     CMDLBL(START)
+                 ENDDO
+
+             IF       COND(&S#DATS *NE 0) THEN(DO)
+                  CALL     PGM(C018) PARM(&S#DATS &W#ERR)
+               IF       COND(&W#ERR *EQ '1') THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-輸入日期錯誤!')
+                   CHGVAR  VAR(&IN30)  VALUE('1')
+                   GOTO     CMDLBL(START)
+               ENDDO
+             ENDDO
+
+             IF       COND(&S#DATE *NE 0) THEN(DO)
+                  CALL     PGM(C018) PARM(&S#DATE &W#ERR)
+               IF       COND(&W#ERR *EQ '1') THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-輸入日期錯誤!')
+                   CHGVAR  VAR(&IN32)  VALUE('1')
+                   GOTO     CMDLBL(START)
+               ENDDO
+             ENDDO
+
+             IF      COND(&S#DATS *NE 0  *AND &S#DATE *EQ 0) THEN(DO   )
+                   CHGVAR  VAR(&S#DATE)  VALUE(&S#DATS)
+             ENDDO
+
+
+             IF       COND(&S#DATS *GT &S#DATE) THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-日期區間錯誤!')
+                   CHGVAR  VAR(&IN30)  VALUE('1')
+                   CHGVAR  VAR(&IN32)  VALUE('1')
+                   GOTO     CMDLBL(START)
+             ENDDO
+
+
+       /* 紀錄輸入值 */
+             CHGVAR     VAR(&W#DATS)    VALUE(&S#DATS)
+             CHGVAR     VAR(&W#DATE)    VALUE(&S#DATE)
+             CHGDTAARA  DTAARA(*LDA (1 8))  VALUE(&W#DATS) /*起始*/
+             CHGDTAARA  DTAARA(*LDA (11 8))  VALUE(&W#DATE) /*終止*/
+             CHGDTAARA  DTAARA(*LDA (517 10)) VALUE(&DSPID)
+
+             SBMJOB     CMD(CALL PGM(ARR150P)) JOB(ARR150P) +
+                        JOBD(ARJOBD)
+             SNDBRKMSG  MSG('<<勤美公司出貨補價差統計表，+
+             開始處理，請稍待...>>') +
+                         TOMSGQ(&DSPID) MSGTYPE(*INFO)
+             RETURN     /* INTERACTIVE JOB   */
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 8))      RTNVAR(&W#DATS)
+             RTVDTAARA  DTAARA(*LDA (11 8))     RTNVAR(&W#DATE)
+             RTVDTAARA  DTAARA(*LDA (517 10)) RTNVAR(&DSPID)
+
+             CLRPFM     FILE(ARR150F)
+
+             OVRPRTF    FILE(ARR150T) TOFILE(ARR150T) +
+                        USRDTA('勤美價差') HOLD(*YES) +
+                        PAGESIZE(*N 96) CPI(12)
+             OVRDBF     FILE(TRNDTL)  TOFILE(TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) QRYSLT(' +
+                        (TXFLAG *NE "D" ) *AND +
+                         (TXCODE *EQ "SA04") *AND +
+                         (TXACDT *GE ' || &W#DATS || ' *AND +
+                          TXACDT *LE ' || &W#DATE || ') *AND +
+                         (TXRESV *EQ "P09008" *OR  +
+                          TXRESV *EQ "P09015" *OR  +
+                          TXRESV *EQ "P09016" *OR  +
+                          TXRESV *EQ "P09017" *OR  +
+                          TXRESV *EQ "P09009" *OR  +
+                          TXRESV *EQ "P09010" *OR  +
+                          TXRESV *EQ "P09011" *OR  +
+                          TXRESV *EQ "P09012" *OR  +
+                          TXRESV *EQ "P09006" *OR  +
+                          TXRESV *EQ "U01544" *OR  +
+                          TXRESV *EQ "U01545") +
+                                       ') +
+                        MAPFLD((TXRESV '%SST(TXORNO 1 6)')) +
+                        KEYFLD((TXCUNO) (TXORNO) (TXNO))
+
+
+                 CALL      PGM(ARR150R1)
+                 CLOF       OPNID(TRNDTL)
+
+                 OVRDBF     FILE(ARR150F1) TOFILE(ARR150F1) SHARE(*YES)
+                 OPNQRYF    FILE(ARR150F1)  KEYFLD( +
+                    (A0ORNO))
+                 CALL      PGM(ARR150R2)
+                 CLOF       OPNID(ARR150F1)
+
+                 OVRDBF     FILE(ARR150F) TOFILE(ARR150F) SHARE(*YES)
+                 OPNQRYF    FILE(ARR150F)  KEYFLD( +
+                    (A1CUNO) (A1ORNO) (A1STNO) (A1PDNM))
+                 CALL      PGM(ARR150R)
+                 CLOF       OPNID(ARR150F)
+             DLTOVR     FILE(*ALL)
+
+             SNDBRKMSG  MSG('<<勤美公司出貨補價差統計表+
+                處理完畢，請列印...>>'                               ) +
+                          TOMSGQ(&DSPID) MSGTYPE(*INFO)
+             ENDPGM
+

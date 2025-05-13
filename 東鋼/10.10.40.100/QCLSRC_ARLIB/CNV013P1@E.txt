@@ -1,0 +1,347 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE  99/01/07 2009AR406 S00WCJ (9901A)  */
+    /*                           99/08/23 2010AR517 S00WCJ (9908A)  */
+    /*                          103/03/17 2014AR810 S00WCJ (0303A)  */
+    /*                           T03下線                          */
+    /*                          108/12/08 S00WCJ (0812A)            */
+    /*                           訂單X00271 做特殊設定          */
+    /*                          109/06/15 S00WCJ (0906A)            */
+    /*                           訂單X00271資料已移除，取消特殊 */
+    /*                           設定                             */
+    /*                          110/12/07 2021AR00046 (1012A)       */
+    /*                           排除訂單H23911外銷未繳款之計算 */
+    /*                          111/12/26 2022AR00057 (1112A)       */
+    /*                           排除訂單H25032外銷未繳款之計算 */
+    /*                          112/03/10 2023AR00006 S00WCJ (1203A)*/
+    /*                           新增大業廠                       */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+    /*9908A  DCL        VAR(&YYA)   TYPE(*CHAR) LEN(2)   */
+    /*9908A*/DCL        VAR(&YYA)   TYPE(*CHAR) LEN(4)
+    /*9908A*/DCL        VAR(&U#SYSD)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&YYA4)  TYPE(*CHAR) LEN(4)
+             DCL        VAR(&MMA)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&YY)    TYPE(*DEC)  LEN(4 0)
+             DCL        VAR(&MM)    TYPE(*DEC)  LEN(2 0)
+             DCL        VAR(&BKDT)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&BYM)   TYPE(*CHAR) LEN(5)
+
+             CHGJOB     RUNPTY(15)
+
+             RTVDTAARA  DTAARA(ARLIB/ARBACKUP (1 8)) RTNVAR(&BKDT)
+             CLRPFM     FILE(CCLIB/ARSTAT)
+             CPYF       FROMFILE(CCLIB/ARSTATO) TOFILE(CCLIB/ARSTAT) +
+                        MBROPT(*ADD)
+
+ /* --------------------------------------------------------------- */
+          /* 統計已開發票*/
+             CHGVAR     VAR(&BYM)    VALUE(%SST(&BKDT 2 5))
+             OVRDBF     FILE(SAMAST) TOFILE(DALIB/SAMAST)
+             OVRDBF     FILE(SACUST) TOFILE(DALIB/SACUST)
+             OVRDBF     FILE(ARSTAT) TOFILE(CCLIB/ARSTAT)
+             OVRDBF     FILE(INVDTL) TOFILE(DALIB/INVDTL) SHARE(*YES)
+             OVRPRTF    FILE(CNV013T) TOFILE(ARLIB/CNV013T) +
+                        USRDTA('發票錯誤')
+             OVRDBF     FILE(INVDTL01) TOFILE(DALIB/INVDTL01)
+             OPNQRYF    FILE(INVDTL)                             +
+                        QRYSLT('(ACDT *NE "99999999" *AND        +
+                                 IVACDT *GE ' || &BKDT || ') *OR +
+                                (ACDT *EQ "99999999" *AND        +
+                            %SST(IVRESV 1 5) *GE "' || &BYM || '")') +
+                        KEYFLD((IVACNO) (IVNO))                  +
+                        MAPFLD((IVACNO '%SST(IVORNO 1 6)') +
+                               (ACDT IVACDT *CHAR 8))
+             CALL       PGM(CNV013R#X)
+             CLOF       OPNID(INVDTL)
+             DLTOVR     FILE(*ALL)
+
+          /* 統計未開發票*/
+             OVRDBF     FILE(ARSTAT) TOFILE(CCLIB/ARSTAT)
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL)                               +
+                        QRYSLT('TXFL02  *EQ " "    *AND            +
+                                TXACDT  *GE ' || &BKDT || ' *AND   +
+                                %SST(TXRESV 10 1) *NE "*" *AND     +
+                               %SST(TXORNO 1  6) *NE "K02607" *AND +
+                          (TXCODE = "SA04" *OR TXCODE = "AR05")')  +
+                        KEYFLD((TXVUNO) (TXNO) (TXACNT))           +
+                        MAPFLD((TXVUNO '%SST(TXORNO 1 6)'))
+             CALL       PGM(CNV013RA)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+          /* 統計外銷已繳款金額*/
+             DLTF       FILE(QTEMP/SARVINX)
+             MONMSG     MSGID(CPF0000)
+             CRTPF      FILE(QTEMP/SARVINX) SRCFILE(ARLIB/QDDSSRC) +
+                        OPTION(*NOLIST *NOSRC) SIZE(*NOMAX)
+
+             OVRDBF     FILE(SARVIN) TOFILE(SARVIN) SHARE(*YES)
+             OPNQRYF    FILE(SARVIN) +
+                        KEYFLD((SIINNO)(SIRVNO)(SIITEM))
+             CALL       PGM(CNV013RC)
+             DLTOVR     FILE(*ALL)
+             CLOF       OPNID(SARVIN)
+
+          /* 統計未開發票－外銷*/
+             OVRDBF     FILE(ARSTAT) TOFILE(CCLIB/ARSTAT)
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+ /*1112A*/   OPNQRYF    FILE(TRNDTL)                               +
+                        QRYSLT('TXFL02  *EQ "Y"             *AND   +
+                                TXACDT  *GE ' || &BKDT || ' *AND   +
+                                %SST(TXRESV 10 1) *NE "*"   *AND   +
+                                %SST(TXIVNO 1  1) *EQ "#"   *AND   +
+                                %SST(TXCUNO 1  1) *EQ "E"   *AND   +
+                                TXVUNO  *NE "H23911"        *AND   +
+                                TXVUNO  *NE "H25032"        *AND   +
+                          (TXCODE = "SA04" *OR TXCODE = "AR05")')  +
+                        KEYFLD((TXVUNO) (TXNO) (TXACNT))           +
+                        MAPFLD((TXVUNO '%SST(TXORNO 1 6)'))
+ /*0906A     OPNQRYF    FILE(TRNDTL)                               +
+                        QRYSLT('(TXFL02  *EQ "Y"             *AND   +
+                                TXACDT  *GE ' || &BKDT || ' *AND   +
+                                %SST(TXRESV 10 1) *NE "*"   *AND   +
+                                %SST(TXIVNO 1  1) *EQ "#"   *AND   +
+                                %SST(TXCUNO 1  1) *EQ "E"   *AND   +
+                          (TXCODE = "SA04" *OR TXCODE = "AR05")) *OR +
+                                (TXVUNO *EQ "X00271")') +
+                        KEYFLD((TXVUNO) (TXNO) (TXACNT))           +
+                        MAPFLD((TXVUNO '%SST(TXORNO 1 6)'))  */
+             CALL       PGM(CNV013RD)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+          /* 統計未出貨訂單－ＦＯＲ　Ｌ／Ｃ　ＵＳＥ*/
+             OVRDBF     FILE(ARSTAT) TOFILE(CCLIB/ARSTAT)
+             OVRDBF     FILE(LLCMSTL1) TOFILE(DALIB/LLCMSTL1)
+             CALL       PGM(CNV013RB)
+             DLTOVR     FILE(*ALL)
+
+          /*    AFTER COMPLETE   */
+ COM:        CPYF       FROMFILE(CCLIB/ARSTAT) TOFILE(DALIB/ARSTAT) +
+                          MBROPT(*REPLACE) FMTOPT(*MAP *DROP)
+ /* --------------------------------------------------------------- */
+
+ DDMF:
+  /*0303A    DLTF       FILE(QTEMP/TYDDM)  */
+  /*0303A    MONMSG     CPF0000            */
+    /*9901A  START */
+             DLTF       FILE(QTEMP/U01DDM)
+             MONMSG     CPF0000
+    /*9901A  END  */
+             DLTF       FILE(QTEMP/MLDDM)
+             MONMSG     CPF0000
+             DLTF       FILE(QTEMP/KSDDM)
+             MONMSG     CPF0000
+
+/*1203A*/    DLTF       FILE(QTEMP/N01DDM)
+/*1203A*/    MONMSG     CPF0000
+
+  /*0303A    CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)      */
+    /*9901A  START */
+             CRTDUPOBJ  OBJ(U01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+    /*9901A  END  */
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+
+/*1203A*/    CRTDUPOBJ  OBJ(N01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+
+
+ TYN:     /*    TRANSFER TO TOUYAN  */
+ /*0303A     CHGDDMF    FILE(QTEMP/TYDDM) RMTFILE(DALIB/ARSTATTM)  */
+ /*0303A     CPYF       FROMFILE(DALIB/ARSTAT) TOFILE(QTEMP/TYDDM) +
+                        MBROPT(*REPLACE)        */
+ /*0303A     MONMSG     MSGID(CPF0000)          */
+ /*0303A     SBMRMTCMD  CMD('CPYF FROMFILE(DALIB/ARSTATTM) +
+                        TOFILE(DALIB/ARSTAT) MBROPT(*REPLACE)') +
+                        DDMFILE(QTEMP/TYDDM)         */
+ /*0303A     MONMSG     MSGID(CPF0000)               */
+
+    /*9901A  START */
+ U01:     /*    TRANSFER TO 新桃  */
+             CHGDDMF    FILE(QTEMP/U01DDM) RMTFILE(DALIB/ARSTATTM)
+             CPYF       FROMFILE(DALIB/ARSTAT) TOFILE(QTEMP/U01DDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+             SBMRMTCMD  CMD('CPYF FROMFILE(DALIB/ARSTATTM) +
+                        TOFILE(DALIB/ARSTAT) MBROPT(*REPLACE)') +
+                        DDMFILE(QTEMP/U01DDM)
+             MONMSG     MSGID(CPF0000)
+    /*9901A  END  */
+
+          /*    TRANSFER TO KOUSHUN */
+
+ KOR:        CHGDDMF    FILE(QTEMP/KSDDM) RMTFILE(DALIB/ARSTATTM)
+             CPYF       FROMFILE(DALIB/ARSTAT) TOFILE(QTEMP/KSDDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+             SBMRMTCMD  CMD('CPYF FROMFILE(DALIB/ARSTATTM) +
+                        TOFILE(DALIB/ARSTAT) MBROPT(*REPLACE)') +
+                        DDMFILE(QTEMP/KSDDM)
+             MONMSG     MSGID(CPF0000)
+          /*    TRANSFER TO KOUSHUN */
+
+ MIL:        CHGDDMF    FILE(QTEMP/MLDDM) RMTFILE(DALIB/ARSTATTM)
+             CPYF       FROMFILE(DALIB/ARSTAT) TOFILE(QTEMP/MLDDM) +
+                        MBROPT(*REPLACE) INCCHAR(*RCD 18 *EQ 'H') +
+                        FMTOPT(*NOCHK)
+             MONMSG     MSGID(CPF0000)
+             SBMRMTCMD  CMD('CPYF FROMFILE(DALIB/ARSTATTM) +
+                        TOFILE(DALIB/ARSTAT) MBROPT(*REPLACE)') +
+                        DDMFILE(QTEMP/MLDDM)
+             MONMSG     MSGID(CPF0000)
+
+
+ N01:     /*    TRANSFER TO 大業  */
+/*1203A*/    CHGDDMF    FILE(QTEMP/N01DDM) RMTFILE(DALIB/ARSTATTM)
+             CPYF       FROMFILE(DALIB/ARSTAT) TOFILE(QTEMP/N01DDM) +
+                        MBROPT(*REPLACE)
+/*1203A*/    MONMSG     MSGID(CPF0000)
+/*1203A*/    SBMRMTCMD  CMD('CPYF FROMFILE(DALIB/ARSTATTM) +
+                        TOFILE(DALIB/ARSTAT) MBROPT(*REPLACE)') +
+/*1203A*/               DDMFILE(QTEMP/N01DDM)
+/*1203A*/    MONMSG     MSGID(CPF0000)
+
+ /* --------------------------------------------------------------- */
+
+             /*   處理授信系統  */
+    /*9908A  START */
+/* GUAD:       RTVSYSVAL  SYSVAL(QYEAR) RTNVAR(&YYA)     */
+   GUAD:
+               RTVJOBA     CYMDDATE(&U#SYSD)
+               CHGVAR      VAR(&U#SYSD)   VALUE('0' *CAT &U#SYSD)
+    /*9908A   END */
+             RTVSYSVAL  SYSVAL(QMONTH) RTNVAR(&MMA)
+    /*9908A  CHGVAR     VAR(&YYA4) VALUE('00' || &YYA)   */
+    /*9908A*/CHGVAR     VAR(&YYA4) VALUE(%SST(&U#SYSD 1  4))
+             CHGVAR     VAR(&YY)   VALUE(&YYA4)
+             CHGVAR     VAR(&MM)   VALUE(&MMA)
+             CHGDTAARA  DTAARA(*LDA (7  2)) VALUE('01')
+             CHGDTAARA  DTAARA(*LDA (15 2)) VALUE('31')
+             CHGDTAARA  DTAARA(*LDA (9  4)) VALUE(&YYA4)
+             CHGDTAARA  DTAARA(*LDA (13 2)) VALUE(&MMA)
+             IF         COND(&MM *EQ 1) THEN(DO)
+                        CHGVAR  VAR(&MM)  VALUE(12)
+                        CHGVAR  VAR(&YY)  VALUE(&YY - 1)
+                        ENDDO
+             ELSE  DO
+                        CHGVAR  VAR(&MM)  VALUE(&MM - 1)
+                   ENDDO
+             CHGVAR     VAR(&YYA4) VALUE(&YY)
+             CHGVAR     VAR(&MMA)  VALUE(&MM)
+             CHGDTAARA  DTAARA(*LDA (1 4)) VALUE(&YYA4)
+             CHGDTAARA  DTAARA(*LDA (5 2)) VALUE(&MMA)
+ /* --------------------------------------------------------------- */
+
+           /*  處理存入保證金－訂單*/
+             CALL       PGM(CCLIB/CCP010P)
+             MONMSG     MSGID(CPF0000)
+
+              /* TRANSFER TO TOUYAN  */
+ /*0303A     CHGDDMF    FILE(QTEMP/TYDDM) RMTFILE(DALIB/CGDDTL)  */
+ /*0303A     CPYF       FROMFILE(DALIB/CGDDTL) TOFILE(QTEMP/TYDDM) +
+                        MBROPT(*REPLACE)                         */
+ /*0303A     MONMSG     MSGID(CPF0000)                         */
+
+    /*9901A START */
+              /* TRANSFER TO 新桃  */
+             CHGDDMF    FILE(QTEMP/U01DDM) RMTFILE(DALIB/CGDDTL)
+             CPYF       FROMFILE(DALIB/CGDDTL) TOFILE(QTEMP/U01DDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+    /*9901A  END  */
+
+              /* TRANSFER TO KOUSHUN */
+             CHGDDMF    FILE(QTEMP/KSDDM) RMTFILE(DALIB/CGDDTL)
+             CPYF       FROMFILE(DALIB/CGDDTL) TOFILE(QTEMP/KSDDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+
+              /* TRANSFER TO MIL     */
+             CHGDDMF    FILE(QTEMP/MLDDM) RMTFILE(DALIB/CGDDTL)
+             CPYF       FROMFILE(DALIB/CGDDTL) TOFILE(QTEMP/MLDDM) +
+                        MBROPT(*REPLACE) FMTOPT(*NOCHK)
+             MONMSG     MSGID(CPF0000)
+
+/*1203A*/    CHGDDMF    FILE(QTEMP/N01DDM) RMTFILE(DALIB/CGDDTL)
+/*1203A*/    CPYF       FROMFILE(DALIB/CGDDTL) TOFILE(QTEMP/N01DDM) +
+                        MBROPT(*REPLACE)
+/*1203A*/    MONMSG     MSGID(CPF0000)
+
+ /* --------------------------------------------------------------- */
+
+           /*  處理預收貨款餘額－訂單*/
+             CALL         PGM(CCLIB/CCP011P)
+             MONMSG     MSGID(CPF0000)
+
+              /* TRANSFER TO TOUYAN  */
+ /*0303A     CHGDDMF    FILE(QTEMP/TYDDM) RMTFILE(DALIB/CPRBAL)    */
+ /*0303A     CPYF       FROMFILE(DALIB/CPRBAL) TOFILE(QTEMP/TYDDM) +
+                        MBROPT(*REPLACE)               */
+ /*0303A     MONMSG     MSGID(CPF0000)               */
+ /*0303A     CHGDDMF    FILE(QTEMP/TYDDM) RMTFILE(DALIB/CPRDTL)  */
+ /*0303A     CPYF       FROMFILE(DALIB/CPRDTL) TOFILE(QTEMP/TYDDM) +
+                        MBROPT(*REPLACE)                 */
+ /*0303A     MONMSG     MSGID(CPF0000)           */
+
+    /*9901A  START */
+              /* TRANSFER TO 新桃  */
+             CHGDDMF    FILE(QTEMP/U01DDM) RMTFILE(DALIB/CPRBAL)
+             CPYF       FROMFILE(DALIB/CPRBAL) TOFILE(QTEMP/U01DDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+             CHGDDMF    FILE(QTEMP/U01DDM) RMTFILE(DALIB/CPRDTL)
+             CPYF       FROMFILE(DALIB/CPRDTL) TOFILE(QTEMP/U01DDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+    /*9901A  EDN  */
+
+              /* TRANSFER TO KOUSHUN */
+             CHGDDMF    FILE(QTEMP/KSDDM) RMTFILE(DALIB/CPRBAL)
+             CPYF       FROMFILE(DALIB/CPRBAL) TOFILE(QTEMP/KSDDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+             CHGDDMF    FILE(QTEMP/KSDDM) RMTFILE(DALIB/CPRDTL)
+             CPYF       FROMFILE(DALIB/CPRDTL) TOFILE(QTEMP/KSDDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+
+              /* TRANSFER TO MIL     */
+             CHGDDMF    FILE(QTEMP/MLDDM) RMTFILE(DALIB/CPRBAL)
+             CPYF       FROMFILE(DALIB/CPRBAL) TOFILE(QTEMP/MLDDM) +
+                        MBROPT(*REPLACE) FMTOPT(*NOCHK)
+             MONMSG     MSGID(CPF0000)
+             CHGDDMF    FILE(QTEMP/MLDDM) RMTFILE(DALIB/CPRDTL)
+             CPYF       FROMFILE(DALIB/CPRDTL) TOFILE(QTEMP/MLDDM) +
+                        MBROPT(*REPLACE) FMTOPT(*NOCHK)
+             MONMSG     MSGID(CPF0000)
+
+/*1203A*/     /* TRANSFER TO 大業  */
+/*1203A*/    CHGDDMF    FILE(QTEMP/N01DDM) RMTFILE(DALIB/CPRBAL)
+/*1203A*/    CPYF       FROMFILE(DALIB/CPRBAL) TOFILE(QTEMP/N01DDM) +
+                        MBROPT(*REPLACE)
+/*1203A*/    MONMSG     MSGID(CPF0000)
+/*1203A*/    CHGDDMF    FILE(QTEMP/N01DDM) RMTFILE(DALIB/CPRDTL)
+/*1203A*/    CPYF       FROMFILE(DALIB/CPRDTL) TOFILE(QTEMP/N01DDM) +
+                        MBROPT(*REPLACE)
+/*1203A*/    MONMSG     MSGID(CPF0000)
+
+
+ /* --------------------------------------------------------------- */
+
+           /*  處理客戶出貨狀況*/
+             SBMJOB     CMD(CALL PGM(CCLIB/CCP001P)) JOB(CCP001P) +
+                        JOBD(CCJOBD) JOBQ(QCTL) LOG(4 0 *SECLVL) +
+                        LOGCLPGM(*YES) MSGQ(*USRPRF)
+             MONMSG     MSGID(CPF0000)
+
+             ENDPGM
+

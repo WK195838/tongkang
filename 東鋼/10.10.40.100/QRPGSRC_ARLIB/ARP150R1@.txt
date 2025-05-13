@@ -1,0 +1,171 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARP150R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     型鋼折讓單資料上傳處理電子發票介面檔
+     H*            5.DATE-WRITTEN  108/05/07 2019AR00025
+     H*
+     H*****************************************************************
+     H            Y
+     FTRNDTL  IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FINEDTLL1IF  E           K        DISK
+     FHIPROD  IF  E           K        DISK
+     FINETRN  UF  E           K        DISK                      A
+     FINETRNG O   E           K        DISK
+     F            RINETRN                           KRENAMEINETRG
+     E                    TAB3    5   5  1   TAB4    6   *公司代號
+     E                    HD      1  14 10
+     I*
+     I            DS
+     I                                        1  30 TXRESV
+     I                                        1   6 TXACYM
+     I                                       15  15 TXWHY
+     I                                       18  18 S#TYP1
+     I            DS
+     I                                        1 256 TRPDCD
+     I                                        1   5 D#PDCD
+     I                                        6 256 D1PDCD
+     I           UDS
+     I                                        1   1 AR#P
+     I                                        2  11 C#USER
+     I                                       12  12 W#ER
+     I                                       13  22 J#USER
+     I                                      801 8080W#DATE
+     I                                      951 985 S#COMP
+     I                                     10011010 D#USER
+     I                                     10111020 S#DEVN
+     I                                     10211021 U#LOC
+     C*****************************************************************
+     C*          Parameter List
+     C*****************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#TXNO  8        *折讓單號
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*FILE =>
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           W#CODE  4
+     C                     KFLD           P#TXNO
+     C*
+     C           KEY02     KLIST
+     C                     KFLD           W#TRNO
+     C                     KFLD           W#ITEM  3
+     C*
+     C           KEY03     KLIST
+     C                     KFLD           TXIVNO
+     C                     KFLD           TXPDNM
+     C*
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C                     MOVEL'AR06'    W#CODE
+     C                     Z-ADD0         TTLTAX  90
+     C                     Z-ADD0         TTLAMT  90
+     C*
+     C           KEY01     SETLLTXREC
+     C                     MOVEL*OFF      *IN65
+     C           *IN68     DOWEQ*OFF
+     C           KEY01     READETXREC               N    65
+     C   65                LEAVE
+     C                     ADD  TXTAX     TTLTAX
+     C                     ADD  TXAMT     TTLAMT
+     C                     ENDDO
+     C*
+     C           KEY01     SETLLTXREC
+     C                     MOVEL*OFF      *IN65
+     C           *IN65     DOWEQ*OFF
+     C           KEY01     READETXREC               N    65
+     C   65                LEAVE
+     C                     MOVELTXNO      W#NO1   1
+     C           TXIVNO    CHAININREC               N51
+     C           W#NO1     IFEQ 'H'
+     C                     MOVELINAREA    W1AREA  1
+     C                     ENDIF
+     C           W1AREA    LOKUPTAB3      TAB4           50*EQ
+     C   50                MOVELTAB4      W1CUNO  6
+     C                     MOVELTXNO      W#TRNO 16
+     C                     Z-ADDTXITEM    W#SENR  30
+     C                     MOVELW#SENR    W#ITEM
+     C           KEY02     CHAINRINETRN              68
+     C   68                CLEARRINETRN
+     C   68                MOVEL'A'       TRFLAG
+     C  N68                MOVEL'C'       TRFLAG
+     C                     MOVELW1AREA    TRAREA
+     C                     SELEC
+     C           INKIND    WHEQ '3'
+     C                     MOVEL'B0401'   TRMSTE
+     C           INKIND    WHEQ '2'
+     C                     MOVEL'D0401'   TRMSTE
+     C                     ENDSL
+     C                     MOVELTXNO      TRNO
+     C           TXDATE    ADD  19110000  W#INDT  80
+     C                     MOVELW#INDT    TRINDT
+     C*賣方
+     C           W1CUNO    CHAINCBCUST              N97
+     C                     MOVELCBMUID    TRSLID
+     C                     MOVELCBFNAM    TRSLNM
+     C                     MOVELCBADR1    TRSLAS
+     C                     MOVELCBCMAN    TRSLPE
+     C*                    MOVELCBTELX    TRSLTL
+     C*買方
+     C           TXCUNO    CHAINCBCUST              N97
+     C                     MOVELCBMUID    TRBYID
+     C                     MOVELCBFNAM    TRBYNM
+     C                     MOVELCBADR1    TRBYAS
+     C                     MOVELCBCMAN    TRBYPE
+     C*                    MOVELCBTELX    TRBYTL
+     C*
+     C                     MOVELS#TYP1    TRALTE
+     C           ININDT    ADD  19110000  W#OIND  80
+     C                     MOVELW#OIND    TROIND
+     C                     MOVELTXIVNO    TROINO
+     C           KEY03     CHAINRINEDTL             N97
+     C  N97                MOVELEDPDCD    TRPDCD
+     C   97                MOVELTXPDNM    D#PDCD
+     C   97      TXPDNM    CHAINHIPROD              N98
+     C  N98 97             MOVELF4CHIN    D1PDCD
+     C   98 97   TXACNT    IFEQ '4'
+     C           TXAMT     IFGE 0
+     C                     MOVELHD,1      D1PDCD
+     C                     ELSE
+     C                     MOVELHD,2      D1PDCD
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     Z-ADDTXQTY     TRQTY
+     C                     Z-ADDTXUPRC    TRUPRC
+     C                     Z-ADDTXAMT     TRAMT
+     C                     Z-ADDTXTAX     TRTAX
+     C                     MOVELW#SENR    TRSENR
+     C                     MOVELINTXTP    TRTXTP
+     C*
+     C                     Z-ADDTTLTAX    TRATAX
+     C                     Z-ADDTTLAMT    TRAAMT
+     C*
+     C                     Z-ADDW#DATE    TRXPDD
+     C                     TIME           TRXPDT
+     C                     MOVELC#USER    TRXUSR
+     C*
+     C   68                WRITERINETRN
+     C  N68                UPDATRINETRN
+     C                     MOVEL'ARP150R1'TRAPNM
+     C                     Z-ADDW#DATE    TRCHDD
+     C                     TIME           TRCHDT
+     C                     MOVELC#USER    TRCUSR
+     C                     WRITEINETRG
+     C                     ENDDO
+     C                     MOVEL*ON       *INLR
+**  TAB3 TAB4
+PMM001 MMM007 HMM005 KMM003 UMM006
+** HD
+預收貨款
+扣預收款
+

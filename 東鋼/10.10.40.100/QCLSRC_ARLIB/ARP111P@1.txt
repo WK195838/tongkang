@@ -1,0 +1,158 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP111P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CSF                                  */
+     /*     4.FUNCTION     客戶暫收統計檔彙總後上傳台北           */
+     /*     5.DATE-WRITTEN  93/09/17                                */
+     /*     6.UPDATE  DATE  99/01/07 2009AR406 S00WCJ (9901A)       */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&USER)  TYPE(*CHAR) LEN(10)
+    /*9901A*/DCL        VAR(&FLAG1) TYPE(*CHAR) LEN(4) VALUE('X XX')
+
+
+             RTVJOBA    TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+             SBMJOB     JOB(ARP111P) JOBD(ARJOBD) JOBQ(QSYS/QCTL) +
+                        RQSDTA('CALL ARLIB/ARP111P') LOGCLPGM(*YES)
+             RETURN
+
+
+ BATCH:
+
+        /* ------------------------------------------------- */
+        /*     彙總處理：兌現金額及繳貨款金額沖銷          */
+
+             OVRDBF     FILE(AR2159D) TOFILE(DALIB/AR2159D)
+             CALL       PGM(ARLIB/ARP111RC)
+             DLTOVR     FILE(*ALL)
+
+
+ /* -------------------------------------------------------------- */
+
+ STEP0:        /*  建立　DDMF  */
+             DLTF       FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMT)
+
+    /*9901A  START */
+             DLTF       FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(U01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMU)
+    /*9901A  END  */
+
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMK)
+
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMH)
+
+
+ STEP1:        /*  台北　抓　桃園  ARLIB/AR2159DT  */
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP111PA) PARM(''T'')') +
+                        DDMFILE(QTEMP/DDMT)
+    /*9901A*/MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP11)
+
+             CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(ARLIB/AR2159DT)  +
+                        LVLCHK(*NO)
+             OVRDBF     FILE(AR2159DP) TOFILE(QTEMP/DDMT)
+             OVRDBF     FILE(AR2159D)  TOFILE(DALIB/AR2159D)
+             CALL       PGM(ARLIB/ARP111RB)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             DLTOVR     FILE(*ALL)
+    /*9901A*/GOTO       CMDLBL(STEP11)
+             ENDDO
+
+             DLTOVR     FILE(*ALL)
+             CLRPFM     FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(%SST(&FLAG1 1 1)) VALUE(' ')
+
+    /*9901A  START */
+ STEP11:        /*  台北　抓　新桃  ARLIB/AR2159DU  */
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP111PA) PARM(''U'')') +
+                        DDMFILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP2)
+
+             CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(ARLIB/AR2159DU)  +
+                        LVLCHK(*NO)
+             OVRDBF     FILE(AR2159DP) TOFILE(QTEMP/DDMU)
+             OVRDBF     FILE(AR2159D)  TOFILE(DALIB/AR2159D)
+             CALL       PGM(ARLIB/ARP111RB)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             DLTOVR     FILE(*ALL)
+             GOTO       CMDLBL(STEP2)
+             ENDDO
+
+             DLTOVR     FILE(*ALL)
+             CLRPFM     FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(%SST(&FLAG1 4 1)) VALUE(' ')
+    /*9901A  END  */
+
+ STEP2:        /*  台北　抓　苗栗  ARLIB/AR2159DH  */
+             GOTO       STEP3           /* 略過苗栗  */
+
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP111PA) PARM(''H'')') +
+                        DDMFILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP3)
+
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(ARLIB/AR2159DH)  +
+                        LVLCHK(*NO)
+             OVRDBF     FILE(AR2159DP) TOFILE(QTEMP/DDMH)
+             OVRDBF     FILE(AR2159D)  TOFILE(DALIB/AR2159D)
+             CALL       PGM(ARLIB/ARP111RB)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             DLTOVR     FILE(*ALL)
+             GOTO       CMDLBL(STEP3)
+             ENDDO
+
+             DLTOVR     FILE(*ALL)
+             CLRPFM     FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(%SST(&FLAG1 2 1)) VALUE(' ')
+
+
+ STEP3:        /*  台北　抓　高雄  ARLIB/AR2159DK  */
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP111PA) PARM(''K'')') +
+                        DDMFILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP4)
+
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(ARLIB/AR2159DK)  +
+                        LVLCHK(*NO)
+             OVRDBF     FILE(AR2159DP) TOFILE(QTEMP/DDMK)
+             OVRDBF     FILE(AR2159D)  TOFILE(DALIB/AR2159D)
+             CALL       PGM(ARLIB/ARP111RB)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             DLTOVR     FILE(*ALL)
+             GOTO       CMDLBL(STEP4)
+             ENDDO
+
+             DLTOVR     FILE(*ALL)
+             CLRPFM     FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(%SST(&FLAG1 3 1)) VALUE(' ')
+
+ /* -------------------------------------------------------------- */
+
+ STEP4:       /* 未成功廠區之訊息 */
+
+    /*9901A*/IF         COND(&FLAG1 *NE '    ') THEN(DO)
+             SNDMSG     TOUSR(&USER) MSG(+
+                        '客戶暫收統計檔上傳失敗"' || &FLAG1 || '"')
+             ENDDO
+
+
+             ENDPGM
+

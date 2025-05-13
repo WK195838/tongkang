@@ -1,0 +1,223 @@
+     H        1   Y                                     1                 BR003
+     FARQ003S CF  E                    WORKSTN
+     F                                        RRN   KSFILE SF1
+CLJ  F                                        RRN3  KSFILE AR003F3
+CLJ  FCPRBAL  IF  E           K        DISK
+     FARSTATL1IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     E*************************************************************
+     E                    ERR     1   8 70
+     I*************************************************************
+     IAADS        DS
+     I                                       21  260YMD
+     I                                       21  220YY
+     I                                       23  240MM
+     I                                       25  260DD
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C**************************************************************
+     C           ARKEY     KLIST
+     C                     KFLD           ARCUNO
+     C                     KFLD           ARORNO
+     C           CBKEY     KLIST
+     C                     KFLD           CBCUNO
+     C********************************
+     C*****                     ******
+     C*****  INITIAL VALUES     ******
+     C*****                     ******
+     C********************************
+     C  N90                MOVE *BLANK    CUST1
+     C  N90                MOVE *BLANK    ORNO1
+     C  N90                MOVE *ALL'9'   ORNO2
+     C  N90                MOVE '1'       SCRN    1
+     C  N90                MOVE '1'       *IN,90
+     C********************************
+     C*****                     ******
+     C*****     MAIN LOGIC      ******
+     C*****                     ******
+     C********************************
+     C           *IN03     DOUEQ'1'
+     C           SCRN      CASEQ'1'       SR#01
+     C           SCRN      CASEQ'2'       SR#02
+CLJ  C           SCRN      CASEQ'3'       SR3000           進入畫面三
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C********************************
+     C*****                     ******
+     C***** SCREEN 01 MAIN CTRL ******
+     C*****                     ******
+     C********************************
+     CSR         SR#01     BEGSR
+     C                     EXFMTTITLE
+     C   KC                EXSR KC#01
+     C   KC                GOTO SR#01Z
+     C                     EXSR CK#01
+     C  N99                EXSR PR#02
+     C  N99                MOVE '2'       SCRN
+     C   99                MOVE '1'       SCRN
+     CSR         SR#01Z    ENDSR
+     C********************************
+     C*****                     ******
+     C***** SCREEN 02 MAIN CTRL ******
+     C*****                     ******
+     C********************************
+     CSR         SR#02     BEGSR
+     C                     WRITEUND01
+     C                     EXFMTSFCTL1
+     C   KC                EXSR KC#01
+     C   KC                GOTO SR#02Z
+     C   KL                EXSR KL#02
+     C   KL                GOTO SR#02Z
+CLJB C* -----------------------------------------------------------
+     C           *IN05     IFEQ '1'
+     C                     EXSR SR3100                     初始畫面三
+     C                     MOVEL'3'       SCRN             進入畫面三
+     C                     ENDIF
+CLJE C* -----------------------------------------------------------
+     CSR         SR#02Z    ENDSR
+     C********************************
+     C*****                     ******
+     C*****   CF03 EXIT         ******
+     C*****                     ******
+     C********************************
+     CSR         KC#01     BEGSR
+     C                     SETON                     LR
+     C                     RETRN
+     CSR                   ENDSR
+     C********************************
+     C*****                     ******
+     C*****   CF12 PREVIOUS     ******
+     C*****                     ******
+     C********************************
+     CSR         KL#02     BEGSR
+     C                     MOVE *BLANK    ERRMSG
+     C                     MOVE '1'       SCRN
+     CSR         KL#02Z    ENDSR
+     C********************************
+     C*****                     ******
+     C*****   SCREEN 01 CKECK   ******
+     C*****                     ******
+     C********************************
+     CSR         CK#01     BEGSR
+     C                     SETOF                     414299
+     C                     SETOF                     434044
+     C                     MOVE *BLANK    ERRMSG
+      **
+     C                     MOVELCUST1     CBCUNO
+     C           CBKEY     CHAINCBCUST               31
+     C   31                SETON                     9943
+     C   31                MOVELERR,3     ERRMSG
+     C                     MOVELCBCUNM    CUSTNM
+      **
+     C           ORNO2     IFEQ *BLANK
+     C                     MOVE *ALL'9'   ORNO2
+     C                     ENDIF
+     C           ORNO1     IFGT ORNO2
+     C                     SETON                     9941
+     C                     MOVELERR,2     ERRMSG
+     C                     ENDIF
+     CSR         CK#01Z    ENDSR
+     C********************************
+     C*****                      *****
+     C*****   SCREEN 02 PREPARE  *****
+     C*****                      *****
+     C********************************
+     CSR         PR#02     BEGSR
+     C                     MOVE *BLANK    ERRMSG
+     C                     SETON                     80
+     C                     WRITESFCTL1
+     C                     SETOF                     801051
+     C                     SETOF                     97
+     C                     Z-ADD0         RRN     30
+     C                     MOVELCUST1     ARCUNO
+     C                     MOVELORNO1     ARORNO
+     C           ARKEY     SETLLARSTATL1             97
+     C           *IN97     DOWEQ'0'
+     C           ARCUNO    READEARSTATL1                 97
+     C  N97      ARORNO    COMP ORNO2                97
+     C   97                LEAVE
+     C                     MOVELARORNO    W01
+     C                     Z-ADDARHAMT    W02
+     C                     Z-ADDARBAMT    W03
+     C                     Z-ADDARGAMT    W04
+     C                     Z-ADDAREAMT    W07
+     C                     Z-ADDARMAMT    W05
+     C                     Z-ADDARPBAL    W06
+     C*                    ADD  ARMAMT    W06
+     C                     ADD  1         RRN
+     C                     WRITESF1
+     C                     ENDDO
+     C           RRN       IFEQ 0
+     C                     CLEARSF1
+     C                     MOVEL'END'     W01
+     C                     ADD  1         RRN
+     C                     SETON                     51
+     C                     WRITESF1
+     C                     SETOF                     51
+     C                     ENDIF
+     C                     SETON                     10
+     CSR         PR#02Z    ENDSR
+     C*
+CLJB C************************************
+     C*  畫面三:財會觀點查詢主函式
+     C************************************
+     CSR         SR3000    BEGSR
+     C                     WRITEAR003F3M
+     C           S#SFN3    IFNE 0
+     C                     SETOF                     71
+     C                     SETON                     727374
+     C                     ELSE
+     C                     SETOF                     7172
+     C                     SETON                     7374
+     C                     ENDIF
+     C                     EXFMTAR003F3C                   螢幕輸入
+     C*
+     C                     MOVEL'2'       SCRN             回前畫面
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  初始畫面三
+     C*----------------------------------------
+     CSR         SR3100    BEGSR
+     C*
+     C                     SETON                     71    清除 SF
+     C                     SETOF                     7273
+     C                     WRITEAR003F3C
+     C*          -------------------------------讀入畫面並計算金額
+     C                     Z-ADD0         RRN3    40
+     C                     Z-ADD0         S#SFN3  40
+     C           *LOVAL    SETLLCPREC
+     C                     MOVEL'0'       *IN69
+     C*
+     C           1         DOWEQ1
+     C                     READ CPREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           CPCUNO    IFEQ CBCUNO
+     C                     ADD  1         RRN3
+     C                     CLEARAR003F3
+     C                     MOVELCPORNO    S#ORNO           訂單
+     C                     Z-ADDCPPBAL    S#PBAL           前期餘額
+     C                     Z-ADDCPAAMT    S#AAMT           本期增加
+     C                     Z-ADDCPBAMT    S#BAMT           本期減少
+     C                     Z-ADDCPNBAL    S#NBAL           本期餘額
+     C                     WRITEAR003F3
+     C                     ADD  1         S#SFN3
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+CLJE C**************************************************************
+      ******************************* END PROGRAM *****************
+** ERR
+訂單錯誤
+訂單範圍錯誤
+客戶編號錯誤
+

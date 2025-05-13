@@ -1,0 +1,72 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR082P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     信用狀押匯月報表                       */
+     /*     5.DATE-WRITTEN  88/12/08                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)     TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)   LEN(10)
+             DCL        VAR(&W#YY)    TYPE(*CHAR)   LEN(4)
+             DCL        VAR(&W#MM)    TYPE(*CHAR)   LEN(2)
+             DCL        VAR(&W#YYMM)  TYPE(*CHAR)   LEN(6)
+
+             DCLF       FILE(ARLIB/ARR082S)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+ INPUT:
+             SNDRCVF    RCDFMT(AR082F1)
+             IF         COND(&IN03 *EQ '1' *OR &IN12 *EQ '1') +
+                        THEN(RETURN)
+
+             IF         COND(&S#MM *GT 12 *OR &S#MM *LT 1) THEN(DO)
+                CHGVAR  VAR(&S#MSG1) VALUE('無該月份！')
+                GOTO    INPUT
+             ENDDO
+
+
+             CHGVAR     VAR(&W#YY) VALUE(&S#YY)
+             CHGVAR     VAR(&W#MM) VALUE(&S#MM)
+             CHGDTAARA  DTAARA(*LDA (1 4)) VALUE(&W#YY)
+             CHGDTAARA  DTAARA(*LDA (5 2)) VALUE(&W#MM)
+             SBMJOB     JOB(ARR082P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                        RQSDTA('CALL ARR082P')
+             CHGDTAARA  DTAARA(*LDA (801 70)) +
+             VALUE('信用狀押匯月報表已匯入排程中。')
+             RETURN
+
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&W#YYMM)
+
+             OVRPRTF    FILE(ARR082T) TOFILE(ARLIB/ARR082T) +
+                        PAGESIZE(*N 198)  CPI(15) +
+                         HOLD(*YES) USRDTA('押匯月報')
+             OVRDBF     FILE(CBCUST) TOFILE(DALIB/CBCUST)
+             OVRDBF     FILE(LLCMST) TOFILE(DALIB/LLCMST)
+             OVRDBF     FILE(RCVDTL) TOFILE(DALIB/RCVDTL) SHARE(*YES)
+             OPNQRYF    FILE(RCVDTL) +
+                        QRYSLT( +
+                              'RVACTP *EQ "D" *AND   +
+                               RVNTTP *EQ "I" *AND   +
+                               RVDUDT *GE ' || &W#YYMM || '01 *AND  +
+                               RVDUDT *LE ' || &W#YYMM || '31') +
+                        KEYFLD((RVCUNO) (RVDUDT))
+
+             CALL       PGM(ARR082R)
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

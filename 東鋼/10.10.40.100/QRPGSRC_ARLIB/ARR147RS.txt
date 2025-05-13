@@ -1,0 +1,191 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR147RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     訂單別出貨表─交貨地點（畫面）
+     H*            5.DATE-WRITTEN  113/04/25 2024AR00015
+     H*            6.UPDATE  DATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR147S CF  E                    WORKSTN
+     FSAMAST  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     E*************************************************************
+     E                    T#ERR   1  20 70
+     I*************************************************************
+     I           UDS
+     I                                      401 408 D#DATS
+     I                                      411 418 D#DATE
+     I                                      421 426 D#CUNO
+     I                                      431 436 D#ORNO
+     I                                      441 450 D#MSMN
+     I                                      451 451 D#AREA
+     I                                      452 452 D#INVT
+     I*
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I*
+     I            DS
+     I                                        1   6 D1CUNO
+     I                                        1   1 S1KIND
+     I                                        2   2 S1CUN1
+     I                                        3   5 S1CUN2
+     I                                        6   6 S1CD01
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C**************************************************************
+     C*   關鍵區
+     C**************************************************************
+     C           KEY01     KLIST
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C**************************************************************
+     C*   主程式
+     C**************************************************************
+     C           *DATE     SUB  19000000  U#SYSD  80
+     C                     Z-ADD0         S#DATS
+     C                     Z-ADD0         S#DATE
+     C           1         DOWEQ1
+     C                     EXFMTAR147F1
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03
+     C                     LEAVE
+     C                     ENDIF
+     C                     SETOF                     414243
+     C                     SETOF                     4499
+     C*
+     C                     EXSR SR1000                     欄位檢核
+     C*
+     C           *IN99     IFNE *OFF
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVEL'0'       P#IN03
+     C                     MOVE *BLANK    D#DATS
+     C                     MOVE S#DATS    D#DATS
+     C                     MOVE *BLANK    D#DATE
+     C                     MOVE S#DATE    D#DATE
+     C                     MOVELS#CUNO    D#CUNO
+     C                     MOVELS#ORNO    D#ORNO
+     C                     MOVELS#MSMN    D#MSMN
+     C                     MOVELS#AREA    D#AREA
+     C                     MOVELS#INVT    D#INVT
+     C                     LEAVE
+     C                     ENDDO
+     C                     SETON                     LR
+     C*
+     C************************************
+     C*  檢核所輸入欄位是否正確
+     C************************************
+     CSR         SR1000    BEGSR
+     C*
+     C           S#DATS    IFNE 0
+     C                     MOVE *ALL'0'   P#DATE
+     C                     MOVE S#DATS    P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM ' '       P#FLAG  1
+     C*
+     C           P#FLAG    IFNE '0'
+     C                     MOVELT#ERR,1   S#MSG1
+     C                     SETON                     4199
+     C                     GOTO END100
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      S#DATS    IFEQ 0
+     C                     MOVELT#ERR,3   S#MSG1
+     C                     SETON                     4199
+     C                     GOTO END100
+     C                     ENDIF
+     C*
+     C  N99      S#DATS    IFNE 0
+     C           S#DATE    ANDEQ0
+     C                     Z-ADDS#DATS    S#DATE
+     C                     ENDIF
+     C*
+     C  N99      S#DATE    IFNE 0
+     C                     MOVE *ALL'0'   P#DATE
+     C                     MOVE S#DATE    P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM ' '       P#FLAG  1
+     C*
+     C           P#FLAG    IFNE '0'
+     C                     MOVELT#ERR,2   S#MSG1
+     C                     SETON                     4199
+     C                     GOTO END100
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     Z-ADDU#SYSD    W#DATE  80
+     C           S#DATE    IFGT W#DATE
+     C                     MOVELT#ERR,4   S#MSG1
+     C                     SETON                     4299
+     C                     GOTO END100
+     C                     ENDIF
+     C*
+     C           S#DATS    IFGT S#DATE
+     C                     MOVELT#ERR,5   S#MSG1
+     C                     SETON                     414299
+     C                     GOTO END100
+     C                     ENDIF
+     C*
+     C  N99      S#CUNO    IFEQ *BLANKS
+     C           S#ORNO    ANDEQ*BLANKS
+     C                     SETON                     434499
+     C                     MOVELT#ERR,6   S#MSG1
+     C                     GOTO END100
+     C                     ENDIF
+     C*
+     C  N99      S#CUNO    IFNE *BLANKS
+     C           S#CUNO    CHAINCBCUST              N55
+     C   55                SETON                     4399
+     C   99                MOVELT#ERR,7   S#MSG1
+     C   99                GOTO END100
+     C                     ENDIF
+     C*
+     C  N99      S#ORNO    IFNE *BLANKS
+     C                     MOVELS#ORNO    S1OREA
+     C                     MOVE S#ORNO    S1ORNO
+     C           KEY01     CHAINSAMAST              N55
+     C   55                SETON                     4499
+     C   99                MOVELT#ERR,8   S#MSG1
+     C   99                GOTO END100
+     C           S#CUNO    IFNE *BLANKS
+     C           D1CUNO    ANDNES#CUNO
+     C                     SETON                     434499
+     C                     MOVELT#ERR,9   S#MSG1
+     C                     GOTO END100
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     CSR         END100    ENDSR
+     C*****************************************************************
+** T#ERR
+０１－所輸入之起始日期錯誤
+０２－所輸入之終止日期錯誤
+０３－日期欄位不可空白
+０４－所輸入之終止日期大於系統日期
+０５－所輸入之起始日期大於終止日期
+０６－客戶編號及訂單編號不可同時空白
+０７－客戶編號不存在，請檢核
+０８－訂單編號不存在，請檢核
+０９－此訂單不屬於此客戶，請檢核
+

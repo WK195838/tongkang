@@ -1,0 +1,213 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR116RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     出貨及發票明細表（畫面）
+     H*            5.DATE-WRITTEN  93/06/10
+     H*            6.DATE-UPDATE   94/09/16
+     H*
+     H*      940916新增不同資料挑選方式
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR116S CF  E                    WORKSTN
+     FINVMSTL5IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FHSMAST  IF  E           K        DISK
+     FRCVDTL  IF  E           K        DISK
+     E*************************************************************
+     E                    ERR     1  10 70
+     I*************************************************************
+     I           UDS
+     I                                     10011010 U#USID
+     I                                      300 300 U#OPT1
+     I                                      301 307 U#APNO
+     I                                      308 308 U#OPT2
+     I                                      309 314 U#CUNO
+     I                                      315 320 U#ORN1
+     I                                      321 326 U#ORN2
+     I                                      327 327 U#OPT3
+     I                                      328 333 U#RCNO
+     I            DS
+     I                                        1   6 D#CUNO
+     I                                        1   1 S1KIND
+     I                                        2   2 S1CUN1
+     I                                        3   5 S1CUN2
+     I                                        6   6 S1CUN3
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C**************************************************************
+     C*          KEY  LIST
+     C**************************************************************
+     C*FILE==>HSMAST(訂單主檔)
+     C           K#HSMT    KLIST
+     C                     KFLD           S1OREA            地區
+     C                     KFLD           S1ORNO            流水號
+     C*FILE==>RCVDTL(繳款明細表)
+     C           K#RCVD    KLIST
+     C                     KFLD           RVNO              繳款單號
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C                     EXSR SR0000                     初始程式
+     C*
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C           SR0000    BEGSR
+     C**************************************************************
+     C                     MOVEL'01'      W#PRID  2        畫面一
+     C*
+     C                     ENDSR
+     C**************************************************************
+     C           SR1000    BEGSR
+     C**************************************************************
+     C*W#PRID='01'-->畫面一
+     C           W#PRID    DOWEQ'01'
+     C                     EXFMTAR116F1                    螢幕輸入
+     C                     MOVEL*BLANK    S#ERR
+     C*
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03           回前畫面
+     C                     MOVEL'00'      W#PRID           結束
+     C                     LEAVE
+     C                     ENDIF
+     C*檢核
+     C                     EXSR SR1100                     檢核
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         SR1100    BEGSR
+     C**************************************************************
+     C                     MOVEA'0000000' *IN,30
+     C                     MOVE *OFF      *IN99
+     C*
+     C           S#OPT1    IFEQ *BLANK
+     C           S#OPT2    ANDEQ*BLANK
+     C           S#OPT3    ANDEQ*BLANK
+     C                     MOVELERR,1     S#ERR
+     C                     SETON                     303236
+     C                     SETON                     99
+     C                     ENDIF
+     C*
+     C  N99      S#OPT1    IFNE *BLANK
+     C           S#OPT2    ANDNE*BLANK
+     C           S#OPT3    ANDNE*BLANK
+     C                     MOVELERR,2     S#ERR
+     C                     SETON                     303236
+     C                     SETON                     99
+     C                     ENDIF
+     C*
+     C  N99      S#OPT1    IFNE *BLANK
+     C           S#OPT2    ANDNE*BLANK
+     C                     MOVELERR,2     S#ERR
+     C                     SETON                     303299
+     C                     ENDIF
+     C*
+     C  N99      S#OPT1    IFNE *BLANK
+     C           S#OPT3    ANDNE*BLANK
+     C                     MOVELERR,2     S#ERR
+     C                     SETON                     303699
+     C                     ENDIF
+     C*
+     C  N99      S#OPT2    IFNE *BLANK
+     C           S#OPT3    ANDNE*BLANK
+     C                     MOVELERR,2     S#ERR
+     C                     SETON                     323699
+     C                     ENDIF
+     C*
+     C  N99                SELEC
+     C           S#OPT1    WHNE *BLANK                     檢核請款別
+     C           S#APNO    IFEQ *BLANK
+     C                     MOVELERR,3     S#ERR
+     C                     SETON                     3199
+     C                     ELSE
+     C           S#APNO    CHAININREC                40
+     C   40                MOVELERR,4     S#ERR
+     C   40                SETON                     3199
+     C                     ENDIF
+     C           S#OPT2    WHNE *BLANK                     檢核客戶別
+     C           S#CUNO    IFEQ *BLANK
+     C                     MOVELERR,5     S#ERR
+     C                     SETON                     3399
+     C                     ELSE
+     C           S#CUNO    CHAINCBREC                41
+     C   41                MOVELERR,6     S#ERR
+     C   41                SETON                     3399
+     C                     ENDIF
+     C*
+     C  N99      S#ORN1    IFNE *BLANK
+     C                     MOVELS#ORN1    S1OREA
+     C                     MOVE S#ORN1    S1ORNO
+     C           K#HSMT    CHAINRHSMAST              42
+     C   42                MOVELERR,7     S#ERR
+     C   42                SETON                     3499
+     C                     ENDIF
+     C*
+     C  N99      S#ORN2    IFNE *BLANK
+     C                     MOVELS#ORN2    S1OREA
+     C                     MOVE S#ORN2    S1ORNO
+     C           K#HSMT    CHAINRHSMAST              43
+     C   43                MOVELERR,7     S#ERR
+     C   43                SETON                     3499
+     C                     ENDIF
+     C*
+     C  N99      S#ORN1    IFNE *BLANK
+     C           S#ORN2    ORNE *BLANK
+     C           D#CUNO    IFNE S#CUNO
+     C                     MOVELERR,8     S#ERR
+     C                     SETON                     333435
+     C                     SETON                     99
+     C                     ENDIF
+     C                     ENDIF
+     C           S#OPT3    WHNE *BLANK                     檢核繳款別
+     C           S#RCNO    IFEQ *BLANK
+     C                     MOVELERR,9     S#ERR
+     C                     SETON                     3799
+     C                     ELSE
+     C           S#RCNO    CHAINRVREC                44
+     C   44                MOVELERR,10    S#ERR
+     C   44                SETON                     3799
+     C                     ENDIF
+     C                     ENDSL
+     C*
+     C  N99                MOVEL'00'      W#PRID
+     C  N99                MOVELS#OPT1    U#OPT1
+     C  N99                MOVELS#APNO    U#APNO
+     C  N99                MOVELS#OPT2    U#OPT2
+     C  N99                MOVELS#CUNO    U#CUNO
+     C  N99                MOVELS#ORN1    U#ORN1
+     C  N99      S#ORN2    IFEQ *BLANK
+     C                     MOVEL'999999'  U#ORN2
+     C                     ELSE
+     C                     MOVELS#ORN2    U#ORN2
+     C                     ENDIF
+     C  N99                MOVELS#OPT3    U#OPT3
+     C  N99                MOVELS#RCNO    U#RCNO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+** ERR
+０１－請選擇出表方式！
+０２－只可選擇一種出表方式！
+０３－請輸入請款單號！
+０４－此張請款單不存在！
+０５－請輸入客戶代號！
+０６－此客戶代號不存在！
+０７－此訂單編號不存在！
+０８－此訂單編號不屬於該客戶！
+０９－請輸入繳款單號！
+１０－此繳款單號不存在！
+

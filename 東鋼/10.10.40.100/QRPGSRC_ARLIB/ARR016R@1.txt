@@ -1,0 +1,234 @@
+     H        1   Y                                     1                 BR003
+     FRCVDTL  IP  E                    DISK
+     FQPRINT  O   F     132            PRINTER
+      *************************************************************
+     E**                  TAB1    1   5  1   TABR1  10
+     I*************************************************************
+     IRVREC
+     I                                              RVCUNOL1
+     I****
+     IAADS        DS
+     I              'もも票據票齡分析表-C         CON3                       X
+     I              'もも'
+     I              '東和鋼鐵企業股份有-C         CON4                       X
+     I              '限公司'
+      *
+     IBBDS        DS
+9008 I                                       21  280YMD
+LYW  I                                       21  260YM
+ .   I                                       21  240YY
+ .   I                                       25  260MM
+ .   I                                       27  280DD
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C**************************************************************
+     C  N90                EXSR INZ#01
+     C  N90                SETON                     90
+     C*  L2                EXSR DL#L2
+     C   L1                EXSR DL#L1
+     C                     EXSR DP#01
+     CL1                   EXSR TL#L1
+     C*2                   EXSR TL#L2
+     CLR                   EXSR TL#LR
+     C**************************************************************
+     C*** SET INITIAL
+     CSR         INZ#01    BEGSR
+     C           *ENTRY    PLIST
+     C                     PARM           AREA    1
+     C                     PARM           CUST1   6
+     C                     PARM           CUST2   6
+      *
+     C                     Z-ADD0         PAG     30
+     C                     Z-ADD80        LCNT    30
+     C                     Z-ADD58        OVRFLW  30
+     C                     Z-ADD0         GQTY1   50
+     C                     Z-ADD0         GQTY2   50
+     C                     Z-ADD0         GQTY3   50
+     C                     Z-ADD0         GQTY4   50
+     C                     Z-ADD0         GQTY5   50
+     C                     Z-ADD0         GAMT1   90
+     C                     Z-ADD0         GAMT2   90
+     C                     Z-ADD0         GAMT3   90
+     C                     Z-ADD0         GAMT4   90
+     C                     Z-ADD0         GAMT5   90
+     C                     MOVE *ALL'='   ALS   132
+     C                     MOVE *ALL'-'   ALQ   122
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS                                **
+     C**----------------------------------------------**
+     CSR         @CHKCT    BEGSR
+     C           LCNT      COMP OVRFLW               75  75
+     C   75                ADD  1         PAG
+     C   75                EXCPTEH#01
+     C   75                Z-ADD9         LCNT
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS L2                             **
+     C**----------------------------------------------**
+     CSR         DL#L2     BEGSR
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS L1                             **
+     C**----------------------------------------------**
+     CSR         DL#L1     BEGSR
+     C                     Z-ADD0         TQTY1   50
+     C                     Z-ADD0         TQTY2   50
+     C                     Z-ADD0         TQTY3   50
+     C                     Z-ADD0         TQTY4   50
+     C                     Z-ADD0         TQTY5   50
+     C                     Z-ADD0         TAMT1   90
+     C                     Z-ADD0         TAMT2   90
+     C                     Z-ADD0         TAMT3   90
+     C                     Z-ADD0         TAMT4   90
+     C                     Z-ADD0         TAMT5   90
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS                                **
+     C**----------------------------------------------**
+     CSR         DP#01     BEGSR
+     C*                    Z-ADD0         WDAY    40
+     C*                    Z-ADDRVDATE    BDATE   60
+     C*                    Z-ADDRVDUDT    EDATE   60
+     C*                    CALL 'C04'
+     C*                    PARM           BDATE
+     C*                    PARM           EDATE
+     C*                    PARM           WDAY
+     C*                    FREE 'C04'
+     C                     MOVE *ALL'0'   P#PDAT
+     C                     MOVE RVDATE    P#PDAT
+     C                     MOVE *ALL'0'   P#EDAT
+     C                     MOVE RVDUDT    P#EDAT
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT  8
+     C                     PARM           P#EDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM 0         DAY     50
+     C                     PARM           P#ERR   1
+     C                     Z-ADDDAY       WDAY    40
+      *
+     C                     ADD  1         TQTY5
+     C                     ADD  RVRAMT    TAMT5
+      *
+     C           WDAY      COMP 90                   31
+     C   31                ADD  1         TQTY4
+     C   31                ADD  RVRAMT    TAMT4
+      *
+     C           WDAY      COMP 60                   31
+     C   31      WDAY      COMP 90                     3131
+     C   31                ADD  1         TQTY3
+     C   31                ADD  RVRAMT    TAMT3
+      *
+     C           WDAY      COMP 30                   31
+     C   31      WDAY      COMP 60                     3131
+     C   31                ADD  1         TQTY2
+     C   31                ADD  RVRAMT    TAMT2
+      *
+     C           WDAY      COMP 30                     3131
+     C   31                ADD  1         TQTY1
+     C   31                ADD  RVRAMT    TAMT1
+      *
+     CSR         DP#01Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME L1 PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#L1     BEGSR
+     C                     ADD  1         LCNT
+     C                     EXSR @CHKCT
+     C   75                ADD  1         LCNT
+     C                     EXCPTED#01
+     C                     ADD  TQTY1     GQTY1
+     C                     ADD  TQTY2     GQTY2
+     C                     ADD  TQTY3     GQTY3
+     C                     ADD  TQTY4     GQTY4
+     C                     ADD  TQTY5     GQTY5
+     C                     ADD  TAMT1     GAMT1
+     C                     ADD  TAMT2     GAMT2
+     C                     ADD  TAMT3     GAMT3
+     C                     ADD  TAMT4     GAMT4
+     C                     ADD  TAMT5     GAMT5
+     CSR         TL#L1Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME L2 PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#LR     BEGSR
+     C                     EXCPTET#LR
+     C                     ADD  3         LCNT
+     CSR         TL#LRZ    ENDSR
+      ***********************************************************
+      ****   DEFINE OUPUT FORMAT                             ****
+      ***********************************************************
+     OQPRINT  E   02           EH#01
+     O                                   17 '報表編號: AR016'
+     O                         CON4      75                                    X
+     O                                  123 '製表日期'
+     O                                  124 ':'
+     O                         UDATE Y  132
+     O        E 1              EH#01
+     O                         CON3      74                                    X
+     O                                  123 '頁　　次'
+     O                                  124 ':'
+     O                         PAG   Z  127
+     O        E 1              EH#01
+     O                                   11 '地區別　:'
+     O                         AREA    +  1
+     O        E 1              EH#01
+     O                                   11 '客戶編號:'
+     O                         CUST1   +  1
+     O                                 +  1 '-'
+     O                         CUST2   +  1
+     O        E 1              EH#01
+     O                         ALS      132
+     O        E 1              EH#01
+     O                                   10 '客戶編號'
+     O                                   20 '客戶名稱'
+     O                                   41 '----３０天----'
+     O                                   63 '----６０天----'
+     O                                   85 '----９０天----'
+     O                                  107 '--９１天以上--'
+     O                                  129 '----合　計----'
+     O        E 1              EH#01
+     O                                   30 '數量'
+     O                                   42 '金　額'
+     O                                   52 '數量'
+     O                                   64 '金　額'
+     O                                   74 '數量'
+     O                                   86 '金　額'
+     O                                   96 '數量'
+     O                                  108 '金　額'
+     O                                  118 '數量'
+     O                                  130 '金　額'
+     O        E 1              EH#01
+     O                         ALS      132
+     O        E 1              ED#01
+     O                 L1      RVCUNO     7
+     O                 L1      RVCUNM    20
+     O                         TQTY1 J   30
+     O                         TAMT1 J   42
+     O                         TQTY2 J   52
+     O                         TAMT2 J   64
+     O                         TQTY3 J   74
+     O                         TAMT3 J   86
+     O                         TQTY4 J   96
+     O                         TAMT4 J  108
+     O                         TQTY5 J  118
+     O                         TAMT5 J  130
+     O        E 1              ET#LR
+     O                         ALQ      132
+     O        E 1              ET#LR
+     O                                   19 '總　計:'
+     O                         GQTY1 J   30
+     O                         GAMT1 J   42
+     O                         GQTY2 J   52
+     O                         GAMT2 J   64
+     O                         GQTY3 J   74
+     O                         GAMT3 J   86
+     O                         GQTY4 J   96
+     O                         GAMT4 J  108
+     O                         GQTY5 J  118
+     O                         GAMT5 J  130
+     O        E 1              ET#LR
+     O                         ALQ      132
+

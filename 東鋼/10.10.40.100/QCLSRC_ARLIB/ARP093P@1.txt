@@ -1,0 +1,87 @@
+    /*****************************************************************/
+    /*                                                               */
+    /*               >>   PROGRAM INTRODUCTION   <<                  */
+    /*                                                               */
+    /*            1.PROGRAM-ID    ARP093P                            */
+    /*            2.PROGRAM-TYPE  CLP                                */
+    /*            3.AUTHOR        S02LYW                             */
+    /*            4.FUNCTION     轉暫收手切傳票傳輸                */
+    /*            5.DATE-WRITTEN  91/10/04                           */
+    /*            P.S. COMPILE 成*OWNER                            */
+    /*                                                               */
+    /*****************************************************************/
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ARA)  TYPE(*CHAR) LEN(3)
+             DCL        VAR(&ARA2) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&FLAG) TYPE(*CHAR) LEN(1)
+
+             RTVJOBA    TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+             CHGDTAARA  DTAARA(*LDA (300   1)) VALUE('X')
+
+ START:
+             SBMJOB     JOB(ARP093P) JOBD(ARJOBD) JOBQ(QCTL) +
+                          RQSDTA('CALL ARLIB/ARP093P')
+             SNDBRKMSG  MSG('轉暫收手切傳票傳輸執行中  ...') +
+                          TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             GOTO       CMDLBL(ENDCLPGM)
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (300   1)) RTNVAR(&FLAG)
+
+ STEP1:       /*  台北　抓　桃園  ............ */
+
+             DLTF       FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMT)
+
+             CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(DALIB/AR2159T) +
+                          LVLCHK(*NO)
+
+             OVRDBF     FILE(AR2159TX)  TOFILE(QTEMP/DDMT)
+             OVRDBF     FILE(AR2159T)   TOFILE(DALIB/AR2159T)
+             CALL       PGM(ARLIB/ARP093R)
+             DLTOVR     FILE(*ALL)
+
+ STEP2:       /*  台北　抓　苗栗  ............ */
+
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMH)
+
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(DALIB/AR2159T) +
+                          LVLCHK(*NO)
+
+             OVRDBF     FILE(AR2159TX)  TOFILE(QTEMP/DDMH)
+             OVRDBF     FILE(AR2159T)   TOFILE(DALIB/AR2159T)
+             CALL       PGM(ARLIB/ARP093R)
+             DLTOVR     FILE(*ALL)
+
+ STEP3:       /*  台北　抓　高雄  ............ */
+
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMK)
+
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(DALIB/AR2159T) +
+                          LVLCHK(*NO)
+
+             OVRDBF     FILE(AR2159TX)  TOFILE(QTEMP/DDMK)
+             OVRDBF     FILE(AR2159T)   TOFILE(DALIB/AR2159T)
+             CALL       PGM(ARLIB/ARP093R)
+             DLTOVR     FILE(*ALL)
+
+   /*判斷此程式是在ON LINE或BATCH狀態下執行*/
+
+             IF         COND(&FLAG *EQ 'X') THEN(DO)
+             SNDBRKMSG  MSG('轉暫收手切傳票傳輸完畢  ...') +
+                          TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             ENDDO
+
+ ENDCLPGM:
+             ENDPGM
+

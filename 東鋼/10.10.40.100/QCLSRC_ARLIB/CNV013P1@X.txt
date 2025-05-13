@@ -1,0 +1,63 @@
+             PGM
+             DCL        VAR(&YYA)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&MMA)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&YY)    TYPE(*DEC)  LEN(2 0)
+             DCL        VAR(&MM)    TYPE(*DEC)  LEN(2 0)
+             DCL        VAR(&BKDT)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&BYM)   TYPE(*CHAR) LEN(4)
+
+             CHGJOB     RUNPTY(15)
+
+             RTVDTAARA  DTAARA(ARLIB/ARBACKUP (1 6)) RTNVAR(&BKDT)
+             CLRPFM     FILE(CCLIB/ARSTAT)
+             CPYF       FROMFILE(CCLIB/ARSTATO) TOFILE(CCLIB/ARSTAT) +
+                        MBROPT(*ADD)
+
+ /* --------------------------------------------------------------- */
+          /* 参璸秨祇布*/
+             CHGVAR     VAR(&BYM)    VALUE(%SST(&BKDT 1 4))
+             OVRDBF     FILE(SAMAST) TOFILE(DALIB/SAMAST)
+             OVRDBF     FILE(SACUST) TOFILE(DALIB/SACUST)
+             OVRDBF     FILE(ARSTAT) TOFILE(CCLIB/ARSTAT)
+             OVRDBF     FILE(INVDTL) TOFILE(DALIB/INVDTL) SHARE(*YES)
+             OVRPRTF    FILE(CNV013T) TOFILE(ARLIB/CNV013T) +
+                        USRDTA('祇布岿粇')
+             OVRDBF     FILE(INVDTL01) TOFILE(DALIB/INVDTL01)
+             OPNQRYF    FILE(INVDTL)                             +
+                        QRYSLT('(IVACDT *NE 99999999 *AND          +
+                                 IVACDT *GE ' || &BKDT || ') *OR +
+                                (IVACDT *EQ 99999999 *AND          +
+                            %SST(IVRESV 1 4) *GE "' || &BYM || '")') +
+                        KEYFLD((IVACNO) (IVNO))                  +
+                        MAPFLD((IVACNO '%SST(IVORNO 1 6)'))
+             CALL       PGM(CNV013R#X)
+             CLOF       OPNID(INVDTL)
+             DLTOVR     FILE(*ALL)
+
+          /* 参璸ゼ秨祇布*/
+             OVRDBF     FILE(ARSTAT) TOFILE(CCLIB/ARSTAT)
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL)                               +
+                        QRYSLT('TXFL02  *EQ " "    *AND            +
+                                TXACDT  *GE ' || &BKDT || ' *AND   +
+                                %SST(TXRESV 10 1) *NE "*" *AND     +
+                          (TXCODE = "SA04" *OR TXCODE = "AR05")')  +
+                        KEYFLD((TXVUNO) (TXNO) (TXACNT))           +
+                        MAPFLD((TXVUNO '%SST(TXORNO 1 6)'))
+             CALL       PGM(CNV013RA)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+          /* 参璸ゼ砯璹虫⌒⒃⑤⑧②〓⒀€⑨⒂*/
+             OVRDBF     FILE(ARSTAT) TOFILE(CCLIB/ARSTAT)
+             OVRDBF     FILE(LLCMSTL1) TOFILE(DALIB/LLCMSTL1)
+             CALL       PGM(CNV013RB)
+             DLTOVR     FILE(*ALL)
+
+          /*    AFTER COMPLETE   */
+ COM:        CPYF       FROMFILE(CCLIB/ARSTAT) TOFILE(DALIB/ARSTAT) +
+                          MBROPT(*REPLACE) FMTOPT(*MAP *DROP)
+ /* --------------------------------------------------------------- */
+
+             ENDPGM
+

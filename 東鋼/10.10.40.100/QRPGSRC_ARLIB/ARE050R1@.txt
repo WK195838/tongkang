@@ -1,0 +1,369 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE050R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     進倉履約折讓自動處理作業-先前處理
+     H*            5.DATE-WRITTEN  91/02/21
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  IP  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FDISMSTL1IF  E           K        DISK
+     F            RDISMST                           KRENAMERDISL
+     FTRNDTLL4IF  E           K        DISK
+     FHSDSCT  IF  E           K        DISK
+     FDISMST  O   E           K        DISK
+     FDISDTL  O   E           K        DISK
+     E                    ARYH        9 12               類別數量金額
+     E                    ARYK        9 12               類別數量金額
+     IINREC       01
+     I                                              INCUNOL2
+     I                                              INORNOL2
+     I                                              INNO  L1
+     IDSDTA      UDS                              6
+     I                                        1   60U#PRDT
+     I            DS
+     I                                        1  12 D#ARY
+     I                                        1   3 D#PROD
+     I                                        4  120D#QTY
+     I           UDS
+     I                                      301 3040D#YYMM
+     I                                     10011010 U#USER
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C*FILE => DISMSTL1
+     C           K#DISL    KLIST
+     C                     KFLD           DMYYMM           處理年月
+     C                     KFLD           DMCONT           處理次數
+     C                     KFLD           DMCUNO           客戶代號
+     C                     KFLD           DMORNO           訂單編號
+     C                     KFLD           DMAREA           處理年月
+     C*FILE => TRNDTLL4
+     C           K#NDTL    KLIST
+     C                     KFLD           TXORN5           訂單號碼
+     C                     KFLD           TXNO             單據號碼
+     C                     KFLD           TXITEM           單據項次
+     C*取得處理次數
+     C                     Z-ADDD#YYMM    DMYYMM
+     C                     Z-ADD999       DMCONT
+     C                     MOVE *BLANK    DMCUNO
+     C                     MOVE *BLANK    DMORNO
+     C                     MOVE *BLANK    DMAREA
+     C           K#DISL    SETGTRDISL
+     C                     READPRDISL                    40
+     C           DMYYMM    IFEQ D#YYMM
+     C           DMCONT    ADD  1         W#CONT  30
+     C                     ELSE
+     C                     Z-ADD1         W#CONT
+     C                     ENDIF
+     C*
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARRDISMST
+     C*
+     C                     Z-ADD0         W#QTYH
+     C                     Z-ADD0         W#QTYK
+     C                     Z-ADD0         W#AMH1
+     C                     Z-ADD0         W#AMK1
+     C                     Z-ADD0         W#AMH2
+     C                     Z-ADD0         W#AMK2
+     C                     Z-ADD0         W#AMH3
+     C                     Z-ADD0         W#AMK3
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARRDISDTL
+     C*初始陣列
+     C                     MOVE *ALL'9'   ARYH
+     C                     MOVE *ALL'9'   ARYK
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C           K#VDTL    KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*排除外銷發票
+     C                     MOVELINCUNO    W#CUN1  1
+     C           W#CUN1    IFEQ 'E'
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C*
+     C                     MOVE INNO      IVNO             發票號碼
+     C                     MOVE '1'       IVACNT           出貨類
+     C                     Z-ADD0         IVITEM
+     C           K#VDTL    SETLLIVREC
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ IVREC               N    40
+     C   40                LEAVE
+     C*
+     C           IVNO      IFNE INNO
+     C                     LEAVE
+     C                     ENDIF
+     C*數量採發票副檔
+     C           IVACNT    IFEQ '1'                        銷貨類
+     C           IVACNT    OREQ '2'                        退貨類
+     C*
+     C                     MOVELIVPDCD    W#PDCD  1        主檔判斷
+     C*
+     C           IVPDCD    IFLT '300'                      非型鋼鋼板
+     C           IVPDCD    ORGT '399'
+     C                     LEAVE
+     C                     ENDIF
+     C*分類別合計
+     C*  苗栗廠
+     C           INAREA    IFEQ 'H'
+     C                     SORTAARYH
+     C           1         DO   9         I       10
+     C                     MOVE ARYH,I    D#ARY
+     C*
+     C           IVPDCD    IFEQ D#PROD                     相等
+     C                     ADD  IVQTY     D#QTY
+     C                     MOVE D#ARY     ARYH,I
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           D#PROD    IFEQ '999'                      初始值
+     C                     MOVE IVPDCD    D#PROD
+     C                     Z-ADDIVQTY     D#QTY
+     C                     MOVE D#ARY     ARYH,I
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ADD  IVQTY     W#QTYH  80
+     C*
+     C                     ENDIF                           苗栗廠END
+     C*  高雄廠
+     C           INAREA    IFEQ 'K'
+     C                     SORTAARYH
+     C           1         DO   9         I       10
+     C                     MOVE ARYK,I    D#ARY
+     C*
+     C           IVPDCD    IFEQ D#PROD                     相等
+     C                     ADD  IVQTY     D#QTY
+     C                     MOVE D#ARY     ARYK,I
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           D#PROD    IFEQ '999'                      初始值
+     C                     MOVE IVPDCD    D#PROD
+     C                     Z-ADDIVQTY     D#QTY
+     C                     MOVE D#ARY     ARYK,I
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ADD  IVQTY     W#QTYK  80
+     C                     ENDIF                           高雄廠END
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C           DTLEND    ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*排除外銷發票
+     C                     MOVELINCUNO    W#CUN1  1
+     C           W#CUN1    IFEQ 'E'
+     C                     GOTO L1END
+     C                     ENDIF
+     C*寫入明細
+     C*苗栗廠
+     C                     SORTAARYH
+     C           1         DO   9         I       10
+     C                     MOVE ARYH,I    D#ARY
+     C           D#PROD    IFNE '999'                      非初始值
+     C                     MOVE INCUNO    DSCUNO           客戶代號
+     C                     MOVE INORNO    DSORNO           訂單號碼
+     C           ININDT    DIV  100       DSYYMM           處理年月
+     C                     Z-ADDW#CONT    DSCONT           處理次數
+     C                     MOVE INNO      DSINNO           發票號碼
+     C                     MOVE INAREA    DSAREA           開立廠區
+     C                     MOVE D#PROD    DSPROD           產品類別
+     C                     Z-ADDD#QTY     DSQTY1           產品數量
+     C                     WRITERDISDTL
+     C                     ELSE
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*高雄廠
+     C                     SORTAARYK
+     C           1         DO   9         I       10
+     C                     MOVE ARYK,I    D#ARY
+     C           D#PROD    IFNE '999'                      非初始值
+     C                     MOVE INCUNO    DSCUNO           客戶代號
+     C                     MOVE INORNO    DSORNO           訂單號碼
+     C           ININDT    DIV  100       DSYYMM           處理年月
+     C                     Z-ADDW#CONT    DSCONT           處理次數
+     C                     MOVE INNO      DSINNO           發票號碼
+     C                     MOVE INAREA    DSAREA           開立廠區
+     C                     MOVE D#PROD    DSPROD           產品類別
+     C                     Z-ADDD#QTY     DSQTY1           產品數量
+     C                     WRITERDISDTL
+     C                     ELSE
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           W#PDCD    IFEQ '3'                        型鋼
+     C           W#PDCD    OREQ '4'                        鋼板
+     C*
+     C           INAREA    IFEQ 'H'                        苗栗廠
+     C                     ADD  INAAMT    W#AMH1 120       出貨金額
+     C                     ADD  INATAX    W#AMH1           出貨稅額
+     C*
+     C                     SUB  INCAMT    W#AMH2 120       折讓金額
+     C                     SUB  INCTAX    W#AMH2           折讓稅額
+     C*
+     C                     SUB  INEAMT    W#AMH3 120       繳款金額
+     C                     SUB  INFAMT    W#AMH3           退票金額
+     C                     SUB  INBAMT    W#AMH3           扣預收
+     C                     ENDIF
+     C*
+     C           INAREA    IFEQ 'K'                        高雄廠
+     C                     ADD  INAAMT    W#AMK1 120       出貨金額
+     C                     ADD  INATAX    W#AMK1           出貨稅額
+     C*
+     C                     SUB  INCAMT    W#AMK2 120       折讓金額
+     C                     SUB  INCTAX    W#AMK2           折讓稅額
+     C*
+     C                     SUB  INEAMT    W#AMK3 120       繳款金額
+     C                     SUB  INFAMT    W#AMK3           退票金額
+     C                     SUB  INBAMT    W#AMK3           扣預收
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C           L1END     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C*排除外銷發票
+     C                     MOVELINCUNO    W#CUN1  1
+     C           W#CUN1    IFEQ 'E'
+     C                     GOTO L2END
+     C                     ENDIF
+     C*計算特殊鋼種加價
+     C                     Z-ADD0         W#QTHX  90
+     C                     Z-ADD0         W#AMTH 120
+     C                     Z-ADD0         W#QTKX  90
+     C                     Z-ADD0         W#AMTK 120
+     C*
+     C                     MOVELINORNO    TXORN5
+     C                     MOVE *BLANK    TXNO
+     C                     Z-ADD0         TXITEM
+     C           K#NDTL    SETLLTXREC
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ TXREC                    40
+     C*
+     C           *IN40     IFEQ *ON
+     C           TXORN5    ORNE INORNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           TXACDT    DIV  100       W#ACYM  60
+     C*
+     C           TXCODE    IFNE 'SA04'                     非銷貨不計
+     C           W#ACYM    ORNE D#YYMM                     非當月不計
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           TXORNO    CHAINRHSDSCT             N41    沒有加價
+     C   41                ITER
+     C*
+     C                     MOVELTXNO      W#AREA  1
+     C           W#AREA    IFEQ 'H'
+     C                     ADD  TXQTY     W#QTHX
+     C           TXQTY     MULT STUPC1    W#AMT   60H
+     C                     ADD  W#AMT     W#AMTH
+     C                     ENDIF
+     C*
+     C           W#AREA    IFEQ 'K'
+     C                     ADD  TXQTY     W#QTKX
+     C           TXQTY     MULT STUPC1    W#AMT   60H
+     C                     ADD  W#AMT     W#AMTK
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*寫入主檔
+     C                     MOVE INORNO    DMORNO           訂單編號
+     C           ININDT    DIV  100       DMYYMM           處理年月
+     C                     Z-ADDW#CONT    DMCONT           處理次數
+     C                     MOVE W#PDCD    DMPROD           產品大類
+     C                     MOVE INSALE    DMSALE           業務員別
+     C                     MOVE INKIND    DMTYPE           發票聯式
+     C                     MOVE INCUNO    DMCUNO           客戶編號
+     C                     MOVE INCUNM    DMCUNM           客戶名稱
+     C                     MOVE U#USER    DMADDM           輸入人員
+     C                     MOVE UDATE     W#UDAT  60
+     C                     Z-ADDW#UDAT    DMADDD           輸入日期
+     C                     TIME           DMADDT           輸入時間
+     C                     MOVE U#USER    DMUPDM           異動人員
+     C                     Z-ADDW#UDAT    DMUPDD           異動日期
+     C                     TIME           DMUPDT           異動時間
+     C           W#QTYH    IFNE 0
+     C                     MOVE 'H'       DMAREA           廠區別
+     C                     Z-ADDW#QTYH    DMQTY1           出貨量
+     C                     Z-ADDW#AMH1    DMAMT1           發票金額
+     C                     Z-ADDW#AMH2    DMAMT2           其他折讓
+     C                     Z-ADDW#AMH3    DMAMT3           繳款金額
+     C                     Z-ADDW#QTHX    DMQTY6
+     C                     Z-ADDW#AMTH    DMAMT6
+     C                     WRITERDISMST
+     C                     ENDIF
+     C           W#QTYK    IFNE 0
+     C                     MOVE 'K'       DMAREA           廠區別
+     C                     Z-ADDW#QTYK    DMQTY1           出貨量
+     C                     Z-ADDW#AMK1    DMAMT1           發票金額
+     C                     Z-ADDW#AMK2    DMAMT2           其他折讓
+     C                     Z-ADDW#AMK3    DMAMT3           繳款金額
+     C                     Z-ADDW#QTKX    DMQTY6
+     C                     Z-ADDW#AMTK    DMAMT6
+     C                     WRITERDISMST
+     C                     ENDIF
+     C*
+     C           L2END     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C*寫入處理年月
+     C           *NAMVAR   DEFN DISCNTDTA DSDTA   6
+     C           *LOCK     IN   DSDTA
+     C                     Z-ADDD#YYMM    U#PRDT
+     C                     OUT  DSDTA
+     C                     UNLCKDSDTA
+     C                     ENDSR
+

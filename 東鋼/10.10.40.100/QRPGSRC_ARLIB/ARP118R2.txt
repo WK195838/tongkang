@@ -1,0 +1,162 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP118R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LBU
+     H*            4.FUNCTION     新桃工程自用發票申請下載處理
+     H*            5.DATE-WRITTEN  98/02/27
+     H*            6.DATE-UPDATE   104/11/12  2015AR953 S00WCJ (0411A)
+     H*                             產品代碼3碼改5碼
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FUENDTLN IP  E           K        DISK
+     FUENAPP  O   E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FHIPROD  IF  E           K        DISK
+     FUENSEQ  UF  E           K        DISK                      A
+     H*****************************************************************
+0411AE                    ARY1       30 46
+     I*----------------------------------------------------------------
+     ITNREC
+     I                                              TNNO  L1
+     I*
+     I            DS
+     I                                        1  10 D#PRIN
+     I                                        1   1 D#PR1
+     I                                        2   7 D#PR2
+     I*
+     I            DS
+0411AI                                        1  46 D#ARY1
+0411AI                                        1   5 D#PDNM
+0411AI                                        6  133D#UPRC
+0411AI                                       14  240D#QTY
+0411AI                                       25  350D#AMT
+0411AI                                       36  460D#TAX
+     I*
+     I           UDS
+     I                                      301 308 D#YM
+     I                                     102110210D#AREA
+     I*
+     C*****************************************************************
+     C*          KEY   LIST
+     C*****************************************************************
+     C           K#UERC    KLIST
+     C                     KFLD           K#KIND  2        編碼種類
+     C                     KFLD           K#PRIN 10        編碼原則
+     C*
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     MOVEA*ALL'9'   ARY1
+     C                     Z-ADD0         W#ITEM  30       項次（暫）
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD1         I       40
+     C                     SORTAARY1
+     C           1         DO   30        I
+     C                     MOVE ARY1,I    D#ARY1
+     C*
+     C           TNPDNM    IFEQ D#PDNM
+     C           TNUPRC    ANDEQD#UPRC
+     C                     ADD  TNQTY     D#QTY            數量
+     C                     ADD  TNAMT     D#AMT            金額
+     C                     ADD  TNTAX     D#TAX            稅額
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C                     ELSE
+     C*
+0411AC           D#PDNM    IFEQ '99999'
+     C                     CLEARARY1,I
+     C                     MOVELTNPDNM    D#PDNM           品名
+     C                     Z-ADDTNUPRC    D#UPRC           單價
+     C                     Z-ADDTNQTY     D#QTY            數量
+     C                     Z-ADDTNAMT     D#AMT            金額
+     C                     Z-ADDTNTAX     D#TAX            稅額
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C                     MOVE UDATE     UPDATE           申請日期
+     C                     MOVE 'U'       UPAREA           申請廠區
+     C                     MOVELTNPJNO    UPPJNO           專案編號
+     C                     MOVELTNOBNO    UPCUNO           目標客戶
+     C*
+     C                     MOVEL*OFF      *IN30
+     C           TNCUNO    CHAINCBREC                30
+     C  N30                MOVELCBFNAM    UPFNAM           客戶全稱
+     C  N30                MOVELCBMUID    UPMUID           統一編號
+     C*
+     C*給定KEY值
+     C                     MOVEL'01'      K#KIND
+     C                     MOVEL'T'       D#PR1
+     C                     MOVELD#YM      D#PR2
+     C                     MOVELD#PRIN    K#PRIN
+     C*
+     C                     MOVEL*OFF      *IN31
+     C           K#UERC    CHAINUEREC                31
+     C           *IN31     IFEQ *ON
+     C                     MOVELK#KIND    UEKIND
+     C                     MOVELK#PRIN    UEPRIN
+     C                     Z-ADD1         UECUNO
+     C                     WRITEUEREC
+     C                     ELSE
+     C                     ADD  1         UECUNO
+     C                     UPDATUEREC
+     C                     ENDIF
+     C*
+     C                     Z-ADDUECUNO    UPSEQ            流水單號
+     C*
+     C                     Z-ADD1         I
+     C                     SORTAARY1
+     C           1         DO   30        I
+     C                     MOVE ARY1,I    D#ARY1
+     C*
+     C           D#PDNM    IFEQ '999'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVELD#PDNM    UPPDNM           品名
+     C                     Z-ADDD#UPRC    UPUPRC           單價
+     C                     Z-ADDD#QTY     UPQTY            數量
+     C                     Z-ADDD#AMT     UPAMT            金額
+     C                     Z-ADDD#TAX     UPTAX            稅額
+     C                     ADD  1         W#ITEM
+     C                     Z-ADDW#ITEM    UPITEM           項次
+     C*
+     C                     MOVEL*OFF      *IN33
+     C           UPPDNM    CHAINRHIPROD              33
+     C  N33                MOVELF4CHIN    UPCHIN           中文品名
+     C   33                MOVEL*BLANK    UPCHIN
+     C*
+     C                     WRITEUPREC
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+

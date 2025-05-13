@@ -1,0 +1,337 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR068RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     訂單別繳款明細表
+     H*            5.DATE-WRITTEN  86/07/29
+     H*            6.UPDATE  DATE  99/09/03  2010AR517  S00WCJ (9909A)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR068S CF  E                    WORKSTN
+     F                                        RRN1  KSFILE AR068F1
+     FSAMAST  IF  E           K        DISK
+     E*************************************************************
+     E                    T#ERR   1   5 70
+     I*************************************************************
+     ILCLDTA     UDS
+9008 I                                        1   6 U#ORNO
+9210 I                                        7  14 U#DAT1
+9210 I                                       15  22 U#DAT2
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+9008 I                                        1   6 F#ORNO
+LYW  I                                        1   1 S1OREA
+ .   I                                        2   60S1ORNO
+     I            DS
+     I                                        1   6 F#CUNO
+     I                                        1   1 S1KIND
+     I                                        2   2 S1CUN1
+     I                                        3   5 S1CUN2
+     I                                        6  10 S1BK05
+     I            DS
+9008 I                                        1   6 S#ORN1
+LYW  I                                        2   6 D#ORN1
+     C**************************************************************
+     C*   檔案搜尋欄位組合
+     C**************************************************************
+     C           K#S1      KLIST                           訂單主檔
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+9909AC           *DATE     SUB  19000000  U#SYSD  80
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C*   副程式開始
+     C**************************************************************
+     C*----------------------------------------
+     C*  宣告及初始變數
+     C*----------------------------------------
+     CSR         SR0000    BEGSR
+     C                     Z-ADD11        N#PAG1  20       SF1筆數
+     C                     MOVEL'F'       W#FLAG  1        函式返回值
+     C                     MOVEL'F'       W#SFE1  1        SF1結束
+9008 C                     MOVEL*BLANK    W#ORNO  6        訂單號碼暫
+     C                     Z-ADD0         RRN1    40
+     C*
+     C           *NAMVAR   DEFN *LDA      LCLDTA
+     C                     IN   LCLDTA
+     C*
+     C                     SETON                     50
+     C                     MOVEL*BLANK    S#ORN1
+     C                     MOVEL'01'      W#PRID  2        函式代號
+     C                     EXSR SR1100                     初始畫面一
+     CSR                   ENDSR
+     C*
+     C************************************
+     C*  畫面一:選擇訂單號碼
+     C************************************
+     CSR         SR1000    BEGSR
+     C                     WRITEAR068F1M
+     C           S#SFN1    IFEQ 0
+     C                     SETOF                     7273
+     C                     SETON                     71
+     C                     ELSE                            有資料
+     C                     SETOF                     73
+     C                     SETON                     7172
+     C                     ENDIF
+     C           W#SFE1    IFEQ 'T'
+     C                     SETON                     74
+     C                     ELSE
+     C                     SETOF                     74
+     C                     ENDIF
+     C                     EXFMTAR068F1C
+     C*
+     C           S#CRN1    IFNE 0
+     C                     Z-ADDS#CRN1    S#NBR1
+     C                     ENDIF
+     C                     SETOF                     50
+     C*
+     C                     SELEC
+     C           *IN03     WHEQ '1'                        結束
+     C           *IN12     OREQ '1'
+     C                     MOVEL'00'      W#PRID
+     C           *IN91     WHEQ '1'                        向下翻頁
+     C                     EXSR SR1200
+     C           *IN92     WHEQ '1'                        向上翻頁
+     C                     EXSR SR1300
+     C*
+     C                     OTHER                           執行鍵
+     C                     MOVEL*BLANK    S#MSG1
+     C           S#ORN1    IFNE *BLANK                     指定記錄
+     C                     EXSR SR1100
+     C                     ELSE                            執行選擇
+     C                     EXSR SR1110
+     C                     ENDIF
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*
+     C*----------------------------------------
+     C*  初始畫面一(指向指定的記錄)
+     C*----------------------------------------
+     CSR         SR1100    BEGSR
+     C           S#ORN1    IFNE *BLANK                     輸入資料找
+     C                     TESTN          D#ORN1     3132
+     C           *IN31     IFNE '1'
+     C           *IN32     ANDNE'1'
+     C                     MOVELT#ERR,4   S#MSG1
+     C                     SETON                     5051
+     C                     GOTO ES1100
+     C                     ENDIF
+     C                     MOVELS#ORN1    F#ORNO
+     C           K#S1      SETLLRSAMAST              69
+     C*
+     C                     ELSE                            用空白找
+     C           *LOVAL    SETLLRSAMAST              69
+     C                     ENDIF
+     C*          -------------------------------
+     C           *IN69     IFEQ '1'
+     C                     Z-ADD0         S#SFN1
+     C                     MOVELT#ERR,1   S#MSG1           查無資料
+     C                     SETON                     5051
+     C*
+     C                     ELSE
+     C                     SETOF                     51
+     C                     MOVEL*BLANK    S#ORN1
+     C                     MOVEL*BLANK    F#ORNO           第一筆就要
+     C                     EXSR SR1010                     清除SF
+     C                     EXSR SR1020                     讀入SF
+     C                     Z-ADD1         S#NBR1
+     C                     ENDIF
+     CSR         ES1100    ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一執行所選擇的
+     C*----------------------------------------
+     CSR         SR1110    BEGSR
+     C                     MOVEL'F'       W#FNDC  1
+     C           1         DO   S#SFN1    RRN1
+     C           RRN1      CHAINAR068F1              69
+     C           S#OPT1    IFEQ ' '
+     C                     ITER
+     C                     ENDIF
+     C           S#OPT1    IFEQ '1'
+     C                     MOVEL*BLANK    S#OPT1           清除選項
+     C                     UPDATAR068F1
+     C                     MOVELT#ERR,5   S#MSG1
+     C                     EXSR SR1111                     印出報表
+     C                     MOVEL'T'       W#FNDC
+     C                     Z-ADDRRN1      S#NBR1
+     C*                    LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           W#FNDC    IFEQ 'F'
+     C                     SETON                     50
+     C                     ENDIF
+     CSR         ES1110    ENDSR
+     C*
+     C*----------------------------------------
+     C*  印出報表（將列印作業丟至批次佇列執行）
+     C*----------------------------------------
+     CSR         SR1111    BEGSR
+     C                     MOVELS#ORNO    U#ORNO
+     C                     MOVE S#DAT1    U#DAT1
+     C                     MOVE S#DAT2    U#DAT2
+     C                     OUT  LCLDTA
+     C*
+     C                     MOVEL*BLANK    W#PJOB 80
+     C           'SBMJOB'  CAT  'JOB(':1  W#PJOB           SBMJOB
+     C           W#PJOB    CAT  'ARR068':0W#PJOB           JOB(ARR068P)
+     C           W#PJOB    CAT  'P)':0    W#PJOB
+     C           W#PJOB    CAT  'JOBD(':1 W#PJOB           JOBD(ARJOBD)
+     C           W#PJOB    CAT  'ARJOBD':0W#PJOB
+     C           W#PJOB    CAT  ')':0     W#PJOB
+     C           W#PJOB    CAT  'CMD':1   W#PJOB           CMD(CALL
+     C           W#PJOB    CAT  '(CALL':0 W#PJOB               ARR068P)
+     C           W#PJOB    CAT  'ARR068':1W#PJOB
+     C           W#PJOB    CAT  'P)':0    W#PJOB
+     C*
+     C                     Z-ADD80        W#PLEN 155
+     C*
+     C                     CALL 'QCMDEXC'
+     C                     PARM           W#PJOB
+     C                     PARM           W#PLEN
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一向下翻一頁
+     C*----------------------------------------
+     CSR         SR1200    BEGSR
+     C           W#SFE1    IFEQ 'T'
+     C                     MOVELT#ERR,2   S#MSG1           已達檔底
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*
+     C                     EXSR SR1010                     清除SF
+     C                     EXSR SR1020                     讀入SF
+     C           S#NBR1    IFGT S#SFN1
+     C                     Z-ADD1         S#NBR1
+     C                     ENDIF
+     CSR         ES1200    ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一向上翻一頁
+     C*----------------------------------------
+     CSR         SR1300    BEGSR
+     C           S#SFN1    IFNE 0                          本頁有資料
+     C                     Z-ADD1         RRN1
+     C           RRN1      CHAINAR068F1              69
+     C                     MOVELS#ORNO    F#ORNO
+     C           K#S1      CHAINRSAMAST              69    移至本頁頭
+     C*
+     C                     READPRSAMAST                  69向前讀一筆
+     C           *IN69     IFEQ '1'                        測試
+     C                     Z-ADDS#SFN1    RRN1
+     C           RRN1      CHAINAR068F1              69
+     C                     MOVELS#ORNO    F#ORNO
+     C           K#S1      CHAINRSAMAST              69    還原至頁尾
+     C                     MOVELT#ERR,3   S#MSG1           己達檔頭
+     C                     GOTO ES1300
+     C                     ELSE                            前有資料
+     C                     READ RSAMAST                  69還原
+     C                     ENDIF
+     C                     ENDIF                           本頁有資料
+     C*
+     C                     EXSR SR1030                     向前移動
+     C                     EXSR SR1010                     清除SF
+     C                     EXSR SR1020                     讀入SF
+     CSR         ES1300    ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一清除SF
+     C*----------------------------------------
+     CSR         SR1010    BEGSR
+     C                     MOVEL*BLANK    S#MSG1
+     C                     SETOF                     717251
+     C                     SETON                     73    清除 SF
+     C                     WRITEAR068F1C
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一向下讀入SF (從目前的檔案位置)
+     C*----------------------------------------
+     CSR         SR1020    BEGSR
+     C                     MOVELF#ORNO    W#ORNO
+     C                     Z-ADD0         S#SFN1
+     C                     Z-ADD0         RRN1
+     C           1         DOWEQ1                          讀取迴圈
+     C                     READ RSAMAST                  69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C           W#ORNO    IFNE F#ORNO
+     C           S#SFN1    IFEQ N#PAG1                     已滿一頁
+     C                     LEAVE
+     C                     ENDIF
+     C                     ADD  1         RRN1
+     C                     CLEARAR068F1
+     C                     MOVELF#ORNO    S#ORNO           搬移資料
+     C                     Z-ADDS1DATE    S#ORDT
+     C                     MOVELS1CTNO    S#CTNO
+     C                     MOVELF#CUNO    S#CUNO
+     C                     MOVELS1CUNO    S#CUNM
+     C*                    MOVEL*BLANK    S#DAT1
+9909AC                     MOVE U#SYSD    S#DAT2
+     C                     WRITEAR068F1
+     C                     MOVELF#ORNO    W#ORNO
+     C                     ADD  1         S#SFN1
+     C                     ENDIF
+     C                     ENDDO                           讀取迴圈
+     C*
+     C           *IN69     IFEQ '1'
+     C                     MOVEL'T'       W#SFE1           已達檔底
+     C                     ELSE
+     C                     MOVEL'F'       W#SFE1           未達檔底
+     C                     READPRSAMAST                  69還原位置
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一向上移動記錄(從目前的檔案位置)
+     C*----------------------------------------
+     CSR         SR1030    BEGSR
+     C                     MOVELF#ORNO    W#ORNO
+     C                     Z-ADD0         S#SFN1
+     C           1         DOWEQ1
+     C                     READPRSAMAST                  69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C           W#ORNO    IFNE F#ORNO
+     C                     MOVELF#ORNO    W#ORNO
+     C                     ADD  1         S#SFN1
+     C           S#SFN1    IFGT N#PAG1                     多一筆
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           *IN69     IFEQ '1'
+     C           *LOVAL    SETLLRSAMAST              69    已達檔頭
+     C                     MOVEL*BLANK    F#ORNO
+     C                     ENDIF
+     CSR                   ENDSR
+     C**************************************************************
+** T#ERR
+０１－找不到資料
+０２－已達檔底
+０３－已達檔頭
+０４－訂單號碼輸入錯誤
+０５－報表列印工作已送入佇列中
+

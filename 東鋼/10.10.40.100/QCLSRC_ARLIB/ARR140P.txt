@@ -1,0 +1,110 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR140P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCJ                                  */
+     /*     4.FUNCTION     銷貨查帳報告下載作業                   */
+     /*     5.DATE-WRITTEN  103/08/04  2014AR854                    */
+     /*     6.UPDATE  DATE                                          */
+     /*                                                             */
+     /***************************************************************/
+
+             PGM
+             DCL        VAR(&DSPID)   TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&W#ERR)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#DAT1) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#DAT2) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+
+        DCLF       FILE(ARR140S)
+
+             RTVJOBA    JOB(&DSPID) OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVN)
+
+  START:
+             SNDRCVF    RCDFMT(AR140F1)
+
+             IF         COND(&IN03 *EQ '1')   THEN(RETURN)
+             IF         COND(&IN12 *EQ '1')   THEN(RETURN)
+
+             CHGVAR     VAR(&IN41)    VALUE('0')
+             CHGVAR     VAR(&IN42)    VALUE('0')
+             CHGVAR     VAR(&S#ERR)   VALUE(' ')
+
+                 IF      COND(&S#DAT1 *EQ 0) THEN(DO)
+                      CHGVAR   VAR(&S#ERR)  VALUE('訊息-日期欄位+
+                             不可空白!')
+                      CHGVAR   VAR(&IN41)   VALUE('1')
+                      GOTO     CMDLBL(START)
+                 ENDDO
+
+             IF       COND(&S#DAT1 *NE 0) THEN(DO)
+                  CALL     PGM(C018) PARM(&S#DAT1 &W#ERR)
+               IF       COND(&W#ERR *EQ '1') THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-輸入日期錯誤!')
+                   CHGVAR  VAR(&IN41)  VALUE('1')
+                   GOTO     CMDLBL(START)
+               ENDDO
+             ENDDO
+
+             IF       COND(&S#DAT2 *NE 0) THEN(DO)
+                  CALL     PGM(C018) PARM(&S#DAT2 &W#ERR)
+               IF       COND(&W#ERR *EQ '1') THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-輸入日期錯誤!')
+                   CHGVAR  VAR(&IN42)  VALUE('1')
+                   GOTO     CMDLBL(START)
+               ENDDO
+             ENDDO
+
+             IF      COND(&S#DAT1 *NE 0  *AND &S#DAT2 *EQ 0) THEN(DO   )
+                   CHGVAR  VAR(&S#DAT2)  VALUE(&S#DAT1)
+             ENDDO
+
+
+             IF       COND(&S#DAT1 *GT &S#DAT2) THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-日期區間錯誤!')
+                   CHGVAR  VAR(&IN41)  VALUE('1')
+                   CHGVAR  VAR(&IN42)  VALUE('1')
+                   GOTO     CMDLBL(START)
+             ENDDO
+
+             CHGVAR     VAR(&W#DAT1)   VALUE(&S#DAT1)
+             CHGVAR     VAR(&W#DAT2)   VALUE(&S#DAT2)
+             CHGDTAARA  DTAARA(*LDA (1   8)) VALUE(&W#DAT1)
+             CHGDTAARA  DTAARA(*LDA (11  8)) VALUE(&W#DAT2)
+
+             SBMJOB     JOB(ARR140P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR140P')
+             SNDBRKMSG  MSG('<<銷貨查帳報告下載，開始處理，請稍待...>>') +
+                          TOMSGQ(&DSPID) MSGTYPE(*INFO)
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1  8)) RTNVAR(&W#DAT1)
+             RTVDTAARA  DTAARA(*LDA (11 8)) RTNVAR(&W#DAT2)
+
+             CLRPFM     ARR140F
+             OVRDBF     FILE(TRNDTLLF) TOFILE(TRNDTLLF) SHARE(*YES)
+
+             OPNQRYF    FILE((TRNDTLLF)) QRYSLT('                  +
+                           (ACDT *GE "' || &W#DAT1 || '") *AND    +
+                           (ACDT *LE "' || &W#DAT2 || '") *AND    +
+                           (TXCODE *EQ "SA04")')                  +
+                          KEYFLD((TXDATE) (TXNO) (TXITEM)) +
+                          MAPFLD((ACDT  TXDATE *CHAR 8))
+
+    /*    CPYFRMQRYF    FROMOPNID(TRNDTLLF) TOFILE(S00WCJ/TRF) +
+              MBROPT(*REPLACE)  CRTFILE(*YES)   */
+             CALL       PGM(ARR140R)
+
+             CLOF       OPNID(TRNDTLLF)
+             DLTOVR     FILE(*ALL)
+
+      ENDPGM
+

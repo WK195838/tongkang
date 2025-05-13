@@ -1,0 +1,91 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP004P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02YSH                                  */
+     /*     4.FUNCTION     外銷發票開立作業-新版(依CI)        */
+     /*     5.DATE-WRITTEN  91/04/29                                */
+     /*                                                             */
+     /*     COMPILE 成OWNER才會RUN                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&YMDA)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&YMD)   TYPE(*DEC)  LEN(6 0)
+             DCL        VAR(&AREA)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&IN03)  TYPE(*LGL)  LEN(1)
+             DCL        VAR(&ORNO)  TYPE(*CHAR) LEN(6)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+
+             IF          COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+             CALL       PGM(ARP004RS) PARM(&IN03 &YMD &AREA &ORNO)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGVAR     VAR(&YMDA)    VALUE(&YMD)
+             CHGDTAARA  DTAARA(*LDA (301 6)) VALUE(&YMDA)
+             CHGDTAARA  DTAARA(*LDA (307 1)) VALUE(&AREA)
+             CHGDTAARA  DTAARA(*LDA (308 6)) VALUE(&ORNO)
+        /*   SBMJOB     CMD(CALL PGM(ARP004P)) JOB(ARP004P) +
+                          JOBD(ARJOBD) OUTQ(&OUTQ)    */
+             SNDBRKMSG   MSG('<<外銷發票開立作業開始處理+
+                              ,請稍待...>>')    +
+                              TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             RETURN
+
+  BATCH:     RTVDTAARA  DTAARA(*LDA (301 6)) RTNVAR(&YMDA)
+             RTVDTAARA  DTAARA(*LDA (307 1)) RTNVAR(&AREA)
+             RTVDTAARA  DTAARA(*LDA (308 6)) RTNVAR(&ORNO)
+
+             DLTF       FILE(QTEMP/TRNDTLX)
+             MONMSG     MSGID(CPF0000)
+
+             CRTDUPOBJ  OBJ(TRNDTL) FROMLIB(DALIB) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(TRNDTLX)
+
+             DLTDTAARA  DTAARA(QTEMP/ARP04DTA)
+             MONMSG     MSGID(CPF0000)
+             CRTDTAARA  DTAARA(QTEMP/ARP04DTA) TYPE(*CHAR) LEN(5)
+       /*先前處理*/
+             OVRDBF     FILE(TRNDTL)  TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OVRDBF     FILE(TRNDTLX) TOFILE(QTEMP/TRNDTLX)
+             OVRDBF     FILE(HSCINV)  TOFILE(HSCINV)
+             OPNQRYF    FILE((TRNDTL)) OPTION(*ALL) QRYSLT('       +
+                          TXCODE *EQ "SA04" *AND DATE *LE "' || +
+                          &YMDA || '" *AND TXTXAR *EQ "' || &AREA +
+                          || '" *AND %SST(TXCUNO 1 1) *EQ "E" *AND +
+                          TXFLAG *NE "D" *AND TXFL02 *EQ " " *AND +
+                          TXIVNO *EQ "          " *AND TXPCNO *EQ +
+                          "' || &ORNO || '"') +
+                          KEYFLD((TXCODE) (TXPCNO) +
+                          (TXPDNM) (TXUPRC) (TXNO)) MAPFLD((TXPCNO +
+                          '%SST(TXORNO 1 6)') (ZONE61 TXDATE *ZONED +
+                          8) (CHAR61 ZONE61 *CHAR 8) (DATE +
+                          '%SST(CHAR61 3 6)' *CHAR 6))
+             CALL       PGM(ARP004RA)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(TRNDTLX) TOFILE(QTEMP/TRNDTLX) SHARE(*YES)
+             OVRDBF     FILE(INVMST)  TOFILE(INVMST)
+             OVRDBF     FILE(INVDTL)  TOFILE(INVDTL)
+             OVRDBF     FILE(HIPROD)  TOFILE(HIPROD)
+             OVRDBF     FILE(CBCUST)  TOFILE(CBCUST)
+             OVRDBF     FILE(SACUST)  TOFILE(SACUST)
+             OVRDBF     FILE(SAMAST)  TOFILE(SAMAST)
+             OVRDBF     FILE(TRNDTL)  TOFILE(TRNDTL)
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 160) +
+                          CPI(12) OUTQ(&OUTQ)
+             OPNQRYF    FILE((TRNDTLX)) +
+                          KEYFLD((TXCODE) (TXPCNO) +
+                          (TXPDNM) (TXUPRC) (TXNO))
+         /*  OPNQRYF    FILE((TRNDTLX)) +
+                          KEYFLD((TXPCNO))    */
+             CALL       PGM(ARP004R) PARM(&AREA)
+             CLOF       OPNID(TRNDTLX)
+             DLTOVR     FILE(*ALL)
+ENDCLPGM:    ENDPGM
+

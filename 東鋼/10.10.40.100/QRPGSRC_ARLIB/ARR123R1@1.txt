@@ -1,0 +1,223 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR123R1
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     客戶銷售排行榜（財會用）－銷貨
+     H*            5.DATE-WRITTEN  95/01/11
+     H*            6.DATE-MODIFY   96/04/11外銷改以報關金額
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+9604 FHSCINV  IF  E           K        DISK
+     FARR123F UF  E           K        DISK                      A
+     E                    ARY1      500 50
+     E*****************************************************************
+     ITXREC
+     I                                              TXCUNML1
+     I            DS
+9604 I                                        1  50 D#ARY1
+     I                                        1   6 D#CUNO
+     I                                        7  16 D#CUNM
+9604 I                                       17  22 D#ORNO
+ .   I                                       23  250D#ITEM
+ .   I                                       26  370D#AMT
+ .   I                                       38  490D#QTY
+ .   I                                       50  50 D#MARK
+ .   I            DS
+ .   I                                        1   9 TXORNO
+9604 I                                        1   6 D#ORN6
+     I            DS
+9704 I                                        1   8 TXNO
+9704 I                                        1   1 D#TXAR
+     I*
+     I           UDS
+     I                                      300 3050U#YM1
+     I                                      306 3110U#YM2
+     I                                      312 3140U#RAK1
+     I                                      315 3170U#RAK2
+     I                                      318 3280U#AMT
+     I                                     10011010 U#USID
+     I*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARRAR123F
+     C*
+     C                     Z-ADD0         W#QTY1 120       出貨量
+     C                     Z-ADD0         W#AMT1 120       出貨金額
+     C                     MOVE *ALL'9'   ARY1
+     C                     MOVE *ALL'9'   W#IVNO 10
+9604 C                     MOVE *ALL'9'   W#ORNO  6
+9604 C                     MOVE *ALL'9'   W#NOCU  6
+     C                     Z-ADD0         I       40
+     C*
+     C           TXCUNM    IFEQ 'THYSSEN'
+     C                     Z-ADD0         W#TMP   10
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C           D#ORN6    IFEQ 'H09539'
+     C           TXCUNO    OREQ 'EH054'
+     C                     MOVEL'X'       W#TEMP  1
+     C                     ENDIF
+     C*
+     C                     MOVELTXCUNO    W#CUNO  1
+     C           W#CUNO    IFEQ 'D'
+     C                     ADD  TXQTY     W#QTY1           出貨數量
+     C                     ADD  TXAMT     W#AMT1           出貨金額
+     C                     ELSE
+     C*外銷採用報關金額
+     C                     Z-ADD1         I
+     C                     SORTAARY1
+     C           1         DO   500       I
+     C                     MOVE ARY1,I    D#ARY1
+9604 C           D#ORN6    IFEQ D#ORNO
+     C                     ADD  TXAMT     D#AMT
+     C                     ADD  TXQTY     D#QTY
+     C*
+9704 C           D#MARK    IFNE D#TXAR
+     C           D#MARK    IFEQ 'H'
+     C           D#MARK    OREQ 'K'
+     C                     MOVEL'O'       D#MARK
+     C                     ENDIF
+9704 C                     ENDIF
+     C*
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C                     ELSE
+9604 C           D#ORNO    IFEQ W#ORNO
+     C                     MOVE *BLANK    D#ORNO
+     C                     MOVELTXCUNO    D#CUNO
+     C                     MOVELTXCUNM    D#CUNM
+9604 C                     MOVELTXORNO    D#ORNO
+9704 C                     MOVELD#TXAR    D#MARK
+     C                     Z-ADDTXAMT     D#AMT
+     C                     Z-ADDTXQTY     D#QTY
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C                     EXSR SR1000
+     C*
+     C           TXCUNM    CHAINRAR123F              40
+     C                     MOVELTXCUNO    A1CUNO
+     C                     MOVELTXCUNM    A1CUNM
+     C                     Z-ADDW#QTY1    A1QTY1
+     C                     Z-ADDW#AMT1    A1AMT1
+     C*          W#AMT1    DIV  W#QTY1    A1PRC1    H
+     C*
+     C   40                WRITERAR123F
+     C  N40                UPDATRAR123F
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C                     Z-ADD1         I
+     C*
+     C                     SORTAARY1
+     C           1         DO   500       I
+     C                     MOVE ARY1,I    D#ARY1
+     C*
+     C           D#ORNO    IFEQ 'H10169'
+     C           D#ORNO    OREQ 'H10170'
+     C           D#ORNO    OREQ 'H10171'
+     C           D#ORNO    OREQ 'H10079'
+     C           D#ORNO    OREQ 'H10080'
+     C                     MOVEL'X'       W#TEMP  1
+     C                     ENDIF
+     C*
+9604 C           D#CUNO    IFNE W#NOCU
+ .   C                     MOVELD#ORNO    C1ORNO
+ .   C           C1ORNO    CHAINHSCINV               44
+     C*
+     C  N44                SELEC
+     C           D#MARK    WHEQ 'H'
+     C                     ADD  C1AMTH    W#AMT1
+     C*
+     C           D#MARK    WHEQ 'K'
+9604 C                     ADD  C1AMTK    W#AMT1
+     C           C1ORNO    IFEQ 'X00080'
+     C                     ADD  22893390  W#AMT1
+     C                     ADD  8387826   W#AMT1
+     C                     ENDIF
+     C           C1ORNO    IFEQ 'H10170'                   K
+     C                     ADD  741034    W#AMT1
+     C                     ENDIF
+     C           C1ORNO    IFEQ 'H10080'                   K
+     C                     ADD  2184004   W#AMT1
+     C                     ENDIF
+     C*
+     C           D#MARK    WHEQ 'O'
+     C*
+     C                     SELEC
+     C           C1ORNO    WHEQ 'H10052'
+     C                     ADD  16867012  W#AMT1
+     C           C1ORNO    WHEQ 'H10053'
+     C                     ADD  25780678  W#AMT1
+     C           C1ORNO    WHEQ 'H10054'
+     C                     ADD  15093437  W#AMT1
+     C           C1ORNO    WHEQ 'H10055'
+     C                     ADD  15564923  W#AMT1
+     C           C1ORNO    WHEQ 'H10056'
+     C                     ADD  10525122  W#AMT1
+     C           C1ORNO    WHEQ 'H10058'
+     C                     ADD  4573624   W#AMT1
+     C           C1ORNO    WHEQ 'H10060'
+     C                     ADD  9754176   W#AMT1
+     C           C1ORNO    WHEQ 'H09624'                   K
+     C                     ADD  7983934   W#AMT1
+     C           C1ORNO    WHEQ 'H09825'                   K
+     C                     ADD  5687624   W#AMT1
+     C           C1ORNO    WHEQ 'H09830'                   H,K
+     C                     ADD  3750017   W#AMT1
+     C                     ADD  1947148   W#AMT1
+     C           C1ORNO    WHEQ 'H10079'                   H,K
+     C                     ADD  3716538   W#AMT1
+     C                     ADD  1864405   W#AMT1
+     C           C1ORNO    WHEQ 'H10162'                   H
+     C                     ADD  16079930  W#AMT1
+     C           C1ORNO    WHEQ 'H10169'                   H,K
+     C                     ADD  3561724   W#AMT1
+     C                     ADD  753758    W#AMT1
+     C           C1ORNO    WHEQ 'H10171'                   H,K
+     C                     ADD  1726363   W#AMT1
+     C                     ADD  5347979   W#AMT1
+     C                     ENDSL
+     C*
+     C                     ADD  C1AMTH    W#AMT1
+     C                     ADD  C1AMTK    W#AMT1
+     C                     ENDSL
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+

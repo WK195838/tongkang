@@ -1,0 +1,541 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP058R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     營業繳款過入財會處理作業
+     H*            5.DATE-WRITTEN  87/05/26
+     H*            6.DATE-UPDATED  88/11/30
+     H*
+     H*  說明：本程式將營業繳款檔之已確認未過入的資料寫入財會繳款檔，
+     H*        同時寫沖銷的發票明繳款記錄至發票明細檔，並更改發票主檔
+     H*        的相關彙總金額。由於在營業的輸入系統內已檢核完整，若在
+     H*        本程式內發現繳款檔有過入還原的情況時，以找出並修改的方
+     H*        式寫回新過入的資料。（非直接寫入相關案）。
+     H*        現金買貨之暫收款異動將相關金額寫入客戶暫收統計檔。
+     H*        同時若發現有現金繳款之預收類發票時，以及暫收款現金買貨
+     H*        寫入授信管控之異動記錄。
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FSARCVFL1IP  E           K        DISK
+     F            SRREC                             KRENAMESRRECP
+     FCBCUST  IF  E           K        DISK
+     FARSAID  IF  E           K        DISK
+     FSARCVF  UF  E           K        DISK
+     FRCVDTL  UF  E           K        DISK                      A
+     FSARVIN  UF  E           K        DISK
+     FINVDTL  UF  E           K        DISK                      A
+     FINVMST  UF  E           K        DISK
+     FLLCMST  UF  E           K        DISK
+     FAR2159F UF  E           K        DISK                      A
+     FCAMBALT O   E           K        DISK
+     FARP058T O   E             66     PRINTER
+     F*****************************************************************
+     ISRRECP
+     I                                              SRRVIDL3
+     I                                              SRRVDTL2
+     I                                              SRRVNOL1
+     I*------------------------------------------------------
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1  140W#SYST
+     I                                        1   60D#ST
+     I                                        7  100D#SY
+     I                                       11  140D#SMD
+     I            DS
+     I                                        1  10 W#DSPN
+     I                                        9  10 D#DSIT
+     C**************************************************************
+     C*   檔案搜尋欄位組合
+     C**************************************************************
+     C           K#SR      KLIST
+     C                     KFLD           SRRVNO
+     C                     KFLD           SRITEM
+     C*
+     C           K#IV      KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C*
+     C           K#AR      KLIST
+     C                     KFLD           ARCUNO
+     C                     KFLD           ARAREA
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L3                EXSR L3CLR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CL3 99                EXSR L3SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C                     Z-ADD0         W#DSIT  20       授信用項次
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L3清除函式
+     C*********************************
+     CSR         L3CLR     BEGSR
+     C                     Z-ADD0         R#PGNO
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2清除函式
+     C*********************************
+     CSR         L2CLR     BEGSR
+     C                     CLEARAR058T1T
+     C                     SETON                     66    強迫換頁
+     C*
+     C                     Z-ADDSRRVDT    R#RVDT           繳款日期
+     C                     MOVELSRDPNO    R#DPNO           繳款部門
+     C                     MOVELSRRVID    R#RVID           收款業務
+     C           SRRVID    CHAINARSAID               69
+     C   69                MOVEL*BLANK    R#RVNM
+     C  N69                MOVELSANAME    R#RVNM
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     CLEARAR058T1S
+     C                     Z-ADD0         W#CCAM 110       現金預收
+     C                     Z-ADD0         W#2159 110       暫收款
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     EXSR SR1000                     過入繳款檔
+     C                     EXSR PR1000                     列印明細
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+     C*  L1 函式  繳款單號更改
+     C*****************************************************************
+     CSR         L1SR      BEGSR
+     C                     WRITEAR058T1L                   換行
+     C                     CLEARAR058T1E
+     C                     Z-ADD0         W#CNTN  10
+     C*
+     C           SRRVNO    CHAINSIREC                69    讀取沖銷檔
+     C           *IN69     DOWEQ'0'
+     C                     EXSR SR2000                     過入發票檔
+     C                     EXSR PR2000                     印出明細
+     C           SRRVNO    READESIREC                    69
+     C                     ENDDO
+     C                     EXSR PR2100
+     C*
+     C           W#CCAM    IFNE 0                          現金預收
+     C                     EXSR SR3000                     授信集中
+     C                     ENDIF
+     C*
+     C           W#2159    IFNE 0                          暫收款統計
+     C                     EXSR SR4000                     金額處理
+     C                     ENDIF
+     C*
+     C           *IN66     IFEQ '1'                        小計列印
+     C                     ADD  1         R#PGNO
+     C                     WRITEAR058T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR058T1S                   印出小計
+     C*
+     C                     ADD  R#SRNA    R#TRNA           合計
+     C                     ADD  R#SRXA    R#TRXA
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2 函式
+     C*********************************
+     CSR         L2SR      BEGSR
+     C           *IN66     IFEQ '1'
+     C                     ADD  1         R#PGNO
+     C                     WRITEAR058T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR058T1T                   印出合計
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L3 函式 換業務員(NOTHING)
+     C*********************************
+     CSR         L3SR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  印核覆(授信介面)
+     C*********************************
+     CSR         LRSR      BEGSR
+     C           'CCLIB/CC'CAT  'P300P':0 W#PGMN 13         CCP300P
+     C                     CALL W#PGMN                     呼叫介面
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     WRITEAR058T1H
+     C                     WRITEAR058T1M
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+     C*  子函式集
+     C*****************************************************************
+     C*----------------------------------------
+     C*  過入繳款檔(SARCVF, RCVDTL)
+     C*----------------------------------------
+     CSR         SR1000    BEGSR
+     C           K#SR      CHAINSRREC                69
+     C                     Z-ADDUDATE     SRTRDT           過入日期
+     C                     MOVELU#USID    SRTRUS           過入人員
+     C                     MOVEL'Y'       SRFL02           財會過入碼
+     C                     UPDATSRREC
+     C*
+     C           K#SR      CHAINRVREC                69
+     C                     CLEARRVREC
+     C*
+     C                     MOVEL'A'       RVFLAG
+     C                     MOVELSRRVNO    RVNO
+     C                     Z-ADDSRRVDT    RVDATE           繳款日
+     C                     MOVELSRCUNO    RVCUNO           客戶編號
+     C           SRCUNO    CHAINCBCUST               70
+     C   70                MOVEL*BLANK    RVCUNM
+     C  N70                MOVELCBCUNM    RVCUNM
+     C                     MOVELSRDPNO    RVDPNO           部門別
+     C                     MOVELSRRVID    RVRVID           收款業務
+     C                     MOVEL'2'       RVTYPE           繳款類別
+     C*
+     C                     Z-ADDSRITEM    RVITEM           項次
+     C                     MOVELSRUSTP    RVUSTP           款項別
+     C                     MOVELSRNTTP    RVNTTP           票據別
+     C                     MOVELSRPBID    RVPBID           付款銀行
+     C                     MOVELSRPANO    RVPANO           付款帳號
+     C                     MOVELSRACTP    RVACTP           借貸別
+     C                     MOVELSRACNO    RVACNO           會計科目
+     C                     MOVELSRRLNO    RVRLNO           相關號碼
+     C                     MOVELSRPLAC    RVPLAC           付款地
+     C                     MOVELSRNTNO    RVNTNO           票據號碼
+     C                     Z-ADDSRDUDT    RVDUDT           到期日
+     C                     Z-ADDSRRAMT    RVRAMT           收款金額
+     C                     MOVELSRSBID    RVSBID           存入銀行
+     C                     MOVELSRSANO    RVSANO           存入帳號
+     C*
+     C                     MOVELU#AREA    RVAREA           出納別
+     C                     MOVELU#AREA    RVTXAR           異動廠區
+     C                     Z-ADDUDATE     RVTXDT           異動日期
+     C*
+     C   69                WRITERVREC                      存檔
+     C  N69                UPDATRVREC
+     C*
+     C*
+     C           RVNTTP    IFEQ 'I'                        信用狀
+     C           RVNTNO    CHAINLLREC                69
+     C           *IN69     IFEQ '0'
+     C                     ADD  RVRAMT    LLAAMT           已押匯增
+     C                     SUB  RVRAMT    LLBAMT           餘額減
+     C                     UPDATLLREC
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           RVUSTP    IFEQ 'A2'                       預收貨款
+     C           RVNTTP    IFEQ 'F'                        現金類
+     C           RVNTTP    OREQ 'G'
+     C           RVNTTP    OREQ 'H'
+     C           RVNTTP    OREQ 'J'
+     C                     ADD  RVRAMT    W#CCAM
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           RVACNO    IFEQ '2159'                     含有暫收款
+     C           RVACTP    IFEQ 'D'
+     C                     SUB  RVRAMT    W#2159           繳貨款
+     C                     ELSE
+     C                     ADD  RVRAMT    W#2159           存暫收
+     C                     ENDIF
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  過入繳款檔列印清單
+     C*----------------------------------------
+     CSR         PR1000    BEGSR
+     C                     CLEARAR058T1D
+     C*
+     C           *INL1     IFEQ '1'                        只印首筆
+     C                     MOVELRVNO      R#RVNO
+     C                     MOVELRVCUNO    R#CUNO
+     C                     MOVELRVCUNM    R#CUNM
+     C                     ENDIF
+     C*
+     C                     MOVELRVUSTP    R#USTP
+     C                     MOVELRVNTTP    R#NTTP
+     C                     MOVELRVACNO    R#ACNO
+     C                     MOVELRVACTP    R#ACTP
+     C                     MOVELRVPBID    R#PBID
+     C                     MOVELRVPANO    R#PANO
+     C                     MOVELRVNTNO    R#NTNO
+     C                     Z-ADDRVDUDT    R#DUDT
+     C                     MOVELRVPLAC    R#PLAC
+     C                     Z-ADDRVRAMT    R#RAMT
+     C*
+     C           *IN66     IFEQ '1'
+     C                     ADD  1         R#PGNO
+     C                     WRITEAR058T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR058T1D
+     C*
+     C           R#ACTP    IFEQ 'D'
+     C                     ADD  R#RAMT    R#SRNA           小計繳款
+     C                     ELSE
+     C                     SUB  R#RAMT    R#SRNA
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  過入發票檔(SARVIN, INVDTL, INVMST)
+     C*----------------------------------------
+     CSR         SR2000    BEGSR
+     C                     MOVEL'Y'       SIFL02           沖銷檔
+     C                     UPDATSIREC                      註記過入
+     C*
+     C           SIINNO    CHAININREC                69    找發票
+     C*
+     C                     MOVELINNO      IVNO
+     C                     MOVEL'6'       IVACNT
+     C                     Z-ADD1         W#ITEM  20
+     C*
+     C           K#IV      CHAINIVREC                69
+     C           *IN69     DOWEQ'0'
+     C           IVAPNO    IFEQ SIRVNO                     已存在
+     C                     Z-ADDIVITEM    W#ITEM
+     C                     LEAVE
+     C                     ENDIF
+     C           IVITEM    ADD  1         W#ITEM
+     C           K#IV      READEIVREC                    69
+     C                     ENDDO
+     C*
+     C                     CLEARIVREC                      寫發票明細
+     C                     MOVEL'A'       IVFLAG           旗標
+     C                     MOVELINNO      IVNO             號碼
+     C                     MOVEL'6'       IVACNT           類別
+     C                     Z-ADDW#ITEM    IVITEM           項次
+*    C                     Z-ADDSRRVDT    IVACDT           入帳日期
+     C                     MOVELINORNO    IVORNO           訂單號碼
+     C                     Z-SUBSIINXA    IVAMT            金額（負）
+     C                     MOVELSIRVNO    IVAPNO           憑証編號
+     C                     MOVEL'Y'       IVFL02           過發票碼
+     C                     MOVEL'I'       IVFL03           類別碼
+     C                     MOVELU#AREA    IVTXAR           異動廠區
+     C                     Z-ADDUDATE     IVTXDT           異動日期
+     C*
+     C   69                WRITEIVREC                      存發票明細
+     C  N69                UPDATIVREC
+     C*
+     C                     MOVEL'C'       INFLAG           旗標
+     C                     ADD  IVAMT     INEAMT           繳款金額
+     C                     ADD  IVAMT     INNBAL           未收餘額
+     C                     MOVELSIRVNO    INRCNO           繳款單號
+     C                     Z-ADDSRRVDT    INRCDT           繳款日期
+     C                     MOVELU#AREA    INTXAR           異動廠區
+     C                     Z-ADDUDATE     INTXDT           異動日期
+     C*
+     C                     UPDATINREC                      存發票主檔
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  過入發票檔列印沖銷明細
+     C*----------------------------------------
+     CSR         PR2000    BEGSR
+     C                     ADD  1         W#CNTN
+     C*
+     C                     SELEC
+     C           W#CNTN    WHEQ 1
+     C                     MOVELINNO      R#INN1           發票號碼
+     C                     MOVELINAPNO    R#APN1           請款單號
+     C                     Z-ADDSIINXA    R#INX1           沖銷金額
+     C           W#CNTN    WHEQ 2
+     C                     MOVELINNO      R#INN2           發票號碼
+     C                     MOVELINAPNO    R#APN2           請款單號
+     C                     Z-ADDSIINXA    R#INX2           沖銷金額
+     C           W#CNTN    WHEQ 3
+     C                     MOVELINNO      R#INN3           發票號碼
+     C                     MOVELINAPNO    R#APN3           請款單號
+     C                     Z-ADDSIINXA    R#INX3           沖銷金額
+     C                     ENDSL
+     C*
+     C           W#CNTN    IFEQ 3
+     C                     EXSR PR2100
+     C                     CLEARAR058T1E
+     C                     Z-ADD0         W#CNTN
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  列印沖銷明細子函式
+     C*----------------------------------------
+     CSR         PR2100    BEGSR
+     C           W#CNTN    IFNE 0
+     C           *IN66     IFEQ '1'
+     C                     ADD  1         R#PGNO
+     C                     WRITEAR058T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR058T1E                   沖銷明細
+     C*
+     C                     ADD  R#INX1    R#SRXA           小計沖銷
+     C                     ADD  R#INX2    R#SRXA
+     C                     ADD  R#INX3    R#SRXA
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  現金預收寫入授信集中管控異動記錄
+     C*----------------------------------------
+     CSR         SR3000    BEGSR
+     C                     MOVELS#DEVI    W#DSPN           更改終端機
+     C           W#DSIT    IFEQ 99                         以避免重複
+     C                     Z-ADD0         W#DSIT
+     C                     ELSE
+     C                     ADD  1         W#DSIT
+     C                     ENDIF
+     C                     MOVE W#DSIT    D#DSIT
+     C*
+     C                     CLEARCTREC
+     C                     Z-ADDUDATE     CTDATE           日期
+     C                     TIME           W#SYST
+     C                     Z-ADDD#ST      CTTIME           時間
+     C                     MOVELU#AREA    CTAREA           廠區
+     C                     MOVELW#DSPN    CTDSPN           終端機
+     C                     MOVELU#USID    CTUSER           使用者
+     C                     MOVELSRCUNO    CTCUNO           客戶
+     C                     MOVEL'AC03'    CTTXID           異動代號
+     C                     MOVELSRRVNO    CTAPNO           單據編號
+     C                     Z-ADDW#CCAM    CTXAMT           異動金額
+     C                     WRITECTREC
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  暫收款相關金額處理
+     C*----------------------------------------
+     CSR         SR4000    BEGSR
+     C                     MOVELSRCUNO    ARCUNO
+     C                     MOVELSRRVNO    ARAREA
+     C           K#AR      CHAINARREC                69    暫收統計檔
+     C           *IN69     IFEQ '1'                        新增
+     C                     CLEARARREC
+     C                     MOVELSRCUNO    ARCUNO
+     C                     MOVELSRRVNO    ARAREA
+     C                     WRITEARREC
+     C           K#AR      CHAINARREC                69
+     C                     ENDIF
+     C*
+     C           W#2159    IFLT 0                          借暫收
+     C                     MOVEL'C'       ARFLAG
+     C                     SUB  W#2159    ARAMT2           新增繳貨款
+     C                     UPDATARREC
+     C                     GOTO ES4000                     返回
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         W#XAMT 110       已兌現金額
+     C           SRRVNO    SETLLRVREC
+     C           1         DOWEQ1
+     C           SRRVNO    READERVREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           RVACTP    IFEQ 'C'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     CALL 'ARQ015R'
+     C                     PARM           RVNO
+     C                     PARM           RVITEM
+     C                     PARM 0         P#RAMT 110       應轉暫收
+     C*
+     C           P#RAMT    IFEQ 0                          無應轉
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           RVNTTP    IFEQ 'F'                        現金類
+     C           RVNTTP    OREQ 'G'
+     C           RVNTTP    OREQ 'H'
+     C           RVNTTP    OREQ 'J'
+     C                     MOVEL'C'       ARFLAG
+     C                     ADD  P#RAMT    ARAMT1           新增已兌現
+     C                     ADD  P#RAMT    W#XAMT
+     C                     MOVE '*'       RVRESV           應轉已兌
+     C                     UPDATRVREC
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           RVACNO    IFEQ '1131'                     應收票據
+     C                     MOVEL'C'       ARFLAG
+     C           RVDUDT    IFLE UDATE                      已兌現
+     C                     ADD  P#RAMT    ARAMT1           新增已兌現
+     C                     ADD  P#RAMT    W#XAMT
+     C                     MOVE '*'       RVRESV           應轉已兌
+     C                     ELSE
+     C                     ADD  P#RAMT    ARAMT3           新增未兌現
+     C                     MOVE '#'       RVRESV           應轉未兌
+     C                     ENDIF
+     C                     UPDATRVREC
+     C                     ENDIF                           應收票據
+     C                     ENDDO
+     C*
+     C                     UPDATARREC                      存暫收統計
+     C*
+     C           W#XAMT    IFGT 0                          有新已兌現
+     C                     EXSR SR4100                     反應授信
+     C                     ENDIF
+     CSR         ES4000    ENDSR
+     C*
+     C*----------------------------------------
+     C*  現金買貨寫入授信集中管控異動記錄
+     C*----------------------------------------
+     CSR         SR4100    BEGSR
+     C                     MOVELS#DEVI    W#DSPN           更改終端機
+     C           W#DSIT    IFEQ 99                         以避免重複
+     C                     Z-ADD0         W#DSIT
+     C                     ELSE
+     C                     ADD  1         W#DSIT
+     C                     ENDIF
+     C                     MOVE W#DSIT    D#DSIT
+     C*
+     C                     CLEARCTREC
+     C                     Z-ADDUDATE     CTDATE           日期
+     C                     TIME           W#SYST
+     C                     Z-ADDD#ST      CTTIME           時間
+     C                     MOVELSRRVNO    CTAREA           廠區
+     C           CTAREA    IFEQ 'H'                        型鋼
+     C                     MOVEL'P'       CTAREA           放在台北
+     C                     ENDIF
+     C                     MOVELW#DSPN    CTDSPN           終端機
+     C                     MOVELU#USID    CTUSER           使用者
+     C                     MOVELSRCUNO    CTCUNO           客戶
+     C                     MOVEL'AC01'    CTTXID           異動代號
+     C                     MOVELSRRVNO    CTAPNO           單據編號
+     C                     Z-ADDW#XAMT    CTXAMT           異動金額
+     C                     WRITECTREC
+     CSR                   ENDSR
+     C*****************************************************************
+

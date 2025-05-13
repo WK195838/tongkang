@@ -1,0 +1,98 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP052RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     應收系統檔案備份移出(畫面）
+     H*            5.DATE-WRITTEN  86/12/20
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARP052S CF  E                    WORKSTN
+     E*************************************************************
+     E                    T#ERR   1   2 70
+     I*************************************************************
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+9008 I                                        1   60W#DATE
+LYW  I                                        1   20D#YY
+ .   I                                        3   40D#MM
+ .   I                                        5   60D#DD
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+9008 C                     PARM           P#YMD   6
+     C**************************************************************
+     C                     Z-ADDUDATE     W#DATE
+     C                     SUB  2         D#YY             保留二年
+     C                     Z-ADD1         D#MM
+     C                     Z-ADD1         D#DD
+     C                     Z-ADDW#DATE    S#YMD
+     C*
+     C           1         DOWEQ1
+     C                     EXFMTAR052F1
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03
+     C                     LEAVE
+     C                     ELSE
+     C                     EXSR SR1000
+     C           W#RTNV    IFEQ 'T'
+     C                     MOVEL'0'       P#IN03
+9008 C                     MOVE S#YMD     P#YMD
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C                     SETON                     LR
+     C*
+     C************************************
+     C*  檢核所輸入年月是否正確
+     C************************************
+     CSR         SR1000    BEGSR
+     C                     MOVEL'F'       W#RTNV  1
+     C*
+     C*                    MOVEL'0'       P#FLAG  1
+9008 C*                    MOVE S#YMD     P#DATE  80
+     C*                    CALL 'C01'
+     C*                    PARM           P#DATE
+     C*                    PARM           P#FLAG
+     C*                    FREE 'C01'
+     C                     MOVE *ALL'0'   P#PDAT
+     C                     MOVE S#YMD     P#PDAT
+     C                     CALL 'UTS102R'
+     C                     PARM           P#PDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM '0'       P#FLAG  1
+     C*
+     C           P#FLAG    IFNE '0'
+     C                     MOVELT#ERR,1   S#MSG1
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C                     Z-ADDUDATE     W#DATE
+     C                     SUB  2         D#YY             保留二年
+     C                     Z-ADD1         D#MM
+     C                     Z-ADD1         D#DD
+     C           S#YMD     IFGT W#DATE
+     C                     MOVELT#ERR,2   S#MSG1
+     C*                    GOTO ES1000
+     C                     ENDIF
+     C*
+     C                     MOVEL'T'       W#RTNV
+     CSR         ES1000    ENDSR
+     C*****************************************************************
+** T#ERR
+０１－所輸入之日期錯誤
+０２－必須至少保留二年內的資料，所輸入的日期太接近現在
+

@@ -1,0 +1,81 @@
+             PGM
+             DCL        VAR(&P#YYMM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&P#DATE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&P#CODE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&YMD)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&ACYMD)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&ACYMDX)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&Y)    TYPE(*CHAR) LEN(4)
+             DCL        VAR(&M)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DTARA) TYPE(*CHAR) LEN(11)
+             DCL        VAR(&DTAR)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&WSID)  TYPE(*CHAR) LEN(10)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&WSID)
+             CHGVAR     VAR(&DTARA) VALUE('ACCTLDTA' *CAT &AREA)
+             RTVDTAARA  DTAARA(DALIB/&DTARA (1 8)) RTNVAR(&ACYMDX)
+             CHGVAR     VAR(&ACYMD) VALUE(ACYMDX)
+
+ DISPLY:     IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARP016RS) PARM(&IN03 &YMD &ACYMD)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&YMD)
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&P#YYMM)
+             RTVDTAARA  DTAARA(*LDA (1 8)) RTNVAR(&P#DATE)
+
+             CALL    PGM(ACP101R) PARM(&P#YYMM &P#CODE)
+             IF         COND(&P#CODE *EQ '1') THEN(DO)
+             SNDBRKMSG  MSG('關帳日期已過，請與相關人員聯絡！') +
+                          TOMSGQ(&WSID)
+             GOTO       CMDLBL(DISPLY)
+             ENDDO
+
+             SBMJOB     JOB(ARP016P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARP016P')
+             RETURN
+             ENDDO
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1    8)) RTNVAR(&YMD)
+             RTVDTAARA  DTAARA(*LDA (1    4)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (5    2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+
+             OVRDBF     FILE(RCVDTLL1) TOFILE(RCVDTLL1) SHARE(*YES)
+                  /* 台北之收款含括台中及苗栗等廠  */
+             IF         COND(&AREA = 'P') THEN(DO)
+             OPNQRYF    FILE((RCVDTLL1))     QRYSLT('   +
+                          RVNTDT *EQ   ' || &YMD || '          +
+                    *AND  RVNTCD *EQ   "1"                     +
+                    *AND  RVVNO2 *EQ   " "                     +
+                    *AND  %SST(RVNO 1 1) *EQ %VALUES("P" "M" "H")   +
+                    *AND  RVDECD *NE  "D"')                    +
+                          KEYFLD((RVSANO)(RVNO)(RVITEM))
+             ENDDO
+             ELSE       CMD(DO)
+             OPNQRYF    FILE((RCVDTLL1))     QRYSLT('   +
+                          RVNTDT *EQ   ' || &YMD || '          +
+                    *AND  RVNTCD *EQ   "1"                     +
+                    *AND  RVVNO2 *EQ   " "                     +
+                    *AND  %SST(RVNO 1 1) *EQ  "' || &AREA || '" +
+                    *AND  RVDECD *NE  "D"')                    +
+                          KEYFLD((RVSANO)(RVNO)(RVITEM))
+             ENDDO
+
+             OVRDBF     FILE(ACTRAN) TOFILE(('AC' || &AREA || 'R'))  +
+                          LVLCHK(*NO)
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 176) +
+                          CPI(13.3)
+             CALL       PGM(ARLIB/ARP016R)
+             CLOF       OPNID(RCVDTLL1)
+             DLTOVR     FILE(*ALL)
+             CHGVAR     VAR(&DTARA) VALUE('ACTTX' *CAT &AREA)
+          /* CHGDTAARA  DTAARA(&DTAR (1 4)) VALUE('0000') */
+             ENDPGM
+

@@ -1,0 +1,248 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR133R1
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     客戶預收貨款核對明細表(先前處理)
+     H*          5.DATE-WRITTEN  97/05/08
+     H*          6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FINVMST  IP  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FARR133F UF  E           K        DISK                      A
+     I*****************************************************************
+     IINREC       01
+     I*
+     I            DS
+     I                                        1  10 INNO
+     I                                        1   2 D#INN1
+     I                                        3  10 D#INN2
+     I*
+     I           UDS
+     I                                      301 3080D#DAT1
+     I                                      309 3160D#DAT2
+     C*****************************************************************
+     C*          KET  LIST
+     C*****************************************************************
+     C*FILE => INVDTL(發票明細檔)
+     C           K#INVD    KLIST
+     C                     KFLD           K#IVNO 10        發票號碼
+     C                     KFLD           K#ACNT  1        類別
+     C*
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C           D#INN1    IFEQ 'MW'
+     C           D#INN2    ANDEQ'59291975'
+     C                     MOVEL'X'       W#TEST  1
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           INTYPE    WHEQ '1'                        銷貨發票
+     C                     EXSR SR1000
+     C           INTYPE    WHEQ '2'                        預收發票
+     C                     EXSR SR2000
+     C                     ENDSL
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AMT4 110
+     C*
+     C*給定INVDTL KEY值
+     C                     MOVELINNO      K#IVNO           發票號碼
+     C                     MOVEL'4'       K#ACNT           類別
+     C*
+     C                     MOVEL*OFF      *IN40
+     C           K#INVD    SETLLIVREC
+     C           *IN40     DOWEQ*OFF
+     C           K#INVD    READEIVREC                    40
+     C*
+     C   40                LEAVE
+     C*
+     C           IVDECD    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           IVORNO    IFNE INORNO
+     C           IVAPNO    ANDNEINORNO
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           INKIND    IFEQ '2'
+     C           IVAMT     DIV  1.05      IVAMT     H
+     C                     ENDIF
+     C*
+     C                     ADD  IVAMT     W#AMT4
+     C                     ENDDO
+     C*
+     C                     MOVEL*OFF      *IN41
+     C           INNO      CHAINRAR133F              41
+     C           *IN41     IFEQ *ON
+     C                     MOVELINNO      W1INNO           發票號碼
+     C                     MOVELINCUNO    W1CUNO           客戶代號
+     C                     MOVELINCUNM    W1CUNM           客戶簡稱
+     C                     MOVELINORNO    W1ORNO           訂單編號
+     C                     MOVELINTYPE    W1TYPE           發票類別
+     C                     Z-ADD0         W1AMT1           預收金額
+     C                     Z-ADD0         W1AMT2           已兌現金額
+     C                     Z-ADD0         W1AMT3           預折讓金額
+     C           W#AMT4    MULT -1        W1AMT4           扣預收金額
+     C                     Z-ADD0         W1AMT5           轉退票金額
+     C                     Z-ADD0         W1AMT6           已兌現餘額
+     C                     WRITERAR133F
+     C                     ELSE
+     C           W#AMT4    MULT -1        IVAMT            扣預收金額
+     C                     ADD  IVAMT     W1AMT4           扣預收金額
+     C                     UPDATRAR133F
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*給定INVDTL KEY值
+     C                     MOVELINNO      K#IVNO           發票號碼
+     C                     MOVEL'4'       K#ACNT           類別
+     C*
+     C                     MOVEL*OFF      *IN40
+     C           K#INVD    SETLLIVREC
+     C           *IN40     DOWEQ*OFF
+     C           K#INVD    READEIVREC                    40
+     C*
+     C   40                LEAVE
+     C*
+     C           IVDECD    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         W#AMT1 110
+     C                     Z-ADD0         W#AMT3 110
+     C*
+     C           IVAMT     IFGT 0
+     C                     EXSR SR2100                     預收貨款
+     C                     ELSE
+     C                     EXSR SR2200                     預收折讓
+     C                     ENDIF
+     C*
+     C                     MOVEL*OFF      *IN41
+     C           INNO      CHAINRAR133F              41
+     C*
+     C           *IN41     IFEQ *ON
+     C                     MOVELINNO      W1INNO           發票號碼
+     C                     MOVELINCUNO    W1CUNO           客戶代號
+     C                     MOVELINCUNM    W1CUNM           客戶簡稱
+     C                     MOVELINORNO    W1ORNO           訂單編號
+     C                     MOVELINTYPE    W1TYPE           發票類別
+     C                     Z-ADDW#AMT1    W1AMT1           預收金額
+     C                     Z-ADD0         W1AMT2           已兌現金額
+     C           W#AMT3    MULT -1        W1AMT3           預折讓金額
+     C                     Z-ADD0         W1AMT4           扣預收金額
+     C                     Z-ADD0         W1AMT5           轉退票金額
+     C                     Z-ADD0         W1AMT6           已兌現餘額
+     C                     WRITERAR133F
+     C                     ELSE
+     C                     ADD  W#AMT1    W1AMT1           預收金額
+     C           W#AMT3    MULT -1        W#AMT3
+     C                     ADD  W#AMT3    W1AMT3           預折讓金額
+     C                     UPDATRAR133F
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     EXSR SR3000                     轉退票金額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C           INKIND    IFEQ '2'
+     C           INTXTP    ANDEQ'1'
+     C                     Z-ADDINAAMT    W#AAMT 110
+     C           W#AAMT    DIV  21        INATAX    H
+     C           W#AAMT    SUB  INATAX    INAAMT    H
+     C                     ELSE
+     C                     Z-ADD0         INATAX
+     C                     ENDIF
+     C*
+     C           INKIND    IFEQ '2'
+     C           IVAMT     DIV  1.05      IVAMT     H
+     C           W#AAMT    SUB  IVAMT     W#AAMT
+     C           W#AAMT    IFLT 2
+     C                     ADD  W#AAMT    IVAMT
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ADD  IVAMT     W#AMT1
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2200    BEGSR
+     C*****************************************************************
+     C           INKIND    IFEQ '2'
+     C           IVAMT     DIV  1.05      IVAMT     H
+     C                     ENDIF
+     C*
+     C                     ADD  IVAMT     W#AMT3
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AMT5 110
+     C*
+     C*給定INVDTL KEY值
+     C                     MOVELINNO      K#IVNO           發票號碼
+     C                     MOVEL'7'       K#ACNT           類別
+     C*
+     C                     MOVEL*OFF      *IN40
+     C           K#INVD    SETLLIVREC
+     C           *IN40     DOWEQ*OFF
+     C           K#INVD    READEIVREC                    40
+     C*
+     C   40                LEAVE
+     C*
+     C           IVDECD    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     ADD  IVAMT     W#AMT5           轉退票金額
+     C                     ENDDO
+     C*
+     C                     MOVEL*OFF      *IN41
+     C           INNO      CHAINRAR133F              41
+     C*
+     C           *IN41     IFEQ *ON
+     C                     MOVELINNO      W1INNO           發票號碼
+     C                     MOVELINCUNO    W1CUNO           客戶代號
+     C                     MOVELINCUNM    W1CUNM           客戶簡稱
+     C                     MOVELINORNO    W1ORNO           訂單編號
+     C                     MOVELINTYPE    W1TYPE           發票類別
+     C                     Z-ADD0         W1AMT1           預收金額
+     C                     Z-ADD0         W1AMT2           已兌現金額
+     C                     Z-ADD0         W1AMT3           預折讓金額
+     C                     Z-ADD0         W1AMT4           扣預收金額
+     C           W#AMT5    DIV  1.05      W1AMT5    H      轉退票金額
+     C                     Z-ADD0         W1AMT6           已兌現餘額
+     C                     WRITERAR133F
+     C                     ELSE
+     C           W#AMT5    DIV  1.05      W1AMT5    H      轉退票金額
+     C                     UPDATRAR133F
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+

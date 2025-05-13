@@ -1,0 +1,149 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR132RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     訂單別出貨及發票明細表（畫面）
+     H*            5.DATE-WRITTEN  86/10/14
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR132S CF  E                    WORKSTN
+     E*************************************************************
+     E                    T#ERR   1   6 70
+     I*************************************************************
+     I           UDS
+     I                                      401 406 U#ORNO
+     I                                      407 414 U#YMDS
+     I                                      415 422 U#YMDE
+     I                                      423 428 U#CUNO
+     I                                      429 434 U#ORN1
+     I                                      435 440 U#ORN2
+     I                                      441 446 U#ORN3
+     I                                      447 452 U#ORN4
+     I*
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I*
+     I            DS
+     I                                        1   6 S#ORNO
+     I                                        1   1 D#OREA
+     I                                        2   6 D#ORNO
+     I*
+     I            DS
+     I                                        1   6 S#CUNO
+     I                                        1   1 S1KIND
+     I                                        2   2 S1CUN1
+     I                                        3   5 S1CUN2
+9008 I*                                       6   6 S1CD01
+LYW  I*                                       7   7 S1CD02
+ .   I*                                       8   8 S1CD03
+ .   I*                                       9   9 S1CD04
+ .   I*                                      10  10 S1CD05
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C**************************************************************
+     C*   主程式
+     C**************************************************************
+     C           1         DOWEQ1
+     C                     EXFMTAR132F1
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03
+     C                     LEAVE
+     C                     ENDIF
+     C                     SETOF                     515253
+     C*
+     C                     EXSR SR2000                     檢核日期
+     C           W#RTNV    IFEQ 'F'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVEL'0'       P#IN03
+     C                     MOVELS#ORNO    U#ORNO
+     C                     MOVE *BLANK    U#YMDS
+     C                     MOVE S#YMDS    U#YMDS
+     C                     MOVE *BLANK    U#YMDE
+     C                     MOVE S#YMDE    U#YMDE
+     C                     MOVELS#CUNO    U#CUNO
+     C                     MOVELS#ORN1    U#ORN1
+     C                     MOVELS#ORN2    U#ORN2
+     C                     MOVELS#ORN3    U#ORN3
+     C                     MOVELS#ORN4    U#ORN4
+     C                     LEAVE
+     C                     ENDDO
+     C                     SETON                     LR
+     C*
+     C************************************
+     C*  檢核所輸入年月是否正確
+     C************************************
+     CSR         SR2000    BEGSR
+     C                     MOVEL'F'       W#RTNV  1
+     C                     MOVE *ALL'0'   P#DATE
+     C                     MOVE S#YMDS    P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM ' '       P#FLAG  1
+     C*
+     C           P#FLAG    IFNE '0'
+     C                     MOVELT#ERR,1   S#MSG1
+     C                     SETON                     52
+     C                     GOTO ES2000
+     C                     ENDIF
+     C*
+     C                     Z-ADDUDATE     W#DATE  60
+     C           S#YMDS    IFGT W#DATE
+     C                     MOVELT#ERR,3   S#MSG1
+     C                     SETON                     52
+     C                     GOTO ES2000
+     C                     ENDIF
+     C*
+     C                     MOVE *ALL'0'   P#DATE
+     C                     MOVE S#YMDE    P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE
+     C                     PARM '1'       P#MODE
+     C                     PARM           P#MTL
+     C                     PARM           P#LY
+     C                     PARM ' '       P#FLAG
+     C*
+     C           P#FLAG    IFNE '0'
+     C                     MOVELT#ERR,2   S#MSG1
+     C                     SETON                     53
+     C                     GOTO ES2000
+     C                     ENDIF
+     C*
+9009 C                     Z-ADDUDATE     W#DATE  60
+     C           S#YMDE    IFGT W#DATE
+     C                     MOVELT#ERR,4   S#MSG1
+     C                     SETON                     53
+     C                     GOTO ES2000
+     C                     ENDIF
+     C*
+     C           S#YMDS    IFGT S#YMDE
+     C                     MOVELT#ERR,5   S#MSG1
+     C                     SETON                     5253
+     C                     GOTO ES2000
+     C                     ENDIF
+     C*
+     C                     MOVEL'T'       W#RTNV
+     CSR         ES2000    ENDSR
+     C*****************************************************************
+** T#ERR
+０１－所輸入之起始日期錯誤
+０２－所輸入之終止日期錯誤
+０３－所輸入之起始日期大於系統日期
+０４－所輸入之終止日期大於系統日期
+０５－所輸入之起始日期大於終止日期
+０６－查無該訂單
+

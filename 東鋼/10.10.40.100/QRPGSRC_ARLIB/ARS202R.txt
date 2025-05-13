@@ -1,0 +1,184 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARS202R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION      折讓單區間列印副程式
+     H*            5.DATE-WRITTEN  108/05/08 2019AR00064
+     H*            6.UPDATE  DATE  110/01/06 S00WCJ (1001A)
+     H*                            修正BUG避免出現類似無窮迴圈產生
+     H*                            之報表檔案
+     H*
+     H*****************************************************************
+     H            Y
+     FARS202S CF  E                    WORKSTN
+     FTRNDTL  IF  E           K        DISK
+1001AFTRNDTLLCIF  E           K        DISK
+1001AF            TXREC                             KRENAMETRNDLC
+     E                    ERR     1  10 40
+     I*
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10011010 U#USID
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C*****************************************************************
+     C*          Parameter List
+     C*****************************************************************
+     C*I:P#TKCD
+     C           *ENTRY    PLIST
+     C                     PARM           P#PTYN  1
+     C*                    PARM           P#NNRB 10
+     C*                    PARM           P#IN12  1
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           W#CODE  4
+     C                     KFLD           W#NOS   8
+     C*
+     C           KEY02     KLIST
+     C                     KFLD           W#CODE
+     C                     KFLD           W#NOE   8
+     C*
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C*SR0000 => Initialize Screen Number
+     C*SR1000 => Screen Number = '01' Process
+     C*SR2000 => Screen Number = '01' Process Subfile
+     C*
+     C                     EXSR SR0000
+     C           PRCID     DOUEQ'00'
+     C           PRCID     CASEQ'01'      SR1000
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*
+     C           *DATE     SUB  19000000  U#SYSD  80
+     C*Initialize Screen Number
+     C*
+     C                     MOVEL*BLANKS   S#NOS
+     C                     MOVEL*BLANKS   S#NOE
+     C                     SETOF                     4142
+     C                     MOVE '01'      PRCID   2
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C*Screen Number = '01' Process
+     C*
+     C           PRCID     DOWEQ'01'
+     C                     EXFMTAR01F2
+     C                     MOVEL*BLANKS   S#ERR
+     C*
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVEL'00'      PRCID
+     C                     MOVEL'N'       P#PTYN
+     C*                    MOVEL'1'       P#IN12
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     EXSR SR1100
+     C  N99                EXSR SR1200
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*
+     C                     SETOF                     994142
+     C                     MOVEL'AR06'    W#CODE
+     C           S#NOS     IFNE *BLANKS
+     C                     MOVELS#NOS     W#NOS
+     C           KEY01     CHAINTXREC                41
+     C   41                MOVELERR,1     S#ERR
+     C   41                SETON                     99
+     C                     ENDIF
+     C  N99      S#NOS     IFEQ *BLANKS
+     C                     MOVELERR,2     S#ERR
+     C                     SETON                     9941
+     C                     ENDIF
+     C*
+     C  N99      S#NOS     IFNE *BLANKS
+     C           S#NOE     ANDEQ*BLANKS
+     C                     MOVELS#NOS     S#NOE
+     C                     ENDIF
+     C*
+     C  N99      S#NOE     IFNE *BLANKS
+     C                     MOVELS#NOE     W#NOE
+     C           KEY02     CHAINTXREC                42
+     C   42                MOVELERR,1     S#ERR
+     C   42                SETON                     99
+     C                     ENDIF
+     C*
+     C  N99      S#NOE     IFEQ *BLANKS
+     C                     MOVELERR,2     S#ERR
+     C                     SETON                     9942
+     C                     ENDIF
+     C*
+     C  N99      S#NOS     IFGT S#NOE
+     C                     MOVELERR,3     S#ERR
+     C                     SETON                     994142
+     C                     ENDIF
+     C*
+     C           END100    ENDSR
+     C*****************************************************************
+     C           SR1200    BEGSR
+     C*****************************************************************
+     C*
+     C                     MOVEL*BLANKS   W#TXNO  8
+     C*
+     C           KEY01     SETLLTRNDTL
+     C                     MOVEL*OFF      *IN50
+     C           *IN50     DOWEQ*OFF
+     C                     READ TXREC                    50
+     C   50                LEAVE
+     C*
+     C           TXNO      IFGT S#NOE
+     C                     LEAVE
+     C                     ENDIF
+     C*
+1001AC           TXNO      CHAINTRNDLC              N50
+1001AC   50                LEAVE
+1001AC*
+     C           TXNO      IFEQ W#TXNO
+     C                     ITER
+     C                     ELSE
+     C                     MOVELTXNO      W#TXNO
+     C                     ENDIF
+     C*
+     C                     MOVEL'Y'       W#PTMD  1
+     C                     MOVEL'A'       W#MODE  1
+     C                     CALL 'ARR033P'
+     C                     PARM           TXNO
+     C                     PARM           W#PTMD
+     C                     PARM           W#MODE
+     C                     ENDDO
+     C*
+     C                     CALL 'ARR033PC'
+     C                     PARM           S#NOS
+     C                     PARM           S#NOE
+     C                     PARM           W#PTMD
+     C                     PARM           W#MODE
+     C                     MOVEL'00'      PRCID
+     C                     MOVEL'Y'       P#PTYN
+     C                     ENDSR
+     C*****************************************************************
+**  ERR
+01折讓單不存在!
+02欄位不可空白!
+03起始值不可大於終止值
+04
+05
+06
+07
+08
+

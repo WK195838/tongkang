@@ -1,0 +1,536 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR093R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     應收帳款承購客戶請款單開立
+     H*          5.DATE-WRITTEN  91/10/02
+     H*          6.DATE-MODIFY   91/12/04
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARE093S CF  E                    WORKSTN
+     F                                        RRN1  KSFILE AR093F2
+     FARINVML3IF  E           K        DISK
+     FARINVY  UF  E           K        DISK
+     F            RARINVM                           KRENAMERINVMY
+     FARCUDT  IF  E           K        DISK
+     FGENSEQ  UF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FTRNDTLL3IF  E           K        DISK
+     F*****************************************************************
+     E                    ERR     1  14 70               *錯誤訊息
+     E*****************************************************************
+     IRINVMY
+     I              AMFLAG                          F#FLAG
+     I              AMINNO                          F#INNO
+     I              AMINDT                          F#INDT
+     I              AMDUDT                          F#DUDT
+     I              AMINTP                          F#INTP
+     I              AMDELT                          F#DELT
+     I              AMDELD                          F#DELD
+     I              AMCUNO                          F#CUNO
+     I              AMCUNM                          F#CUNM
+     I              AMAAMT                          F#AAMT
+     I              AMATAX                          F#ATAX
+     I              AMBAMT                          F#BAMT
+     I              AMBTAX                          F#BTAX
+     I              AMCAMT                          F#CAMT
+     I              AMDAMT                          F#DAMT
+     I              AMEAMT                          F#EAMT
+     I              AMFAMT                          F#FAMT
+     I              AMAPN1                          F#APN1
+     I              AMAPD1                          F#APD1
+     I              AMAPN2                          F#APN2
+     I              AMAPD2                          F#APD2
+     I              AMORNO                          F#ORNO
+     I              AMAREA                          F#AREA
+     I              AMACN1                          F#ACN1
+     I              AMDAT1                          F#DAT1
+     I              AMDLC1                          F#DLC1
+     I              AMBLCB                          F#BLCB
+     I              AMDLM1                          F#DLM1
+     I              AMDLD1                          F#DLD1
+     I              AMAPCD                          F#APCD
+     I              AMCHKC                          F#CHKC
+     I              AMCHKM                          F#CHKM
+     I              AMCHKD                          F#CHKD
+     I              AMDLC2                          F#DLC2
+     I              AMDLM2                          F#DLM2
+     I              AMDLD2                          F#DLD2
+     I              AMCLOC                          F#CLOC
+     I              AMCLOM                          F#CLOM
+     I              AMCLOD                          F#CLOD
+     I              AMUPDM                          F#UPDM
+     I              AMUPDD                          F#UPDD
+     I              AMUPDT                          F#UPDT
+     I*
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10111020 S#DEVN
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1   6 D#APNO
+     I                                        1   1 D#APN1
+     I                                        2   60D#APN2
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000           畫面二
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*----------------------------------------------------------------
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVEL'01'      W#PRID  2
+     C                     MOVE *OFF      *IN99
+     C                     MOVE *ON       *IN35
+     C*FILE==>GENSEQ
+     C           K#GE      KLIST
+     C                     KFLD           GEKIND
+     C                     KFLD           GEPRIN
+     C*FILE==>ARINVML3
+     C           W#ARIV    KLIST
+     C                     KFLD           AMAPN2
+     C                     KFLD           AMINNO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*----------------------------------------------------------------
+     C                     MOVE *ON       *IN35             MODE
+     C*
+     C           W#PRID    DOWEQ'01'
+     C*
+     C                     WRITEAR093H
+     C                     EXFMTAR093F1
+     C*
+     C                     MOVEA'0000'    *IN,30
+     C                     MOVEL*BLANK    S#ERR1
+     C*-----------
+     C*IN03 IN12 -
+     C*-----------
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C* CHECK SRCEEN
+     C                     EXSR SR1100
+     C*列印
+     C           S#CODE    IFEQ '5'
+     C                     EXSR SR1100
+     C  N99                MOVELS#APNO    P#APN2  6
+     C  N99                CALL 'ARR093P1'
+     C                     PARM           P#APN2
+     C                     MOVELERR,14    S#ERR1
+     C                     MOVE '01'      W#PRID
+     C                     ITER
+     C                     ENDIF
+     C*
+     C  N99                MOVE '02'      W#PRID
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*----------------------------------------------------------------
+     C                     SETOF                     99
+     C*----------------
+     C*CHECK功能代碼-
+     C*----------------
+     C           S#CODE    IFEQ *BLANK
+     C                     SETON                     3099
+     C                     MOVELERR,1     S#ERR1
+     C                     ENDIF
+     C*
+     C  N99      S#CODE    IFNE '1'
+     C           S#CODE    ANDNE'2'
+     C           S#CODE    ANDNE'3'
+     C           S#CODE    ANDNE'4'
+     C           S#CODE    ANDNE'5'
+     C                     SETON                     3099
+     C                     MOVELERR,2     S#ERR1
+     C                     ENDIF
+     C*----------------
+     C*CHECK客戶代號-
+     C*----------------
+     C  N99      S#CUNO    IFEQ *BLANK
+     C                     SETON                     3199
+     C                     MOVELERR,3     S#ERR1
+     C                     ENDIF
+     C*----------------
+     C*CHECK訂單號碼-
+     C*----------------
+     C  N99      S#ORNO    IFEQ *BLANK
+     C                     SETON                     3299
+     C                     MOVELERR,4     S#ERR1
+     C                     ENDIF
+     C*----------------
+     C*CHECK輸入條件-
+     C*----------------
+     C*判斷此客戶是否辦理承購
+     C  N99      S#CUNO    CHAINRARCUDT             N51
+     C  N99      *IN51     IFEQ *ON
+     C                     SETON                     3199
+     C                     MOVELERR,10    S#ERR1
+     C                     ELSE
+     C                     MOVELACCUNM    S#CUNM
+     C                     ENDIF
+     C*
+     C  N99      S#CODE    IFEQ '1'                        新增
+     C                     EXSR SR1110
+     C                     ELSE
+     C                     EXSR SR1120
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1110    BEGSR
+     C*----------------------------------------------------------------
+     C*新增不可輸入請款單號
+     C           S#CODE    IFEQ '1'
+     C           S#APNO    ANDNE*BLANK
+     C                     SETON                     3399
+     C                     MOVELERR,6     S#ERR1
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1120    BEGSR
+     C*----------------------------------------------------------------
+     C*修改，刪除，查詢，列印時要輸入請款單號
+     C           S#APNO    IFEQ *BLANK
+     C                     SETON                     3399
+     C                     MOVELERR,5     S#ERR1
+     C                     ENDIF
+     C*
+     C                     MOVELS#APNO    AMAPN2
+     C                     MOVE *BLANK    AMINNO
+     C           W#ARIV    SETLLRARINVM
+     C                     SETOF                     5051
+     C  N99      *IN50     DOWEQ*OFF
+     C                     READ RARINVM                  50
+     C*
+     C           *IN50     IFEQ *ON
+     C           AMAPN2    ORNE S#APNO
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           AMDELT    IFNE 'D'                        只要一筆
+     C           AMCLOC    ANDNE'Y'
+     C                     SETON                     51
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C*判斷修改時，若該客戶的該張請款單已繳款，則不允許修改
+     C  N99 51   AMFAMT    IFNE 0
+     C                     SETON                     3399
+     C                     MOVELERR,8     S#ERR1
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*----------------------------------------------------------------
+     C*W#PRID='01'--->ARR093S-2 畫面
+     C*
+     C                     Z-ADD0         S#EAMT
+     C                     Z-ADD1         S#NBR
+     C                     Z-ADD0         RRN1    50
+     C                     MOVE *OFF      *IN35            S#MODE燈號
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN73            SFLCLR
+     C                     WRITEAR093F2C
+     C                     MOVE *OFF      *IN73
+     C*
+     C                     SELEC
+     C           S#CODE    WHEQ '1'
+     C                     MOVE '新增'  S#MODE
+     C                     MOVE *OFF      *IN34             PROTECT
+     C                     MOVEA'10'      *IN,75            PRINT,SAVE
+     C           S#CODE    WHEQ '2'
+     C                     MOVE '修改'  S#MODE
+     C                     MOVE *OFF      *IN34             PROTECT
+     C                     MOVEA'00'      *IN,75            PRINT,SAVE
+     C           S#CODE    WHEQ '3'
+     C                     MOVE '作廢'  S#MODE
+     C                     MOVE *ON       *IN34             PROTECT
+     C                     MOVEA'10'      *IN,75            PRINT,SAVE
+     C           S#CODE    WHEQ '4'
+     C                     MOVE '查詢'  S#MODE
+     C                     MOVE *ON       *IN34             PROTECT
+     C                     MOVEA'11'      *IN,75            PRINT,SAVE
+     C                     ENDSL
+     C*
+     C*當S#CODE<>1時，讀入請款單號不為空白的資料
+     C           S#CODE    IFNE '1'
+     C                     MOVELS#APNO    W#APNO 10        暫存
+     C                     MOVELW#APNO    AMAPN2           請款單號
+     C                     MOVEL*BLANK    AMINNO           發票號碼
+     C                     EXSR SR2100
+     C                     ENDIF
+     C*
+     C*當S#CODE=1,2時，讀入請款單號為空白的資料
+     C           S#CODE    IFEQ '1'
+     C           S#CODE    OREQ '2'
+     C                     MOVEL*BLANK    W#APNO           暫存
+     C                     MOVELW#APNO    AMAPN2           請款單號
+     C                     MOVEL*BLANK    AMINNO           發票號碼
+     C                     EXSR SR2100
+     C                     ENDIF
+     C*
+     C           RRN1      IFEQ 0                          SFLDSP OFF
+     C                     MOVE *ON       *IN72
+     C                     MOVELERR,11    S#ERR2
+     C                     ELSE
+     C                     MOVE *OFF      *IN72
+     C                     ENDIF
+     C*顯示畫面
+     C           W#PRID    DOWEQ'02'
+     C*
+     C                     WRITEAR093H
+     C                     WRITEAR093F2M
+     C                     EXFMTAR093F2C
+     C                     MOVEL*BLANK    S#ERR2
+     C*結束作業
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*回上頁
+     C           *IN12     IFEQ *ON
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*重新計算請款金額
+     C                     EXSR SR2300
+     C*
+     C*當未選取任何資料時，不允許做其他的動作
+     C*當修改時不可刪除所有的資料
+     C           S#CODE    IFEQ '2'
+     C           S#EAMT    ANDEQ0
+     C                     MOVELERR,13    S#ERR2
+     C                     ITER
+     C                     ELSE
+     C           S#EAMT    IFEQ 0
+     C                     MOVELERR,12    S#ERR2
+     C                     ITER
+     C                     ENDIF
+     C                     ENDIF
+     C*列印
+     C  N75      *IN05     IFEQ *ON
+     C                     MOVELS#APNO    P#APN2  6
+     C                     CALL 'ARR093P1'
+     C                     PARM           P#APN2
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*存檔：存檔時，當S#CODE=3時，需重讀資料，其餘情況則不需要
+     C  N76      *IN10     IFEQ *ON
+     C                     EXSR SR2400
+     C           S#CODE    IFNE '3'
+     C                     MOVE *OFF      *IN75            新增與修改完成後，
+     C                     ITER                            允許列印
+     C                     ELSE
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR                           讀入資料
+     C*----------------------------------------------------------------
+     C*一次讀入
+     C           W#ARIV    SETLLRARINVM
+     C                     MOVE *OFF      *IN42
+     C           *IN42     DOWEQ*OFF
+     C                     READ RARINVM                  42
+     C   42                LEAVE
+     C*
+     C           AMAPN2    IFNE W#APNO
+     C                     LEAVE
+     C                     ENDIF
+     C*客戶編號不符，訂單編號不符，結案碼不為空白
+     C           AMCUNO    IFNE S#CUNO
+     C           AMORNO    ORNE S#ORNO
+     C           AMCLOC    ORNE *BLANK
+     C           AMDELT    ORNE *BLANK
+     C                     ITER
+     C                     ENDIF
+     C*
+ 9212C*                    CLEARAR093F2
+     C*
+     C                     MOVELAMCUNO    S#CUNO           客戶編號
+     C                     MOVELAMORNO    S#ORNO           訂單號碼
+     C                     Z-ADDAMINDT    S#INDT           發票日期
+     C                     MOVE UDATE     S#APDT           請款日期
+     C                     MOVELAMINNO    S#INNO           發票號碼
+     C                     Z-ADDAMDAMT    S#DAMT           發票金額
+     C                     MOVELAMAPN1    S#APN1           承購單號
+     C*
+     C*計算請款金額（包含折讓金額）
+     C                     EXSR SR2310
+     C                     Z-ADDW#BAMT    S#BAMT           折讓／銷退金額
+     C*
+     C*當請款單號不為空白時，上Ｙ與合計請款金額
+     C           W#APNO    IFNE *BLANK                     新增以外
+     C                     MOVEL'Y'       S#OPT
+     C                     ADD  W#EAMT    S#EAMT
+     C                     ENDIF
+     C*
+     C                     ADD  1         RRN1
+     C                     WRITEAR093F2
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2300    BEGSR
+     C*****************************************************************
+     C                     Z-ADD1         RRN1
+     C                     Z-ADD0         S#EAMT
+     C*
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C           RRN1      CHAINAR093F2              90
+     C   90                LEAVE
+     C*
+     C           S#OPT     IFEQ 'Y'
+     C                     EXSR SR2310
+     C                     ADD  W#EAMT    S#EAMT
+     C                     ENDIF
+     C*
+     C                     ADD  1         RRN1
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2310    BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AAMT  80       出貨金額
+     C                     Z-ADD0         W#BAMT  70       折讓／銷退金額
+     C                     Z-ADD0         W#CAMT  80       扣預收與扣預收沖回
+     C                     Z-ADD0         W#DAMT  70       總稅額
+     C                     Z-ADD0         W#EAMT  90       請款金額暫存
+     C*
+     C           S#INNO    CHAININREC               N40
+     C                     Z-ADDINAAMT    W#AAMT           出貨金額
+     C                     Z-ADDINCAMT    W#BAMT           折退
+     C                     Z-ADDINBAMT    W#CAMT           扣預收
+     C                     ADD  INDAMT    W#CAMT           扣預沖回
+     C                     Z-ADDINATAX    W#DAMT           出貨稅額
+     C                     ADD  INCTAX    W#DAMT           折退稅額
+     C                     ADD  INDTAX    W#DAMT           扣預沖回稅
+     C*
+     C                     EXSR SR2311                     找未確折退
+     C*
+     C           W#EAMT    ADD  INFAMT    W#EAMT           繳款┼退票
+     C                     ADD  W#AAMT    W#EAMT
+     C                     ADD  W#BAMT    W#EAMT
+     C                     ADD  W#CAMT    W#EAMT
+     C                     ADD  W#DAMT    W#EAMT           請款金額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2311    BEGSR
+     C*****************************************************************
+     C*--------------------------------------------
+     C*   找出未確認的折讓單（計入請款內容）
+     C*--------------------------------------------
+     C           INNO      SETLLTXREC
+     C           1         DOWEQ1
+     C           INNO      READETXREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           TXFLAG    IFEQ 'D'                        已作廢
+     C           TXFL01    OREQ 'Y'                        已確認
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           INTYPE    IFEQ '2'                        預收
+     C                     SUB  TXAMT     W#BAMT
+     C                     ELSE
+     C           TXACNT    IFEQ '4'                        扣預收
+     C                     SUB  TXAMT     W#CAMT
+     C                     ELSE
+     C                     SUB  TXAMT     W#BAMT           折退
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     SUB  TXTAX     W#DAMT           稅額
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2400    BEGSR
+     C*****************************************************************
+     C*新增時取得請款單號，其餘情況則沿用原來的請款單號
+     C           S#CODE    IFEQ '1'
+     C                     MOVEL'03'      GEKIND           編碼種類
+     C                     MOVELU#AREA    GEPRIN           編碼原則
+     C           K#GE      CHAINGEREC                41
+     C  N41                ADD  1         GECUNO
+     C  N41                UPDATGEREC
+     C  N41                MOVELU#AREA    D#APN1
+     C  N41                Z-ADDGECUNO    D#APN2           請款單號
+     C                     MOVELD#APNO    S#APNO
+     C                     ENDIF
+     C*
+     C*UPDATE ARINVM的請款單號
+     C*
+     C                     Z-ADD1         RRN1
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C           RRN1      CHAINAR093F2              90
+     C   90                LEAVE
+     C*
+     C           S#INNO    CHAINRINVMY               41    發票號碼
+     C           S#CODE    IFNE '3'
+     C           S#OPT     ANDEQ'Y'
+     C                     MOVELS#APNO    F#APN2           請款單號
+     C                     MOVE UDATE     F#APD2           請款日期
+     C                     ELSE
+     C                     MOVEL*BLANK    F#APN2           請款單號
+     C                     Z-ADD0         F#APD2           請款日期
+     C                     ENDIF
+     C                     MOVEL'C'       F#FLAG           處理代碼
+     C                     MOVELU#USID    F#UPDM           異動人員
+     C                     MOVE UDATE     F#UPDD           異動日期
+     C                     TIME           F#UPDT           異動時間
+     C                     UPDATRINVMY
+     C*
+     C                     ADD  1         RRN1
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+**  ERR
+01-請輸入功能代碼！
+02-功能代碼必須為１，２，３，４，５！
+03-請輸入客戶代號！
+04-請輸入訂單號碼！
+05-請輸入請款單號！
+06-新增時請款單號不可輸入！
+07-此客戶此張請款單已存在，不可再新增！
+08-此張請款單已收完款，不可再更正！
+09-此客戶此張請款單不存在！
+10-此客戶未辦理承購！
+11-無符合條件之資料！
+12-請挑選資料！
+13-修改時不可刪除所有資料！
+14-請款單已送至批次佇列執行。
+

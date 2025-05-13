@@ -1,0 +1,71 @@
+             PGM
+             DCLF       FILE(ARP036S)
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&W#DATE) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&TXAR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#ERR)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#BDAT) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&W#EDAT) TYPE(*CHAR) LEN(6)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+             RTVDTAARA  DTAARA(*LDA (951 35))  RTNVAR(&COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&DEVNM)
+ START:      SNDRCVF
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             /* CHECK 處理日期 */
+             IF         COND(&S#DATB *EQ 0) THEN(DO)
+               CHGVAR     VAR(&ERRMSG) VALUE('日期不可空白！！')
+               GOTO       CMDLBL(START)
+             ENDDO
+             /*        */
+             IF         COND(&S#DATE *EQ 0) THEN(DO)
+               CHGVAR     VAR(&ERRMSG) VALUE('日期不可空白！！')
+               GOTO       CMDLBL(START)
+             ENDDO
+             /*        */
+             CHGVAR     VAR(&W#DATE) VALUE(&S#DATB)
+             CALL       PGM(MTLIB/MTS001P) PARM(&W#DATE &W#ERR)
+             IF         COND(&W#ERR *EQ '1' ) THEN(DO)
+               CHGVAR     VAR(&ERRMSG) VALUE('日期錯誤！')
+               GOTO       CMDLBL(START)
+             ENDDO
+             /*       */
+             CHGVAR     VAR(&W#DATE) VALUE(&S#DATE)
+             CALL       PGM(MTLIB/MTS001P) PARM(&W#DATE &W#ERR)
+             IF         COND(&W#ERR *EQ '1' ) THEN(DO)
+               CHGVAR     VAR(&ERRMSG) VALUE('日期錯誤！')
+               GOTO       CMDLBL(START)
+             ENDDO
+             /*        */
+             IF         COND(&S#DATB *GT &S#DATE) THEN(DO)
+               CHGVAR  VAR(&ERRMSG) VALUE('起始日期不可大於截止日期！')
+               GOTO       CMDLBL(START)
+             ENDDO
+             CHGVAR     VAR(&W#BDAT) VALUE(&S#DATB)
+             CHGVAR     VAR(&W#EDAT) VALUE(&S#DATE)
+             CHGDTAARA  DTAARA(*LDA (1 6)) VALUE(&W#BDAT)
+             CHGDTAARA  DTAARA(*LDA (7 6)) VALUE(&W#EDAT)
+             SBMJOB     JOB(ARP036P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARP036P')
+             RETURN
+
+  BATCH:     /* CLRPFM     INVCUT */
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&W#BDAT)
+             RTVDTAARA  DTAARA(*LDA (7 6)) RTNVAR(&W#EDAT)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&TXAR)
+             OVRDBF     FILE(INVMST) TOFILE(INVMST) SHARE(*YES)
+             OPNQRYF    FILE((INVMST)) OPTION(*ALL) QRYSLT('     +
+                          INPRTC *EQ " "                       & +
+                          INDECD *EQ " "                       & +
+                          INAREA *EQ "' || &TXAR || '"         & +
+                          INDT   *GE "' || &W#BDAT || '"       & +
+                          INDT   *LE "' || &W#EDAT || '" ') +
+                          KEYFLD((INNO)) MAPFLD((INDT ININDT *CHAR 6))
+             CALL       PGM(ARP036R)
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+             CALL       PGM(ARR063P)
+             ENDPGM
+

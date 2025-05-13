@@ -1,0 +1,250 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARP120R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     獎勵金價格補助處理報表─價格補助
+     H*            5.DATE-WRITTEN  101/02/10 2012AR641
+     H*            6.UPDATE-DATE   104/09/24 2015AR953 S00WCJ (0409A)
+     H*                             產品代碼3碼擴5碼
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FHSVOUR  IP  E           K        DISK
+     FARRDTL  UF  E           K        DISK                      A
+     FARRDCUL1IF  E           K        DISK
+     FARRDMT  IF  E           K        DISK
+     FARRDPR  IF  E           K        DISK
+     FARRDPD  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     F*
+     FARP120T1O   E             60     PRINTER      KINFDS PRTCTL
+     F*
+0409AE                    ARY        60 15
+     IRHSVOUR
+     I                                              S4AREAL4
+     I                                              S4CUNOL3
+     I                                              S4NAMEL2
+     I                                              S4QULTL1
+     IPRTCTL      DS
+     I                                    B 367 3680CURLIN
+     I                                    B 369 3720CURPAG
+     I*
+     I            DS
+     I                                        1   3 S4NAME
+     I                                        1   1 D#NAME
+     I            DS
+0409AI                                        1   5 R#PDNM
+     I                                        1   1 D#PDNM
+     I            DS
+0409AI                                        1  15 D#ARY
+0409AI                                        1   5 D#PDN1
+0409AI                                        6  150D#TAMT
+     I           UDS
+     I                                        1   60R#YYMM
+     I                                      801 8080D#DATE
+     I                                      951 985 COMP
+     I                                     10011010 U#USID
+     I                                     10111020 DEVNM
+     C*
+     C****************************************************************
+     C           KEY01     KLIST
+     C                     KFLD           S4AREA
+     C                     KFLD           R#YYMM
+     C                     KFLD           W#KIND
+     C                     KFLD           S4CUNO
+0409AC                     KFLD           S#NAME
+     C                     KFLD           S4QULT
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C   L4                EXSR SR0000
+     C                     EXSR SR1000
+     C   60                EXSR SR2000
+     CL1                   EXSR SR3000
+     C*L2                   EXSR SR4000
+     CL3                   EXSR SR5000
+     CL4                   EXSR SR6000
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C* 印表頭
+     C                     CLEARAR120T1M
+     C                     CLEARAR120T2M
+     C                     CLEARAR120T3M
+     C                     MOVEL*ALL'9'   ARY
+     C                     Z-ADD1         I       20
+     C                     MOVELS4AREA    R#AREA
+     C                     MOVEL'1'       W#KIND  1        *補助類別
+     C                     WRITEAR120T1H
+     C                     MOVEL*OFF      *IN60
+     C                     MOVEL*ON       *IN51
+     C                     MOVEL*OFF      *IN55
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C           S4CUNO    CHAINARRDCUL1             41
+     C           *IN41     IFEQ *ON
+     C                     MOVELS4CUNO    W#CUNO  6
+     C                     MOVE '*****'   W#CUNO
+     C           W#CUNO    CHAINARRDCUL1             41
+     C   41                GOTO END100
+     C                     ENDIF
+0409AC                     MOVELS4NAME    S#NAME  5
+0409AC           S#NAME    CHAINARRDPD               42
+     C           *IN42     IFEQ *ON
+0409AC                     MOVELS4NAME    W#NAME  5
+     C                     MOVE '****'    W#NAME
+     C           W#NAME    CHAINARRDPD               42
+     C   42                GOTO END100
+     C  N42      PDPRIC    IFEQ *BLANKS
+     C                     GOTO END100
+     C                     ENDIF
+     C                     ENDIF
+     C           S4QULT    CHAINARRDMT               43
+     C           *IN43     IFEQ *ON
+     C                     GOTO END100
+     C                     ENDIF
+     C*
+     C           KEY01     CHAINRARRDTL              65
+     C   65                CLEARRARRDTL
+     C   65                MOVEL'A'       TLFLAG
+     C  N65                MOVEL'C'       TLFLAG
+     C                     MOVELS4AREA    TLAREA
+     C                     Z-ADDR#YYMM    TLYYMM
+     C                     MOVELW#KIND    TLKIND
+     C                     MOVELS4CUNO    TLCUNO
+     C                     MOVELS4NAME    TLPDNM
+     C                     MOVELS4QULT    TLMETL
+     C*數量計算以理論重計
+     C   65                Z-ADDS4STDW    TLQTY
+     C  N65                ADD  S4STDW    TLQTY
+     C           '1'       CHAINARRDPR               44
+     C  N44                Z-ADDPRPRIC    TLPRIC
+     C           TLQTY     MULT TLPRIC    TLAMT     H
+     C   65                MOVELU#USID    TLENTM
+     C   65                Z-ADDD#DATE    TLENTD
+     C   65                TIME           TLENTT
+     C                     MOVELU#USID    TLUPDM
+     C                     Z-ADDD#DATE    TLUPDD
+     C                     TIME           TLUPDT
+     C   65                WRITERARRDTL
+     C  N65                UPDATRARRDTL
+     C*
+     C                     MOVELS4CUNO    R#CUNO
+     C           S4CUNO    CHAINCBCUST               66
+     C           *IN66     IFEQ *OFF
+     C                     MOVELCBCUNM    R#CUNM
+     C                     ELSE
+     C                     MOVEL*BLANKS   R#CUNM
+     C                     ENDIF
+     C                     MOVELS4NAME    R#PDNM
+     C                     MOVELS4QULT    R#METL
+     C*
+     C                     Z-ADDTLQTY     R#QTY
+     C                     Z-ADDTLAMT     R#TAM1           *鋼種
+     C           END100    ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*
+     C                     WRITEAR120T1X
+     C                     WRITEAR120T1H
+     C                     SETOF                     60
+     C                     SETOF                     55
+     C                     ENDSR
+     C*
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*
+     C           R#QTY     IFNE 0
+     C*                    SETON                     51
+     C                     WRITEAR120T1D
+     C*
+     C*將類別合計至ARY中
+     C*
+     C                     SORTAARY
+     C           1         DO   60        I
+     C                     MOVE ARY,I     D#ARY
+     C*
+0409AC           D#PDN1    IFEQ '99999'
+     C                     MOVELR#PDNM    D#PDN1
+     C                     Z-ADDR#TAM1    D#TAMT
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ELSE
+     C           R#PDNM    IFEQ D#PDN1
+     C                     ADD  R#TAM1    D#TAMT
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ADD  R#QTY     R#TQTY
+     C                     ADD  R#TAM1    R#TAM2
+     C                     ADD  R#QTY     R1TQTY
+     C                     ADD  R#TAM1    R1TAM2
+     C                     ADD  R#QTY     R2TQTY
+     C                     ADD  R#TAM1    R2TAM2
+     C                     Z-ADD0         R#QTY
+     C                     Z-ADD0         R#TAM1
+     C                     SETOF                     51
+     C                     ENDIF
+     C*          D#NAME    IFNE D#PDNM
+     C*          *INL3     OREQ *ON
+     C*                    EXSR SR4000
+     C*                    ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4000    BEGSR
+     C*****************************************************************
+     C*
+     C           R#TQTY    IFNE 0
+     C                     WRITEAR120T1M
+     C                     Z-ADD0         R#TQTY
+     C                     Z-ADD0         R#TAM2
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR5000    BEGSR
+     C*****************************************************************
+     C*
+     C           R1TQTY    IFNE 0
+     C                     WRITEAR120T2M
+     C                     Z-ADD0         R#QTY
+     C                     Z-ADD0         R#TAM1
+     C                     Z-ADD0         R1TQTY
+     C                     Z-ADD0         R1TAM2
+     C                     MOVEL*ON       *IN51
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR6000    BEGSR
+     C*****************************************************************
+     C*
+     C                     WRITEAR120T3M
+     C*
+     C                     Z-ADD1         J       20
+     C                     SORTAARY
+     C           1         DO   60        J
+     C                     MOVE ARY,J     D#ARY
+0409AC           D#PDN1    IFNE '99999'
+0409AC                     MOVELD#PDN1    R#SPDM
+     C                     Z-ADDD#TAMT    R#TAMT
+     C                     WRITEAR120T4M
+     C                     WRITEAR120T1L
+     C                     MOVEL*ON       *IN55
+     C   60                EXSR SR2000
+     C                     ELSE
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C                     ENDSR
+

@@ -1,0 +1,53 @@
+        /******************************************************/
+        /*                                                    */
+        /*        >>   PROGRAM INTRODUCTION  <<               */
+        /*        1.PROGRAM-ID     ARP095P1                   */
+        /*        2.PROGRAM-TYPE   CLP                        */
+        /*        3.AUTHOR         S02CSF                     */
+        /*        4.FUNCTION      應收帳款承購發票自動結案  */
+        /*        5.DATE-WRITTEN   92/03/03                   */
+        /*        6.DATE-MODIFY                               */
+        /*                                                    */
+        /******************************************************/
+              PGM
+              DCL         VAR(&TYPE)    TYPE(*CHAR)  LEN(1)
+              DCL         VAR(&FLAG)    TYPE(*CHAR)  LEN(1)
+              DCL         VAR(&S#DEVN)  TYPE(*CHAR)  LEN(10)
+              DCL         VAR(&S#USER)  TYPE(*CHAR)  LEN(10)
+
+
+              RTVJOBA     JOB(&S#DEVN) USER(&S#USER) +
+                          TYPE(&TYPE)
+
+              IF          COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+              RTVDTAARA  DTAARA(*LDA (1011 10))   RTNVAR(&S#DEVN)
+              RTVDTAARA  DTAARA(*LDA (1001 10))   RTNVAR(&S#USER)
+              CHGDTAARA  DTAARA(*LDA (300   1))   VALUE('X')
+   START:
+       /*     SBMJOB      JOB(ARP095P1) JOBD(ARJOBD) +
+                          RQSDTA('CALL ARP095P1')     */
+              SNDBRKMSG   MSG('<<應收帳款承購發票自動結案+
+                              ,已開始處理,請稍待...>>')    +
+                              TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+       /*     RETURN              */
+   BATCH:
+              RTVDTAARA  DTAARA(*LDA (300   1))   RTNVAR(&FLAG)
+
+              OVRDBF     FILE(ARCVMS) TOFILE(ARCVMS) SHARE(*YES)
+              OPNQRYF    FILE((ARCVMS)) OPTION(*ALL) QRYSLT(' +
+                         (ASFL01  *NE " ") *AND +
+                         (ASFL02  *EQ " ")')
+              CALL       PGM(ARP095R1)
+              CLOF       OPNID(ARCVMS)
+              DLTOVR     FILE(*ALL)
+
+   /*判斷ｃａｌｌ此程式是在ｏｎｌｉｎｅ　ｏｒ　ｂａｔｃｈ狀態*/
+
+              IF         COND(&FLAG  *EQ 'X') THEN(DO)
+              SNDBRKMSG   MSG('<<應收帳款承購發票自動結案+
+                              ,已完成.....>>')    +
+                              TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+              ENDDO
+              ENDPGM
+

@@ -1,0 +1,196 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP068R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     銷貨帳款應收統計處理－繳款未兌現比
+     H*            5.DATE-WRITTEN  88/06/11
+     H*            6.UPDATE  DATE  101/09/21  2012AR682 S00WCJ (0109A)
+     H*                            113/08/12 S00WCJ (1308A)
+     H*                             排除110/01/01前之發票繳款單號重
+     H*                             覆之資料
+     H*
+     H* 說明：將未兌現之繳款明細找出，計算該張繳款書之兌現比率。
+     H*       依每張含未兌現票據之繳款書找出相關之發票。
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FRCVDTLL1IP  E           K        DISK
+     F            RVREC                             KRENAMERVRECP
+     FRCVDTL  IF  E           K        DISK
+     FINVDTLL1IF  E           K        DISK
+     FARSTRV  IF  E           K        DISK                      A
+     FARSTIN  UF  E           K        DISK                      A
+     F*****************************************************************
+     IRVRECP
+     I                                              RVNO  L1
+     I*------------------------------------------------------
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10011003 U#DPID
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C           K#IV      KLIST
+     C                     KFLD           IVACNT
+     C                     KFLD           IVAPNO
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式     (換了繳款書)
+     C*********************************
+     CSR         L1CLR     BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  換了繳款書
+     C*********************************
+     CSR         L1SR      BEGSR
+     C                     CLEARAVREC
+     C                     Z-ADD0         W#CAMT 110       貸方金額
+     C*
+     C           RVNO      SETLLRVREC                69
+     C           *IN69     DOWEQ'0'                        繳款迴圈
+     C           RVNO      READERVREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           RVFLAG    IFEQ 'D'                        作廢不計
+     C           RVDECD    OREQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           RVACTP    IFEQ 'C'                        貸方
+     C                     ADD  RVRAMT    W#CAMT
+     C                     ENDIF
+     C*
+     C           RVACTP    IFEQ 'D'                        借方
+     C                     SELEC
+     C           RVNTTP    WHEQ 'A'                        票據類
+     C           RVNTTP    OREQ 'B'
+     C           RVNTTP    OREQ 'C'
+     C           RVNTTP    OREQ 'D'
+     C           RVNTTP    OREQ 'E'
+     C           RVNTTP    OREQ 'I'
+     C           RVNTCD    IFNE '1'                        未兌現
+     C           RVACNO    ANDEQ'1131'
+0109AC           RVNTCD    ORNE '1'
+0109AC           RVACNO    ANDEQ'111001'
+     C                     ADD  RVRAMT    AVBAMT
+     C           RVDUDT    IFGT AVRVLD
+     C                     Z-ADDRVDUDT    AVRVLD           最後兌現日
+     C                     ENDIF
+     C                     ELSE                            已兌現
+     C                     ADD  RVRAMT    AVAAMT
+     C                     ENDIF
+     C*
+     C                     OTHER                           其他現金類
+     C                     ADD  RVRAMT    AVAAMT
+     C                     ENDSL
+     C                     ENDIF                           借方
+     C                     ENDDO                           繳款迴圈
+     C*
+     C*  本項統計以銷貨為主，現金優先扣抵貨款，故貸方金額先沖未兌現
+     C*
+     C           W#CAMT    IFGT AVBAMT                     沖貸方
+     C                     SUB  AVBAMT    W#CAMT
+     C                     Z-ADD0         AVBAMT
+     C                     SUB  W#CAMT    AVAAMT
+     C                     ELSE
+     C                     SUB  W#CAMT    AVBAMT
+     C                     ENDIF
+     C*
+     C           AVAAMT    ADD  AVBAMT    W#TAMT 110
+     C*
+     C           W#TAMT    IFGT 0                          有繳款金額
+     C           AVAAMT    ANDLTW#TAMT                     有未兌現時
+     C                     MOVELRVNO      AVRVNO
+     C                     Z-ADDRVDATE    AVRVDT
+     C           AVAAMT    DIV  W#TAMT    AVRATE    H
+     C                     WRITEAVREC                      才存檔
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式   找出相對的發票兌現情形
+     C*********************************
+     CSR         LRSR      BEGSR
+     C           *LOVAL    SETLLAVREC                69
+     C           1         DOWEQ1
+     C                     READ AVREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVEL'6'       IVACNT
+     C                     MOVEL*BLANK    IVAPNO
+     C                     MOVELAVRVNO    IVAPNO
+     C*
+     C           K#IV      SETLLIVREC                69
+     C           1         DOWEQ1                          發票明細
+     C           K#IV      READEIVREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           IVFLAG    IFEQ 'D'
+     C           IVDECD    OREQ 'D'
+1308AC           IVACDT    ORLT 1100101
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     Z-SUBIVAMT     W#TAMT
+     C           W#TAMT    MULT AVRATE    W#CAMT    H      已兌現
+     C                     SUB  W#CAMT    W#TAMT           未兌現
+     C           IVNO      CHAINANREC                69
+     C*
+     C           *IN69     IFEQ '1'
+     C                     CLEARANREC
+     C                     MOVELIVNO      ANINNO           發票號碼
+     C                     MOVELAVRVNO    ANRVNO           繳款號碼
+     C                     Z-ADDAVRVDT    ANRVDT           繳款日期
+     C                     Z-ADDAVRVLD    ANRVLD           最後兌現日
+     C                     Z-ADDW#TAMT    ANBAMT           未兌現金額
+     C                     WRITEANREC
+     C                     ELSE
+     C           AVRVLD    IFGT ANRVLD
+     C                     Z-ADDAVRVLD    ANRVLD           最後兌現日
+     C                     ENDIF
+     C                     ADD  W#TAMT    ANBAMT           未兌現金額
+     C                     MOVEL'*'       ANSTCD           多筆繳款
+     C                     UPDATANREC
+     C                     ENDIF
+     C                     ENDDO                           發票明細
+     C*
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+

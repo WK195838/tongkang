@@ -1,0 +1,192 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE050R3
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     進倉履約折讓自動處理作業-列印清單
+     H*            5.DATE-WRITTEN  91/02/22
+     H*                            102/10/15 2013AR777 S00WCJ(0210A)
+     H*                             增加直接列印折讓單
+     H*                            102/12/17 2013AR787 S00WCJ(0212A)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FDISDTL  UP  E           K        DISK
+     FDISMST  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FARE050T O   E             69     PRINTER
+     IRDISDTL     01
+     I                                              DSCUNOL4
+     I                                              DSAREAL3
+     I                                              DSORNOL2
+     I                                              DSTXNOL1
+     I           UDS
+     I                                      523 523 D#PRT
+     I                                     10011010 T#USID
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L4                EXSR L4CLR
+     C   L3                EXSR L3CLR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CL3 99                EXSR L3SR
+     CL4 99                EXSR L4SR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C*初始報表
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C*
+     C           K#SMST    KLIST
+     C                     KFLD           DMCUNO
+     C                     KFLD           DMORNO
+     C                     KFLD           DMYYMM
+     C                     KFLD           DMCONT
+     C                     KFLD           DMAREA
+     C*
+     C                     SETON                     69    列印燈號
+     C                     SETON                     99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L4CLR     BEGSR
+     C*****************************************************************
+     C                     SETON                     69    列印燈號
+     C                     CLEARAR050T4
+     C                     ENDSR
+     C*****************************************************************
+     C           L3CLR     BEGSR
+     C*****************************************************************
+     C                     MOVE *BLANK    W#AREA  1        廠區暫存
+     C                     CLEARAR050T3
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     MOVE *BLANK    W#ORNO  6        訂單暫存
+     C                     Z-ADD0         W#CONT  30       次數暫存
+     C                     CLEARAR050T2
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR050T1
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     ADD  DSAMT1    T#AMT
+     C                     ADD  DSAMT2    T#TAX
+     C*
+0212AC           D#PRT     IFEQ *BLANKS
+     C                     MOVE *BLANK    DSCODE
+     C                     UPDATRDISDTL
+0212AC                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*
+     C                     MOVELDSCUNO    T#CUNO           客戶代號
+     C           DSCUNO    CHAINCBREC                40
+     C                     MOVE CBCUNM    T#CUNM           客戶簡稱
+     C*
+     C           DSAREA    IFEQ W#AREA                     廠區
+     C                     MOVE *BLANK    T#AREA
+     C                     ELSE
+     C                     MOVE DSAREA    T#AREA
+     C                     MOVE DSAREA    W#AREA
+     C                     ENDIF
+     C*
+     C           DSORNO    IFEQ W#ORNO                     訂單
+     C                     MOVE *BLANK    W#ORNO
+     C                     ELSE
+     C                     MOVE DSORNO    T#ORNO
+     C                     MOVE DSORNO    W#ORNO
+     C                     ENDIF
+     C*
+     C           DSCONT    IFEQ W#CONT                     訂單
+     C                     Z-ADD0         T#CONT
+     C                     ELSE
+     C                     Z-ADDDSCONT    T#CONT
+     C                     Z-ADDDSCONT    W#CONT
+     C                     ENDIF
+     C*
+     C                     MOVELDSTXNO    T#TXNO           折讓單號
+     C                     Z-ADDDSTXDT    T#TXDT           入帳日期
+     C*
+     C                     MOVE DSCUNO    DMCUNO           客戶代號
+     C                     MOVE DSORNO    DMORNO           訂單
+     C                     MOVE DSYYMM    DMYYMM           處理年月
+     C                     MOVE DSCONT    DMCONT           處理次數
+     C                     MOVE DSAREA    DMAREA           廠區
+     C           K#SMST    CHAINRDISMST              40
+     C  N40                Z-ADDDMACYM    T#ACYM
+     C   40                Z-ADD0         T#ACYM
+     C*
+     C   69                WRITEAR050TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR050T1
+0210AC*
+0212AC           D#PRT     IFEQ *BLANKS
+0210AC                     CALL 'ARR033P'
+0210AC                     PARM           T#TXNO
+0210AC                     FREE 'ARR033P'
+0212AC                     ENDIF
+     C*
+     C                     ADD  T#AMT     T#TAM1           訂單小計
+     C                     ADD  T#TAX     T#TAX1           訂單小計
+     C*
+     C                     ADD  T#AMT     T#TAM2           廠區小計
+     C                     ADD  T#TAX     T#TAX2           廠區小計
+     C*
+     C                     ADD  T#AMT     T#TAM3           客戶總計
+     C                     ADD  T#TAX     T#TAX3           客戶總計
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR050TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR050T2
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L3SR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR050TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR050T3
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L4SR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR050TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR050T4
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C*無資料
+     C                     EXSR INISR
+     C*
+     C   69                WRITEAR050TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR050TM
+     C*
+     C                     ENDSR
+

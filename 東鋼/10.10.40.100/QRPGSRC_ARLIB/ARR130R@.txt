@@ -1,0 +1,166 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR130R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     已開發票押匯狀況彙總表
+     H*          5.DATE-WRITTEN  96/11/14
+     H*          6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  IP  E           K        DISK
+     FSARVINL2IF  E           K        DISK
+     FARSAID  IF  E           K        DISK
+     FARR130T O   E             66     PRINTER
+     E*****************************************************************
+     IINREC
+     I                                              INRVIDL2
+     I                                              INCUNOL1
+     I*
+     I           UDS
+     I                                      301 308 D#DATS
+     I                                      309 316 D#DATE
+     I                                      317 318 D#RVID
+     C*****************************************************************
+     C*          KEY       LIST
+     C*****************************************************************
+     C           K#TRAN    KLIST
+     C                     KFLD           K#VRNO  4        傳票號碼
+     C                     KFLD           K#ITEM  20       項次
+     C*
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C  N90                EXSR INZ#01
+     C  N90                SETON                     90
+     C   L2                EXSR DL#L2
+     C   L1                EXSR DL#L1
+     C                     EXSR DP#01
+     CL1 90                EXSR TL#L1
+     CL2 90                EXSR TL#L2
+     CLR 90                EXSR TL#LR
+     CLRN90                EXSR MSGSR
+     C*
+     C*****************************************************************
+     CSR         INZ#01    BEGSR
+     C*****************************************************************
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C*
+     C                     MOVELD#DATS    T#DATS           起發票日期
+     C                     MOVELD#DATE    T#DATE           訖發票日期
+     C*
+     C                     MOVE *ON       *IN66
+     C*
+     C                     Z-ADD0         W#A2MT 130       發票金額
+     C                     Z-ADD0         W#B2MT 130       已繳金額
+     C                     Z-ADD0         W#C2MT 130       未繳金額
+     C*
+     C           D#RVID    IFEQ *BLANK
+     C                     MOVEL'全部'  T#RVNM
+     C                     ELSE
+     C           D#RVID    CHAINARSAID               41
+     C  N41                MOVELSANAME    T#RVNM
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         DL#L2     BEGSR
+     C*****************************************************************
+     C                     CLEARAR130T1T
+     C*
+     C                     Z-ADD0         W#A1MT 130       發票金額
+     C                     Z-ADD0         W#B1MT 130       已繳金額
+     C                     Z-ADD0         W#C1MT 130       未繳金額
+     C*
+     C*                    MOVE *ON       *IN66
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         DL#L1     BEGSR
+     C*****************************************************************
+     C                     CLEARAR130T1D
+     C*
+     C                     Z-ADD0         W#AAMT 110       發票金額
+     C                     Z-ADD0         W#BAMT 110       已繳金額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         DP#01     BEGSR
+     C*****************************************************************
+     C*發票金額累計
+     C                     ADD  INAAMT    W#AAMT
+     C                     ADD  INATAX    W#AAMT
+     C                     ADD  INBAMT    W#AAMT
+     C                     ADD  INCAMT    W#AAMT
+     C                     ADD  INCTAX    W#AAMT
+     C                     ADD  INDAMT    W#AAMT
+     C                     ADD  INDTAX    W#AAMT
+     C                     ADD  INFAMT    W#AAMT
+     C*已繳金額累計
+     C                     MOVE *OFF      *IN40
+     C           INNO      CHAINSARVINL2             40
+     C  N40                ADD  SIINXA    W#BAMT
+     C*
+     CSR         ENDPSR    ENDSR
+     C*****************************************************************
+     CSR         TL#L1     BEGSR
+     C*****************************************************************
+     C                     MOVELINCUNO    T#CUNO           客戶代號
+     C                     MOVELINCUNM    T#CUNM           客戶簡稱
+     C                     MOVELINRVID    T#RVID           業務別
+     C                     Z-ADDW#AAMT    T#AAMT           發票金額
+     C                     Z-ADDW#BAMT    T#BAMT           已繳金額
+     C           W#AAMT    SUB  W#BAMT    T#CAMT           未繳金額
+     C*
+     C   66                WRITEAR130T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR130T1D
+     C*
+     C                     ADD  T#AAMT    W#A1MT
+     C                     ADD  T#BAMT    W#B1MT
+     C                     ADD  T#CAMT    W#C1MT
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         TL#L2     BEGSR
+     C*****************************************************************
+     C                     Z-ADDW#A1MT    T#A1MT           發票金額
+     C                     Z-ADDW#B1MT    T#B1MT           已繳金額
+     C                     Z-ADDW#C1MT    T#C1MT           未繳金額
+     C*
+     C   66                WRITEAR130T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR130T1T
+     C*
+     C                     ADD  T#A1MT    W#A2MT
+     C                     ADD  T#B1MT    W#B2MT
+     C                     ADD  T#C1MT    W#C2MT
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         TL#LR     BEGSR
+     C*****************************************************************
+     C                     Z-ADDW#A2MT    T#A2MT           發票金額
+     C                     Z-ADDW#B2MT    T#B2MT           已繳金額
+     C                     Z-ADDW#C2MT    T#C2MT           未繳金額
+     C*
+     C   66                WRITEAR130T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR130T2T
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INZ#01
+     C*
+     C   66                WRITEAR130T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR130T1M
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+

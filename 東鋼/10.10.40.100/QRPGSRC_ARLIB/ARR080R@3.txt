@@ -1,0 +1,205 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR080R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     發票與銷貨金額差異表
+     H*            5.DATE-WRITTEN  88/07/23
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FTRNDTLL2IF  E           K        DISK
+     F            TXREC                             KRENAMETXRECL
+     FARR080T O   E             66     PRINTER
+     E*************************************************************
+     E                    TAB1    1   6  1   TAB1R   8
+     I*****************************************************************
+     ITXREC
+     I                                              TXRESVL2
+     I                                              TXIVNOL1
+     ITXRECL
+     I              TXIVNO                          F#IVNO
+     I              TXAMT                           F#AMT
+     I              TXPDNM                          F#PDNM
+     I              TXRESV                          F#RESV
+     I*------------------------------------------------------
+     I           UDS
+     I                                        1   1 W#AREA
+     I                                        2   70W#YYMM
+     I                                        2   50R#YY
+     I                                        6   70R#MM
+     I*
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C           W#AREA    LOKUPTAB1      TAB1R          69
+     C   69                MOVELTAB1R     R#AREA
+     C*
+8901 C                     Z-ADD0         W#AMTD
+     C                     SETON                     66    首頁表頭
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2清除函式換訂單
+     C*********************************
+     CSR         L2CLR     BEGSR
+     C                     CLEARAR080T1S
+     C                     Z-ADD0         W#ITEM  40       明細筆數
+8901 C                     Z-ADD0         W#AMTD
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式換發票
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     CLEARAR080T1D
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     ADD  TXAMT     R#AMTB
+     CSR         ESDTL     ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  發票明細
+     C*********************************
+     CSR         L1SR      BEGSR
+     C           TXIVNO    CHAININREC                69
+     C   69                Z-ADD0         R#AMTA
+     C  N69                Z-ADDINAAMT    R#AMTA           出貨金額
+     C           R#AMTA    SUB  R#AMTB    R#AMTC           差額
+8909 C*差額一旦大於十, 需重新檢核.以防止人工開立跨月銷貨
+ .   C           R#AMTC    IFLT -10
+ .   C           R#AMTC    ORGT 10
+ .   C           R#AMTC    ANDNE0
+ .   C*
+ .   C           TXIVNO    SETLLTXRECL                      TRNDTLL2
+ .   C                     READ TXRECL                   40
+ .   C                     Z-ADD0         W#AMTF 120
+ .   C           *IN40     DOWEQ*OFF
+ .   C*
+ .   C           TXIVNO    IFNE F#IVNO                     發票號碼
+ .   C                     LEAVE
+ .   C                     ENDIF
+ .   C*
+ .   C           INKIND    IFEQ '2'                        二聯式
+ .   C           D#CUNO    ANDNE'E'                        外銷客戶
+ .   C           F#AMT     MULT 1.05      F#AMT     H
+ .   C                     ENDIF
+ .   C*
+ .   C                     ADD  F#AMT     W#AMTF           出貨金額
+ .   C*
+ .   C                     READ TXRECL                   40
+ .   C                     ENDDO
+ .   C*
+ .   C                     MOVELINCUNO    D#CUNO  1
+ .   C*
+ .   C                     Z-ADDW#AMTF    R#AMTB
+ .   C           R#AMTA    SUB  W#AMTF    R#AMTC           差額
+ .   C*
+ .   C                     ENDIF
+ .   C*
+     C           R#AMTC    IFNE 0                          有差額才印
+     C* 8901 TRNDTL -> INVMST
+8901 C                     MOVELINCUNO    R#CUNO           客戶編號
+ .   C                     MOVELINCUNM    R#CUNM           客戶名稱
+ .   C                     MOVELINORNO    R#ORNO           訂單編號
+     C                     MOVELTXIVNO    R#INNO           發票編號
+     C   66                WRITEAR080T1H
+     C   66                SETOF                     66
+8901 C           R#AMTB    IFEQ 0
+  .  C                     MOVEL'原訂單'R#MARK
+  .  C                     MOVELTXORNO    R#ORN1
+  .  C                     ADD  R#AMTA    W#AMTD  90
+  .  C                     ADD  R#AMTA    W#AMTE  90
+  .  C                     ELSE
+  .  C                     MOVE *BLANK    R#MARK
+  .  C                     ENDIF
+     C                     WRITEAR080T1D
+     C*
+     C                     ADD  1         W#ITEM           累計筆數
+     C                     ADD  R#AMTA    R#SAMA           小計金額
+     C                     ADD  R#AMTB    R#SAMB
+     C                     ADD  R#AMTC    R#SAMC
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2 函式  訂單小計
+     C*********************************
+     CSR         L2SR      BEGSR
+     C           W#ITEM    IFGT 0
+     C   66                WRITEAR080T1H
+     C   66                SETOF                     66
+8901 C           W#AMTD    IFGT 0
+  .  C                     MOVEL'原訂單'R#MAR1
+  .  C                     Z-ADDW#AMTD    R#AMTD
+  .  C                     ELSE
+  .  C                     MOVE *BLANK    R#MAR1
+8901 C                     Z-ADD0         W#AMTD
+8901 C                     Z-ADD0         R#AMTD
+  .  C                     ENDIF
+     C                     WRITEAR080T1S
+     C*
+     C                     ADD  R#SAMA    R#TAMA           合計金額
+     C                     ADD  R#SAMB    R#TAMB
+     C                     ADD  R#SAMC    R#TAMC
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式 （印出合計）
+     C*********************************
+     CSR         LRSR      BEGSR
+     C   66                WRITEAR080T1H
+     C   66                SETOF                     66
+8901 C           W#AMTE    IFGT 0
+  .  C                     MOVEL'原訂單'R#MAR2
+  .  C                     Z-ADDW#AMTE    R#AMTE
+  .  C                     ENDIF
+     C                     WRITEAR080T1T
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     EXSR INISR
+     C                     WRITEAR080T1H
+     C                     WRITEAR080T1M
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  子函式集
+     C*********************************
+     C*****************************************************************
+** TAB1
+ 全公司
+P台北
+M台中
+T桃園
+H苗栗
+K高雄
+

@@ -1,0 +1,424 @@
+        /******************************************************/
+        /*                                                    */
+        /*        >>   PROGRAM INTRODUCTION  <<               */
+        /*        1.PROGRAM-ID     ARR098P                    */
+        /*        2.PROGRAM-TYPE   CLP                        */
+        /*        3.AUTHOR         S02CSF                     */
+        /*        4.FUNCTION      自製出貨明細表            */
+        /*        5.DATE-WRITTEN   91/09/16                   */
+        /*        6.DATE-MODIFY                               */
+        /*                                                    */
+        /******************************************************/
+            PGM
+            DCLF       FILE(ARR098S)
+            DCL        VAR(&YYMMDD) TYPE(*CHAR) LEN(8)
+            DCL        VAR(&YYMD1)  TYPE(*CHAR) LEN(8)
+            DCL        VAR(&DATE)   TYPE(*CHAR) LEN(8)
+            DCL        VAR(&MONS)   TYPE(*CHAR) LEN(2)
+            DCL        VAR(&MONE)   TYPE(*CHAR) LEN(2)
+            DCL        VAR(&YARS)   TYPE(*CHAR) LEN(4)
+            DCL        VAR(&YARE)   TYPE(*CHAR) LEN(4)
+            DCL        VAR(&DAYS)   TYPE(*CHAR) LEN(2)
+            DCL        VAR(&DAYE)   TYPE(*CHAR) LEN(2)
+            DCL        VAR(&MMF)    TYPE(*CHAR) LEN(2)
+            DCL        VAR(&MMT)    TYPE(*CHAR) LEN(2)
+            DCL        VAR(&MM1)    TYPE(*DEC)  LEN(2 0)
+            DCL        VAR(&MM2)    TYPE(*DEC)  LEN(2 0)
+            DCL        VAR(&M1)     TYPE(*CHAR) LEN(2)
+            DCL        VAR(&Y)      TYPE(*CHAR) LEN(4)
+            DCL        VAR(&AREA)   TYPE(*CHAR) LEN(1)
+            DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+            DCL        VAR(&TYPE)   TYPE(*CHAR) LEN(1)
+            DCL        VAR(&DSPID)  TYPE(*CHAR) LEN(10)
+            DCL        VAR(&C_PDNS) TYPE(*CHAR) LEN(3)
+            DCL        VAR(&C_PDNE) TYPE(*CHAR) LEN(3)
+            DCL        VAR(&C_DATS) TYPE(*CHAR) LEN(8)
+            DCL        VAR(&C_DATE) TYPE(*CHAR) LEN(8)
+            DCL        VAR(&ARES)   TYPE(*CHAR) LEN(1)
+            DCL        VAR(&AREE)   TYPE(*CHAR) LEN(1)
+            DCL        VAR(&CUTYD)  TYPE(*CHAR) LEN(1)
+            DCL        VAR(&CUTYE)  TYPE(*CHAR) LEN(1)
+            DCL        VAR(&YMS)    TYPE(*CHAR) LEN(6)
+
+            RTVJOBA    JOB(&S#DEVN) USER(&S#USER) OUTQ(&OUTQ) +
+                       TYPE(&TYPE)
+            IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+    /*      RTVDTAARA  DTAARA(*LDA (1011 10))   RTNVAR(&S#DEVN) */
+    /*      RTVDTAARA  DTAARA(*LDA (1021 1))    RTNVAR(&AREA)  */
+            CHGDTAARA  DTAARA(*LDA (1011 10))   VALUE(&S#DEVN)
+            CHGDTAARA  DTAARA(*LDA (500 10))    VALUE(&DSPID)
+            RTVDTAARA  DTAARA(*LDA (1021 1))    RTNVAR(&S#AREA)
+
+    /*      CHGVAR     VAR(&S#AREA) VALUE('T')   */
+            CHGVAR     VAR(&S#PDNM) VALUE('2')
+            CHGVAR     VAR(&S#OPT ) VALUE('Y')
+
+ START:     SNDRCVF
+
+            IF         COND(&IN03 *EQ '1') THEN(RETURN)
+            IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+            CHGVAR     VAR(&IN25)   VALUE('0')
+            CHGVAR     VAR(&IN26)   VALUE('0')
+            CHGVAR     VAR(&IN27)   VALUE('0')
+            CHGVAR     VAR(&IN28)   VALUE('0')
+            CHGVAR     VAR(&IN29)   VALUE('0')
+            CHGVAR     VAR(&S#ERR)  VALUE(' ')
+
+/*CKECK 廠區代號*/
+
+            IF         COND((&S#AREA  *NE 'K')  *AND     +
+                            (&S#AREA  *NE 'T')  *AND     +
+                            (&S#AREA  *NE 'M')  *AND     +
+                            (&S#AREA  *NE 'L')  *AND     +
+                            (&S#AREA  *NE 'H')  *AND     +
+                            (&S#AREA  *NE 'P')) THEN(DO)
+            CHGVAR     VAR(&IN25)   VALUE('1')
+            CHGVAR     VAR(&S#ERR)  VALUE('廠區別錯誤！')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+  /*    CHECK  起始年月　　*/
+             CHGVAR     VAR(&DATE)   VALUE(&S#YYMM)
+             CHGVAR     VAR(&MONS)   VALUE(%SST(&DATE 5 2))
+             CHGVAR     VAR(&YARS)   VALUE(%SST(&DATE 1 4))
+             CHGVAR     VAR(&DAYS)   VALUE(%SST(&DATE 7 2))
+             IF         COND((&MONS *LT '01')   *OR +
+                             (&MONS *GT '12')   *OR +
+                             (&DAYS *LT '01')   *OR +
+                             (&DAYS *GT '32')   *OR +
+                             (&YARS *LT '0001') *OR +
+                             (&YARS *GT '9999')) THEN(DO)
+             CHGVAR     VAR(&IN26)   VALUE('1')
+             CHGVAR     VAR(&S#ERR)  VALUE('起始年月日錯誤!')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+       /*    CHECK   終止年月   */
+             CHGVAR     VAR(&DATE)   VALUE(&S#YYM1)
+             CHGVAR     VAR(&MONE)   VALUE(%SST(&DATE 5 2))
+             CHGVAR     VAR(&YARE)   VALUE(%SST(&DATE 1 4))
+             CHGVAR     VAR(&DAYE)   VALUE(%SST(&DATE 7 2))
+             IF         COND((&MONE *LT '01')   *OR +
+                             (&MONE *GT '12')   *OR +
+                             (&DAYE *LT '01')   *OR +
+                             (&DAYE *GT '32')   *OR +
+                             (&YARE *LT '0001') *OR +
+                             (&YARE *GT '9999')) THEN(DO)
+             CHGVAR     VAR(&IN27)   VALUE('1')
+             CHGVAR     VAR(&S#ERR)  VALUE('終止年月日錯誤!')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+       /*    CHECK   起迄年月　　*/
+             IF         COND(&S#YYMM *GT &S#YYM1) THEN(DO)
+             CHGVAR     VAR(&IN26)   VALUE('1')
+             CHGVAR     VAR(&IN27)   VALUE('1')
+             CHGVAR     VAR(&S#ERR)  VALUE('起始年月不得大於終止年!')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+            IF         COND(&S#YYMM *EQ 0   ) THEN(DO)
+            CHGVAR     VAR(&IN26)   VALUE('1')
+            CHGVAR     VAR(&S#ERR)  VALUE('年月日不可空白')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+            IF         COND(&S#YYM1 *EQ 0   ) THEN(DO)
+            CHGVAR     VAR(&IN27)   VALUE('1')
+            CHGVAR     VAR(&S#ERR)  VALUE('年月日不可空白')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+  /*    CHECK 品名　*/
+            IF         COND((&S#PDNM *NE ' '  )  *AND +
+                            (&S#PDNM *NE '2'  )  *AND +
+                            (&S#PDNM *NE '3'  )  *AND +
+                            (&S#PDNM *NE '4'  )  *AND +
+                            (&S#PDNM *NE '5'  )  *AND +
+                            (&S#PDNM *NE '6'  )  *AND +
+                            (&S#PDNM *NE '9'  )) THEN(DO)
+            CHGVAR     VAR(&IN28)    VALUE('1')
+            CHGVAR     VAR(&S#ERR)   VALUE('類別輸入錯誤!!!')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+            IF         COND(&S#PDNM *EQ '2'    ) THEN(DO)
+            CHGVAR     VAR(&C_PDNS)  VALUE('100')
+            CHGVAR     VAR(&C_PDNE)  VALUE('299')
+            ENDDO
+
+            IF         COND(&S#PDNM *EQ '3'    ) THEN(DO)
+            CHGVAR     VAR(&C_PDNS)  VALUE('3A0')
+            CHGVAR     VAR(&C_PDNE)  VALUE('399')
+            ENDDO
+
+            IF         COND(&S#PDNM *EQ '4'    ) THEN(DO)
+            CHGVAR     VAR(&C_PDNS)  VALUE('400')
+            CHGVAR     VAR(&C_PDNE)  VALUE('499')
+            ENDDO
+
+            IF         COND(&S#PDNM *EQ '5'    ) THEN(DO)
+            CHGVAR     VAR(&C_PDNS)  VALUE('500')
+            CHGVAR     VAR(&C_PDNE)  VALUE('599')
+            ENDDO
+
+            IF         COND(&S#PDNM *EQ '6'    ) THEN(DO)
+            CHGVAR     VAR(&C_PDNS)  VALUE('600')
+            CHGVAR     VAR(&C_PDNE)  VALUE('699')
+            ENDDO
+
+            IF         COND(&S#PDNM *EQ '9'    ) THEN(DO)
+            CHGVAR     VAR(&C_PDNS)  VALUE('900')
+            CHGVAR     VAR(&C_PDNE)  VALUE('999')
+            ENDDO
+
+            IF         COND(&S#PDNM *EQ ' '    ) THEN(DO)
+            CHGVAR     VAR(&C_PDNS)  VALUE('100')
+            CHGVAR     VAR(&C_PDNE)  VALUE('999')
+            ENDDO
+
+   /*CKECK 列印欄*/
+
+            IF         COND(&S#OPT   *EQ ' ') THEN(DO)
+            CHGVAR     VAR(&IN29)   VALUE('1')
+            CHGVAR     VAR(&S#ERR)  VALUE('列印欄不可空白')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+   /*CKECK 內外銷*/
+
+            IF         COND(&S#CUTY  *EQ ' ') THEN(DO)
+            CHGVAR     VAR(&IN30)   VALUE('1')
+            CHGVAR     VAR(&S#ERR)  VALUE('內外銷別不可空白')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+             /* MOVE Screen Field */
+             CHGDTAARA  DTAARA(*LDA (410 1))   VALUE(&S#AREA)
+             CHGVAR     VAR(&YYMMDD)  VALUE(&S#YYMM)
+             CHGVAR     VAR(&YYMD1)  VALUE(&S#YYM1)
+             CHGDTAARA  DTAARA(*LDA (411 8))   VALUE(&YYMMDD)
+             CHGDTAARA  DTAARA(*LDA (419 8))   VALUE(&YYMD1)
+             CHGDTAARA  DTAARA(*LDA (427 3))   VALUE(&C_PDNS)
+             CHGDTAARA  DTAARA(*LDA (430 3))   VALUE(&C_PDNE)
+             CHGDTAARA  DTAARA(*LDA (433 1))   VALUE(&S#OPT)
+             CHGDTAARA  DTAARA(*LDA (434 1))   VALUE(&S#CUTY)
+
+            SBMJOB     CMD(CALL PGM(ARR098P)) JOB(ARR098P) +
+                       JOBD(ARJOBD)
+            SNDBRKMSG  MSG('<<自製出貨明細表已開始處理 +
+                           ,請稍待.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+            RETURN
+
+ BATCH:      RTVDTAARA  DTAARA(*LDA (410 1))   RTNVAR(&S#AREA)
+             RTVDTAARA  DTAARA(*LDA (411 8))   RTNVAR(&YYMMDD)
+             RTVDTAARA  DTAARA(*LDA (419 8))   RTNVAR(&YYMD1)
+             RTVDTAARA  DTAARA(*LDA (415 2))   RTNVAR(&MMF)
+             RTVDTAARA  DTAARA(*LDA (423 2))   RTNVAR(&MMT)
+             RTVDTAARA  DTAARA(*LDA (411 4))   RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (411 8))   RTNVAR(&C_DATS)
+             RTVDTAARA  DTAARA(*LDA (419 8))   RTNVAR(&C_DATE)
+             RTVDTAARA  DTAARA(*LDA (427 3))   RTNVAR(&C_PDNS)
+             RTVDTAARA  DTAARA(*LDA (430 3))   RTNVAR(&C_PDNE)
+             RTVDTAARA  DTAARA(*LDA (1021 1))  RTNVAR(&AREA)
+             RTVDTAARA  DTAARA(*LDA (433 1))   RTNVAR(&S#OPT)
+             RTVDTAARA  DTAARA(*LDA (434 1))   RTNVAR(&S#CUTY)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVN)
+
+             CHGVAR     VAR(&MM1) VALUE(&MMF)
+             CHGVAR     VAR(&MM2) VALUE(&MMT)
+             CHGVAR     VAR(&YMS) VALUE(&Y || &MMF)
+             CHGVAR     VAR(&M1) VALUE(&MM1)
+
+             ADDLIBLE ACLIB
+             MONMSG   MSGID(CPF0000)
+
+
+             IF         COND((&AREA *NE 'T')  *AND   +
+                             (&AREA *NE 'H')) THEN(DO)
+             CPYF       FROMFILE(DALIB/ACVR) TOFILE(QTEMP/TRANBU) +
+                        MBROPT(*REPLACE) CRTFILE(*YES)            +
+                        INCREL((*IF  ACYM   *EQ &YMS))
+             ENDDO
+             ELSE (DO)
+             CPYF       FROMFILE(DALIB/ACVR) TOFILE(QTEMP/TRANBU) +
+                        MBROPT(*REPLACE) CRTFILE(*YES)            +
+                        INCREL((*IF  ACYM   *EQ &YMS))
+             ENDDO
+ AGAIN:
+             CHGVAR     VAR(&MM1) VALUE(&MM1 + 1)
+             CHGVAR     VAR(&M1) VALUE(&MM1)
+             CHGVAR     VAR(&YMS) VALUE(&Y || &M1)
+             IF         COND(&MM1 *LE &MM2) THEN(DO)
+             IF         COND((&AREA *NE 'T')  *AND +
+                             (&AREA *NE 'H')) THEN(DO)
+             CPYF       FROMFILE(DALIB/ACVR) TOFILE(QTEMP/TRANBU) +
+                        MBROPT(*ADD) CRTFILE(*NO)                 +
+                        INCREL((*IF  ACYM   *EQ &YMS))
+             ENDDO
+             ELSE (DO)
+             CPYF       FROMFILE(DALIB/ACVR) TOFILE(QTEMP/TRANBU) +
+                        MBROPT(*ADD) CRTFILE(*NO)                  +
+                        INCREL((*IF  ACYM   *EQ &YMS))
+             ENDDO
+             GOTO       CMDLBL(AGAIN)
+             ENDDO
+
+ /*廠區別*/
+            IF         COND(&S#AREA *EQ ' '    ) THEN(DO)
+            CHGVAR     VAR(&ARES)    VALUE(' ')
+            CHGVAR     VAR(&AREE)    VALUE('9')
+            ENDDO
+            ELSE (DO)
+            CHGVAR     VAR(&ARES)    VALUE(&S#AREA)
+            CHGVAR     VAR(&AREE)    VALUE(&S#AREA)
+            ENDDO
+
+ /*內外銷*/
+            IF         COND(&S#CUTY *EQ '1'    ) THEN(DO)
+            CHGVAR     VAR(&CUTYD)   VALUE('D')
+            CHGVAR     VAR(&CUTYE)   VALUE('D')
+            ENDDO
+            IF         COND(&S#CUTY *EQ '2'    ) THEN(DO)
+            CHGVAR     VAR(&CUTYD)   VALUE('E')
+            CHGVAR     VAR(&CUTYE)   VALUE('E')
+            ENDDO
+            IF         COND(&S#CUTY *EQ '3'    ) THEN(DO)
+            CHGVAR     VAR(&CUTYD)   VALUE('D')
+            CHGVAR     VAR(&CUTYE)   VALUE('E')
+            ENDDO
+
+            /*      開始處理       */
+            /*    　寫入AC255PF    */
+            CLRPFM     AC255PF
+            OVRDBF     FILE(ACTRAN) TOFILE(QTEMP/TRANBU) SHARE(*YES)
+            IF         COND(&S#CUTY *EQ '3')  THEN(DO)
+                       OPNQRYF FILE((ACTRAN)) QRYSLT('         +
+                       ((ACNO   *EQ "4111" )            *OR +
+                        (ACNO   *EQ "4114" )            *OR +
+                        (ACNO   *EQ "4112" )            *OR +
+                        (ACNO   *EQ "4115" )            *OR +
+                        (ACNO   *EQ "4113" )            *OR +
+                        (ACNO   *EQ "4116" ))             *AND +
+                       (YMD    *GE "' || &C_DATS || '")   *AND +
+                       (YMD    *LE "' || &C_DATE || '")   *AND +
+                       (ACCARD *GE "' || &ARES || '")     *AND +
+                       (ACCARD *LE "' || &AREE || '")     *AND +
+                       (%SST(ACVRNO 1 1) *NE "X")')            +
+                       MAPFLD((YMD ACYMD *CHAR 8))             +
+                       KEYFLD((ACCARD) (ACDSC1))
+                       ENDDO
+            IF         COND(&S#CUTY *EQ '1')  THEN(DO)
+                       OPNQRYF FILE((ACTRAN)) QRYSLT('         +
+                       ((ACNO *EQ "4111")                *OR +
+                        (ACNO *EQ "4112")                *OR +
+                        (ACNO *EQ "4113"))                *AND +
+                       (YMD    *GE "' || &C_DATS || '")   *AND +
+                       (YMD    *LE "' || &C_DATE || '")   *AND +
+                       (ACCARD *GE "' || &ARES || '")     *AND +
+                       (ACCARD *LE "' || &AREE || '")     *AND +
+                       (%SST(ACVRNO 1 1) *NE "X")')            +
+                       MAPFLD((YMD ACYMD *CHAR 8))             +
+                       KEYFLD((ACCARD) (ACDSC1))
+                       ENDDO
+            IF         COND(&S#CUTY *EQ '2')  THEN(DO)
+                       OPNQRYF FILE((ACTRAN)) QRYSLT('         +
+                       ((ACNO *EQ "4114")                *OR +
+                        (ACNO *EQ "4115")                *OR +
+                        (ACNO *EQ "4116"))                *AND +
+                       (YMD    *GE "' || &C_DATS || '")   *AND +
+                       (YMD    *LE "' || &C_DATE || '")   *AND +
+                       (ACCARD *GE "' || &ARES || '")     *AND +
+                       (ACCARD *LE "' || &AREE || '")     *AND +
+                       (%SST(ACVRNO 1 1) *NE "X")')            +
+                       MAPFLD((YMD ACYMD *CHAR 8))             +
+                       KEYFLD((ACCARD) (ACDSC1))
+                       ENDDO
+            CALL       ACP255R
+            CLOF       OPNID(ACTRAN)
+            DLTOVR     *ALL
+
+            /* 依據ACR255PF,寫入ARR098F1    */
+            CLRPFM     ARR098F1
+
+            OVRDBF     FILE(AC255PF) TOFILE(DALIB/AC255PF) SHARE(*YES)
+            OVRDBF     FILE(ACPROD)  TOFILE(ACPROD)
+            OPNQRYF    FILE(AC255PF) QRYSLT('+
+                       (A1PRNO *GE "' || &C_PDNS || '") *AND +
+                       (A1PRNO *LE "' || &C_PDNE || '")') +
+                       KEYFLD((A1PRNO))
+            CALL       PGM(ARR098R1)
+            CLOF       OPNID(AC255PF)
+            DLTOVR     FILE(*ALL)
+
+            DLTF       FILE(QTEMP/TRANBU)
+
+            /* 依據ARR089P,WRITE ARR098F1    */
+            OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+            OVRDBF     FILE(WTMASP) TOFILE(DALIB/WTMASP)
+            OPNQRYF    FILE(TRNDTL) QRYSLT('+
+                       (TXCODE *EQ "SA04") *AND +
+                       (AREA *EQ "' || &S#AREA || '") *AND +
+                       (ENTD *GE "' || &C_DATS || '") *AND +
+                       (ENTD *LE "' || &C_DATE || '") *AND +
+                       (%SST(TXCUNO 1 1) *GE "' || &CUTYD || '") *AND +
+                       (%SST(TXCUNO 1 1) *LE "' || &CUTYE || '") *AND +
+                       (TXPDNM *GE "' || &C_PDNS || '") *AND +
+                       (TXPDNM *LE "' || &C_PDNE || '")') +
+                       KEYFLD((TXPDNM) (TXDATE) (TXNO)) +
+                       MAPFLD((ENTD TXACDT *CHAR 8) +
+                              (AREA '%SST(TXNO 1 1)' *CHAR 1))
+            CALL       PGM(ARR098R2)
+            CLOF       OPNID(TRNDTL)
+            DLTOVR     FILE(*ALL)
+
+            OVRDBF     FILE(ARR098FY) TOFILE(ARR098F1)
+            OVRDBF     FILE(ARR098F1) TOFILE(ARR098F1) SHARE(*YES)
+            OPNQRYF    FILE(ARR098F1) OPTION(*ALL) QRYSLT('+
+                       (F1CODE *EQ "1")')     +
+                       KEYFLD((F1CODE) (F1PDNM) )
+            CALL       PGM(ARR098R3)
+            CLOF       OPNID(ARR098F1)
+            DLTOVR     FILE(*ALL)
+
+            OVRPRTF    FILE(ARR098T) TOFILE(ARLIB/ARR098T) +
+                       PAGESIZE(*N 198)  CPI(15) HOLD(*YES) +
+                       USRDTA('自製出貨')
+            OVRDBF     FILE(ARR098F1) TOFILE(ARR098F1) +
+                       SHARE(*YES)
+            IF         COND(&S#OPT  *EQ 'N') THEN( +
+            OPNQRYF    FILE(ARR098F1) QRYSLT(' +
+                       (F1CODE  *EQ "3")    *AND +
+                       ((F1QTY4  *NE  0 )    *OR +
+                        (F1AMT4  *NE  0 )    *OR +
+                        (F1QTY2  *NE  0 )    *OR +
+                        (F1AMT2  *NE  0 )    *OR +
+                        (F1AMT3  *NE  0 )    *OR +
+                        (F1QTY   *NE  0 )    *OR +
+                        (F1AMT   *NE  0 ))') +
+                       MAPFLD((F1AREA '%SST(F1PDNM 1 1)')) +
+                       KEYFLD((F1CODE) (F1AREA) (F1PDN1)))
+            ELSE       CMD( +
+            OPNQRYF    FILE(ARR098F1) QRYSLT(' +
+                       (F1QTY4  *NE  0 )    *OR  +
+                       (F1AMT4  *NE  0 )    *OR  +
+                       (F1QTY2  *NE  0 )    *OR  +
+                       (F1AMT2  *NE  0 )    *OR  +
+                       (F1AMT3  *NE  0 )    *OR  +
+                       (F1QTY   *NE  0 )    *OR  +
+                       (F1AMT   *NE  0 )') +
+                       MAPFLD((F1AREA '%SST(F1PDNM 1 1)')) +
+                       KEYFLD((F1CODE) (F1AREA) (F1PDN1)))
+
+            CALL       PGM(ARR098R4)
+            CLOF       OPNID(ARR098F1)
+            DLTOVR     FILE(*ALL)
+
+            SNDBRKMSG  MSG('<< 自製出貨明細表已處理完成, +
+                               請列印.......>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+            ENDPGM
+

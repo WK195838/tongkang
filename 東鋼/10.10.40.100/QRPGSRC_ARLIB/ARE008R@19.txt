@@ -1,0 +1,908 @@
+     H*****************************************************************
+     H*
+     H*            UPDATE  DATE  98/05/07 2009AR306 S00WCJ(9805A)
+     H*                          98/06/19 2009AR327 S00WCJ(9806A)
+     H*                          98/12/16 2009AR396 S00WCJ (9812A)
+     H*                          99/08/23 2010AR517 S00WCJ (9908A)
+     H*                         101/03/15 S00WCJ (0103A)
+     H*                          凰英反應入帳日期須大於傳票代開日
+     H*                         101/04/02 S00WCJ (0104A)
+     H*                          凰英反應將前次修改還原
+     H*                         102/10/29 S00WCJ (0210A)
+     H*                          磅單日期小於990101排除
+     H*                         103/10/09 2014AR876 S00WCJ (0310A)
+     H*                          磅差一正一負調整後，USER於發票欄位
+     H*                          第一碼上@後，存檔直接上0000000000
+     H*                          避免資料列入未開立發票
+     H*                         103/10/17 S00WCJ (0310B)
+     H*                          外銷訂單做磅差調整，須可上#
+     H*                         104/09/18 2015AR953 S00WCJ (0409A)
+     H*                          產品代碼3碼擴5碼
+     H*                         104/11/09 S00WCJ (0411A)
+     H*                          磅單日期小於990101排除後仍出現87
+     H*                          年之資料
+     H*                         105/03/01 S00WCJ (0503A)
+     H*                          磅單日期小於1030101排除
+     H*                         108/08/20 2019AR00057 S00WCJ (0808A)
+     H*                          配合磅單過至項次修改
+     H*                         108/10/30 S00WCJ (0810A)
+     H*                          RRN由20項由為60項
+     H*                         108/11/18 S00WCJ (0811A)
+     H*                          USER一正一負調整之資料非一筆完成時，
+     H*                         若跨月調整，發票號碼後四碼須寫入帳年
+     H*                         月，例如：U1180984
+     H*                         109/01/14 2019AR00079 S00WCJ (0901A)
+     H*                         新增磅單調整功能鍵，並開放USER自行
+     H*                         輸入之資料可修改及檢核單價不可小於0
+     H*                         109/03/17 S00WCJ (0903A)
+     H*                         修正外銷磅單無法調整之檢核BUG
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARE008S CF  E                    WORKSTN
+     F                                        RRN   KSFILE SF1
+     FTRNDTL  UF  E           K        DISK                      A
+     FSAMAST  IF  E           K        DISK
+     FHIPROD  IF  E           K        DISK
+0901AFARE008F UF  E           K        DISK
+     E*************************************************************
+0808AE                    ERR     1  30 70
+     I*************************************************************
+     IAADS        DS
+     I                                        1   6 W1CUNO
+     I                                        1   1 S1KIND
+     I                                        2   2 S1CUN1
+     I                                        3   5 S1CUN2
+9008 I                                        6  10 S1BK05
+9008 I                                        6   6 S1CD01
+9008 I                                        7   7 S1CD02
+9008 I                                        8   8 S1CD03
+9008 I                                        9   9 S1CD04
+9008 I                                       10  10 S1CD05
+LYW  I                                       11  19 KORNO
+ .   I                                       11  11 KORNO1
+ .   I                                       12  160KORNO2
+ .   I                                       17  190KORNO4
+     I                                       31  40 TXIVNO
+     I                                       31  31 TXIVN1
+0901AI                                       32  32 TXIVN2
+0811AI                                       37  40 TXIVN4
+CLJ  I            DS
+0409AI                                        1  30 TXRESV
+     I                                       10  10 D#TXRV
+0808AI                                       13  14 D#VRTM
+0808AI                                       19  21 D#PDS1
+0901AI                                       22  22 D#USYN
+9711 I            DS
+ .   I                                        1   6 CUNO
+9711 I                                        1   1 D#CUN1
+     I            DS
+9008 I                                        1   9 ORNO
+LYW  I                                        1   1 D#ORN1
+ .   I                                        2   2 D#ORN2
+ .   I                                        3   6 D#ORN3
+ .   I                                        7   9 D#ORN4
+9207 I            DS
+9207 I                                        1   80D#DATE
+9207 I                                        3   60D#YYMM
+0811AI            DS
+0811AI                                        1   80DATE
+0811AI                                        1   60D#SDYM
+0811AI            DS
+0811AI                                        1   80ACDT
+0811AI                                        1   60D#SAYM
+0811AI                                        3   60D1SAYM
+0811AI            DS
+0811AI                                        1   80U#SYSD
+0811AI                                        1   60D#USYM
+     I           UDS
+CLJ  I                                        1   1 U#PASS
+     I                                      951 985 COMP
+     I                                     10011001 D#USID
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C**************************************************************
+     C           TXKEY     KLIST
+     C                     KFLD           TXCODE
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+     C           TX1KEY    KLIST
+     C                     KFLD           TXCODE
+     C                     KFLD           TXNO
+     C           SAKEY     KLIST
+     C                     KFLD           KORNO1
+     C                     KFLD           KORNO2
+     C                     KFLD           KORNO4
+0901AC           KEY01     KLIST
+0901AC                     KFLD           TXNO
+0901AC                     KFLD           TXITEM
+     C*
+     C           *ENTRY    PLIST
+     C                     PARM           TDATE   8
+     C**************************************************************
+     C  N90                MOVE TDATE     EDATE   80
+0811AC  N90                Z-ADD0         DATE
+0811AC  N90                Z-ADD0         ACDT
+     C  N90                MOVE '1'       SCRN    1
+     C  N90                MOVE '1'       *IN,90
+0808AC           *DATE     SUB  19000000  U#SYSD  80
+9004 C           D#USID    IFNE 'B'
+ .   C           D#USID    ANDNE'S'
+ .   C           D#USID    ANDNE'T'
+ .   C                     MOVE *ON       *IN43
+ .   C                     MOVE '4'       CODE
+ .   C                     ENDIF
+     C**************************************************************
+     C           *IN03     DOUEQ'1'
+     C           SCRN      CASEQ'1'       SR#01
+     C           SCRN      CASEQ'2'       SR#02
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     CSR         SR#01     BEGSR
+     C                     EXFMTTITLE
+     C   KC                EXSR KC#01
+     C                     EXSR CK#01
+0901AC                     MOVEL*BLANKS   W#IN05  1
+0901AC  N99N43   *IN05     IFEQ *ON
+0901AC           CODE      ANDEQ'2'
+0901AC                     CLOSEARE008F
+0901AC                     CALL 'ARE008PB'
+0901AC                     PARM           NO
+0901AC                     OPEN ARE008F
+0901AC                     MOVEL'Y'       W#IN05
+0901AC                     ENDIF
+     C  N99                EXSR PR#02
+     C  N99                MOVE '2'       SCRN
+     CSR         SR#01Z    ENDSR
+     C******
+     CSR         SR#02     BEGSR
+     C                     WRITEUND01
+     C                     EXFMTSFCTL1
+     C   KC                EXSR KC#01
+     C   KL                MOVE '1'       SCRN
+     C   KL                MOVE *BLANK    ERRMSG
+     C   KL                GOTO SR#02Z
+     C   KJ                EXSR KJ#02
+     C   KJ                GOTO SR#02Z
+     C           CODE      IFEQ '1'
+     C           CODE      OREQ '2'
+     C                     EXSR CK#02
+     C                     ELSE
+     C           CODE      IFEQ '4'
+     C                     MOVE '1'       SCRN
+     C                     ENDIF
+     C                     ENDIF
+     CSR         SR#02Z    ENDSR
+     C*****
+     CSR         KC#01     BEGSR
+     C                     SETON                     LR
+     C                     RETRN
+     CSR                   ENDSR
+     C****
+     CSR         KJ#02     BEGSR
+     C           CODE      IFEQ '1'
+     C           CODE      OREQ '2'
+     C                     EXSR CK#02
+     C                     ENDIF
+     C  N99                EXSR FL#02
+     C  N99                MOVE '1'       SCRN
+     CSR         KJ#02Z    ENDSR
+     C****
+     CSR         CK#01     BEGSR
+     C                     SETOF                     414299
+     C                     SETOF                     43
+     C                     MOVE *BLANK    ERRMSG
+     C                     SELEC
+     C*功能代碼不可空白
+     C           CODE      WHEQ ' '
+     C                     SETON                     4199
+     C                     MOVE ERR,1     ERRMSG
+     C*功能代碼必須為２，４
+     C           CODE      WHEQ '2'
+     C                     MOVE '更正'  MOD
+     C                     MOVE '0'       *IN72
+     C           CODE      WHEQ '4'
+     C                     MOVE '查詢'  MOD
+     C                     MOVE '1'       *IN72
+     C                     OTHER
+     C                     SETON                     4199
+     C                     MOVE ERR,2     ERRMSG
+     C                     ENDSL
+     C******
+     C*磅單號碼不可空白
+     C           NO        IFEQ *BLANK
+     C                     SETON                     4299
+     C                     MOVE ERR,3     ERRMSG
+     C                     ENDIF
+     C**
+     C           *IN99     IFEQ '0'
+     C                     MOVEL'SA04'    TXCODE
+     C                     MOVEL*BLANK    TXNO
+     C                     MOVELNO        TXNO
+     C                     Z-ADD1         TXITEM
+9801 C*
+ .   C                     MOVEL*OFF      *IN97
+ .   C           TXKEY     SETLLTRNDTL
+ .   C           *IN97     DOWEQ*OFF
+ .   C           TX1KEY    READETRNDTL              N    97
+ .   C*
+ .   C   97                LEAVE
+ .   C*
+0210AC*          TXDATE    IFLT 990101
+0503AC           TXDATE    IFLT 1030101
+ .   C                     ITER
+ .   C                     ENDIF
+ .   C                     LEAVE
+9801 C                     ENDDO
+     C*
+     C                     SELEC
+     C*該磅單號碼不存在
+     C           CODE      WHNE '1'
+     C           *IN97     ANDEQ'1'
+     C*                    SETON                     4299
+     C*                    MOVE ERR,7     ERRMSG
+9806AC                     SETON                     4299
+9806AC                     MOVE ERR,7     ERRMSG
+　 C*此張磅單若非本廠區，不可輸入磅差　
+     C           CODE      WHEQ '2'
+     C           TXTXAR    ANDNETXAR
+     C                     SETON                     4299
+     C                     MOVE ERR,17    ERRMSG
+0901AC           CODE      WHEQ '2'
+0901AC           TXIVNO    ANDNE*BLANKS
+0901AC           TXIVN2    ANDNE'0'
+0901AC           TXIVN1    ANDNE'*'
+0903AC           TXIVN1    ANDNE'#'
+0901AC                     SETON                     4299
+0901AC                     MOVELERR,28    ERRMSG
+     C**
+ 9207C*該磅單所屬的年月已關帳，不可做磅差更正
+  .  C*          CODE      WHEQ '2'
+  .  C*                    Z-ADDTXDATE    D#DATE           單據日期
+  .  C*                    MOVELD#YYMM    P#YYMM  4
+  .  C*                    MOVEL*BLANK    P#CODE  1
+  .  C*                    CALL 'ACP101R'
+  .  C*                    PARM           P#YYMM
+  .  C*                    PARM ' '       P#CODE
+  .  C*                    FREE 'ACP101R'
+  .  C*          P#CODE    IFEQ '1'
+  .  C*                    SETON                     4299
+  .  C*                    MOVE ERR,22    ERRMSG
+ 9207C*                    ENDIF
+     C**
+     C*          CODE      WHEQ '2'
+     C*          *IN97     ANDEQ'0'
+     C*          TXIVNO    ANDNE*BLANK
+     C*          TXIVN1    ANDNE'*'
+     C*                    SETON                     4299
+     C*                    MOVE ERR,6     ERRMSG
+     C                     ENDSL
+     C                     ENDIF
+     CSR         CK#01Z    ENDSR
+     C******
+     CSR         PR#02     BEGSR
+     C                     SETON                     80
+     C                     WRITESFCTL1
+     C                     SETOF                     80
+     C                     Z-ADD0         RRN     20
+     C                     MOVE *BLANK    SALE
+     C                     MOVE *BLANK    CUNO
+     C                     MOVE *BLANK    CUNM
+     C                     MOVE *BLANK    SATP
+     C                     MOVE *BLANK    IVTP
+     C                     Z-ADD0         TTLAMT
+     C                     Z-ADD0         TTLQTY
+     C**
+     C           CODE      CASEQ'1'       PR#ADD
+     C                     CAS            PR#OTH
+     C                     ENDCS
+     C*
+     C                     Z-ADD1         S#NBR1
+     CSR         PR#02Z    ENDSR
+     C******
+     C******
+     CSR         PR#ADD    BEGSR
+     CSR         PR#ADZ    ENDSR
+     C******
+     CSR         PR#OTH    BEGSR
+     C                     Z-ADDTXDATE    DATE
+     C                     MOVEL'SA04'    TXCODE
+     C                     MOVEL*BLANK    TXNO
+     C                     MOVELNO        TXNO
+     C                     Z-ADD0         TXITEM
+     C           TXKEY     SETLLTRNDTL               97
+0411AC           *IN97     DOWEQ'0'
+0411AC           TX1KEY    READETRNDTL                   97
+0411AC   97                LEAVE
+0411AC*          TXDATE    IFLT 990101
+0503AC           TXDATE    IFLT 1030101
+0411AC                     ITER
+0411AC                     ENDIF
+     C                     CLEARSF1
+     C   72                SETON                     7071
+     C                     ADD  1         RRN
+     C           RRN       IFNE TXITEM
+     C           RRN       DOWLTTXITEM
+     C                     Z-ADDRRN       ITEM
+     C                     MOVEL*IN70     HFD1
+     C                     MOVEL*IN71     HFD2
+     C                     WRITESF1
+     C                     ADD  1         RRN
+     C                     ENDDO
+     C                     ENDIF
+CLJ  C           TXVUNO    IFNE *BLANK
+0901AC           CODE      OREQ '4'
+     C                     SETON                     77    除己代開
+     C                     END                             未代可改
+0901AC           D#USYN    IFNE *BLANKS
+0901AC           CODE      OREQ '4'
+0901AC           *IN77     OREQ *ON
+     C                     SETON                     70    其他不可改
+---  C                     MOVEL'S'       HLD
+0901AC                     ENDIF
+     C                     MOVELTXIVNO    INV1    1
+     C           INV1      IFNE ' '
+     C           INV1      ANDNE'*'
+     C           INV1      ANDNE'#'
+     C                     SETON                     7170
+     C                     END
+     C                     Z-ADDTXITEM    ITEM
+     C                     MOVELTXACNT    ACNT
+     C                     MOVELTXPDNM    PDNM
+     C                     MOVELTXCUNO    CUNO
+     C                     MOVELTXCUNM    CUNM
+     C                     MOVELTXSALE    SALE
+     C                     MOVELTXSATP    SATP
+     C                     MOVELTXIVTP    IVTP
+     C                     MOVELTXRVID    RVID
+9801 C                     MOVELTXVUNO    VUNO
+     C                     Z-ADDTXQTY     QTY
+     C                     MOVELTXRESV    TPRCA   7
+     C                     SETOF                     21
+     C                     TESTN          TPRCA      21
+     C   21                MOVE TPRCA     TPRC    70
+     C   21      TPRC      DIV  100000    PRC
+     C  N21                Z-ADDTXUPRC    PRC
+     C                     Z-ADDTXAMT     AMT
+     C                     MOVELTXORNO    ORNO
+0901AC*
+0901AC           W#IN05    IFEQ 'Y'
+0901AC           KEY01     CHAINRAR008F              79
+0901AC           *IN79     IFEQ *OFF
+0901AC           F1IVNO    ANDNE*BLANKS
+0901AC                     MOVELF1IVNO    IVNO
+0901AC                     ELSE
+0901AC                     MOVELTXIVNO    IVNO
+0901AC                     ENDIF
+0901AC                     ELSE
+0901AC                     MOVELTXIVNO    IVNO
+0901AC                     ENDIF
+     C*
+0808AC                     MOVELD#VRTM    VRTM
+0808AC                     MOVELD#PDS1    PDS1
+     C                     MOVELTXFLAG    FLAG
+     C                     Z-ADDTXACDT    ACDT
+     C           TXFLAG    IFNE 'D'
+     C                     ADD  TXAMT     TTLAMT
+     C                     ADD  TXQTY     TTLQTY
+     C                     ENDIF
+     C                     MOVEL*IN70     HFD1
+     C                     MOVEL*IN71     HFD2
+     C                     WRITESF1
+0411AC*          TX1KEY    READETRNDTL                   97
+     C                     ENDDO
+     C****
+0901AC           W#IN05    IFEQ 'Y'
+0901AC           NO        SETLLRAR008F
+0901AC                     MOVEL*OFF      *IN97
+0901AC           *IN97     DOWEQ*OFF
+0901AC           NO        READERAR008F             N    97
+0901AC   97                LEAVE
+0901AC                     CLEARSF1
+0901AC                     MOVEL*ON       *IN88
+0901AC                     ADD  1         RRN
+0901AC                     Z-ADDRRN       ITEM
+0901AC                     MOVELF1ACNT    ACNT
+0901AC                     MOVELF1PDNM    PDNM
+0901AC                     MOVELF1CUNO    CUNO
+0901AC                     MOVELF1CUNM    CUNM
+0901AC                     Z-ADDF1QTY     QTY
+0901AC                     Z-ADDF1PRC     PRC
+0901AC                     Z-ADDF1AMT     AMT
+0901AC                     MOVELF1ORNO    ORNO
+0901AC                     MOVELF1IVNO    IVNO
+0901AC                     Z-ADDF1DATE    ACDT
+0901AC                     MOVELF1VRTM    VRTM
+0901AC                     MOVELF1PDS1    PDS1
+0901AC                     ADD  F1AMT     TTLAMT
+0901AC                     ADD  F1QTY     TTLQTY
+0901AC                     SETOF                     7071
+0901AC                     MOVEL*IN70     HFD1
+0901AC                     MOVEL*IN71     HFD1
+0901AC                     WRITESF1
+0901AC                     ENDDO
+0901AC                     MOVEL*BLANKS   W#IN05
+0901AC                     ENDIF
+0901AC*
+     C           CODE      IFEQ '2'
+     C                     CLEARSF1
+0810AC*          RRN       DOWLE19
+0810AC           RRN       DOWLE59
+     C                     ADD  1         RRN
+     C                     Z-ADDRRN       ITEM
+     C                     MOVEL*IN70     HFD1
+     C                     MOVEL*IN71     HFD2
+     C                     WRITESF1
+     C                     ENDDO
+     C                     ENDIF
+     C                     SETON                     10
+     CSR         PR#OTZ    ENDSR
+     C******
+     CSR         CK#02     BEGSR
+     C                     SETOF                     99
+     C                     MOVE *BLANK    ERRMSG
+     C                     Z-ADD0         TTLAMT
+     C                     Z-ADD0         TTLQTY
+0811AC                     Z-ADD0         W#AAMT 120
+     C***
+     C                     Z-ADD1         S#NBR1
+     C                     Z-ADD0         RRN
+     C                     MOVE '0'       *IN95
+     C           *IN95     DOWEQ'0'
+     C                     MOVEA'00000000'*IN,51
+     C                     MOVEA'00'      *IN,59
+0808AC                     MOVEA'00'      *IN,62
+     C                     ADD  1         RRN
+     C           RRN       CHAINSF1                  95
+     C   95                LEAVE
+     C           ACNT      IFEQ *BLANK
+     C           PDNM      ANDEQ*BLANK
+     C           FLAG      OREQ 'D'
+     C                     MOVELHFD1      *IN70
+     C                     MOVELHFD2      *IN71
+     C                     UPDATSF1
+     C                     ITER
+     C                     ENDIF
+     C***
+9801 C           VUNO      IFNE *BLANK
+ .   C                     SETON                     77    除己代開
+ .   C                     ELSE
+ .   C                     SETOF                     77    除己代開
+     C           EDATE     COMP ACDT                 57
+     C   57                SETON                     99
+     C   57                MOVELERR,16    ERRMSG
+     C   57                Z-ADDRRN       S#NBR1
+0808AC   99                GOTO ERR1
+ .   C                     END                             未代可改
+0901AC                     MOVELIVNO      INV1
+0901AC           D#USYN    IFNE *BLANKS
+0901AC           *IN77     ANDEQ*ON
+0901AC           INV1      ANDNE*BLANKS
+0901AC           INV1      ANDNE'*'
+0901AC           INV1      ANDNE'#'
+9801 C                     SETON                     70    其他不可改
+0901AC                     ENDIF
+     C***
+     C           HLD       IFEQ *BLANK
+     C                     SELEC
+     C           ACNT      WHEQ ' '
+     C                     SETON                     9951
+     C                     MOVE ERR,9     ERRMSG
+0808AC   99                GOTO ERR1
+     C           ACNT      WHNE '1'
+     C           ACNT      ANDNE'2'
+     C           ACNT      ANDNE'3'
+     C                     SETON                     9951
+     C                     MOVE ERR,10    ERRMSG
+0808AC   99                GOTO ERR1
+     C                     ENDSL
+     C***
+     C           PDNM      IFNE *BLANK
+0409AC                     MOVELPDNM      F4NAME
+0409AC           F4NAME    CHAINHIPROD               97
+CLJ  C*                                                    檢核訂單
+     C           *IN97     IFEQ '0'
+     C                     TESTN          D#ORN2     69
+     C  N69                MOVEL*ALL'0'   D#ORN2
+     C                     TESTN          D#ORN4     69
+     C  N69                MOVEL*ALL'0'   D#ORN4
+     C                     MOVELORNO      KORNO
+     C           SAKEY     CHAINSAMAST               97
+     C           *IN97     IFEQ '0'
+     C           PDNM      ANDNES1PDNO
+     C                     SETON                     97
+     C                     ENDIF
+     C                     ENDIF
+---  C*
+     C   97                SETON                     9952
+     C   97                MOVE ERR,11    ERRMSG
+0808AC   99                GOTO ERR1
+     C                     ENDIF
+     C***
+     C*          AMT       IFEQ 0
+     C*                    SETON                     9953
+     C*                    MOVELERR,14    ERRMSG
+     C*                    ENDIF
+     C***
+     C           AMT       IFNE 0
+     C           QTY       ANDNE0
+     C           PRC       ANDNE0
+     C           QTY       MULT PRC       WAMT    90H
+     C           AMT       IFNE WAMT
+     C                     SETON                     9955
+     C                     MOVELERR,20    ERRMSG
+     C                     Z-ADDRRN       S#NBR1
+0808AC   99                GOTO ERR1
+     C                     ENDIF
+     C                     ENDIF
+0310AC*
+0310AC           AMT       IFLT 0
+0310BC           D#CUN1    ANDNE'E'
+0310AC                     MOVELERR,24    ERRMSG
+0310AC                     ENDIF
+     C****
+0901AC           PRC       IFLT 0
+0901AC                     SETON                     9954
+0901AC                     MOVELERR,29    ERRMSG
+0901AC                     GOTO ERR1
+0901AC                     ENDIF
+     C*
+     C           AMT       IFEQ 0
+     C           QTY       MULT PRC       AMT       H
+     C                     ENDIF
+     C***
+     C           AMT       IFEQ 0
+     C                     SETON                     9955
+     C                     MOVELERR,14    ERRMSG
+     C                     Z-ADDRRN       S#NBR1
+0808AC   99                GOTO ERR1
+     C                     ENDIF
+     C***
+     C*                    CALL 'C01'
+     C*                    PARM           ACDT
+     C*                    PARM           FLAG1   1
+     C*                    FREE 'C01'
+     C                     MOVE *ALL'0'   P#DATE
+     C                     MOVE ACDT      P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM           FLAG1   1
+     C           FLAG1     IFNE '0'
+     C                     SETON                     9957
+     C                     MOVELERR,13    ERRMSG
+     C                     Z-ADDRRN       S#NBR1
+0808AC   99                GOTO ERR1
+     C                     ELSE
+     C           EDATE     COMP ACDT                 57
+     C   57                SETON                     99
+     C   57                MOVELERR,16    ERRMSG
+     C   57                Z-ADDRRN       S#NBR1
+0808AC   99                GOTO ERR1
+     C                     ENDIF
+     C***
+     C           ORNO      IFEQ *BLANK
+     C                     SETON                     9956
+     C                     MOVELERR,12    ERRMSG
+     C                     Z-ADDRRN       S#NBR1
+0808AC   99                GOTO ERR1
+     C                     ELSE
+     C                     MOVELORNO      KORNO
+     C           SAKEY     CHAINSAMAST               97
+     C   97                MOVELERR,8     ERRMSG
+     C   97                Z-ADDRRN       S#NBR1
+     C   97                SETON                     9956
+0808AC   99                GOTO ERR1
+     C  N97      CUNO      IFEQ *BLANK
+     C                     MOVELW1CUNO    CUNO
+     C                     MOVELS1CUNO    CUNM
+     C                     ELSE
+     C           CUNO      IFNE W1CUNO
+     C                     SETON                     9960
+     C                     MOVELERR,19    ERRMSG
+     C                     MOVE *BLANK    CUNM
+     C                     ELSE
+     C                     MOVELS1CUNO    CUNM
+     C                     ENDIF
+     C                     ENDIF
+     C  N97                MOVELS1RECV    RVID
+     C  N97                MOVELS1SND     SALE
+     C  N97                MOVELS1KIND    SATP
+     C  N97                MOVELS1CHK     IVTP
+     C                     ENDIF
+     C                     ENDIF
+     C****
+0808AC*
+0808AC           VRTM      IFEQ *BLANKS
+0808AC           PDS1      ANDEQ*BLANKS
+0808AC           VRTM      OREQ *BLANKS
+0808AC           ACDT      ANDGEU#SYSD
+0808AC*          PDS1      OREQ *BLANKS
+0808AC*          ACDT      ANDGEU#SYSD
+0808AC                     MOVELERR,25    ERRMSG
+0808AC                     Z-ADDRRN       S#NBR1
+0808AC                     SETON                     626399
+0808AC   99                GOTO ERR1
+0808AC                     ELSE
+0808AC                     MOVEL*BLANKS   W#WTCK
+0808AC           QTY       IFLE 0
+0808AC                     MOVEL'SA04'    TXCODE
+0808AC                     MOVELNO        TXNO
+0808AC                     Z-ADD0         TXITEM
+0808AC           TXKEY     SETLLTXREC
+0808AC                     MOVEL*OFF      *IN69
+0808AC           *IN69     DOWEQ*OFF
+0808AC           TX1KEY    READETXREC                    69
+0808AC   69                LEAVE
+0808AC           VRTM      IFNE D#VRTM
+0808AC           PDS1      ORNE D#PDS1
+0808AC                     ITER
+0808AC                     ENDIF
+0808AC                     MOVEL'Y'       W#WTCK  1
+0808AC                     LEAVE
+0808AC                     ENDDO
+0808AC   69      W#WTCK    IFNE 'Y'
+0808AC                     SETON                     626399
+0808AC                     MOVELERR,26    ERRMSG
+0808AC   99                GOTO ERR1
+0808AC                     ENDIF
+0808AC                     ENDIF
+0808AC                     ENDIF
+0808AC*
+     C                     ADD  AMT       TTLAMT
+     C                     ADD  QTY       TTLQTY
+     C***
+     C                     MOVELIVNO      TXIVNO
+     C           HFD2      IFEQ '0'
+     C           IVNO      ANDNE*BLANK
+     C           TXIVN1    ANDNE'*'
+     C           TXIVN1    ANDNE'#'
+0310AC           TXIVN1    ANDNE'@'
+     C                     MOVELERR,18    ERRMSG
+     C                     Z-ADDRRN       S#NBR1
+     C                     SETON                     9959
+     C                     ENDIF
+0811AC*
+0811AC           TXIVN1    IFEQ '@'
+0811AC                     ADD  AMT       W#AAMT
+0811AC                     ENDIF
+CLJ  C*
+9805AC*
+9805AC           HFD2      IFEQ '0'
+9805AC           D#CUN1    ANDEQ'E'
+9805AC           TXIVN1    ANDNE'#'
+9805AC                     MOVELERR,23    ERRMSG
+9805AC                     Z-ADDRRN       S#NBR1
+9805AC                     SETON                     9959
+9805AC                     ENDIF
+9805AC*
+     C           HFD2      IFEQ '0'
+     C           TXIVN1    ANDEQ'#'
+     C           U#PASS    ANDNE'Y'                        未通過密碼
+     C                     MOVEL'SA04'    TXCODE
+     C                     MOVELNO        TXNO
+     C                     Z-ADDRRN       TXITEM
+     C*
+9711 C                     MOVEL*OFF      *IN69
+ .   C           TXKEY     SETLLTXREC
+ .   C           *IN69     DOWEQ*OFF
+ .   C           TXKEY     READETXREC                    69
+ .   C*
+ .   C   69                LEAVE
+ .   C*
+0210AC*          TXDATE    IFLT 990101
+0503AC           TXDATE    IFLT 1030101
+ .   C                     ITER
+ .   C                     ENDIF
+ .   C                     LEAVE
+9711 C                     ENDDO
+     C*
+     C           *IN69     IFEQ '0'
+     C           TXIVN1    ANDEQ'#'                        原已註記
+     C*
+     C                     ELSE
+9711 C           D#CUN1    IFNE 'E'
+     C                     MOVELERR,21    ERRMSG
+     C                     Z-ADDRRN       S#NBR1
+     C                     SETON                     9959
+     C                     ENDIF
+     C                     ENDIF
+---  C                     ENDIF
+     C*
+0808AC           ERR1      TAG
+     C                     MOVELHFD1      *IN70
+     C                     MOVELHFD2      *IN71
+     C                     UPDATSF1
+     C***
+     C                     ENDDO
+0811AC  N99      W#AAMT    IFNE 0
+0811AC                     MOVELERR,27    ERRMSG
+0811AC                     SETON                     99
+0811AC                     ENDIF
+     C******
+     CSR         CK#02Z    ENDSR
+     C******
+     CSR         FL#02     BEGSR
+     C           CODE      CASEQ'2'       UP#02
+     C                     ENDCS
+0901AC*
+0901AC           NO        SETLLRAR008F
+0901AC                     MOVEL*OFF      *IN56
+0901AC           *IN56     DOWEQ*OFF
+0901AC           NO        READERAR008F                  56
+0901AC   56                LEAVE
+0901AC                     DELETRAR008F
+0901AC                     ENDDO
+     CSR         FL#02Z    ENDSR
+     C****
+     CSR         UP#02     BEGSR
+     C***
+     C                     Z-ADD0         RRN
+     C                     SETOF                     95
+     C           *IN95     DOWEQ'0'
+     C                     ADD  1         RRN
+     C           RRN       CHAINSF1                  95
+     C   95                LEAVE
+     C           HLD       IFNE *BLANK
+     C           HFD2      ANDEQ'1'
+     C                     ITER
+     C                     ENDIF
+     C                     MOVEL'SA04'    TXCODE
+     C                     MOVELNO        TXNO
+     C                     Z-ADDRRN       TXITEM
+     C           TXKEY     CHAINTRNDTL               96
+     C           ACNT      IFEQ *BLANK
+     C           PDNM      ANDEQ*BLANK
+     C           FLAG      OREQ 'D'
+     C   96                ITER
+     C                     MOVE 'D'       TXFLAG
+     C                     MOVE TXAR      TXTXAR
+9908AC*                    Z-ADDUDATE     TXTXDT
+9908AC           *DATE     SUB  19000000  TXTXDT
+     C                     UPDATTXREC
+     C                     ELSE
+     C  N96                EXSR UP#TX
+     C   96                EXSR WR#TX
+     C                     ENDIF
+     C***
+     C                     ENDDO
+     C***
+     CSR         UP#02Z    ENDSR
+     C***************************
+     C***  WRITE  TO  TRNDTL  ***
+     C***************************
+     CSR         WR#TX     BEGSR
+     C                     CLEARTXREC
+     C                     MOVEL'SA04'    TXCODE
+     C                     MOVELNO        TXNO
+     C                     MOVEL'A'       TXFLAG
+     C                     Z-ADDRRN       TXITEM
+     C                     MOVELACNT      TXACNT
+     C                     Z-ADDDATE      TXDATE
+     C                     Z-ADDACDT      TXACDT
+     C                     MOVELCUNO      TXCUNO
+     C                     MOVELCUNM      TXCUNM
+     C                     MOVELORNO      TXORNO
+     C                     MOVELSATP      TXSATP
+     C                     MOVELRVID      TXRVID
+     C                     MOVELSALE      TXSALE
+     C                     MOVELIVTP      TXIVTP
+     C                     MOVELPDNM      TXPDNM
+     C                     Z-ADDQTY       TXQTY
+     C                     Z-ADDPRC       TXUPRC
+     C                     Z-ADDAMT       TXAMT
+     C                     MOVELTXAR      TXTXAR
+     C                     MOVELIVNO      TXIVNO
+     C                     MOVELIVNO      IVNO1
+     C           IVNO1     IFEQ '#'
+     C                     MOVEL'Y'       TXFL02
+     C                     ENDIF
+0811AC*D#SDYM螢幕單據年月
+0811AC*D#SAYM螢幕入帳年月
+0811AC*D#USYM系統年月
+0310AC           IVNO1     IFEQ '@'
+0310AC                     MOVEL*ALL'0'   TXIVNO
+0310AC                     MOVEL'Y'       TXFL02
+0811AC           D#SDYM    IFEQ D#SAYM
+0811AC           D#SAYM    ANDNED#USYM
+0811AC                     MOVELD1SAYM    TXIVN4
+0811AC                     ENDIF
+0811AC           D#SDYM    IFNE D#SAYM
+0811AC                     MOVELD1SAYM    TXIVN4
+0811AC                     ENDIF
+0310AC                     ENDIF
+9908AC*                    Z-ADDUDATE     TXTXDT
+9908AC           *DATE     SUB  19000000  TXTXDT
+     C           PRC       MULT 100000    TPRC    70H
+     C                     MOVELTPRC      TXRESV
+CLJ  C                     MOVEL'*'       D#TXRV
+0808AC                     MOVELVRTM      D#VRTM
+0808AC                     MOVELPDS1      D#PDS1
+     C                     WRITETXREC
+     CSR         WR#TXZ    ENDSR
+     C***************************
+     C***  UPDATE TO  TRNDTL  ***
+     C***************************
+     CSR         UP#TX     BEGSR
+     C                     MOVE 'C'       TXFLAG
+     C                     MOVELACNT      TXACNT
+     C                     Z-ADDACDT      TXACDT
+     C                     MOVELORNO      TXORNO
+     C                     MOVELPDNM      TXPDNM
+     C                     MOVELIVNO      TXIVNO
+     C                     Z-ADDQTY       TXQTY
+     C                     Z-ADDPRC       TXUPRC
+     C                     Z-ADDAMT       TXAMT
+     C                     MOVELCUNO      TXCUNO
+     C                     MOVELCUNM      TXCUNM
+     C                     MOVELSATP      TXSATP
+     C                     MOVELRVID      TXRVID
+     C                     MOVELSALE      TXSALE
+     C                     MOVELIVTP      TXIVTP
+     C                     MOVELIVNO      IVNO1   1
+     C           IVNO1     IFEQ '#'
+     C                     MOVEL'Y'       TXFL02
+     C                     ENDIF
+     C           IVNO1     IFEQ ' '
+     C                     MOVEL' '       TXFL02
+     C                     ENDIF
+     C                     MOVELIVNO      TXIVNO
+0811AC*D#SDYM螢幕單據年月
+0811AC*D#SAYM螢幕入帳年月
+0811AC*D#USYM系統年月
+0310AC           IVNO1     IFEQ '@'
+0310AC                     MOVEL*ALL'0'   TXIVNO
+0310AC                     MOVEL'Y'       TXFL02
+0811AC           D#SDYM    IFEQ D#SAYM
+0811AC           D#SAYM    ANDNED#USYM
+0811AC                     MOVELD1SAYM    TXIVN4
+0811AC                     ENDIF
+0811AC           D#SDYM    IFNE D#SAYM
+0811AC                     MOVELD1SAYM    TXIVN4
+0811AC                     ENDIF
+0310AC                     ENDIF
+     C                     MOVELTXAR      TXTXAR
+9908AC*                    Z-ADDUDATE     TXTXDT
+9908AC           *DATE     SUB  19000000  TXTXDT
+     C           PRC       MULT 100000    TPRC    70H
+     C                     MOVELTPRC      TXRESV
+0808AC                     MOVELVRTM      D#VRTM
+0808AC                     MOVELPDS1      D#PDS1
+     C                     UPDATTXREC
+     CSR         UP#TXZ    ENDSR
+** ERR
+功能代碼必須輸入．
+功能代碼必須為２，４，
+磅單編號必須輸入
+此張磅單已存在
+此張磅單已開傳票，不可再刪除
+此張磅單已開發票，不可再修改
+此張磅單不存在
+訂單編號不存在
+種類必須輸入
+種類必須為１，２，３
+品名代號不存在
+訂單編號必須輸入
+入帳日期錯誤
+金額必須輸入
+數量必須輸入
+入帳日期不可比代開傳票日期還小
+此張磅單非屬本廠區，不可輸入磅差　
+發票號碼必須空白或第一碼為�陊磃衁篲�不開發票或�苤值衁磳瓣ㄥ}發票
+客戶編號與訂單所屬之客戶編號不同，請查核
+金額需等於數量も單價
+２１－＃永不開發票密碼未通過，不得註記。
+２２─該磅單所屬的年月已關帳，不可做磅差更正！
+２３─外銷訂單發票第一碼需為＃!
+24-做一正一負調整時，發票第一碼上@，表不開立發票!!
+25-磅單項次及徑度不可空白!
+26-輸入之資料與過帳之磅單資料不符!!
+27-發票第一碼上@之金額合計不為0，請檢核!!
+28-磅單已開立發票，不可修改
+29-單價不可小於0
+

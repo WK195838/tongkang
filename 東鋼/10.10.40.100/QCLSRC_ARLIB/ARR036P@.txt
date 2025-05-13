@@ -1,0 +1,63 @@
+             PGM
+             DCL        VAR(&INT) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&AREAF) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&AREAT) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&P#TXDT) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&C_TXDT) TYPE(*CHAR) LEN(6)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARR036RS) PARM(&IN03 &AREAF &AREAT &P#TXDT)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGDTAARA  DTAARA(*LDA (1 1)) VALUE(&AREAF)
+             CHGDTAARA  DTAARA(*LDA (2 1)) VALUE(&AREAT)
+             CHGDTAARA  DTAARA(*LDA (11 8)) VALUE(&P#TXDT)
+             SBMJOB     JOB(ARR036P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR036P')
+             RETURN
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (1 1))   RTNVAR(&AREAF)
+             RTVDTAARA  DTAARA(*LDA (2 1))   RTNVAR(&AREAT)
+             RTVDTAARA  DTAARA(*LDA (11 8))  RTNVAR(&P#TXDT)
+             RTVDTAARA  DTAARA(*LDA (13 6))  RTNVAR(&C_TXDT)
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE((TRNDTL)) QRYSLT('                     +
+                        (%SST(TXNO 1 1) *EQ %RANGE("' || &AREAF || '" +
+                          "' || &AREAT || '")) *AND +
+                        (TXCODE *EQ "SA04") *AND +
+                        (((TXFL02 *EQ " ") *AND +
+                          (CHAR1 *LE "' || &C_TXDT || '")) *OR +
+                         ((CHAR2 *LE "' || &C_TXDT || '") *AND +
+                          (TXIVNO *NE "          ") *AND +
+                          (TXFLAG *NE "D") *AND +
+                          (CHAR1 *GT "' || &C_TXDT || '")))') +
+                          KEYFLD((TXFL01) (TXCUNO) (TXPCNO) (TXNO)) +
+                          MAPFLD((TXPCNO '%SST(TXORNO 1 5)')        +
+                                 (TXFL01 '%SST(TXNO   1 1)') +
+                                 (CHAR1 TXACDT *CHAR 6) +
+                                 (CHAR2 TXDATE *CHAR 6))
+
+             CRTDUPOBJ  OBJ(TRNDTL) FROMLIB(DALIB) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(TRNDTLW)
+             OVRDBF     FILE(TRNDTLW) TOFILE(QTEMP/TRNDTLW) SHARE(*YES)
+             CALL       PGM(ARR036RA)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) +
+                        USRDTA('未開發票')
+             OVRDBF     FILE(TRNDTL) TOFILE(QTEMP/TRNDTLW) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        MAPFLD((TXPCNO '%SST(TXORNO 1 5)')        +
+                               (TXFL01 '%SST(TXNO   1 1)'))       +
+                        KEYFLD((TXFL01) (TXFLAG) +
+                               (TXCUNO) (TXPCNO) (TXNO))
+             CALL       PGM(ARR036R)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

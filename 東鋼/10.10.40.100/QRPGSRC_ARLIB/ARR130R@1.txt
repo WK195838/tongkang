@@ -1,0 +1,312 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR130R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     已開發票押匯狀況彙總表
+     H*          5.DATE-WRITTEN  96/11/14
+     H*          6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  IP  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FARR130T O   E             66     PRINTER
+     E*****************************************************************
+     IINREC
+     I                                              INRVIDL2
+     I                                              INCUNOL1
+     I*
+     I            DS
+     I                                        1  10 INNO
+     I                                        1   2 D#INN1
+     I                                        3  10 D#INN2
+     I*
+     I           UDS
+     I                                      301 3080D#DATE
+     I                                      317 317 D#OPT
+     C*****************************************************************
+     C*          KEY       LIST
+     C*****************************************************************
+     C           K#INVD    KLIST
+     C                     KFLD           K#IVNO 10        發票號碼
+     C                     KFLD           K#ACNT  1        類別
+     C*
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C  N90                EXSR INZ#01
+     C  N90                SETON                     90
+     C   L2                EXSR DL#L2
+     C   L1                EXSR DL#L1
+     C                     EXSR DP#01
+     CL1 90                EXSR TL#L1
+     CL2 90                EXSR TL#L2
+     CLR 90                EXSR TL#LR
+     CLRN90                EXSR MSGSR
+     C*
+     C*****************************************************************
+     CSR         INZ#01    BEGSR
+     C*****************************************************************
+     C                     CLEARAR130T1T
+     C                     MOVELD#DATE    T#DATE           截止日期
+     C                     MOVEL*ON       *IN66
+     C*
+     C           D#OPT     IFEQ '1'
+     C                     MOVEL'型鋼'  T#DPNM
+     C                     ELSE
+     C                     MOVEL'鋼筋'  T#DPNM
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         W#A3MT 120       未請款金額
+     C                     Z-ADD0         W#B3MT 120       未繳款金額
+     C                     Z-ADD0         W#C3MT 120       未繳清金額
+     C                     Z-ADD0         W#A3QT 120       未請款數量
+     C                     Z-ADD0         W#B3QT 120       未繳款數量
+     C                     Z-ADD0         W#C3QT 120       未繳清數量
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         DL#L2     BEGSR
+     C*****************************************************************
+     C                     CLEARAR130T1T
+     C*
+     C                     Z-ADD0         W#A2MT 120       未請款金額
+     C                     Z-ADD0         W#B2MT 120       未繳款金額
+     C                     Z-ADD0         W#C2MT 120       未繳清金額
+     C                     Z-ADD0         W#A2QT 120       未請款數量
+     C                     Z-ADD0         W#B2QT 120       未繳款數量
+     C                     Z-ADD0         W#C2QT 120       未繳清數量
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         DL#L1     BEGSR
+     C*****************************************************************
+     C                     CLEARAR130T1D
+     C*
+     C                     Z-ADD0         W#NBAL 110       未收餘額
+     C                     Z-ADD0         W#A1MT 110       未請款金額
+     C                     Z-ADD0         W#B1MT 110       未繳款金額
+     C                     Z-ADD0         W#C1MT 110       未繳清金額
+     C                     Z-ADD0         W#A1QT 110       未請款數量
+     C                     Z-ADD0         W#B1QT 110       未繳款數量
+     C                     Z-ADD0         W#C1QT 110       未繳清數量
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         DP#01     BEGSR
+     C*****************************************************************
+     C           D#INN1    IFEQ 'XW'
+     C           D#INN2    ANDEQ'15506009'
+     C                     MOVEL'X'       W#TEST  1
+     C                     ENDIF
+     C*
+     C           ININDT    IFLE 950101
+     C           ININDT    ANDNE0
+     C                     GOTO ENDPSR
+     C                     ENDIF
+     C*
+     C*確認發票餘額是否為零
+     C                     Z-ADD0         W#NBAL
+     C                     ADD  INAAMT    W#NBAL           出貨金額
+     C                     ADD  INATAX    W#NBAL           出貨稅額
+     C                     ADD  INBAMT    W#NBAL           預收貨款
+     C                     ADD  INCAMT    W#NBAL           折讓銷退額
+     C                     ADD  INCTAX    W#NBAL           折讓銷退稅
+     C                     ADD  INDAMT    W#NBAL           扣預收金額
+     C                     ADD  INDTAX    W#NBAL           扣預收稅額
+     C                     ADD  INEAMT    W#NBAL           繳款金額
+     C                     ADD  INFAMT    W#NBAL           退票金額
+     C*
+     C           W#NBAL    IFEQ 0
+     C                     GOTO ENDPSR
+     C                     ENDIF
+     C*
+     C           INRCDT    IFGT D#DATE
+     C           INRCDT    ANDNE0
+     C                     GOTO ENDPSR
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           INAPDT    WHEQ 0                          未請款
+     C           ININDT    ANDLTD#DATE
+     C           INAPDT    ORGT D#DATE
+     C           ININDT    ANDLTD#DATE
+     C                     EXSR SR1100
+     C           INAPDT    WHLE D#DATE
+     C           INRCDT    IFEQ 0                          已請款未繳
+     C           INRCDT    ORGT D#DATE
+     C                     EXSR SR1200
+     C                     ELSE
+     C           INRCDT    IFLE D#DATE
+     C           W#NBAL    ANDNE0
+     C                     EXSR SR1300
+     C                     ENDIF
+     C                     ENDIF
+     C           INRCDT    WHNE 0                          已繳未繳清
+     C           INRCDT    ORLE D#DATE                     繳款日期
+     C           W#NBAL    IFNE 0
+     C                     EXSR SR1300
+     C                     ENDIF
+     C                     ENDSL
+     C*
+     CSR         ENDPSR    ENDSR
+     C*****************************************************************
+     CSR         SR1100    BEGSR
+     C*****************************************************************
+     C                     MOVEL*OFF      *IN40
+     C                     MOVELINNO      K#IVNO           發票號碼
+     C                     MOVEL'1'       K#ACNT           類別
+     C                     ADD  W#NBAL    W#A1MT           未請款金額
+     C*
+     C           K#INVD    SETLLINVDTL
+     C           *IN40     DOWEQ*OFF
+     C           K#INVD    READEINVDTL                   40
+     C*
+     C   40                LEAVE
+     C*
+     C           IVDECD    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     ADD  IVQTY     W#A1QT           未請款數量
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         SR1200    BEGSR
+     C*****************************************************************
+     C                     MOVEL*OFF      *IN40
+     C                     MOVELINNO      K#IVNO           發票號碼
+     C                     MOVEL'1'       K#ACNT           類別
+     C                     ADD  W#NBAL    W#B1MT           未繳款金額
+     C*
+     C           K#INVD    SETLLINVDTL
+     C           *IN40     DOWEQ*OFF
+     C           K#INVD    READEINVDTL                   40
+     C*
+     C   40                LEAVE
+     C*
+     C           IVDECD    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     ADD  IVQTY     W#B1QT           未繳款數量
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         SR1300    BEGSR
+     C*****************************************************************
+     C                     MOVEL*OFF      *IN40
+     C                     MOVELINNO      K#IVNO           發票號碼
+     C                     MOVEL'1'       K#ACNT           類別
+     C                     ADD  W#NBAL    W#C1MT           未繳款金額
+     C*
+     C           K#INVD    SETLLINVDTL
+     C           *IN40     DOWEQ*OFF
+     C           K#INVD    READEINVDTL                   40
+     C*
+     C   40                LEAVE
+     C*
+     C           IVDECD    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     ADD  IVQTY     W#C1QT           未繳款數量
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         TL#L1     BEGSR
+     C*****************************************************************
+     C           W#A1MT    IFEQ 0
+     C           W#B1MT    ANDEQ0
+     C           W#C1MT    ANDEQ0
+     C                     GOTO ENL1SR
+     C                     ENDIF
+     C*
+     C                     MOVELINCUNO    T#CUNO           客戶代號
+     C                     MOVELINCUNM    T#CUNM           客戶簡稱
+     C                     Z-ADDW#A1MT    T#A1MT           未請款金額
+     C                     Z-ADDW#A1QT    T#A1QT           未請款數量
+     C                     Z-ADDW#B1MT    T#B1MT           未繳款金額
+     C                     Z-ADDW#B1QT    T#B1QT           未繳款數量
+     C                     Z-ADDW#C1MT    T#C1MT           未繳清金額
+     C                     Z-ADDW#C1QT    T#C1QT           未繳清數量
+     C*
+     C   66                WRITEAR130T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR130T1D
+     C*客戶小計
+     C                     ADD  T#A1MT    W#A2MT           未請款金額
+     C                     ADD  T#A1QT    W#A2QT           未請款數量
+     C                     ADD  T#B1MT    W#B2MT           未繳款金額
+     C                     ADD  T#B1QT    W#B2QT           未繳款數量
+     C                     ADD  T#C1MT    W#C2MT           未繳清金額
+     C                     ADD  T#C1QT    W#C2QT           未繳清數量
+     C*
+     CSR         ENL1SR    ENDSR
+     C*****************************************************************
+     CSR         TL#L2     BEGSR
+     C*****************************************************************
+     C           W#A2MT    IFEQ 0
+     C           W#B2MT    ANDEQ0
+     C           W#C2MT    ANDEQ0
+     C                     GOTO ENL2SR
+     C                     ENDIF
+     C*
+     C                     MOVELINRVID    T#RVID           業務別
+     C                     Z-ADDW#A2MT    T#A2MT           未請款金額
+     C                     Z-ADDW#A2QT    T#A2QT           未請款數量
+     C                     Z-ADDW#B2MT    T#B2MT           未繳款金額
+     C                     Z-ADDW#B2QT    T#B2QT           未繳款數量
+     C                     Z-ADDW#C2MT    T#C2MT           未繳清金額
+     C                     Z-ADDW#C2QT    T#C2QT           未繳清數量
+     C*
+     C   66                WRITEAR130T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR130T1T
+     C*總合計
+     C                     ADD  T#A2MT    W#A3MT           未請款金額
+     C                     ADD  T#A2QT    W#A3QT           未請款數量
+     C                     ADD  T#B2MT    W#B3MT           未繳款金額
+     C                     ADD  T#B2QT    W#B3QT           未繳款數量
+     C                     ADD  T#C2MT    W#C3MT           未繳清金額
+     C                     ADD  T#C2QT    W#C3QT           未繳清數量
+     C*
+     CSR         ENL2SR    ENDSR
+     C*****************************************************************
+     CSR         TL#LR     BEGSR
+     C*****************************************************************
+     C           W#A3MT    IFEQ 0
+     C           W#B3MT    ANDEQ0
+     C           W#C3MT    ANDEQ0
+     C                     GOTO ENLRSR
+     C                     ENDIF
+     C*
+     C                     Z-ADDW#A3MT    T#A3MT           未請款金額
+     C                     Z-ADDW#A3QT    T#A3QT           未請款數量
+     C                     Z-ADDW#B3MT    T#B3MT           未繳款金額
+     C                     Z-ADDW#B3QT    T#B3QT           未繳款數量
+     C                     Z-ADDW#C3MT    T#C3MT           未繳清金額
+     C                     Z-ADDW#C3QT    T#C3QT           未繳清數量
+     C*
+     C   66                WRITEAR130T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR130T2T
+     C*
+     CSR         ENLRSR    ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INZ#01
+     C*
+     C   66                WRITEAR130T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR130T1M
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+

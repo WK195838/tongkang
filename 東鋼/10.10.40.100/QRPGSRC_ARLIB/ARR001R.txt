@@ -1,0 +1,312 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR001RH
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ（原作者不可考）
+     H*            4.FUNCTION     請款單列印作業
+     H*            5.DATE-WRITTEN  88/02/12
+     H*                            99/08/31  2010AR517  S00WCJ (9908A)
+     H*
+     H*  <說明> 本程式從原請款單列印作業 ARR001R複製再加以修改。
+     H*           本程式將原來之全手動改成RPG CYCLE 的寫法，並且
+     H*           依訂單別不同而換頁。
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMSTL1IP  E           K        DISK
+     FTRNDTLL3IF  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FQPRINT  O   F     106            PRINTER
+     I*************************************************************
+     IINREC
+     I                                              INORNOL1
+     I*================================================================
+     I              '一．承蒙　貴客戶惠-C         CON1
+     I              '顧，不勝感激，玆檢-
+     I              '送　貴客戶本期應付-
+     I              '帳款明細、出貨單（-
+     I              '磅單）、及發票（如-
+     I              '附）'
+     I              '敬請查收並惠予核查-C         CON2
+     I              '，若發現帳款內容與-
+     I              '實際不符時，請即連-
+     I              '絡本公司營業部經辦-
+     I              '人員予以更正．'
+     I              '二．核查無誤後，本-C         CON3
+     I              '公司業務員將依貴我-
+     I              '雙方約定之領款日（-
+     I              '　年　月　日）前往-
+     I              '收款．'
+     I              '東和鋼鐵企業股份有-C         CON4                       X
+     I              '限公司'
+     I              '三．本公司帳款處理-C         CON5
+     I              '均已電腦化，敬請貴-
+     I              '客戶依本帳單所列金-
+     I              '額核實付款．'
+     I*================================================================
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C**************************************************************
+     C           TXKEY     KLIST
+     C                     KFLD           TXIVNO
+     C           IVKEY     KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+9908AC           *DATE     SUB  19000000  U#SYSD  80
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C**************************************************************
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C                     Z-ADD0         PAG     30
+     C                     Z-ADD21        LCNT    20
+     C                     Z-ADD20        TCNT    20
+     C                     Z-ADD50        FCNT    20
+     C                     Z-ADD0         CNT
+     C                     Z-ADD0         QTYT    70
+     C                     Z-ADD0         AAMTT   80
+     C                     Z-ADD0         BAMTT   70
+     C                     Z-ADD0         CAMTT   80
+     C                     Z-ADD0         DAMTT   70
+     C                     Z-ADD0         EAMTT   80
+     C                     Z-ADD0         TTLAMT  80
+     C                     MOVE *ALL'='   ALS    98
+     C                     SETOF                     22
+     C                     SETOF                     23
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     Z-ADDTCNT      LCNT             強迫換頁
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     MOVELINNO      INVNO  10
+9008 C                     MOVELINORNO    ORNO    6
+LYW  C                     Z-ADDININDT    DATE    80
+     C                     Z-ADDINAAMT    AAMT    80
+     C                     Z-ADDINCAMT    BAMT    70
+     C                     Z-ADDINBAMT    CAMT    80
+     C                     ADD  INDAMT    CAMT
+     C                     Z-ADDINATAX    DAMT    70
+     C                     ADD  INCTAX    DAMT
+     C                     ADD  INDTAX    DAMT
+     C                     Z-ADDINEAMT    EAMT    80
+     C                     ADD  INFAMT    EAMT
+     C                     EXSR @WEI
+     C                     EXSR @GET
+     C                     Z-ADDAAMT      NBAL    80
+     C                     ADD  BAMT      NBAL
+     C                     ADD  CAMT      NBAL
+     C                     ADD  DAMT      NBAL
+     C                     ADD  EAMT      NBAL
+     C                     ADD  NBAL      TTLAMT  80
+     C                     ADD  AAMT      AAMTT   80
+     C                     ADD  BAMT      BAMTT   70
+     C                     ADD  CAMT      CAMTT   80
+     C                     ADD  DAMT      DAMTT   70
+     C                     ADD  EAMT      EAMTT   80
+0301 C           AAMT      IFNE 0
+     C                     EXSR PR#01
+0301 C                     ENDIF
+     CSR         DP#01Z    ENDSR
+     C*
+     C*********************************
+     C*  L1 函式
+     C*********************************
+     CSR         L1SR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  印核覆
+     C*********************************
+     CSR         LRSR      BEGSR
+     C                     EXCPTET#01
+     C                     SETON                     23
+     C                     EXCPTEF#01
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+     C*  子函式集
+     C*****************************************************************
+     C**----------------------------------------***
+     C**   列出一筆                           ***
+     C**----------------------------------------***
+     CSR         PR#01     BEGSR
+     C           LCNT      COMP TCNT                 75  75
+     C   75 22             EXCPTEF#01
+     C   75                ADD  1         PAG
+     C   75                EXCPTEH#01
+     C   75                Z-ADD0         LCNT
+     C  N22                SETON                     22
+     C                     EXCPTED#01
+     C                     ADD  1         LCNT
+     C                     ADD  1         CNT     30
+     C  N22                SETON                     22
+     CSR         PR#01Z    ENDSR
+     C******
+     C**----------------------------------------***
+     C**   GET DISCOUNT AMT                     ***
+     C**----------------------------------------***
+     CSR         @GET      BEGSR
+     C                     MOVELINNO      TXIVNO
+     C           TXKEY     SETLLTRNDTLL3             97
+     C           *IN97     DOWEQ'0'
+     C           TXIVNO    READETRNDTLL3                 97
+     C   97                LEAVE
+     C           TXFL01    IFEQ 'Y'
+     C           TXFLAG    OREQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C           INTYPE    IFEQ '2'
+     C                     SUB  TXAMT     BAMT
+     C                     ELSE
+     C           TXACNT    IFNE '4'
+     C                     SUB  TXAMT     BAMT
+     C                     ELSE
+     C                     SUB  TXAMT     CAMT
+     C                     ENDIF
+     C                     ENDIF
+     C                     SUB  TXTAX     DAMT
+     C                     ENDDO
+     CSR         @GETZ     ENDSR
+     C**----------------------------------------***
+     C**   GET WEIGHT                           ***
+     C**----------------------------------------***
+     CSR         @WEI      BEGSR
+     C                     Z-ADD0         QTY     70
+     C                     MOVE *BLANK    PNO     8
+     C                     MOVELINNO      IVNO
+     C                     MOVEL*BLANK    IVACNT
+     C                     Z-ADD0         IVITEM
+     C           IVKEY     SETLLINVDTL               97
+     C           *IN97     DOWEQ'0'
+     C           IVNO      READEINVDTL                   97
+     C   97                LEAVE
+     C           IVACNT    IFNE '1'
+     C                     LEAVE
+     C                     ENDIF
+     C           IVFLAG    IFEQ 'D'
+     C           IVDECD    OREQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C                     MOVELIVAPNO    PNO
+     C                     ADD  IVQTY     QTY
+     C                     ENDDO
+     C                     ADD  QTY       QTYT
+     CSR         @WEIZ     ENDSR
+     O*****************************************************************
+     O*        列印報表
+     O*****************************************************************
+     OQPRINT  E   02           EH#01
+     O                                   17 '報表編號: AR001'
+     O                         CON4      62                                    X
+     O                                   87 '製表日期'
+     O                                   88 ':'
+9908AO                         U#SYSD    98 '    /  /  '
+     O        E 1              EH#01
+     O                                   59 'も　請　款　單　も'             X
+     O                                   87 '頁　　次'
+     O                                   88 ':'
+     O                         PAG   Z   91
+     O        E 2              EH#01
+     O                                   11 '客戶編號:'
+     O                         INCUNO    18
+     O                                   42 '訂單編號:'
+     O                         INORNO    48
+     O                                   69 '請款日期:'
+     O                         INAPDTY   78
+     O        E 1              EH#01
+     O                                   11 '客戶名稱:'
+     O                         INCUNM    21
+     O                                   42 '收款業務員:'
+     O                         INRVID    45
+     O                                   69 '請款單號:'
+     O                         INAPNO    77
+     O        E 1              EH#01
+     O                         ALS       98
+     O        E 1              EH#01
+     O                                   10 '發票日期'
+     O                                   20 '發票號碼'
+     O                                   30 '磅單號碼'
+     O                                   40 '出貨數量'
+     O                                   52 '出貨金額'
+     O                                   64 '折讓／銷退'
+     O                                   75 '預收貨款'
+     O                                   86 '銷項稅額'
+     O                                   98 '請款金額'
+     O        E 1              EH#01
+     O                         ALS       98
+     O        E 11             ED#01
+9009 O                         DATE  Y   10
+     O                         INVNO     20
+     O                         PNO       30
+     O                         QTY   J   40
+     O                         AAMT  J   52
+     O                         BAMT  J   63
+     O                         CAMT  J   75
+     O                         DAMT  J   86
+     O                         NBAL  J   98
+     O        E 1              ET#01
+     O                         ALS       98
+     O        E 1              ET#01
+     O                                   20 '合　　計：'
+     O                         QTYT  J   40
+     O                         AAMTT J   52
+     O                         BAMTT J   63
+     O                         CAMTT J   75
+     O                         DAMTT J   86
+     O                         TTLAMT    98 '   ,   ,$0 -'
+     O        E 2              ET#01
+     O                                   94 '發票總張數：'
+     O                         CNT   J   98
+     O        E   51   23      EF#01
+     O                                   20 '客戶簽收：'
+     O                                   40 '簽收日期：'
+     O                                   60 '主管：'
+     O                                   80 '業務員：'
+     O        E   53   23      EF#01
+     O                         ALS       98
+     O        E   53  N23      EF#01
+     O                                   24 '========================'
+     O                                   44 '===================='
+     O                                   56 '接　下　頁'
+     O                                   72 '================'
+     O                                   96 '========================'
+     O                                   98 '=='
+     O        E   55           EF#01
+     O                         CON1      98
+     O        E   56           EF#01
+     O                         CON2      94
+     O        E   58           EF#01
+     O                         CON3      82
+     O        E   60           EF#01
+     O                         CON5      70
+

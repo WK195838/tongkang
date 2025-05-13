@@ -1,0 +1,159 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR088R
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     應收發票明細表(查帳用)
+     H*            5.DATE-WRITTEN  89/08/03
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  IP  E           K        DISK
+     FARR088T O   E             69     PRINTER
+     IINREC       01
+     I                                              INCUNOL2
+     I                                              INORNOL1
+TEST I            DS
+ .   I                                        1  10 INNO
+ .   I                                        3  10 D#NO
+     I           UDS
+     I                                      500 505 D#ORNO
+     I                                      506 5110T#DATE
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C           *IN99     IFEQ *OFF
+     C                     EXSR INISR
+     C                     ENDIF
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C           D#ORNO    IFEQ *BLANK
+     C                     MOVE '全部'  T#ORNO
+     C                     ELSE
+9008 C                     MOVELD#ORNO    T#ORNO
+     C                     ENDIF
+     C                     SETON                     6999
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         T#AMT2           *出貨金額
+     C                     Z-ADD0         T#CMT2           *折退金額
+     C                     Z-ADD0         T#DMT2           *扣預收
+     C                     Z-ADD0         T#TAX2           *稅額
+     C                     Z-ADD0         T#BAL2           *發票餘額
+     C           W#CON2    IFGT 0
+     C                     SETON                     69
+     C                     Z-ADD0         W#CON2
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         T#AMT1           *出貨金額
+     C                     Z-ADD0         T#CMT1           *折退金額
+     C                     Z-ADD0         T#DMT1           *扣預收
+     C                     Z-ADD0         T#TAX1           *稅額
+     C                     Z-ADD0         T#BAL1
+     C                     Z-ADD0         W#CON1
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+TEST C           D#NO      IFEQ '17204627'
+  .  C                     Z-ADD0         W#TEST  10
+  .  C                     ENDIF
+     C*
+     C                     MOVE INCUNO    T#CUNO           客戶編號
+     C                     MOVE INCUNM    T#CUNM           客戶名稱
+9008 C                     MOVELINORNO    T#ORN1           訂單編號
+     C                     MOVE INNO      T#INNO           發票號碼
+     C                     Z-ADDININDT    T#INDT           發票日期
+     C                     Z-ADDINAAMT    T#AAMT           出貨金額
+     C                     Z-ADDINCAMT    T#CAMT           折退金額
+     C                     Z-ADDINDAMT    T#DAMT           扣預收
+     C                     Z-ADDINATAX    T#TAX            稅款
+     C                     ADD  INDAMT    T#TAX
+     C           INAAMT    ADD  INATAX    T#NBAL           彙總餘額
+     C                     ADD  INBAMT    T#NBAL
+     C                     ADD  INCAMT    T#NBAL
+     C                     ADD  INCTAX    T#NBAL
+     C                     ADD  INDAMT    T#NBAL
+     C                     ADD  INDTAX    T#NBAL
+     C           INRCDT    IFGT T#DATE
+     C   69                WRITEAR088H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR088T1
+     C*
+     C                     ADD  T#AAMT    T#AMT1           *出貨金額
+     C                     ADD  T#CAMT    T#CMT1           *折退金額
+     C                     ADD  T#DAMT    T#DMT1           *扣預收
+     C                     ADD  T#TAX     T#TAX1           *稅額
+     C                     ADD  T#NBAL    T#BAL1           *發票餘額
+     C*
+     C                     ADD  1         W#CON1  40
+     C                     ENDIF
+     C*
+     C           INRCDT    IFEQ 0
+     C           INNBAL    ANDNE0
+     C   69                WRITEAR088H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR088T1
+     C*
+     C                     ADD  T#AAMT    T#AMT1           *出貨金額
+     C                     ADD  T#CAMT    T#CMT1           *折退金額
+     C                     ADD  T#DAMT    T#DMT1           *扣預收
+     C                     ADD  T#TAX     T#TAX1           *稅額
+     C                     ADD  T#NBAL    T#BAL1           *發票餘額
+     C*
+     C                     ADD  1         W#CON1  40
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           W#CON1    IFGT 0
+     C   69                WRITEAR088H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR088T2
+     C                     ADD  T#AMT1    T#AMT2           *出貨金額
+     C                     ADD  T#CMT1    T#CMT2           *折退金額
+     C                     ADD  T#DMT1    T#DMT2           *扣預收
+     C                     ADD  T#TAX1    T#TAX2           *稅額
+     C                     ADD  T#BAL1    T#BAL2           *發票餘額
+     C                     ADD  1         W#CON2  40
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C*列印合計
+     C           W#CON2    IFGT 0
+     C   69                WRITEAR088H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR088T3
+     C                     ENDIF
+     C                     ENDSR
+     C****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C                     ENDSR
+     C****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C*NO DATA
+     C                     ENDSR
+

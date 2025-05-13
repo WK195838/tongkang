@@ -1,0 +1,96 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR051PX                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02YSH                                  */
+     /*     4.FUNCTION     折讓開立簽回明細表（整月）反傾銷用     */
+     /*     5.DATE-WRITTEN  90/07/04                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&SYSN)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREAS)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&AREAE)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&YYMMS)  TYPE(*CHAR) LEN(4)
+             DCL        VAR(&YYMME)  TYPE(*CHAR) LEN(4)
+
+             RTVNETA    SYSNAME(&SYSN)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+ BATCH:
+             CHGVAR     VAR(&YYMMS) VALUE(8903)
+             CHGVAR     VAR(&YYMME) VALUE(9006)
+
+             CLRPFM     FILE(ARLIB/ARR051F)
+             MONMSG     MSGID(CPF0000)
+
+             DLTF       FILE(QTEMP/TRNDTLX)
+             MONMSG     MSGID(CPF0000)
+
+             CRTDUPOBJ  OBJ(TRNDTL) FROMLIB(DALIB) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(TRNDTLX)
+             OVRDBF     FILE(TRNDTLL3) TOFILE(QTEMP/TRNDTLX)
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('TXCODE *EQ "AR06" *AND +
+                                TXFL01 *NE " " *AND +
+                                TXACNT *EQ %VALUES("2" "3" "4") *AND +
+                         %SST(TXNO 1 1) *EQ "H" *AND +
+                         %SST(TXRESV 1 4) *GE "' || &YYMMS || '" *AND +
+                         %SST(TXRESV 1 4) *LE "' || &YYMME || '" *AND +
+                                TXFLAG *NE "D"')
+             CALL       PGM(ARR051R0)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+
+    /* 銷貨折讓  */
+             CHGDTAARA  DTAARA(*LDA (301 1)) VALUE('A')
+             OVRDBF     FILE(TRNDTL) TOFILE(QTEMP/TRNDTLX) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('(TXFLAG *EQ "H" *OR +
+                                TXFLAG *EQ "K") *AND +
+                                TXACNT *EQ "3"') +
+                        KEYFLD((TXFLAG) (TXRESV) (TXNO) (TXIVNO) +
+                               (TXPDNM)) +
+                        MAPFLD((TXFL02 TXFLAG))
+             CALL       PGM(ARR051RY)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+    /* 銷貨退回  */
+             CHGDTAARA  DTAARA(*LDA (301 1)) VALUE('B')
+             OVRDBF     FILE(TRNDTL) TOFILE(QTEMP/TRNDTLX) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('(TXFLAG *EQ "H" *OR +
+                                TXFLAG *EQ "K") *AND +
+                                TXACNT *EQ "2"') +
+                        KEYFLD((TXFLAG) (TXRESV) (TXNO) (TXIVNO) +
+                               (TXPDNM)) +
+                        MAPFLD((TXFL02 TXFLAG))
+             CALL       PGM(ARR051RY)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+
+    /* 預收折讓  */
+             CHGDTAARA  DTAARA(*LDA (301 1)) VALUE('C')
+             OVRDBF     FILE(TRNDTL) TOFILE(QTEMP/TRNDTLX) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('(TXFLAG *EQ "H" *OR +
+                                TXFLAG *EQ "K") *AND +
+                                TXACNT *EQ "4"') +
+                        KEYFLD((TXFLAG) (TXRESV) (TXNO) (TXIVNO) +
+                               (TXPDNM)) +
+                        MAPFLD((TXFL02 TXFLAG))
+             CALL       PGM(ARR051RY)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+ ENDDING:    ENDPGM
+

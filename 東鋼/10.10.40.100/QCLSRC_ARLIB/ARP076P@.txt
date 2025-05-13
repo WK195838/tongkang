@@ -1,0 +1,109 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP076P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02YSH                                  */
+     /*     4.FUNCTION     電子商務介面-請款單(ARLCDS  FOR  SQL)*/
+     /*     5.DATE-WRITTEN  89/12/29                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)   /*執行狀態*/
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&DEVI)  TYPE(*CHAR) LEN(10)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+             SBMJOB     JOB(ARP076P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARP076P')
+             SBMJOB     JOB(ARP077P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARP077P')
+             SBMJOB     JOB(ARP078P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARP078P')
+             RETURN
+
+BATCH:
+             CLRPFM     FILE(ARLCDS)
+             MONMSG     MSGID(CPF0000)
+     /*產生原始請款單檔*/
+             OVRDBF     FILE(INVMST)   TOFILE(DALIB/INVMST)
+             OVRDBF     FILE(TRNDTL)   TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OVRDBF     FILE(CBCUST)   TOFILE(DALIB/CBCUST)
+             OPNQRYF    FILE(TRNDTL) QRYSLT('+
+                            (TXCODE *EQ "SA04") *AND +
+                            (DATE *GE "890101")') +
+                        KEYFLD(TXNO) +
+                        MAPFLD((CHAR TXDATE *CHAR 8) +
+                               (DATE '%SST(CHAR 3 6)' *CHAR 6))
+             CALL       PGM(ARP076R)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+     /*產生請款單檔之繳款狀態檔*/
+             CLRPFM     FILE(DALIB/ARLCDST)
+             MONMSG     MSGID(CPF0000)
+             OVRDBF     FILE(ARLCDS)  TOFILE(DALIB/ARLCDS) SHARE(*YES)
+             OVRDBF     FILE(ARLCDST) TOFILE(DALIB/ARLCDST)
+             OPNQRYF    FILE(ARLCDS) +
+                        KEYFLD((ALVTNO) (ALAPNO))
+             CALL       PGM(ARP076R1)
+             CLOF       OPNID(ARLCDS)
+             DLTOVR     FILE(*ALL)
+     /*產生請款單檔之結案訂單*/
+             CLRPFM     FILE(DALIB/ARLCDSW)
+             MONMSG     MSGID(CPF0000)
+             OVRDBF     FILE(ARLCDS)  TOFILE(DALIB/ARLCDS) SHARE(*YES)
+             OVRDBF     FILE(ARLCDSW) TOFILE(DALIB/ARLCDSW)
+             OPNQRYF    FILE(ARLCDS) +
+                        KEYFLD((ALVTNO) (ALORNO) (ALPDAT))
+             CALL       PGM(ARP076R2)
+             CLOF       OPNID(ARLCDS)
+             DLTOVR     FILE(*ALL)
+     /* MODIFY 請款單檔所需下傳資料*/
+             OVRDBF     FILE(ARLCDS)  TOFILE(DALIB/ARLCDS)
+             OVRDBF     FILE(ARLCDST) TOFILE(DALIB/ARLCDST)
+             CALL       PGM(ARP076R3)
+             DLTOVR     FILE(*ALL)
+     /*加入未開請款單之發票*/
+             OVRDBF     FILE(INVMST)  TOFILE(DALIB/INVMST) SHARE(*YES)
+             OVRDBF     FILE(ARLCDS)  TOFILE(DALIB/ARLCDS)
+             OVRDBF     FILE(ARLCDSW) TOFILE(DALIB/ARLCDSW)
+             OPNQRYF    FILE(INVMST) QRYSLT('+
+                            (INDECD *EQ " ") *AND +
+                            (INAPNO *EQ "       ") *AND +
+                            (INTYPE *NE "9") *AND +
+                            (INTYPE *NE "2") *AND +
+                            (DATE *GE "890101")') +
+                        MAPFLD((CHAR ININDT *CHAR 8) +
+                               (DATE '%SST(CHAR 3 6)' *CHAR 6))
+             CALL       PGM(ARP076R4)
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+     /*加入未開發票之銷貨明細*/
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OVRDBF     FILE(ARLCDS)  TOFILE(DALIB/ARLCDS)
+             OVRDBF     FILE(ARLCDSW) TOFILE(DALIB/ARLCDSW)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('+
+                              (TXCODE *EQ "SA04") *AND +
+                              (TXIVNO *EQ "          ") *AND +
+                              (TXFLAG *NE "D") *AND +
+                              (DATE *GE "890101")') +
+                        MAPFLD((CHAR TXDATE *CHAR 8) +
+                               (DATE '%SST(CHAR 3 6)' *CHAR 6)) +
+                        KEYFLD((TXNO))
+             CALL       PGM(ARP076R5)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&DEVI)
+
+             IF         COND(&DEVI *NE '          ') THEN(DO)
+             SNDBRKMSG  MSG('<<電子商務介面檔-請款單處理完畢+
+                        ....>>') TOMSGQ(&DEVI) +
+                        MSGTYPE(*INFO)
+             ENDDO
+             ENDPGM
+

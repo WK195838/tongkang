@@ -1,0 +1,342 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP004RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LYW
+     H*            4.FUNCTION     外銷發票開立作業-新版(依CI)
+     H*            5.DATE-WRITTEN  91/04/29
+     H*            6.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARP004S CF  E                    WORKSTN
+     F                                        RRN2  KSFILE AR004F2
+     FHSCINV  IF  E           K        DISK
+     FGENSEQ  UF  E           K        DISK                      A
+     E                    ERR     1   8 70               *錯誤訊息
+     I            DS
+     I                                        1   6 D#DATX
+     I                                        1   40D#YYMM
+     I                                        3   40D#MM
+     I                                        5   60D#DD
+     I           UDS
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVN
+     I                                     10211021 S#AREA
+     C*****************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C                     PARM           P#DATE  60
+     C                     PARM           P#AREA  1
+     C                     PARM           P#ORNO  6
+     C*
+     C           K#NSEQ    KLIST
+     C                     KFLD           GEKIND
+     C                     KFLD           GEPRIN
+     C*HSCINV
+     C           K#CINV    KLIST
+     C                     KFLD           C1ORNO           訂單號碼
+     C                     KFLD           C1OSEQ           流水號
+     C                     KFLD           C1CITM            CI項次
+     C****************************************************************
+     C*      MAIN           PROGRAM
+     C****************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000           畫面二
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C                     MOVEL'ARP004S-'S#SRID
+     C                     MOVE '01'      W#PRID  2
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVE *ALL'-'   S#LIN3
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->ARP004S-01畫面
+     C                     MOVE '01'      S#SRID
+     C           W#PRID    DOWEQ'01'
+     C*
+     C                     WRITEAR004H
+     C                     EXFMTAR004F1
+     C                     SETOF                     404142
+     C*
+     C                     MOVE *BLANK    S#ERR1
+     C*F3=結束作業
+     C*F12=回前畫面
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     MOVE '1'       P#IN03
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     EXSR SR1100
+     C*
+     C  N99                MOVE '02'      W#PRID
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*檢核
+     C                     MOVE *OFF      *IN99
+     C*開立廠區
+     C           S#AREA    IFNE 'T'
+     C           S#AREA    ANDNE'M'
+     C           S#AREA    ANDNE'H'
+     C           S#AREA    ANDNE'K'
+     C           S#AREA    ANDNE'P'
+     C                     SETON                     4099
+     C                     MOVELERR,1     S#ERR1
+     C                     ENDIF
+     C*訂單別
+     C  N99      S#ORNO    IFEQ *BLANK
+     C                     SETON                     4199
+     C                     MOVELERR,2     S#ERR1
+     C                     ENDIF
+     C*
+     C                     Z-ADDS#DATE    W#DATE  80
+     C                     MOVE W#DATE    P#PATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#PATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM           FLAG    1
+     C*
+     C  N99      FLAG      IFNE '0'
+     C                     SETON                     4299
+     C                     MOVELERR,3     S#ERR1
+     C                     ENDIF
+     C*
+     C                     MOVE UDATE     W#DATX  60
+     C  N99      S#DATE    IFGT W#DATX
+     C                     SETON                     4299
+     C                     MOVE ERR,3     S#ERR1
+     C                     ENDIF
+     C*檢核日期(本月5日前可重開上月底發票)
+     C                     MOVEL'99'      GEKIND
+     C                     MOVELS#AREA    GEPRIN
+     C           K#NSEQ    CHAINGEREC               N97
+     C  N99      *IN97     IFEQ *OFF
+     C                     Z-ADDGECUNO    W#DATX  60
+     C*
+     C                     MOVE S#DATE    D#DATX
+     C                     MOVE D#MM      W#MM1   20       欲開月
+     C                     MOVE D#DD      W#DD1   20       欲開日期
+     C                     SELEC
+     C           D#MM      WHEQ 1
+     C                     Z-ADD31        W#DD    20       月底日期
+     C           D#MM      WHEQ 2
+     C                     Z-ADD28        W#DD             月底日期
+     C           D#MM      WHEQ 3
+     C                     Z-ADD31        W#DD             月底日期
+     C           D#MM      WHEQ 4
+     C                     Z-ADD30        W#DD             月底日期
+     C           D#MM      WHEQ 5
+     C                     Z-ADD31        W#DD             月底日期
+     C           D#MM      WHEQ 6
+     C                     Z-ADD30        W#DD             月底日期
+     C           D#MM      WHEQ 7
+     C                     Z-ADD31        W#DD             月底日期
+     C           D#MM      WHEQ 8
+     C                     Z-ADD31        W#DD             月底日期
+     C           D#MM      WHEQ 9
+     C                     Z-ADD30        W#DD             月底日期
+     C           D#MM      WHEQ 10
+     C                     Z-ADD31        W#DD             月底日期
+     C           D#MM      WHEQ 11
+     C                     Z-ADD30        W#DD             月底日期
+     C           D#MM      WHEQ 12
+     C                     Z-ADD31        W#DD             月底日期
+     C                     ENDSL
+     C                     MOVE UDATE     D#DATX
+     C                     MOVE D#MM      W#MM2   40       現在月
+     C                     MOVE D#DD      W#DD2   20       現在日期
+     C*
+     C           W#DD2     IFLE 5                           5日
+     C           W#DD1     ANDEQW#DD                       月底
+     C           W#MM2     SUB  W#MM1     W#MM    20
+     C*
+     C           W#MM      IFEQ 1                          差一個月
+     C           W#MM      OREQ -11                        差一個月
+     C                     MOVE *ON       *IN98
+     C                     ELSE
+     C                     MOVE *OFF      *IN98
+     C                     ENDIF
+     C*
+     C                     ELSE
+     C                     MOVE *OFF      *IN98
+     C                     ENDIF
+     C*
+     C  N98      S#DATE    IFLT W#DATX
+     C                     SETON                     4299
+     C                     MOVELERR,5     S#ERR1
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C***************************************************************
+     C           SR2000    BEGSR
+     C**************************************************************
+     C*輸入畫面
+     C                     MOVE '02'      S#SRID
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN74            *SFLCLR
+     C                     WRITEAR004F2C
+     C                     MOVE *OFF      *IN74            *SFLCLR
+     C*
+     C                     Z-ADD0         RRN2    40
+     C*
+     C                     MOVE S#ORNO    C1ORNO           訂單號碼
+     C                     Z-ADD0         C1OSEQ           流水號
+     C                     Z-ADD0         C1CITM            CI項次
+     C*
+     C           K#CINV    SETLLRHSCINV
+     C                     EXSR SR2100                     讀入
+     C*
+     C           RRN2      IFEQ 0
+     C                     MOVE *ON       *IN72            *SFLDSP OFF
+     C                     ELSE
+     C                     MOVE *OFF      *IN72
+     C                     ENDIF
+     C*
+     C                     MOVELERR,6     S#ERR2
+     C*
+     C           W#PRID    DOWEQ'02'
+     C*
+     C                     WRITEAR004H
+     C                     WRITEAR004F2M
+     C                     EXFMTAR004F2C
+     C*
+     C                     MOVE *BLANK    S#ERR2
+     C                     SETOF                     43
+     C*
+     C           *IN12     IFEQ '1'
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           *IN03     IFEQ '1'
+     C                     MOVE '00'      W#PRID
+     C                     MOVE '1'       P#IN03
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     EXSR SR2200                     檢核
+     C*
+     C  N99      *IN10     IFEQ *ON                        確認開立
+     C                     EXSR SR2300
+     C                     MOVE '00'      W#PRID
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C*讀入
+     C                     MOVE *OFF      *IN30
+     C           *IN30     DOWEQ*OFF
+     C                     READ RHSCINV             N    30
+     C   30                LEAVE
+     C*
+     C           C1ORNO    IFNE S#ORNO
+     C                     LEAVE
+     C                     ENDIF
+     C*檔頭
+     C                     MOVELC1OCUS    S#CUNO           訂單客戶
+     C                     MOVELC1OCNM    S#CUNM
+     C                     Z-ADDC1RRAT    S#RRAT           參考匯率
+     C                     Z-ADDC1TRAT    S#TRAT           報關匯率
+     C                     Z-ADDC1CDTE    S#CDTE           報關日期
+     C                     Z-ADDC1AMTH    S#AMTH           報關金額
+     C                     Z-ADDC1AMTK    S#AMTK           報關金額
+     C*明細
+     C           C1OSEQ    IFNE S#OSEQ                     流水號
+     C           C1ICNM    ORNE S#ICNM                      CI客戶
+     C           C1CINO    ORNE S#CINO                      CI號碼
+     C                     Z-ADDC1OSEQ    S#OSEQ
+     C                     MOVELC1ICNM    S#ICNM
+     C                     MOVELC1CINO    S#CINO
+     C                     ADD  1         RRN2
+     C                     WRITEAR004F2
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     Z-ADD1         S#NBR2
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2200    BEGSR
+     C*****************************************************************
+     C                     SETOF                     99
+     C*明細
+     C                     Z-ADD0         W#RRN2  40
+     C                     MOVE *OFF      *IN30
+     C           *IN30     DOWEQ*OFF
+     C                     ADD  1         W#RRN2
+     C*
+     C           W#RRN2    IFGT RRN2
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           W#RRN2    CHAINAR004F2              30
+     C*CI號碼空白
+     C           S#CINO    IFEQ *BLANK                      CI號碼
+     C                     SETON                     4399
+     C                     ELSE
+     C                     SETOF                     43
+     C                     ENDIF
+     C*
+     C                     UPDATAR004F2
+     C*
+     C                     ENDDO
+     C*
+     C   99                MOVELERR,7     S#ERR2
+     C*
+     C                     MOVELS#ORNO    W#ORN1  1
+     C  N99      W#ORN1    IFEQ 'H'
+     C           RRN2      ANDEQ0
+     C                     MOVELERR,8     S#ERR2
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2300    BEGSR
+     C*****************************************************************
+     C                     MOVE '0'       P#IN03
+     C                     Z-ADDS#DATE    P#DATE
+     C                     MOVE S#AREA    P#AREA
+     C                     MOVE S#ORNO    P#ORNO
+     C*更新已開立日期
+     C                     MOVEL'99'      GEKIND
+     C                     MOVELS#AREA    GEPRIN
+     C           K#NSEQ    CHAINGEREC                97
+     C                     Z-ADDS#DATE    GECUNO
+     C  N97N98             UPDATGEREC
+     C   97N98             WRITEGEREC
+     C                     ENDSR
+     C*
+** ERR
+01-廠區別錯誤！
+02-訂單號碼不得空白！
+03-日期錯誤！
+04-日期不可大於系統日期！
+05-日期不可小於已開立發票日期！
+06-確認相關資訊後,請按F10確認開立！
+07- CI號碼錯誤！
+08-型鋼或鋼板之外銷資訊不存在！
+

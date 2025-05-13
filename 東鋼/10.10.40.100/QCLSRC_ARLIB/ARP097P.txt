@@ -1,0 +1,60 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR101P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02CSF                                    */
+        /*        4.FUNCTION      應收帳款承購(E-FACTORING)發票異常檢核表*/
+        /*        5.DATE-WRITTEN   91/09/16                                  */
+        /*        6.DATE-MODIFY                                              */
+        /*                                                                   */
+        /*********************************************************************/
+              PGM
+              DCL         VAR(&TYPE)    TYPE(*CHAR)  LEN(1)
+              DCL         VAR(&S#DEVN)  TYPE(*CHAR)  LEN(10)
+              DCL         VAR(&S#USER)  TYPE(*CHAR)  LEN(10)
+
+
+              RTVJOBA     JOB(&S#DEVN) USER(&S#USER) +
+                          TYPE(&TYPE)
+
+              IF          COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+   START:
+      /*      SBMJOB      JOB(ARP097P) JOBD(ARJOBD) +
+                          RQSDTA('CALL ARP097P')     */
+      /*      SNDBRKMSG   MSG('<<訂單國別對照檔處理+
+                              ,已開始處理,請稍待...>>')    +
+                              TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO) */
+      /*      RETURN  */
+   BATCH:
+
+              OVRDBF     FILE(HSCINV) TOFILE(HSCINV) SHARE(*YES)
+              OPNQRYF    FILE((HSCINV)) QRYSLT(' +
+                         (C1HOLD  *NE "  ") *AND +
+                         (C1ORNO  *NE "      ")')
+              CALL       PGM(ARLIB/ARP097R)
+              CLOF       OPNID(HSCINV)
+              DLTOVR     FILE(*ALL)
+      /*傳輸苗栗*/
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     CPF0000
+
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMH)
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(DALIB/ARORCN)
+             CPYF       FROMFILE(DALIB/ARORCN) TOFILE(QTEMP/DDMH) +
+                          MBROPT(*REPLACE)
+      /*傳輸高雄*/
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     CPF0000
+
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMK)
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(DALIB/ARORCN)
+             CPYF       FROMFILE(DALIB/ARORCN) TOFILE(QTEMP/DDMK) +
+                          MBROPT(*REPLACE)
+      /*      SNDBRKMSG   MSG('<<訂單國別對照檔處理+
+                              ,已完成.....>>')    +
+                              TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)  */
+              ENDPGM
+

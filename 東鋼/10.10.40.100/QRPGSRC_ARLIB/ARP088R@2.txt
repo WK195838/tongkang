@@ -1,0 +1,153 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP088R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     承購發票客戶別彙總作業
+     H*            5.DATE-WRITTEN  92/01/23
+     H*            6.DATE-MODIFY
+     H*
+     H* A當日承購金額　　　承購日期為ＵＤＡＴＥ的發票金額
+     H*   B非當日承購金額　　承購日期＜＞ＵＤＡＴＥ的發票金額
+     H*   C逾期未兌現金額　　發票金額─繳款金額
+     H* D已承購金額　　　　當日承購金額＋非當日承購金額
+     H*   E可動撥餘額　　　　前日承購餘額X預支比例　─已預支金額+
+     H*            　　　　　本日承購金額X預支比例　─逾期未兌現
+     H*   F帳上餘額　　　　　已承購金額X預支比例─已預支金額
+     H*****************************************************************
+     H        1   Y                                     1                 BR100
+     FARINVM  IP  E           K        DISK
+     FARCUDT  UF  E           K        DISK
+     FARORDE  O   E                    DISK
+     IRARINVM
+     I                                              AMCUNOL2
+     I                                              AMORNOL1
+     C  N99                MOVE *ON       *IN99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#FAMT 120       當日承購額度
+     C                     Z-ADD0         W#EAMT 120       非當日承購額度
+     C                     Z-ADD0         W#HAMT 120       逾期未兌現金額
+     C                     Z-ADD0         W#DAMT 120       已沖銷金額
+     C                     Z-ADD0         W#GAMT 120H      前日承購餘額X預比
+     C                     Z-ADD0         W#GAM1 120H      本日承購金額X預比
+     C                     Z-ADD0         W#IAMT 120H      帳上餘額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AAMX 120       已承購金額
+     C                     Z-ADD0         W#BAMX 120       融資金額
+     C                     Z-ADD0         W#CAMX 120       沖銷金額
+     C                     Z-ADD0         W#DAT1  80
+     C                     Z-ADD0         W#DAT2  80
+     C                     MOVE 'Y'       W#CODE  1
+     C                     ENDSR
+     C*****************************************************************
+     CSR         DTLSR     BEGSR
+     C*****************************************************************
+     C                     ADD  AMDAMT    W#AAMX           發票金額
+     C                     ADD  AMEAMT    W#BAMX           融資金額
+     C                     ADD  AMFAMT    W#CAMX           沖銷金額
+     C*承購起日
+     C           W#DAT1    IFEQ 0                          第一筆
+     C                     Z-ADDAMAPD1    W#DAT1
+     C                     ELSE
+     C           AMAPD1    IFLT W#DAT1                     其餘
+     C                     Z-ADDAMAPD1    W#DAT1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           W#CODE    IFNE *BLANK
+     C           AMCLOC    IFEQ *BLANK                     未結案
+     C                     MOVE *BLANK    W#CODE
+     C                     Z-ADD0         W#DAT2
+     C                     ENDIF
+     C           AMCLOD    IFGE W#DAT2
+     C                     Z-ADDAMCLOD    W#DAT2
+     C                     ENDIF
+     C                     ENDIF
+     C*已承購且未結案
+     C           AMAPCD    IFNE *BLANK                     承購確認碼
+     C           AMCLOC    ANDEQ*BLANK                     結案碼
+     C*
+     C*若承購日期＝當日，則發票金額＝當日承購金額
+     C*若承購日期＜＞當日，則發票金額＝非當日承購金額
+     C           AMDLD1    IFEQ UDATE
+     C                     ADD  AMDAMT    W#FAMT           當日承購額度
+     C                     ELSE
+     C                     ADD  AMDAMT    W#EAMT           非當日承購額度
+     C                     ENDIF
+     C*
+     C           AMDUDT    IFLT UDATE
+     C           AMDAMT    SUB  AMFAMT    W#HAMT           逾期未兌現金額
+     C                     ENDIF
+     C*
+     C                     ADD  AMFAMT    W#DAMT           已沖銷金額
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C                     CLEARRARORDE
+     C                     MOVE AMCUNO    ARCUNO           客戶代號
+     C                     MOVE AMORNO    ARORNO           訂單號碼
+     C                     Z-ADDW#AAMX    ARAAMT           承購金額
+     C                     Z-ADDW#BAMX    ARBAMT           預支金額
+     C                     Z-ADDW#CAMX    ARCAMT           沖銷金額
+     C                     Z-ADDW#DAT1    ARDAT1           承購起日
+     C                     Z-ADDW#DAT2    ARDAT2           結案日期
+     C                     MOVE W#CODE    ARCLOC           結案碼
+     C                     WRITERARORDE
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C                     MOVELAMCUNO    W#CUNO  5
+     C                     MOVELW#CUNO    W#CUN1  6
+     C           W#CUN1    CHAINRARCUDT              40
+     C           *IN40     IFEQ *OFF
+     C*
+     C*非當日承購金額（需減已繳款金額）
+ 9203C*          W#EAMT    SUB  W#DAMT    ACEAMT           非當日承購額度
+ 9203C                     Z-ADDW#EAMT    ACEAMT           非當日承購額度
+     C*
+     C*已承購金額＝當日承購金額＋非當日承購金額
+     C           W#FAMT    ADD  ACEAMT    ACAAM1           已承購金額
+     C                     Z-ADDW#FAMT    ACFAMT           當日承購額度
+     C                     Z-ADDW#HAMT    ACHAMT           逾期未兌現金額
+     C*
+     C*可動撥餘額＝前日承購餘額X預支比例　─已預支金額+
+     C*            本日承購金額X預支比例　─逾期未兌現
+     C*
+     C           ACEAMT    MULT ACBRAT    W#GAMT
+     C           ACFAMT    MULT ACBRAT    W#GAM1
+     C                     SUB  ACCAMT    W#GAMT
+     C                     ADD  W#GAM1    W#GAMT
+     C                     SUB  ACHAMT    W#GAMT
+     C                     Z-ADDW#GAMT    ACGAMT
+     C*
+     C*帳上餘額＝已承購金額─已預支金額
+     C           ACAAM1    MULT ACBRAT    W#IAMT
+     C           W#IAMT    SUB  ACCAMT    ACIAMT           帳上餘額
+     C*
+     C                     Z-ADDW#DAMT    ACDAMT           已沖銷金額
+     C*
+     C                     UPDATRARCUDT
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+

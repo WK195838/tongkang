@@ -1,0 +1,39 @@
+     /****************************************************************/
+     /*                                                              */
+     /*               >>   PROGRAM INTRODUCTION   <<                 */
+     /*                                                              */
+     /*            1.PROGRAM-ID    ARP091P                           */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S02YSH                            */
+     /*            4.FUNCTION     信用狀記錄(FOR SQL)              */
+     /*            5.DATE-WRITTEN  91/04/12                          */
+     /*                                                              */
+     /*                                                              */
+     /****************************************************************/
+             PGM
+             DCL        VAR(&JOBTYPE) TYPE(*CHAR)  LEN(1)
+
+             RTVJOBA    TYPE(&JOBTYPE)
+             IF         COND(&JOBTYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+             IF         COND(&JOBTYPE *EQ '1') THEN(DO)
+             SBMJOB     CMD(CALL PGM(ARP091P)) JOB(ARP091P) +
+                          JOBD(ARJOBD)
+             GOTO       CMDLBL(ENDPGM)
+             ENDDO
+
+  BATCH:
+  STEP1:     /* 刪除異動記錄內已傳輸的記錄 */
+             OVRDBF     FILE(ARLCBL) TOFILE(DALIB/ARLCBL)
+             CALL       PGM(ARP091R1)
+             DLTOVR     FILE(*ALL)
+
+  STEP2:     /* 產生新的信用狀資料檔 */
+             OVRDBF     FILE(LLCMST) TOFILE(DALIB/LLCMST)
+             OVRDBF     FILE(CBCUST) TOFILE(DALIB/CBCUST)
+             OVRDBF     FILE(ARLCBL) TOFILE(DALIB/ARLCBL)
+             CALL       PGM(ARP091R2)
+             DLTOVR     FILE(*ALL)
+
+  ENDPGM:
+             ENDPGM
+

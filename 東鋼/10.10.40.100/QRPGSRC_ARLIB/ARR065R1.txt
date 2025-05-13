@@ -1,0 +1,253 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR065R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        KRH
+     H*            4.FUNCTION
+     H*            5.DATE-WRITTEN  85/12/18
+     H*
+     H*****************************************************************
+     FTRNDTL  IP  E           K        DISK
+     FSAMAST  IF  E           K        DISK
+     FARR065T1O   E             69     PRINTER
+     E*****************************************************************
+     E                    ARY1       20 43
+     E                    TAB1    6   6  1   TAB2    6   *地區名稱
+     I*****************************************************************
+     ITXREC
+     I                                              TXPDNML1
+     I                                              TXUPRCL1
+     I                                              TXIVNOL1
+     I                                              TXNO  L2
+     I            DS
+     I                                        1   7 TXORNO
+     I                                        1   5 W#ORNO
+     I                                        1   1 W#AREA
+     I                                        2   5 W#NO
+     I            DS
+     I                                        1  43 A1DATA
+     I                                        1   3 A1PDNM
+     I                                        4  120A1QTY1
+     I                                       13  230A1AMT1
+     I                                       24  320A1QTY2
+     I                                       33  430A1AMT2
+     I           UDS
+     I                                      301 301 U#AREA
+     I                                      302 3070U#DATE
+     I                                      308 308 U#INOU
+     I                                      309 309 U#PROD
+     C*****************************************************************
+     C           K#ORNO    KLIST
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C           *IN99     IFEQ *OFF
+     C                     EXSR INISR
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1                   EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C*INITIAL設定
+     C                     MOVE *ON       *IN69            *表頭
+     C                     MOVE *ALL'='   R#DASH           *=====
+     C*CHAIN地區別
+     C                     MOVE W#AREA    R#AREA
+     C           W#AREA    LOKUPTAB1      TAB2           50*EQ
+     C  N50                MOVE *ALL'*'   R#ARNM
+     C   50                MOVE TAB2      R#ARNM
+     C*CHAIN客戶別
+     C                     MOVE TXCUNO    R#CUNO
+     C                     MOVE TXCUNM    R#CUNM
+     C                     MOVE W#ORNO    R#ORNO
+     C                     MOVE W#NO      S1ORNO  40
+     C                     MOVE W#AREA    S1OREA  1
+     C           K#ORNO    CHAINSAMAST              N66
+     C  N66                MOVE S1CTNO    R#CTNO
+     C   66                MOVE *ALL'*'   R#CTNO
+     C*
+     C                     MOVEL*ALL'9'   ARY1
+     C                     Z-ADD0         A1LEN   20
+     C                     Z-ADD0         I       20
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     MOVE *OFF      *IN44
+     C   69                WRITEAR065T1H                   *表頭
+     C                     MOVE *OFF      *IN69
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#QTY   70
+     C                     Z-ADD0         W#AMT  110
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     ADD  TXQTY     W#QTY
+     C                     ADD  TXAMT     W#AMT
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*PROCESS DATA
+     C           W#QTY     IFEQ 0
+     C                     GOTO E#L1SR
+     C                     ENDIF
+     C*
+     C                     MOVE TXNO      R#PCNO           *磅單號碼
+     C                     MOVE TXDATE    R#DATE           *出貨日期
+     C                     MOVE TXPDNM    R#PDNM
+     C                     MOVE TXUPRC    R#UPRC
+     C                     Z-ADDW#QTY     R#QTY
+     C                     Z-ADDW#AMT     R#AMT
+     C                     MOVE TXIVNO    R#IVNO
+     C                     MOVE TXSALE    R#SALE
+     C*
+     C                     EXSR SR1000                     統計陣列
+     C*列印明細
+     C   69                WRITEAR065T1H                   *表頭
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR065T11                   *明細
+     C           *IN44     IFEQ *OFF
+     C                     MOVE *ON       *IN44
+     C                     ENDIF
+     C           E#L1SR    ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C*
+     C                     SORTAARY1                       排序陣列
+     C                     EXSR PR1000                     印已開發票
+     C                     EXSR PR2000                     印未開發票
+     C*
+     C           1         DO   A1LEN     I                合計全部
+     C                     MOVELARY1,I    A1DATA
+     C                     ADD  A1QTY1    R#QTY2
+     C                     ADD  A1AMT1    R#AMT2
+     C                     ADD  A1QTY2    R#QTY2
+     C                     ADD  A1AMT2    R#AMT2
+     C                     ENDDO
+     C*
+     C   69                WRITEAR065T1H                   *表頭
+     C                     SETOF                     69
+     C                     WRITEAR065T14                   *=====
+     C   69                WRITEAR065T1H                   *表頭
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR065T13                   *總計
+     C                     ENDSR
+     C********************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C*NO DATA
+     C                     EXSR INISR
+     C                     WRITEAR065T1H               60  *OV
+     C                     WRITEAR065MG1               60  *OV
+     C*
+     C                     ENDSR
+     C*
+     C*****************************************************************
+     C*         統計陣列子函式（將各品名之值累計至陣列中）
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C                     MOVEL'F'       W#FIND  1
+     C           1         DO   A1LEN     I
+     C                     MOVELARY1,I    A1DATA
+     C           R#PDNM    IFEQ A1PDNM
+     C           R#IVNO    IFNE *BLANK
+     C                     ADD  R#QTY     A1QTY1
+     C                     ADD  R#AMT     A1AMT1
+     C                     ELSE
+     C                     ADD  R#QTY     A1QTY2
+     C                     ADD  R#AMT     A1AMT2
+     C                     ENDIF
+     C                     MOVELA1DATA    ARY1,I
+     C                     MOVEL'T'       W#FIND
+     C                     LEAVE
+     C                     ENDIF
+     C           A1PDNM    IFEQ '999'
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           W#FIND    IFEQ 'F'
+     C                     ADD  1         A1LEN
+     C                     Z-ADDA1LEN     I
+     C                     MOVEL*ALL'0'   A1DATA           初始為零
+     C                     MOVELR#PDNM    A1PDNM
+     C           R#IVNO    IFNE *BLANK
+     C                     Z-ADDR#QTY     A1QTY1
+     C                     Z-ADDR#AMT     A1AMT1
+     C                     ELSE
+     C                     Z-ADDR#QTY     A1QTY2
+     C                     Z-ADDR#AMT     A1AMT2
+     C                     ENDIF
+     C                     MOVELA1DATA    ARY1,I
+     C                     ENDIF
+     C                     ENDSR
+     C*
+     C*****************************************************************
+     C*         列印已開發票合計
+     C*****************************************************************
+     C           PR1000    BEGSR
+     C   69                WRITEAR065T1H                   *表頭
+     C                     SETOF                     69
+     C                     SETOF                     4645  己開發票
+     C                     WRITEAR065T14                   *=====
+     C*
+     C           1         DO   A1LEN     I
+     C   69                WRITEAR065T1H                   *表頭
+     C                     SETOF                     6944
+     C                     MOVELARY1,I    A1DATA
+     C                     MOVE A1PDNM    R#PNM1
+     C                     Z-ADDA1QTY1    R#QTY1
+     C                     Z-ADDA1AMT1    R#AMT1
+     C           R#PNM1    IFNE *BLANK
+     C                     WRITEAR065T12
+     C           *IN45     IFEQ '0'
+     C                     SETON                     45
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C                     ENDSR
+     C*
+     C*****************************************************************
+     C*         列印未開發票合計
+     C*****************************************************************
+     C           PR2000    BEGSR
+     C   69                WRITEAR065T1H                   *表頭
+     C                     SETOF                     6945
+     C                     SETON                     46    未開發票
+     C                     WRITEAR065T14                   *=====
+     C           1         DO   A1LEN     I
+     C   69                WRITEAR065T1H                   *表頭
+     C                     SETOF                     6944
+     C                     MOVELARY1,I    A1DATA
+     C                     MOVE A1PDNM    R#PNM1
+     C                     Z-ADDA1QTY2    R#QTY1
+     C                     Z-ADDA1AMT2    R#AMT1
+     C           R#PNM1    IFNE *BLANK
+     C                     WRITEAR065T12
+     C           *IN45     IFEQ '0'
+     C                     SETON                     45
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C*
+**  TAB1 TAB2
+P台北T桃園M台中K高雄H苗栗L林口
+

@@ -1,0 +1,425 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP067RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     發票區間開立作業（畫面）
+     H*            5.DATE-WRITTEN  88/01/31
+     H*            6.UPDATE  DATE  99/08/31  2010AR517  S00WCJ (9908A)
+     H*                            102/09/05 2013AR768  S00WCJ (0209A)
+     H*                             增加跨月選擇欄位
+     H*                            104/10/09 2015AR955  S00WCJ (0410A)
+     H*                             增加訂單及客戶皆為空白時須按F23
+     H*                             才能執行
+     H*                            106/01/01 S00WCJ (0601A)
+     H*                            108/02/22 S00WCJ (0802A)
+     H*                             增加客戶編號及訂單編號之檢核
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARP067S CF  E                    WORKSTN
+     FGENSEQ  UF  E           K        DISK
+9706 FCBCUST  IF  E           K        DISK
+9706 FSAMAST  IF  E           K        DISK
+0209AFINVTLG  O   E           K        DISK
+     E*************************************************************
+     E                    T#TB1   1   5  1
+0410AE                    T#MSG   1  20 70
+     I*************************************************************
+     I           UDS
+     I                                        1  10 X#GEPR
+     I                                       11  180X#DATE
+     I                                       21  280X#TXD1
+     I                                       31  380X#TXD2
+     I                                       41  480X#NO1
+     I                                       51  580X#NO2
+0412 I                                       60  65 X#ORNO
+9003 I                                       66  71 X#CUNO
+     I*
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 S#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1   60U#XYM
+     I                                        1   10U#X1
+     I                                        1   20U#X2
+9806 I                                        1   6 U#CX1
+     I                                        3   6 U#CX2
+9706 I            DS
+ .   I                                        1   6 S#ORNO
+9706 I                                        1   1 D#AREA
+0802AI            DS
+0802AI                                        1   6 D#CUNO
+0802AI                                        1   1 S1KIND
+0802AI                                        2   2 S1CUN1
+0802AI                                        3   5 S1CUN2
+0802AI                                        6   6 S1CD01
+     C**************************************************************
+     C*   程式參數接收區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1        結束旗標
+     C**************************************************************
+     C*   檔案搜尋欄位組合
+     C**************************************************************
+     C           K#GE      KLIST                           編號檔
+     C                     KFLD           GEKIND
+     C                     KFLD           GEPRIN
+     C*
+9706 C           K#MAST    KLIST                           訂單檔
+ .   C                     KFLD           K#OREA  1
+9706 C                     KFLD           K#ORNO  50
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+9908AC           *DATE     SUB  19000000  U#SYSD  80
+0209AC                     MOVEL'N'       S#YN
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C*   副程式開始
+     C**************************************************************
+     C*----------------------------------------
+     C*  宣告及初始變數
+     C*----------------------------------------
+     CSR         SR0000    BEGSR
+     C                     MOVEL'01'      W#PRID  2
+     C                     EXSR SR1100                     初始畫面一
+     C                     SETON                     52
+     C*
+     C                     Z-ADD0         X#NO1
+     C                     Z-ADD0         X#NO2
+     CSR                   ENDSR
+     C*
+     C************************************
+     C*  畫面一:輸入廠區及發票開立號碼
+     C************************************
+     CSR         SR1000    BEGSR
+     C*
+0601AC   22                MOVEL'Y'       W#IN22  1
+0601AC  N22                MOVEL*BLANKS   W#IN22
+     C*
+     C                     EXFMTAR067F1
+     C                     SETOF                     5152
+     C                     SETOF                     5354
+0802AC                     SETOF                     555657
+     C                     MOVEL*BLANK    S#MSG1
+     C*
+0601AC           W#IN22    IFEQ 'Y'
+0601AC                     MOVEL*ON       *IN22
+0601AC                     ENDIF
+     C*
+     C                     SELEC
+     C           *IN03     WHEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03
+     C                     MOVEL'00'      W#PRID
+     C*
+     C           *IN10     WHEQ '1'
+0209AC           S#YN      ANDEQ'N'
+0209AC           *IN22     OREQ '1'
+0209AC           S#YN      ANDEQ'Y'
+0410AC           *IN23     OREQ '1'
+     C                     EXSR SR1300                     存檔執行
+     C*
+     C                     OTHER
+     C                     EXSR SR1200                     檢核
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  初始畫面一
+     C*----------------------------------------
+     CSR         SR1100    BEGSR
+     C                     MOVELU#AREA    S#AREA
+     C*
+     C                     MOVEL'99'      GEKIND           已開日期
+     C                     MOVELS#AREA    GEPRIN
+     C           K#GE      CHAINGEREC               N69
+     C                     Z-ADDGECUNO    S#XDAT
+     C                     Z-ADDS#XDAT    S#DATE
+     C*
+     C                     EXSR SR1110                     設欄值
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一：設編號欄值並檢核之
+     C*----------------------------------------
+     CSR         SR1110    BEGSR
+     C                     MOVEL'T'       W#RTNV
+     C                     SETOF                     6263
+     C*
+     C                     MOVEL*BLANK    GEPRIN
+     C           S#DATE    DIV  100       U#XYM            設GEPRIN
+9806 C*          U#X2      IFEQ 0
+ .   C*          S#AREA    CAT  U#CX2:0   GEPRIN
+9806 C*                    ELSE
+     C           S#AREA    CAT  U#CX1:0   GEPRIN
+9806 C*                    ENDIF
+     C*
+     C                     MOVEL'01'      GEKIND           二聯式
+     C           K#GE      CHAINGEREC               N69
+     C           *IN69     IFEQ '1'
+     C                     MOVEL'F'       W#RTNV
+     C                     SETON                     5253
+     C                     SETON                     62
+     C                     ELSE
+     C                     MOVELGEPRE     S#PRE2
+     C                     Z-ADDGESTNO    S#STN2
+     C                     Z-ADDGEENNO    S#ENN2
+     C                     Z-ADDGECUNO    S#CUN2
+     C           S#ENN2    SUB  S#CUN2    S#LEV2
+     C                     ENDIF
+     C*
+     C                     MOVEL'02'      GEKIND           三聯式
+     C           K#GE      CHAINGEREC               N69
+     C           *IN69     IFEQ '1'
+     C                     MOVEL'F'       W#RTNV
+     C                     SETON                     5253
+     C                     SETON                     63
+     C                     ELSE
+     C                     MOVELGEPRE     S#PRE3
+     C                     Z-ADDGESTNO    S#STN3
+     C                     Z-ADDGEENNO    S#ENN3
+     C                     Z-ADDGECUNO    S#CUN3
+     C           S#ENN3    SUB  S#CUN3    S#LEV3
+     C                     ENDIF
+     C*
+     C   62N63             MOVELT#MSG,5   S#MSG1
+     C  N62 63             MOVELT#MSG,6   S#MSG1
+     C   62 63             MOVELT#MSG,7   S#MSG1
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一：檢核
+     C*----------------------------------------
+     CSR         SR1200    BEGSR
+     C                     MOVEL'F'       W#RTNV  1
+     C                     SETOF                     5153
+     C*
+     C           S#AREA    LOKUPT#TB1                    69
+     C           *IN69     IFEQ '0'
+     C                     MOVELT#MSG,8   S#MSG1           廠區錯誤
+     C                     SETON                     51
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*
+     C                     MOVEL'99'      GEKIND           已開日期
+     C                     MOVEL*BLANK    GEPRIN
+     C                     MOVELS#AREA    GEPRIN
+     C           K#GE      CHAINGEREC               N69
+     C                     Z-ADDGECUNO    S#XDAT
+     C*                                                    檢核日期
+     C                     MOVE S#DATE    P#DATE  8
+     C                     CALL 'UTS104R'
+     C                     PARM           P#DATE
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM '2'       P#MOD2  1
+     C                     PARM '0000'    P#DAYS  4
+     C                     PARM *BLANK    P#RTND  8
+     C                     PARM *BLANK    P#ERRC  1
+     C*
+     C           P#ERRC    IFNE '0'
+     C                     MOVELT#MSG,1   S#MSG1           日期錯誤
+     C                     SETON                     5253
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*
+9908AC           S#DATE    IFGT U#SYSD
+     C                     MOVELT#MSG,2   S#MSG1           大於系統日
+     C                     SETON                     5253
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*
+9908AC                     Z-ADDU#SYSD    W#LMDT  80       找上月底
+     C                     MOVE '01'      W#LMDT
+     C                     MOVE W#LMDT    P#DATE
+     C                     CALL 'UTS104R'
+     C                     PARM           P#DATE
+     C                     PARM '1'       P#MOD1
+     C                     PARM '1'       P#MOD2
+     C                     PARM '0001'    P#DAYS
+     C                     PARM *BLANK    P#RTND
+     C                     PARM *BLANK    P#ERRC
+     C                     MOVE P#RTND    W#LMDT           上月底
+     C*
+     C           S#DATE    IFLT S#XDAT
+     C           S#DATE    ANDNEW#LMDT
+     C                     MOVELT#MSG,3   S#MSG1           小於已開日
+     C                     SETON                     5253
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*
+9908AC                     Z-ADDU#SYSD    W#CRDT  80
+     C                     MOVE '03'      W#CRDT           本月三日
+     C           S#DATE    IFLT S#XDAT
+     C           S#DATE    ANDEQW#LMDT                     上月底
+9908AC           U#SYSD    ANDGTW#CRDT
+     C                     MOVELT#MSG,4   S#MSG1
+     C                     SETON                     5253
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*
+9706 C                     MOVEL*OFF      *IN40
+ .   C           S#CUNO    IFNE *BLANK
+ .   C           S#CUNO    CHAINCBCUST               40
+ .   C  N40                MOVELCBCUNM    S#CUNM
+ .   C   40                MOVEL*BLANK    S#CUNM
+0802AC   40                MOVELT#MSG,17  S#MSG1
+0802AC   40                SETON                     56
+0802AC   40                GOTO ES1200
+ .   C                     ENDIF
+ .   C*
+ .   C           S#ORNO    IFNE *BLANK
+ .   C           D#AREA    ANDNE'H'
+ .   C                     MOVELS#ORNO    K#OREA           地區別
+ .   C                     MOVE S#ORNO    K#ORNO           訂單號碼
+ .   C*
+ .   C           K#MAST    CHAINSAMAST               40
+ .   C  N40                MOVELS1CTNO    S#CTNO           工程編號
+ .   C   40                MOVEL*BLANK    S#CTNO
+0802AC   40                MOVELT#MSG,18  S#MSG1
+0802AC   40                SETON                     57
+0820AC   40                GOTO ES1200
+ .   C                     ENDIF
+9706 C*
+0802AC           S#CUNO    IFNE *BLANKS
+0802AC           S#ORNO    ANDNE*BLANKS
+0802AC           D#CUNO    ANDNES#CUNO
+0802AC                     MOVELT#MSG,16  S#MSG1
+0802AC                     SETON                     5657
+0802AC                     GOTO ES1200
+0802AC                     ENDIF
+     C*
+     C                     MOVELS#TXD1    W#TXM1  6
+     C                     MOVELS#TXD2    W#TXM2  6
+     C           W#TXM1    IFNE W#TXM2
+0209AC           S#YN      ANDEQ'N'
+  .  C                     MOVELT#MSG,9   S#MSG1
+0209AC                     SETON                     55
+  .  C                     GOTO ES1200
+     C                     ENDIF
+     C*
+0209AC           W#TXM1    IFEQ W#TXM2
+0209AC           S#YN      ANDEQ'Y'
+0209AC                     MOVELT#MSG,14  S#MSG1
+0209AC                     SETON                     55
+0209AC                     GOTO ES1200
+0209AC                     ENDIF
+0209AC*
+     C           S#TXD1    IFGT S#TXD2
+     C                     MOVELT#MSG,10  S#MSG1
+     C                     SETON                     54
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*
+     C           S#TXD2    IFGT S#DATE
+     C                     MOVELT#MSG,11  S#MSG1
+     C                     SETON                     54
+     C                     GOTO ES1200
+     C                     ENDIF
+0209AC*
+0209AC           S#YN      IFEQ 'Y'
+0209AC           *IN22     ANDEQ*OFF
+0209AC                     MOVELT#MSG,13  S#MSG1
+0209AC                     SETON                     55
+0209AC                     GOTO ES1200
+0209AC                     ENDIF
+     C*
+0410AC           S#CUNO    IFEQ *BLANKS
+0410AC           S#ORNO    ANDEQ*BLANKS
+0410AC           *IN23     ANDEQ*OFF
+0802AC                     SETON                     5657
+0410AC                     MOVELT#MSG,16  S#MSG1
+0410AC                     GOTO ES1200
+0410AC                     ENDIF
+     C*
+     C                     MOVELS#TXD1    W#TXM1
+     C                     MOVELS#DATE    W#TXM2
+0413 C*          W#TXM1    IFNE W#TXM2
+ .   C*                    MOVELT#MSG,12  S#MSG1
+ .   C*                    SETON                     54
+ .   C*                    GOTO ES1200
+ .   C*                    ENDIF
+     C*
+     C                     EXSR SR1110                     設定欄值
+     CSR         ES1200    ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一：存檔執行
+     C*----------------------------------------
+     CSR         SR1300    BEGSR
+     C                     EXSR SR1200
+     C           W#RTNV    IFEQ 'F'
+     C                     GOTO ES1300
+     C                     ENDIF
+     C*
+     C                     MOVELGEPRIN    X#GEPR           存參數
+     C                     MOVE S#DATE    X#DATE
+     C                     MOVE S#TXD1    X#TXD1
+     C                     MOVE S#TXD2    X#TXD2
+     C                     MOVEL'0'       P#IN03
+0412 C                     MOVE S#ORNO    X#ORNO
+0412 C                     MOVE S#CUNO    X#CUNO
+     C*
+     C           S#DATE    IFGE S#XDAT                     非上月最後
+     C                     MOVEL'99'      GEKIND           已開日期
+     C                     MOVEL*BLANK    GEPRIN
+     C                     MOVELS#AREA    GEPRIN
+     C           K#GE      CHAINGEREC                69
+     C                     Z-ADDS#DATE    GECUNO
+     C                     UPDATGEREC                      存檔
+     C                     ENDIF
+     C*
+0209AC           *IN22     IFEQ *ON
+0209AC                     CLEARRINVTLG
+0209AC                     MOVELS#AREA    LGAREA
+0209AC                     Z-ADDS#DATE    LGDATE
+0209AC                     Z-ADDS#TXD1    LGTXD1
+0209AC                     Z-ADDS#TXD2    LGTXD2
+0209AC                     MOVELS#CUNO    LGCUNO
+0209AC                     MOVELS#ORNO    LGORNO
+0209AC                     MOVELS#USID    LGENTM
+0209AC                     Z-ADDU#SYSD    LGENTD
+0209AC                     TIME           LGENTT
+0209AC                     WRITERINVTLG
+0209AC                     ENDIF
+0209AC*
+     C                     MOVEL'00'      W#PRID           結束
+     CSR         ES1300    ENDSR
+     C*
+     C**************************************************************
+** T#TB1
+P
+M
+T
+H
+K
+** T#MSG
+０１日期錯誤！
+０２日期不可大於系統日期！
+０３日期不可小於已開立日期！
+０４本月已超過五號，不可重開上月底的發票！
+０５該年月之二聯式字軌尚未輸入！
+０６該年月之三聯式字軌尚未輸入！
+０７該年月之字軌尚未輸入！
+０８輸入之廠區不合法！
+０９銷貨日期區間跨月，跨月欄位須選Y!!
+１０銷貨日期區間之起日不得大於止日！
+１１銷貨日期區間之止日不得大於發票日期！
+１２銷貨日期區間之年月必須與發票日期之年月相同！
+１３跨月開立發票請按F22執行!!
+１４銷貨日期區間非跨月，跨月欄位須選N!!
+１５客戶編號及訂單編號皆為空白，若要執行請按F23!!
+１６客戶編號與訂單編號對應有誤，請檢核!!
+１７客戶編號有誤，請檢核!!
+１８訂單編號有誤，請檢核!!
+

@@ -1,0 +1,55 @@
+        /******************************************************/
+        /*                                                    */
+        /*        >>   PROGRAM INTRODUCTION  <<               */
+        /*        1.PROGRAM-ID     ARE094P                    */
+        /*        2.PROGRAM-TYPE   CLP                        */
+        /*        3.AUTHOR         S02LBU                     */
+        /*        4.FUNCTION    應收票據代開傳票後更正作業*/
+        /*        5.DATE-WRITTEN   95/07/27                   */
+        /*        6.DATE-MODIFY                               */
+        /*                                                    */
+        /******************************************************/
+            PGM
+            DCL        VAR(&P#IN03)   TYPE(*CHAR) LEN(1)
+            DCL        VAR(&P#IN12)   TYPE(*CHAR) LEN(1)
+            DCL        VAR(&W#RVDT)   TYPE(*CHAR) LEN(8)
+            DCL        VAR(&W#RVNO)   TYPE(*CHAR) LEN(6)
+            DCL        VAR(&W#YEAR)   TYPE(*CHAR) LEN(2)
+            DCL        VAR(&W#MM)     TYPE(*CHAR) LEN(2)
+            DCL        VAR(&FILE)     TYPE(*CHAR) LEN(6)
+            DCL        VAR(&MBR)      TYPE(*CHAR) LEN(4)
+            DCL        VAR(&W#MM)     TYPE(*CHAR) LEN(2)
+            DCL        VAR(&W#USER)   TYPE(*CHAR) LEN(10)
+            DCL        VAR(&W#CHKF)   TYPE(*CHAR) LEN(1)
+
+            CALL       PGM(ARE094RS) PARM(&P#IN03)
+            IF         COND(&P#IN03 *EQ '1') THEN(RETURN)
+
+            RTVDTAARA  DTAARA(*LDA (301     8)) RTNVAR(&W#RVDT)
+            RTVDTAARA  DTAARA(*LDA (309     6)) RTNVAR(&W#RVNO)
+            RTVJOBA    USER(&W#USER)
+
+            CHGVAR     VAR(&W#YEAR)  VALUE(%SST(&W#RVDT 1 4))
+            CHGVAR     VAR(&W#MM)    VALUE(%SST(&W#RVDT 5 2))
+            CHGVAR     VAR(&W#CHKF)  VALUE(%SST(&W#USER 1 1))
+            CHGVAR     VAR(&FILE)    VALUE(ACPR)
+            CHGVAR     VAR(&MBR)     VALUE(VR || &W#MM)
+
+
+      /*    IF         COND(&W#CHKF *EQ 'F') THEN(DO)  */
+            IF         COND((&W#CHKF *EQ 'F')  *OR +
+                            (&W#CHKF *EQ 'S')) THEN(DO)
+            CALL       PGM(ARE094R1) PARM(&P#IN12)
+            IF         COND(&P#IN12 *EQ '1') THEN(RETURN)
+            ENDDO
+
+            ELSE DO
+            OVRDBF     FILE(ACTRAN) TOFILE(&FILE)
+            CALL       PGM(ARE094R2) PARM(&P#IN12)
+            IF         COND(&P#IN12 *EQ '1') THEN(RETURN)
+            ENDDO
+
+            DLTOVR     FILE(*ALL)
+
+            ENDPGM
+

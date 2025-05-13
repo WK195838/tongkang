@@ -1,0 +1,520 @@
+     H        1   Y                                     1                 BR003
+     FARE015S CF  E                    WORKSTN
+     F                                        RRN   KSFILE SF1
+     FRCVDTLL2UF  E           K        DISK
+     FAR2159F UF  E           K        DISK
+     FBANKAC  IF  E           K        DISK
+     FACTRAN  IF  E           K        DISK                      A
+     E*************************************************************
+     E                    ERR     1  13 70
+     E                    TAB1    1   6  1   TABR1  10
+     I*************************************************************
+     IAADS        DS
+     I                                       21  260YMD
+     I                                       21  220YY
+     I                                       23  240MM
+     I                                       25  260DD
+     IBBDS        DS
+     I                                       11  20 W02
+     I                                       11  11 W02TT1
+     I                                       12  12 W02TT2
+     I                                       13  20 W02TT3
+     I                                       21  30 W22
+     I                                       21  21 W22TT1
+     I                                       22  22 W22TT2
+     I                                       23  30 W22TT3
+      *
+     I            DS
+     I                                        1   6 RVNO
+     I                                        1   1 D#AREA
+      *
+     I            DS
+     I                                        1   6 VRNOX
+     I                                        2   60NO1
+     I                                       11  16 VRNON
+     I                                       12  160NO3
+     I            DS
+     I                                        1  12 RVRESV
+     I                                        1   1 REMK
+     I                                        2   5 RESV
+     I                                       12  12 D#RESV
+     I           UDS
+     I                                      301 3060D#YM
+     I                                      951 985 COMP
+     I                                     10011010 D#USER
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+      *****************************************************************
+      *                     PLIST
+      *****************************************************************
+      *     FILE => 確認金額
+     C           P#VDTL    PLIST
+     C                     PARM           RVNO
+     C                     PARM           RVITEM
+     C                     PARM 0         P#RAMT 110
+      *
+      *****************************************************************
+      *                    KEY  LIST
+      *****************************************************************
+      *
+      *     FILE => AR2159
+     C           K#2159    KLIST
+     C                     KFLD           RVCUNO
+     C                     KFLD           D#AREA
+      *
+     C           RVKEY     KLIST
+     C                     KFLD           RVDUDT
+     C                     KFLD           RVNTNO
+     C                     KFLD           RVNO
+     C                     KFLD           RVITEM
+     C           ACKEY     KLIST
+     C                     KFLD           ACTYPE
+     C                     KFLD           ACCURR
+     C                     KFLD           ACACNO
+     C           ACKEY1    KLIST
+     C                     KFLD           TXAR
+     C                     KFLD           D#YM
+     C                     KFLD           ACVRNO
+     C                     KFLD           ACITEM
+     C********************************
+     C*****                     ******
+     C*****  INITIAL VALUES     ******
+     C*****                     ******
+     C********************************
+     C* N90                Z-ADDUDATE     DATE0
+     C  N90                Z-ADDUDATE     DATE1
+     C  N90                Z-ADDUDATE     DATE2
+     C  N90                MOVE '1'       SCRN    1
+     C  N90                Z-ADD990       R#L01   30
+     C  N90                EXSR @FDNO
+     C  N90                MOVE '1'       *IN,90
+     C********************************
+     C*****                     ******
+     C*****     MAIN LOGIC      ******
+     C*****                     ******
+     C********************************
+     C           *IN03     DOUEQ'1'
+     C           SCRN      CASEQ'1'       SR#01
+     C           SCRN      CASEQ'2'       SR#02
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C********************************
+     C*****                     ******
+     C***** SCREEN 01 MAIN CTRL ******
+     C*****                     ******
+     C********************************
+     CSR         SR#01     BEGSR
+     C                     EXFMTTITLE
+     C   KC                EXSR KC#01
+     C   KC                GOTO SR#01Z
+     C                     EXSR CK#01
+     C  N99                EXSR PR#02
+     C  N99                MOVE '2'       SCRN
+     C   99                MOVE '1'       SCRN
+     CSR         SR#01Z    ENDSR
+     C********************************
+     C*****                     ******
+     C***** SCREEN 02 MAIN CTRL ******
+     C*****                     ******
+     C********************************
+     CSR         SR#02     BEGSR
+     C                     WRITEUND01
+     C                     EXFMTSFCTL1
+     C   KC                EXSR KC#01
+     C   KC                GOTO SR#02Z
+     C   KJ                EXSR KJ#02
+     C   KJ                GOTO SR#02Z
+     C   KL                EXSR KL#02
+     C   KL                GOTO SR#02Z
+     C                     EXSR CK#02
+     CSR         SR#02Z    ENDSR
+     C**----------------------------------------------**
+     C**  FIND LAST NO                                **
+     C**----------------------------------------------**
+     CSR         @FDNO     BEGSR
+     C                     MOVEL'A99999'  ACVRNO
+     C                     Z-ADD999       ACITEM
+     C                     SETOF                     95
+     C           ACKEY1    SETLLACTRAN
+     C                     READPACTRAN                   95
+     C  N95                MOVELACVRNO    TYPE    1
+     C  N95      TYPE      COMP 'A'                  9595
+     C  N95                MOVELACVRNO    VRNON
+     C  N95                ADD  1         NO3
+     C  N95                MOVELVRNON     VRNOX
+     C   95                MOVEL'A00001'  VRNOX
+     CSR                   ENDSR
+     C********************************
+     C*****                     ******
+     C*****   CF03 EXIT         ******
+     C*****                     ******
+     C********************************
+     CSR         KC#01     BEGSR
+     C                     SETON                     LR
+     C                     RETRN
+     CSR                   ENDSR
+     C********************************
+     C*****                     ******
+     C*****   CF10 SAVE         ******
+     C*****                     ******
+     C********************************
+     CSR         KJ#02     BEGSR
+     C                     EXSR CK#02
+     C  N99                EXSR FL#02
+     C  N99                EXSR KC#01
+     CSR         KJ#02Z    ENDSR
+     C********************************
+     C*****                     ******
+     C*****   CF12 PREVIOUS     ******
+     C*****                     ******
+     C********************************
+     CSR         KL#02     BEGSR
+     C                     MOVE *BLANK    ERRMSG
+     C                     MOVE '1'       SCRN
+     CSR         KL#02Z    ENDSR
+     C********************************
+     C*****                     ******
+     C*****   SCREEN 01 CKECK   ******
+     C*****                     ******
+     C********************************
+     CSR         CK#01     BEGSR
+     C                     SETOF                     414299
+     C                     SETOF                     434440
+     C                     MOVE *BLANK    ERRMSG
+      **
+     C           DATE1     IFGT DATE2
+     C                     SETON                     9941
+     C                     MOVELERR,2     ERRMSG
+     C                     ENDIF
+      **
+     C           DATE1     IFNE 0
+     C*                    CALL 'C01'
+     C*                    PARM DATE1     APDT    60
+     C*                    PARM ' '       FLAG    1
+     C*                    FREE 'C01'
+     C                     MOVE *ALL'0'   P#DATE
+     C                     MOVE DATE1     P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM           FLAG    1
+     C           FLAG      IFNE '0'
+     C                     SETON                     9941
+     C                     MOVELERR,1     ERRMSG
+     C                     ENDIF
+     C                     ENDIF
+      **
+     C*                    CALL 'C01'
+     C*                    PARM DATE2     APDT    60
+     C*                    PARM ' '       FLAG    1
+     C*                    FREE 'C01'
+     C                     MOVE *ALL'0'   P#DATE
+     C                     MOVE DATE2     P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM           FLAG    1
+     C           FLAG      IFNE '0'
+     C                     SETON                     9942
+     C                     MOVELERR,1     ERRMSG
+     C                     ENDIF
+     CSR         CK#01Z    ENDSR
+     C********************************
+     C*****                      *****
+     C*****   SCREEN 02 PREPARE  *****
+     C*****                      *****
+     C********************************
+     CSR         PR#02     BEGSR
+     C                     Z-ADD1         DSPREC
+     C                     MOVE *BLANK    ERRMSG
+     C                     SETON                     80
+     C                     WRITESFCTL1
+     C                     SETOF                     801051
+     C                     SETOF                     97
+     C                     Z-ADD0         RRN     30
+     C                     Z-ADDDATE1     RVDUDT
+     C                     MOVE *BLANK    RVNTNO
+     C           RVKEY     SETLLRCVDTLL2             97
+     C           *IN97     DOWEQ'0'
+     C                     READ RCVDTLL2            N    97
+     C  N97      RVDUDT    COMP DATE2                97
+     C   97                LEAVE
+     C           RVACNO    COMP '1131'               3131
+     C  N31      RVVNO2    COMP *BLANK                   31
+     C  N31      RVNTNO    COMP *BLANK                   31
+     C  N31      RVNTCD    COMP '1'                    31
+     C   31                ITER
+     C                     MOVELRVNO      TXARW   1
+     C           TXAR      COMP TXARW                3131
+     C   31                ITER
+     C           RVNTCD    IFEQ '2'
+     C           REMK      ANDNE'X'
+     C                     ITER
+     C                     ENDIF
+     C                     MOVELRVTBID    H01
+     C                     MOVELRVTANO    H02
+     C                     MOVELRVNO      H03
+     C                     MOVELRVITEM    H04
+     C                     MOVE *BLANK    ACT
+     C                     MOVELRVSBID    W01
+     C                     MOVELRVSANO    W02
+     C                     MOVELW02TT1    ACTYPE
+     C                     MOVELW02TT2    ACCURR
+     C                     MOVELW02TT3    ACACNO
+     C           ACKEY     CHAINBANKAC               31
+     C   31                MOVE *BLANK    ACBAID
+     C   31                MOVE *BLANK    ACBNAM
+     C                     MOVELACBAID    W01
+     C                     MOVELACBNAM    W01X
+     C                     MOVELRVNTNO    W03
+     C                     MOVE *BLANK    W04
+     C           RVNTTP    LOKUPTAB1      TABR1          31
+     C   31                MOVELTABR1     W04
+     C  N31                MOVEL'其他'  W04
+     C                     Z-ADDRVDUDT    W05
+     C                     Z-ADDRVRAMT    W06
+     C                     SETOF                     31
+     C           RVNTCD    COMP '2'                      31
+     C   31                MOVEL'Y'       W07
+     C  N31                MOVEL*BLANK    W07
+     C                     MOVELRVTBID    W21
+     C                     MOVELRVTANO    W22
+     C                     MOVELW22TT1    ACTYPE
+     C                     MOVELW22TT2    ACCURR
+     C                     MOVELW22TT3    ACACNO
+     C           ACKEY     CHAINBANKAC               31
+     C   31                MOVE *BLANK    ACBAID
+     C   31                MOVE *BLANK    ACBNAM
+     C                     MOVELACBAID    W21
+     C                     MOVELACBNAM    W21X
+     C                     MOVELRVNO      W23
+     C                     MOVELRVCUNM    W24
+     C                     MOVELRVDATE    W25
+     C                     MOVE *BLANK    W26
+     C           RVPLAC    COMP 'D'                      31
+     C   31                MOVEL'本埠'  W26
+     C           RVPLAC    COMP 'E'                      31
+     C   31                MOVEL'外埠'  W26
+     C                     MOVELRVUSTP    W27
+     C                     ADD  1         RRN
+     C                     WRITESF1
+     C           RRN       IFGT R#L01
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C           PR#02Y    TAG
+     C           RRN       IFEQ 0
+     C                     CLEARSF1
+     C                     MOVEL'END DATA'W01X
+     C                     ADD  1         RRN
+     C                     SETON                     51
+     C                     WRITESF1
+     C                     SETOF                     51
+     C                     ENDIF
+      *
+     C                     SETON                     10
+     CSR         PR#02Z    ENDSR
+     C********************************
+     C*****                      *****
+     C*****   SCREEN 02 CHECK    *****
+     C*****                      *****
+     C********************************
+     CSR         CK#02     BEGSR
+     C                     Z-ADD1         DSPREC
+     C                     SETOF                     31
+     C           *IN31     DOWEQ'0'
+     C                     READCSF1                      31
+     C  N31                Z-ADDRRN       DSPREC
+     C                     END
+      *
+     C                     SETOF                     994041
+     C                     SETOF                     424344
+     C                     MOVE *BLANK    ERRMSG
+      **
+     C*                    CALL 'C01'
+     C*                    PARM DATE0     APDT    60
+     C*                    PARM ' '       FLAG    1
+     C*                    FREE 'C01'
+     C           FLAG      IFNE '0'
+     C                     SETON                     9940
+     C                     MOVELERR,1     ERRMSG
+     C                     ENDIF
+     C***
+     C                     Z-ADD0         RRN
+     C                     SETOF                     97
+     C           *IN97     DOWEQ'0'
+     C                     ADD  1         RRN
+     C                     SETOF                     414243
+     C                     SETOF                     51
+     C           RRN       CHAINSF1                  97
+     C   97                LEAVE
+     C           ACT       COMP ' '                      31
+     C  N31      ACT       COMP 'Y'                      31
+     C  N31      ACT       COMP 'C'                      31
+     C  N31                SETON                     4199
+     C  N31                MOVELERR,3     ERRMSG
+      *
+     C           ACT       COMP 'Y'                      31
+     C   31      W07       COMP 'Y'                      31
+     C   31                SETON                     4199
+     C   31                MOVELERR,6     ERRMSG
+      *
+     C           ACT       IFEQ 'C'
+     C           W07       ANDEQ' '
+     C                     SETON                     4199
+     C                     MOVELERR,7     ERRMSG
+     C                     ENDIF
+      *
+     C*          *IN99     IFEQ '0'
+      *
+     C                     UPDATSF1
+     C                     ENDDO
+     CSR         CK#02Z    ENDSR
+     C********************************
+     C*****                      *****
+     C*****   WRITE DATA TO FILE *****
+     C*****                      *****
+     C********************************
+     CSR         FL#02     BEGSR
+     C                     Z-ADD0         RRN
+     C                     SETOF                     97
+     C           *IN97     DOWEQ'0'
+     C                     ADD  1         RRN
+     C           RRN       CHAINSF1                  97
+     C   97                LEAVE
+     C                     SETOF                     50
+     C           ACT       IFEQ 'Y'
+     C           ACT       OREQ 'C'
+     C           W07       ANDEQ'X'
+     C                     Z-ADDW05       RVDUDT
+     C                     MOVELW03       RVNTNO
+     C                     MOVELH03       RVNO
+     C                     MOVELH04       RVITEM
+     C           RVKEY     CHAINRCVDTLL2             31
+     C   31                ITER
+      *
+     C           ACT       IFEQ 'Y'
+     C                     SETON                     50
+     C                     MOVE '2'       RVNTCD
+     C*                    MOVE UDATE     RVNTDT
+     C                     MOVELVRNOX     RESV
+     C                     MOVEL'X'       REMK
+     C                     ELSE
+     C                     MOVE '1'       RVNTCD
+     C                     MOVEL*BLANK    RESV
+     C                     MOVEL' '       REMK
+     C                     ENDIF
+     C                     MOVEL'C'       RVFLAG
+     C                     MOVELTXAR      RVTXAR
+     C                     Z-ADDUDATE     RVTXDT
+     C                     MOVE *BLANK    W#RESV  1
+     C           D#RESV    IFEQ '*'
+     C                     MOVE '#'       D#RESV
+     C                     MOVE '#'       W#RESV  1
+     C                     ENDIF
+     C                     UPDATSF1
+     C                     UPDATRVREC
+     C                     CALL 'ARQ015R' P#VDTL
+     C           W#RESV    IFEQ '#'
+     C           K#2159    CHAINARREC                60
+     C                     MOVEL'C'       ARFLAG
+     C  N60                SUB  P#RAMT    ARAMT1
+     C  N60                ADD  P#RAMT    ARAMT3
+     C  N60                UPDATARREC
+     C                     ENDIF
+     C                     Z-ADD0         ITEM    30
+     C                     EXSR WR#01
+     C                     ADD  1         NO3
+     C                     MOVELVRNON     VRNOX
+     C                     ENDIF
+     C                     ENDDO
+     CSR         FL#02Z    ENDSR
+     C**------------------------------------------**
+     C**    DETAIL TIME  WRITE DATA TO ACTRAN     **
+     C**------------------------------------------**
+     CSR         WR#01     BEGSR
+     C**** WRITE TO 1112
+     C                     ADD  1         ITEM
+     C                     CLEARRACVOUR
+     C                     MOVEL'P'       ACVRTY
+     C                     MOVE TXAR      ACDM03
+     C                     MOVELTXAR      ACCARD
+     C                     MOVEL'A'       ACKIND
+     C                     MOVELTXAR      ACAREA           開立廠區
+     C                     Z-ADDD#YM      ACYM             年月
+     C                     Z-ADDRVNTDT    ACYMD
+     C                     MOVELVRNOX     ACVRNO
+     C                     Z-ADDITEM      ACITEM
+     C   50                MOVEL'C'       ACDC
+     C  N50                MOVEL'D'       ACDC
+     C                     MOVEL'1112'    ACNO
+     C                     MOVEL'C'       ACTYCO
+     C                     Z-ADDRVRAMT    ACAMT
+     C                     MOVELRVSANO    ACBKNO
+     C                     MOVEL'A'       ACSEPT
+     C                     MOVELRVNO      ACDSC1
+     C*
+     C                     MOVELD#USER    ACENTM           建檔人員
+     C                     MOVE UDATE     ACENTD           建檔日期
+     C                     TIME           ACENTT           建檔時間
+     C                     MOVELD#USER    ACUPDM           異動人員
+     C                     MOVE UDATE     ACUPDD           異動日期
+     C                     TIME           ACUPDT           異動時間
+     C                     WRITERACVOUR
+     C                     Z-ADDITEM      SIT1    30
+     C*
+     C**** WRITE TO 1131
+     C                     ADD  1         ITEM
+     C                     CLEARRACVOUR
+     C                     MOVEL'P'       ACVRTY
+     C                     MOVE TXAR      ACDM03
+     C                     MOVELTXAR      ACCARD
+     C                     MOVEL'A'       ACKIND
+     C                     MOVELTXAR      ACAREA           開立廠區
+     C                     Z-ADDD#YM      ACYM             年月
+     C                     Z-ADDRVNTDT    ACYMD
+     C                     MOVELVRNOX     ACVRNO
+     C                     Z-ADDITEM      ACITEM
+     C   50                MOVEL'D'       ACDC
+     C  N50                MOVEL'C'       ACDC
+     C                     MOVEL'1131'    ACNO
+     C                     MOVEL'H'       ACTYCO
+     C                     MOVELRVNTNO    ACRLNO
+     C                     MOVELRVDUDT    ACDUE
+     C                     MOVELRVCUNM    ACCSNM
+     C                     Z-ADDRVRAMT    ACAMT
+     C                     MOVEL'A'       ACSEPT
+     C                     MOVELRVNO      ACDSC1
+     C*
+     C                     MOVELD#USER    ACENTM           建檔人員
+     C                     MOVE UDATE     ACENTD           建檔日期
+     C                     TIME           ACENTT           建檔時間
+     C                     MOVELD#USER    ACUPDM           異動人員
+     C                     MOVE UDATE     ACUPDD           異動日期
+     C                     TIME           ACUPDT           異動時間
+     C                     WRITERACVOUR
+     C*
+     CSR                   ENDSR
+      ******************************* END PROGRAM *****************
+** ERR
+日期錯誤
+日期範圍錯誤
+處理代碼錯誤
+銀行代號錯誤
+銀行帳號錯誤
+此筆資料已退票不可再退票
+此筆資料未退票不可取消
+** TAB1
+A支票
+B背書支票
+C本票
+D背書本票
+E銀行本票
+I信用狀
+

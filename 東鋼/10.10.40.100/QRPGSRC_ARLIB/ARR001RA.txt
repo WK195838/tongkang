@@ -1,0 +1,236 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR001R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LWL
+     H*            4.FUNCTION     請款單列印作業
+     H*            5.DATE-WRITTEN  86/09/24
+     H*            6.DATE-MODIFY   86/11/11
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMSTL5IF  E           K        DISK
+     F            INREC                             KRENAMEINRECL5
+     FARR001PFUF  E           K        DISK                      A
+     FARR001SACF  E                    WORKSTN
+     F                                        RRN   KSFILE AR001F1
+     E                    ERR     1   2 70               *錯誤訊息
+     I           UDS
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVN
+     I                                     10211021 D#AREA
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*發票主檔FILE => INVMSTL5
+     C           K#VMST    KLIST
+     C                     KFLD           KAPNO1  7        *請款單號
+     C           K#ARPF    KLIST
+     C                     KFLD           ARCUNO           *客戶編號
+     C                     KFLD           ARAPNO           *請款單號
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C                     EXSR SR0000                     *初值設定
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           *初始畫面
+     C           W#PRID    CASEQ'02'      SR2000           * READC
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C                     RETRN
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*初值設定
+     C                     MOVE *OFF      *IN41            * CURSOR
+     C                     MOVE *ON       *IN50
+     C                     MOVE *OFF      *IN99
+     C* Clear subfile
+     C                     MOVE *ON       *IN74            *SFLCLR
+     C                     WRITEAR001F1C
+     C                     MOVE *OFF      *IN74            *SFLCLR
+     C                     Z-ADD1         RRN     20
+     C*將SFL畫面依1,2,3,4,5..順序排列
+     C           1         DO   5         I       10
+     C           0         DO   5         J       10
+     C           5         MULT J         W#TMP1  20
+     C                     Z-ADDRRN       SEQ
+     C           I         ADD  W#TMP1    S#ITEM
+     C                     CLEARS#APNO
+     C                     WRITEAR001F1
+     C                     ADD  1         RRN
+     C                     ENDDO1
+     C                     ENDDO1
+     C*
+     C                     MOVE '01'      W#PRID  2
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*起始畫面AR001F1C
+     C           W#PRID    DOWEQ'01'
+     C*
+     C           *IN50     IFEQ *OFF
+     C           *IN99     ANDEQ*OFF
+     C                     MOVE *ON       *INLR
+     C                     RETRN
+     C                     ENDIF
+     C*
+     C*                    CLEARAR001F1
+     C* Clear subfile
+     C*                    MOVE *ON       *IN74            *SFLCLR
+     C*                    WRITEAR001F1C
+     C*                    MOVE *OFF      *IN74            *SFLCLR
+     C*                    Z-ADD1         RRN     20
+     C*將SFL畫面依1,2,3,4,5..順序排列
+     C*          1         DO   5         I       10
+     C*          0         DO   5         J       10
+     C*          5         MULT J         W#TMP1  20
+     C*                    Z-ADDRRN       SEQ
+     C*          I         ADD  W#TMP1    S#ITEM
+     C*                    CLEARS#APNO
+     C*                    CLEARS#MARK
+     C*                    WRITEAR001F1
+     C*                    ADD  1         RRN
+     C*                    ENDDO1
+     C*                    ENDDO1
+     C*
+     C                     WRITEAR001H
+     C                     WRITEAR001FM
+     C                     EXFMTAR001F1C
+     C                     MOVEA'00'      *IN,41
+     C                     MOVE *OFF      *IN99
+     C                     MOVE *BLANK    S#ERR
+     C*F3=結束作業
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVE '02'      W#PRID
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*READC AR001F1
+     C                     Z-ADD1         RRN
+     C*
+     C           W#PRID    DOWEQ'02'
+     C                     READCAR001F1                9898*ER*EOF
+     C   98                MOVE '01'      W#PRID
+     C   98                LEAVE
+     C*
+     C           S#APNO    IFEQ '      '
+     C                     ITER
+     C                     ENDIF
+     C*資料檢核
+     C           RECHK     TAG
+     C                     EXSR SR3000
+     C*
+     C           S#ERR     IFNE *BLANK
+     C                     WRITEAR001H
+     C                     WRITEAR001FM
+     C                     EXFMTAR001F1C
+     C                     SETOF                     994142
+     C                     MOVE *BLANK    S#ERR
+     C                     READCAR001F1                9898*ER*EOF
+     C                     GOTO RECHK
+     C                     ELSE
+     C                     READCAR001F1                9898*ER*EOF
+     C                     EXSR SR3100
+     C                     MOVE *OFF      *IN50
+     C                     ENDIF
+     C*
+     C                     MOVE '01'      W#PRID
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C**************************************************************
+     C           SR3000    BEGSR
+     C**************************************************************
+     C*資料檢核
+     C           *IN98     DOWEQ*OFF
+8611 C                     MOVEA'00'      *IN,41
+     C*
+     C                     MOVELS#APNO    KAPNO1           *請款單號
+     C           K#VMST    CHAININRECL5              60    * NOT FOUND
+     C           *IN60     IFEQ *ON
+     C  N99                MOVE ERR,1     S#ERR
+     C                     SETON                     9941
+     C                     ENDIF
+     C*
+     C           S#MARK    IFNE 'Y'                        *備註
+     C           S#MARK    ANDNE' '
+     C  N99                MOVE ERR,2     S#ERR
+     C                     SETON                     9942
+     C                     ENDIF
+     C*
+     C                     SETON                     70    *SFLNXTCHG
+     C           SEQ       CHAINAR001F1              61    *1->NR
+     C  N61                UPDATAR001F1
+     C                     SETOF                     70
+     C*
+     C                     READCAR001F1                9898*ER*EOF
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C**************************************************************
+     C           SR3100    BEGSR
+     C**************************************************************
+     C*存入檔案ARR001PF
+     C           *IN98     DOWEQ*OFF
+8611 C                     MOVEA'00'      *IN,41
+     C*
+8611 C                     MOVELS#APNO    S#NUM            *請款單號
+8611 C                     MOVELS#APNO    KAPNO1           *請款單號
+     C           K#VMST    CHAININRECL5              60    * NOT FOUND
+     C           *IN60     IFEQ *OFF
+     C           INAPNO    ANDEQS#APNO
+     C                     MOVELINCUNO    ARCUNO           *客戶編號
+     C                     MOVELS#APNO    ARAPNO           *請款單號
+     C*
+     C           S#MARK    IFEQ 'Y'                        *備註
+     C                     MOVE '03'      W#PRID
+     C           W#PRID    DOWEQ'03'
+     C                     EXFMTAR001W1
+     C* F12 = EXIT AR001W1
+     C           *IN12     IFEQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     ENDIF
+     C*
+     C           K#ARPF    CHAINAR001PF              61
+     C                     MOVELS#DSP1    ARDSP1           *備註1
+     C                     MOVELS#DSP2    ARDSP2           *備註2
+     C                     MOVELS#DSP3    ARDSP3           *備註3
+     C                     MOVELS#DSP4    ARDSP4           *備註4
+     C                     MOVELS#DSP5    ARDSP5           *備註5
+     C  N61                UPDATAR001PF
+     C   61                WRITEAR001PF
+     C*
+     C                     ENDIF
+     C                     READCAR001F1                9898*ER*EOF
+     C                     MOVE *BLANK    S#DSP1           *備註1
+     C                     MOVE *BLANK    S#DSP2           *備註2
+     C                     MOVE *BLANK    S#DSP3           *備註3
+     C                     MOVE *BLANK    S#DSP4           *備註4
+     C                     MOVE *BLANK    S#DSP5           *備註5
+     C                     MOVE *BLANK    ARDSP1           *備註1
+     C                     MOVE *BLANK    ARDSP2           *備註2
+     C                     MOVE *BLANK    ARDSP3           *備註3
+     C                     MOVE *BLANK    ARDSP4           *備註4
+     C                     MOVE *BLANK    ARDSP5           *備註5
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C**************************************************************
+**  ERR
+01-請款單號輸入錯誤！
+02-備註欄位需為空白或Y！
+

@@ -1,0 +1,706 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE043R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     客戶暫收款編修程式
+     H*            5.DATE-WRITTEN  88/11/31
+     H*            6.UPDATE  DATE  99/02/06 2010AR434 S00WCJ (9902A)
+     H*                            99/08/24 2010AR517 S00WCJ (9908A)
+     H*                           100/08/16 2011AR621 S00WCJ (0008A)
+     H*                            客戶現金餘額計算列入暫收未兌現金額
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARE043S CF  E                    WORKSTN
+     F                                        RRN1  KSFILE AR043F1
+     FAR2159D UF  E           K        DISK                      A
+     FAR2159Z IF  E           K        DISK
+     F            RAR2159D                          KRENAMERAR2159Z
+     FAR2159F UF  E           K        DISK                      A
+     FHSCONT  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FCAMBALT O   E           K        DISK
+     E*************************************************************
+     E                    T#MSG   1  11 70
+     E                    TAB1    1   5  1
+     I*************************************************************
+     IRAR2159Z
+     I              ADFLAG                          F#FLAG
+     I              ADCUNO                          F#CUNO
+     I              ADAREA                          F#AREA
+     I              ADORNO                          F#ORNO
+     I              ADAMT1                          F#AMT1
+     I              ADAMT2                          F#AMT2
+     I              ADAMT3                          F#AMT3
+     I              ADAMT4                          F#AMT4
+     I              ADAMT5                          F#AMT5
+     I              ADAMT6                          F#AMT6
+     I              ADRESV                          F#RESV
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1  140W#SYST
+     I                                        1   60D#ST
+     I                                        7  100D#SY
+     I                                       11  140D#SMD
+     I            DS
+     I                                        1  10 W#DSPN
+     I                                        9  10 D#DSIT
+     I            DS
+     I                                        1   6 D#ORNO
+     I                                        1   1 D#AREA
+     I                                        2   60D#CNUM
+     C**************************************************************
+     C*   檔案搜尋欄位組合
+     C**************************************************************
+     C*FILE==>AR2159D(暫收統計檔)
+     C           K#2159    KLIST                           　　　　　
+     C                     KFLD           ADCUNO
+     C                     KFLD           ADAREA
+     C                     KFLD           ADORNO
+     C*FILE==>AR2159F(暫收統計檔)
+     C           K#AR      KLIST                           　　　　　
+     C                     KFLD           ARCUNO
+     C                     KFLD           ARAREA
+     C*FILE==>AR2159Z(暫收統計檔)
+     C           K#ARZ     KLIST                           　　　　　
+     C                     KFLD           F#CUNO
+     C                     KFLD           F#AREA
+     C                     KFLD           F#ORNO
+     C*FILE==>HSCONT(買賣合約書檔)
+     C           K#HSNT    KLIST                           　　　　　
+     C                     KFLD           SBAREA
+     C                     KFLD           SBCNUM
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000           畫面二
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C*   副程式開始
+     C**************************************************************
+     C*----------------------------------------
+     C*  宣告及初始變數
+     C*----------------------------------------
+     CSR         SR0000    BEGSR
+     C                     Z-ADD10        N#PAG1  20       SF1筆數
+     C                     MOVEL'01'      W#PRID  2        函式代號
+     C                     MOVEL'F'       W#RTNV  1        函式返回值
+     C                     MOVEL'F'       W#SFE1  1        SF1結束
+     C                     Z-ADD0         RRN1    40
+     C*
+     C                     MOVEL*BLANK    S#INK1
+     C                     EXSR SR1100                     初始畫面一
+     C                     SETON                     51
+     CSR                   ENDSR
+     C*
+     C************************************
+     C*  畫面一:選擇客戶編號
+     C************************************
+     CSR         SR1000    BEGSR
+     C                     WRITEAR043F1M
+     C           S#SFN1    IFEQ 0
+     C                     SETOF                     7273
+     C                     SETON                     71
+     C                     ELSE                            有資料
+     C                     SETOF                     73
+     C                     SETON                     7172
+     C                     ENDIF
+     C           W#SFE1    IFEQ 'T'
+     C                     SETON                     74
+     C                     ELSE
+     C                     SETOF                     74
+     C                     ENDIF
+     C                     EXFMTAR043F1C
+     C*
+     C                     SETOF                     51
+     C                     MOVEL*BLANK    S#MSG1
+     C           S#CRN1    IFNE 0
+     C                     Z-ADDS#CRN1    S#NBR1
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           *IN03     WHEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'00'      W#PRID
+     C           *IN91     WHEQ '1'                        向下翻頁
+     C                     EXSR SR1300
+     C           *IN92     WHEQ '1'                        向上翻頁
+     C                     EXSR SR1400
+     C           *IN05     WHEQ '1'                        重新顯示
+     C                     EXSR SR1500
+     C           *IN06     WHEQ '1'                        新增
+     C                     EXSR SR1600
+     C*
+     C                     OTHER                           執行鍵
+     C                     EXSR SR1200
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  初始畫面一(指向指定的記錄)
+     C*----------------------------------------
+     CSR         SR1100    BEGSR
+     C                     MOVELS#INK1    ADCUNO
+     C           ADCUNO    SETLLRAR2159D             69
+     C           *IN69     IFEQ '1'
+     C           *HIVAL    SETGTRAR2159D             69
+     C                     EXSR SR1130                     向前讀一頁
+     C                     ENDIF
+     C*
+     C                     EXSR SR1110                     清除SF
+     C                     EXSR SR1120                     讀入SF
+     C*
+     C                     Z-ADD1         S#NBR1           指向第一筆
+     CSR         ES1100    ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一清除SF
+     C*----------------------------------------
+     CSR         SR1110    BEGSR
+     C                     MOVEL*BLANK    S#MSG1
+     C                     SETOF                     7172
+     C                     SETON                     73    清除 SF
+     C                     WRITEAR043F1C
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一向下讀入SF (從目前的檔案位置)
+     C*----------------------------------------
+     CSR         SR1120    BEGSR
+     C                     MOVEL'F'       W#SFE1
+     C                     Z-ADD0         S#SFN1
+     C                     Z-ADD0         RRN1
+     C*
+     C           1         DOWEQ1                          讀取迴圈
+     C                     READ RAR2159D            N    69
+     C           *IN69     IFEQ '1'
+     C                     MOVEL'T'       W#SFE1
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ADD  1         S#SFN1
+     C           S#SFN1    IFGT N#PAG1                     已滿一頁
+     C                     Z-ADDN#PAG1    S#SFN1
+     C                     LEAVE
+     C                     ENDIF
+     C                     ADD  1         RRN1
+     C                     CLEARAR043F1
+     C                     EXSR SR1121                     搬移資料
+     C                     WRITEAR043F1
+     C                     ENDDO                           讀取迴圈
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一向讀入記錄之搬移資料
+     C*----------------------------------------
+     CSR         SR1121    BEGSR
+     C                     MOVELADCUNO    S#CUNO
+     C                     MOVEL*BLANK    S#CUNM
+     C           S#CUNO    CHAINCBCUST               69
+     C  N69                MOVELCBCUNM    S#CUNM
+     C                     MOVELADAREA    S#AREA
+     C                     MOVELADORNO    S#ORNO
+     C*
+9010 C           ADAMT1    ADD  ADAMT3    S#TAMT
+9010 C                     ADD  ADAMT4    S#TAMT
+9010 C*                    Z-ADDADAMT1    S#AMT1
+     C                     Z-ADDADAMT2    S#AMT2
+9010 C*                    Z-ADDADAMT3    S#AMT3
+9010 C           ADAMT1    ADD  ADAMT4    S#NBAL
+9010 C                     SUB  ADAMT2    S#NBAL
+0008AC                     ADD  ADAMT3    S#NBAL
+     C*
+     C                     MOVELADRESV    S#RESV
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一向上移動記錄(從目前的檔案位置)
+     C*----------------------------------------
+     CSR         SR1130    BEGSR
+     C                     Z-ADD0         S#SFN1
+     C*
+     C           1         DOWEQ1
+     C                     READPRAR2159D            N    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ADD  1         S#SFN1
+     C           S#SFN1    IFGT N#PAG1                     多一筆
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           *IN69     IFEQ '1'
+     C           *LOVAL    SETLLRAR2159D             69
+     C                     MOVEL'T'       W#SFB1  1        已達檔頭
+     C                     ELSE
+     C                     MOVEL'F'       W#SFB1           未達檔頭
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一：執行
+     C*----------------------------------------
+     CSR         SR1200    BEGSR
+     C           S#INK1    IFNE *BLANK
+     C                     EXSR SR1100
+     C                     MOVEL*BLANK    S#INK1
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*
+     C           1         DO   S#SFN1    RRN1
+     C           RRN1      CHAINAR043F1              69
+     C                     SELEC
+     C           S#OPT1    WHEQ '2'
+     C                     Z-ADDRRN1      S#NBR1
+     C                     MOVEL*BLANK    S#OPT1
+     C                     UPDATAR043F1
+     C                     MOVEL'02'      W#PRID
+     C                     MOVEL'C'       W#EDTP
+     C                     EXSR SR2100
+     C                     GOTO ES1200
+     C                     ENDSL
+     C                     ENDDO
+     C*
+     C                     SETON                     51
+     CSR         ES1200    ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一：向下翻一頁
+     C*----------------------------------------
+     CSR         SR1300    BEGSR
+     C           W#SFE1    IFEQ 'T'
+     C                     MOVELT#MSG,2   S#MSG1           已達檔底
+     C                     GOTO ES1300
+     C                     ENDIF
+     C*
+     C           S#SFN1    IFNE 0                          本頁有資料
+     C                     Z-ADDS#SFN1    RRN1
+     C           RRN1      CHAINAR043F1              69
+     C                     MOVELS#CUNO    ADCUNO
+     C                     MOVELS#AREA    ADAREA
+     C                     MOVELS#ORNO    ADORNO
+     C           K#2159    CHAINRAR2159D            N69    移至本頁尾
+     C                     ENDIF                           本頁有資料
+     C*
+     C                     EXSR SR1110                     清除SF
+     C                     EXSR SR1120                     讀入SF
+     C           S#NBR1    IFGT S#SFN1
+     C                     Z-ADD1         S#NBR1
+     C                     ENDIF
+     CSR         ES1300    ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一：向上翻一頁
+     C*----------------------------------------
+     CSR         SR1400    BEGSR
+     C           S#SFN1    IFNE 0                          本頁有資料
+     C                     Z-ADD1         RRN1
+     C           RRN1      CHAINAR043F1              69
+     C                     MOVELS#CUNO    ADCUNO
+     C                     MOVELS#AREA    ADAREA
+     C                     MOVELS#ORNO    ADORNO
+     C           K#2159    CHAINRAR2159D            N69    移至本頁頭
+     C                     ENDIF                           本頁有資料
+     C*
+     C                     EXSR SR1130                     向前移動
+     C                     EXSR SR1110                     清除SF
+     C                     EXSR SR1120                     讀入SF
+     C*
+     C           W#SFB1    IFEQ 'T'
+     C                     MOVELT#MSG,3   S#MSG1           己達檔頭
+     C                     ENDIF
+     CSR         ES1400    ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一：重新顯示
+     C*----------------------------------------
+     CSR         SR1500    BEGSR
+     C           S#SFN1    IFEQ 0                          本頁無資料
+     C           *HIVAL    SETGTRAR2159D
+     C                     EXSR SR1130                     向前讀一頁
+     C*
+     C                     ELSE
+     C                     Z-ADD1         RRN1
+     C           RRN1      CHAINAR043F1              69
+     C                     MOVELS#CUNO    ADCUNO
+     C                     MOVELS#AREA    ADAREA
+     C                     MOVELS#ORNO    ADORNO
+     C           K#2159    CHAINRAR2159D            N69    移至本頁頭
+     C                     READPRAR2159D            N    69前移一筆
+     C           *IN69     IFEQ '1'
+     C           *LOVAL    SETLLRAR2159D
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     EXSR SR1110                     清除SF
+     C                     EXSR SR1120                     讀入SF
+     C*
+     C           S#NBR1    IFGT S#SFN1
+     C                     Z-ADD1         S#NBR1
+     C                     ENDIF
+     CSR         ES1500    ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一：新增
+     C*----------------------------------------
+     CSR         SR1600    BEGSR
+     C                     MOVEL'02'      W#PRID
+     C                     MOVEL'A'       W#EDTP  1
+     C                     EXSR SR2100
+     CSR                   ENDSR
+     C*
+     C************************************
+     C*  畫面二:編輯資料
+     C************************************
+     CSR         SR2000    BEGSR
+     C                     EXFMTAR043F2                    螢幕輸入
+     C*
+     C                     MOVEL*BLANK    S#MSG2
+     C*
+     C                     SELEC
+     C           *IN03     WHEQ '1'
+     C                     MOVEL'00'      W#PRID           結束
+     C           *IN12     WHEQ '1'
+     C                     MOVEL'01'      W#PRID           回前畫面
+     C                     EXSR SR1500
+     C           *IN10     WHEQ '1'
+     C                     EXSR SR2300                     存檔
+     C           *IN91     WHEQ '1'
+     C                     EXSR SR2400                     上筆
+     C           *IN92     WHEQ '1'
+     C                     EXSR SR2500                     下筆
+     C*
+     C                     OTHER
+     C                     EXSR SR2200                     檢核
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面二：初始
+     C*----------------------------------------
+     CSR         SR2100    BEGSR
+     C           W#EDTP    IFEQ 'C'
+     C                     MOVEL'修改'  S#EDTP
+     C                     SETON                     52
+     C           S#CUNO    CHAINCBCUST               69
+     C  N69                MOVELCBCUNM    S#CUNM
+     C*
+     C                     MOVELS#CUNO    ADCUNO
+     C                     MOVELS#AREA    ADAREA
+     C                     MOVELS#ORNO    ADORNO
+     C           K#2159    CHAINRAR2159D            N69
+9010 C           ADAMT1    ADD  ADAMT3    S#TAMT
+9010 C                     ADD  ADAMT4    S#TAMT
+     C                     Z-ADDADAMT1    S#AMT1
+     C                     Z-ADDADAMT2    S#AMT2
+     C                     Z-ADDADAMT3    S#AMT3
+9010 C                     Z-ADDADAMT4    S#AMT4
+9010 C*          ADAMT1    ADD  ADAMT3    S#NBAL
+9010 C*                    SUB  ADAMT2    S#NBAL
+9010 C           ADAMT1    ADD  ADAMT4    S#NBAL
+9010 C                     SUB  ADAMT2    S#NBAL
+0008AC                     ADD  ADAMT3    S#NBAL
+     C                     MOVELADRESV    S#RESV
+     C                     ENDIF
+     C*
+     C           W#EDTP    IFEQ 'A'
+     C                     MOVEL'新增'  S#EDTP
+     C                     SETOF                     52
+     C                     MOVEL*BLANK    S#CUNO
+     C                     MOVEL*BLANK    S#CUNM
+     C                     MOVELU#AREA    S#AREA
+     C                     MOVEL*BLANK    S#ORNO
+     C                     Z-ADD0         S#AMT1
+     C                     Z-ADD0         S#AMT2
+     C                     Z-ADD0         S#AMT3
+9010 C                     Z-ADD0         S#AMT4
+     C                     Z-ADD0         S#NBAL
+     C                     MOVEL*BLANK    S#RESV
+     C                     ENDIF
+     C*
+     C                     SETOF                     535455
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面二：檢核
+     C*----------------------------------------
+     CSR         SR2200    BEGSR
+     C                     MOVEL'F'       W#RTNV  1
+     C                     MOVEA'0000'    *IN,53
+     C                     MOVEL*BLANK    W#CUNO  6
+     C*
+     C           W#EDTP    IFEQ 'A'                        新增模式
+     C                     MOVELS#CUNO    ADCUNO
+     C                     MOVELS#AREA    ADAREA
+     C                     MOVELS#ORNO    ADORNO
+     C           K#2159    CHAINRAR2159D            N69
+     C           *IN69     IFEQ '0'                        已存在
+     C                     SETON                     53
+     C                     MOVELT#MSG,4   S#MSG2
+     C                     GOTO ES2200
+     C                     ENDIF
+     C                     ENDIF                           新增模式
+     C*
+     C           S#AREA    LOKUPTAB1                     69
+     C           *IN69     IFEQ '0'                        廠區不符
+     C                     SETON                     54
+     C                     MOVELT#MSG,5   S#MSG2
+     C                     GOTO ES2200
+     C                     ENDIF
+     C*
+     C           S#ORNO    IFEQ *BLANK
+     C                     SETON                     56
+     C                     MOVELT#MSG,9   S#MSG2
+     C                     GOTO ES2200
+     C                     ENDIF
+     C*
+     C                     MOVELS#ORNO    D#ORNO
+     C                     MOVELD#AREA    SBAREA
+     C                     Z-ADDD#CNUM    SBCNUM
+     C           K#HSNT    CHAINRHSCONT              40
+     C           *IN40     IFEQ *ON
+     C                     SETON                     56
+     C                     MOVELT#MSG,11  S#MSG2
+     C                     GOTO ES2200
+     C                     ELSE
+     C                     MOVELSBCUID    W#CUNO
+     C                     MOVE SBCUCD    W#CUNO
+     C           W#CUNO    IFNE S#CUNO
+     C                     SETON                     56
+     C                     MOVELT#MSG,10  S#MSG2
+     C                     GOTO ES2200
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C*
+     C           S#AMT2    IFGT 0
+     C           S#AMT1    IFGT 0
+     C                     MOVELT#MSG,8   S#MSG2
+     C                     SETON                     55
+     C                     GOTO ES2200
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVEL'T'       W#RTNV
+     CSR         ES2200    ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面二：存檔
+     C*----------------------------------------
+     CSR         SR2300    BEGSR
+     C                     EXSR SR2200
+     C           W#RTNV    IFEQ 'F'
+     C                     GOTO ES2300
+     C                     ENDIF
+     C*
+     C                     MOVELS#CUNO    ADCUNO
+     C                     MOVELS#AREA    ADAREA
+     C                     MOVELS#ORNO    ADORNO
+     C           K#2159    CHAINRAR2159D             69
+     C*
+     C                     EXSR SR2310                     授信集中
+     C*
+     C  N69                MOVEL'C'       ADFLAG
+     C   69                MOVEL'A'       ADFLAG
+     C*
+     C                     MOVELS#CUNO    ADCUNO
+     C                     MOVELS#AREA    ADAREA
+     C                     MOVELS#ORNO    ADORNO
+     C                     Z-ADDS#AMT1    ADAMT1
+     C                     Z-ADDS#AMT2    ADAMT2
+     C                     Z-ADDS#AMT3    ADAMT3
+9010 C                     Z-ADDS#AMT4    ADAMT4
+     C                     Z-ADD0         ADAMT5
+     C                     Z-ADD0         ADAMT6
+     C                     MOVELS#RESV    ADRESV
+9902AC   69                Z-ADD0         ADAMT7
+9902AC   69                Z-ADD0         ADAMT8
+9902AC   69                Z-ADD0         ADAMT9
+9902AC   69                Z-ADD0         ADAM10
+     C*
+     C  N69                UPDATRAR2159D
+     C   69                WRITERAR2159D
+     C*
+     C*異動AR2159F
+     C                     Z-ADD0         W#AMTA 110
+     C                     Z-ADD0         W#AMTB 110
+     C                     Z-ADD0         W#AMTC 110
+     C                     Z-ADD0         W#AMTD 110
+     C                     Z-ADD0         W#AMTE 110
+     C                     Z-ADD0         W#AMTF 110
+     C*
+     C                     MOVELADCUNO    F#CUNO
+     C                     MOVELADAREA    F#AREA
+     C                     MOVEL*BLANK    F#ORNO
+     C           K#ARZ     SETLLRAR2159Z
+     C                     MOVEL*OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ RAR2159Z                 41
+     C   41                LEAVE
+     C*
+     C           F#CUNO    IFNE ADCUNO
+     C           F#AREA    ORNE ADAREA
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ADD  F#AMT1    W#AMTA
+     C                     ADD  F#AMT2    W#AMTB
+     C                     ADD  F#AMT3    W#AMTC
+     C                     ADD  F#AMT4    W#AMTD
+     C                     ADD  F#AMT5    W#AMTE
+     C                     ADD  F#AMT6    W#AMTF
+     C*
+     C                     ENDDO
+     C*
+     C                     MOVELADCUNO    ARCUNO
+     C                     MOVELADAREA    ARAREA
+     C           K#AR      CHAINARREC                69
+     C                     MOVELADFLAG    ARFLAG
+     C                     MOVELADCUNO    ARCUNO
+     C                     MOVELADAREA    ARAREA
+     C                     Z-ADDW#AMTA    ARAMT1
+     C                     Z-ADDW#AMTB    ARAMT2
+     C                     Z-ADDW#AMTC    ARAMT3
+     C                     Z-ADDW#AMTD    ARAMT4
+     C                     Z-ADDW#AMTE    ARAMT5
+     C                     Z-ADDW#AMTF    ARAMT6
+     C                     MOVELADRESV    ARRESV
+9902AC   69                Z-ADD0         ARAMT7
+9902AC   69                Z-ADD0         ARAMT8
+9902AC   69                Z-ADD0         ARAMT9
+9902AC   69                Z-ADD0         ARAM10
+     C  N69                UPDATARREC
+     C   69                WRITEARREC
+     C*
+     C           W#EDTP    IFEQ 'A'
+     C                     EXSR SR2100                     初始畫面
+     C                     MOVELT#MSG,7   S#MSG2
+     C                     ELSE
+     C                     MOVELT#MSG,1   S#MSG2
+     C                     ENDIF
+     CSR         ES2300    ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面二：下筆
+     C*----------------------------------------
+     CSR         SR2400    BEGSR
+     C           W#EDTP    IFEQ 'A'                        新增不可
+     C                     MOVELT#MSG,6   S#MSG2
+     C                     GOTO ES2400
+     C                     ENDIF
+     C*
+     C                     MOVELS#CUNO    ADCUNO
+     C                     MOVELS#AREA    ADAREA
+     C                     MOVELS#ORNO    ADORNO
+     C           K#2159    CHAINRAR2159D            N69
+     C                     READ RAR2159D            N    69
+     C           *IN69     IFEQ '0'
+     C                     MOVELADCUNO    S#CUNO
+     C                     MOVELADAREA    S#AREA
+     C                     MOVELADORNO    S#ORNO
+     C                     EXSR SR2100                     初始畫面
+     C                     ELSE
+     C                     MOVELT#MSG,2   S#MSG2
+     C                     ENDIF
+     CSR         ES2400    ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面二：上筆
+     C*----------------------------------------
+     CSR         SR2500    BEGSR
+     C           W#EDTP    IFEQ 'A'                        新增不可
+     C                     MOVELT#MSG,6   S#MSG2
+     C                     GOTO ES2500
+     C                     ENDIF
+     C*
+     C                     MOVELS#CUNO    ADCUNO
+     C                     MOVELS#AREA    ADAREA
+     C                     MOVELS#ORNO    ADORNO
+     C           K#2159    CHAINRAR2159D            N69
+     C                     READPRAR2159D            N    69
+     C           *IN69     IFEQ '0'
+     C                     MOVELADCUNO    S#CUNO
+     C                     MOVELADAREA    S#AREA
+     C                     MOVELADORNO    S#ORNO
+     C                     EXSR SR2100                     初始畫面
+     C                     ELSE
+     C                     MOVELT#MSG,3   S#MSG2
+     C                     ENDIF
+     CSR         ES2500    ENDSR
+     C*
+     C*==============================================================
+     C*  扣預收款寫入授信集中管控異動記錄並傳回值
+     C*==============================================================
+     CSR         SR2310    BEGSR
+     C           *IN69     IFEQ '0'                        記錄存在
+     C                     Z-ADDADAMT1    W#AMT1 110
+     C                     ELSE
+     C                     Z-ADD0         W#AMT1
+     C                     ENDIF
+     C*
+     C           S#AMT1    SUB  W#AMT1    W#XAMT 110       異動金額
+     C           W#XAMT    IFEQ 0
+     C                     GOTO ES2310
+     C                     ENDIF
+     C*
+     C                     MOVELS#DEVI    W#DSPN           更改終端機
+     C           W#DSIT    IFEQ 99                         以避免重複
+     C                     Z-ADD0         W#DSIT  20
+     C                     ELSE
+     C                     ADD  1         W#DSIT
+     C                     ENDIF
+     C                     MOVE W#DSIT    D#DSIT
+     C*
+     C                     CLEARCTREC
+9908AC*                    Z-ADDUDATE     CTDATE           日期
+9908AC           *DATE     SUB  19000000  CTDATE           日期
+     C                     TIME           W#SYST
+     C                     Z-ADDD#ST      CTTIME           時間
+     C                     MOVELU#AREA    CTAREA           廠區
+     C                     MOVELW#DSPN    CTDSPN           終端機
+     C                     MOVELU#USID    CTUSER           使用者
+     C                     MOVELS#CUNO    CTCUNO           客戶
+     C                     MOVEL'AC01'    CTTXID           異動代號
+     C                     MOVEL'ARE043R' CTAPNO           單據編號
+     C                     Z-ADDW#XAMT    CTXAMT           異動金額
+     C                     WRITECTREC
+     C*
+     C           'CCLIB/CC'CAT  'P300P':0 W#PGMN 13         CCP300P
+     C                     CALL W#PGMN                     呼叫介面
+     CSR         ES2310    ENDSR
+     C*
+     C**************************************************************
+** T#MSG
+０１－資料異動已存檔完畢。
+０２－已達檔底。
+０３－已達檔頭。
+０４－輸入之客戶，廠區及訂單暫收款記錄已存在，請用修改的方式異動資料。
+０５－輸入的廠區不存在！
+０６－新增狀態不可移動記錄！
+０７－新增記錄已存檔完畢，要終止新增作業請按F12。
+０８－暫收繳貨款金額不正確，尚有現金可扣抵！
+０９－訂單編號不可空白！
+１０－該訂單編號不屬於該客戶！
+１１－該訂單編號不存在！
+** TAB1
+P
+M
+T
+H
+K
+

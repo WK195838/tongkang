@@ -1,0 +1,94 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR125P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02LBU                                  */
+     /*     4.FUNCTION     廠區別隨車折扣明細表                 */
+     /*     5.DATE-WRITTEN  95/04/26                                */
+     /*                                                             */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN12)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&YMD1)   TYPE(*DEC)  LEN(8 0)
+             DCL        VAR(&YMD2)   TYPE(*DEC)  LEN(8 0)
+             DCL        VAR(&YMDA)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&YMDB)   TYPE(*CHAR) LEN(8)
+
+
+             RTVJOBA    TYPE(&INT) OUTQ(&OUTQ)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+ RDSP:
+             CHGVAR     VAR(&IN03)    VALUE('0')
+             CHGVAR     VAR(&IN12)    VALUE('0')
+             CALL       PGM(ARR125RS) PARM(&IN03 &YMD1 &YMD2)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGVAR     VAR(&YMDA)        VALUE(&YMD1)
+             CHGVAR     VAR(&YMDB)        VALUE(&YMD2)
+             CHGDTAARA  DTAARA(*LDA ( 1 8)) VALUE(&YMDA)
+             CHGDTAARA  DTAARA(*LDA (11 8)) VALUE(&YMDB)
+
+             SBMJOB     JOB(ARR125P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARR125P')
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA ( 1 8)) RTNVAR(&YMDA)
+             RTVDTAARA  DTAARA(*LDA (11 8)) RTNVAR(&YMDB)
+
+             CALL       PGM(ARP102P)
+
+             CLRPFM     ARR125F
+             OVRDBF     FILE(ARDSLG) TOFILE(ARDSLG) SHARE(*YES)
+             OPNQRYF    FILE(ARDSLG) QRYSLT(' +
+                                ADDATE *GE ' || &YMDA || ' *AND  +
+                                ADDATE *LE ' || &YMDB || ' *AND  +
+                                CUNO   *GE "D"             *AND  +
+                                CUNO   *LE "G"             *AND  +
+                         ADRESV *EQ %VALUES("1" "2" "3" "4" "5" "6")') +
+                        MAPFLD((ADRESV '%SST(ADPDNM 1 1)')  +
+                               (ADACNT '%SST(ADCUNO 1 1)')  +
+                               (ADSALE '%SST(ADPDNM 1 2)')  +
+                               (CUNO   '%SST(ADCUNO 1 1)')) +
+                        KEYFLD((ADRESV) (ADAREA) (ADSALE))
+             CALL       PGM(ARR125R1)
+             CLOF       OPNID(ARDSLG)
+             DLTOVR     FILE(*ALL)
+
+             OVRPRTF    FILE(ARR125T1) TOFILE(ARR125T1) +
+                        PAGESIZE(*N 198) +
+                        CPI(15) HOLD(*YES)  USRDTA('各廠折扣')
+             OVRDBF     FILE(ARR125F) TOFILE(ARR125F) SHARE(*YES)
+             OPNQRYF    FILE(ARR125F) +
+                        KEYFLD((ARCODE) (ARAREA))
+             CALL       PGM(ARR125R2)
+             CLOF       OPNID(ARR125F)
+             DLTOVR     FILE(*ALL)
+
+             OVRPRTF    FILE(ARR125T2) TOFILE(ARR125T2) +
+                        PAGESIZE(*N 198) +
+                        CPI(15) HOLD(*YES)  USRDTA('各廠折扣')
+             OVRDBF     FILE(ARDSLG) TOFILE(ARDSLG) SHARE(*YES)
+             OPNQRYF    FILE(ARDSLG) QRYSLT(' +
+                                ADDATE *GE ' || &YMDA || ' *AND  +
+                                ADDATE *LE ' || &YMDB || ' *AND  +
+                                CUNO   *GE "D"             *AND  +
+                                CUNO   *LE "G"             *AND  +
+                           ADRESV *EQ %VALUES("1" "2" "3" "4" "5" "6")') +
+                        KEYFLD((ADAREA) (ADPDNM) (ADINNO))       +
+                        MAPFLD((ADRESV '%SST(ADPDNM 1 1)')       +
+                               (CUNO   '%SST(ADCUNO 1 1)'))
+             CALL       PGM(ARR125R3)
+             CLOF       OPNID(ARDSLG)
+             DLTOVR     FILE(*ALL)
+
+             RETURN
+             ENDPGM
+

@@ -1,0 +1,41 @@
+     /****************************************************************/
+     /*                                                              */
+     /*               >>   PROGRAM INTRODUCTION   <<                 */
+     /*                                                              */
+     /*            1.PROGRAM-ID    ARP104P                           */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S02CSF                            */
+     /*            4.FUNCTION     修正TRNDTL銷貨類(SA04)項次　 */
+     /*            5.DATE-WRITTEN  92/09/09                          */
+     /*            6.DATE-MODIFY                                     */
+     /*                                                              */
+     /****************************************************************/
+            PGM
+            DCL        VAR(&INT)    TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&DSPID)  TYPE(*CHAR)  LEN(10)
+
+            RTVJOBA    JOB(&DSPID)   TYPE(&INT)
+            IF         COND(&INT  *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+            SBMJOB     CMD(CALL PGM(ARLIB/ARP104P)) JOB(ARP104P) +
+                       JOBD(ARJOBD)
+            RETURN
+
+ BATCH:
+            OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) +
+                       SHARE(*YES)
+            OPNQRYF    FILE(TRNDTL) OPTION(*ALL)  QRYSLT(' +
+                       (TXCODE *EQ "SA04")   *AND +
+                       (NO     *EQ "T"   )   *AND +
+                       (DATE   *GE "920815") *AND +
+                       (DATE   *LE "920907")') +
+                       KEYFLD((TXNO) (TXITEM)) +
+                       MAPFLD((DAT1   TXDATE   *CHAR 8)   +
+                              (DATE   '%SST(DAT1 3 6)' *CHAR 6)  +
+                              (NO     '%SST(TXNO 1 1)' *CHAR 1))
+            CALL       PGM(ARLIB/ARP104R)
+            CLOF       OPNID(TRNDTL)
+            DLTOVR     FILE(*ALL)
+
+            ENDPGM
+

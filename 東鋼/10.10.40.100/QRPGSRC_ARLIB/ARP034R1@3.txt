@@ -1,0 +1,204 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP034R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        SIMON LIAO
+     H*            4.FUNCTION     票據兌現處理作業
+     H*            5.WRITE-DATE    88/11/11
+     H*            5.DATE-UPDATE   101/09/21  2012AR682 S00WCJ (0109A)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FRCVDTL  UP  E           K        DISK
+     FRCVDTZ  IF  E           K        DISK
+     F            RVREC                             KRENAMERVRECZ
+     FAR2159F UF  E           K        DISK
+     FAR2159D UF  E           K        DISK
+     F*****************************************************************
+     E                    ARY1      100 19
+     E*****************************************************************
+     IRVREC
+     I                                              RVNO  L1
+     IRVRECZ
+     I              RVFLAG                          F#FLAG
+     I              RVNO                            F#RVNO
+     I              RVITEM                          F#ITEM
+     I              RVDATE                          F#DATE
+     I              RVCUNO                          F#CUNO
+     I              RVCUNM                          F#CUNM
+     I              RVTYPE                          F#TYPE
+     I              RVDPNO                          F#DPNO
+     I              RVVNO1                          F#VNO1
+     I              RVDECD                          F#DECD
+     I              RVDEDT                          F#DEDT
+     I              RVUSTP                          F#USTP
+     I              RVNTTP                          F#NTTP
+     I              RVPBID                          F#PBID
+     I              RVPANO                          F#PANO
+     I              RVACTP                          F#ACTP
+     I              RVACNO                          F#ACNO
+     I              RVRLNO                          F#RLNO
+     I              RVPLAC                          F#PLAC
+     I              RVNTNO                          F#NTNO
+     I              RVDUDT                          F#DUDT
+     I              RVRAMT                          F#RAMT
+     I              RVSBID                          F#SBID
+     I              RVSANO                          F#SANO
+     I              RVAMCD                          F#AMCD
+     I              RVWRNO                          F#WRNO
+     I              RVNTCD                          F#NTCD
+     I              RVNTDT                          F#NTDT
+     I              RVPRCD                          F#PRCD
+     I              RVPRDT                          F#PRDT
+     I              RVTBID                          F#TBID
+     I              RVTANO                          F#TANO
+     I              RVVNO2                          F#VNO2
+     I              RVTXAR                          F#TXAR
+     I              RVTXDT                          F#TXDT
+     I              RVAREA                          F#AREA
+     I              RVRVID                          F#RVID
+     I              RVRESV                          F#RESV
+     I              RVOLRV                          F#OLRV
+     I              RVOLDT                          F#OLDT
+     I              RVRES2                          F#RES2
+     I*
+     I            DS
+     I                                        1   6 RVNO
+     I                                        1   1 D#AREA
+     I*
+     I            DS
+     I                                        1  12 RVRESV
+     I                                       12  12 D#RESV
+     I            DS
+     I                                        1  19 D#ARY1
+     I                                        1   20D#ITEM
+     I                                        3   8 D#ORNO
+     I                                        9  190D#RAMT
+     C*****************************************************************
+     C*                    KEY  LIST
+     C*****************************************************************
+     C*FILE => AR2159F
+     C           K#2159    KLIST
+     C                     KFLD           RVCUNO
+     C                     KFLD           D#AREA
+     C*FILE => AR2159D
+     C           K#ARD     KLIST
+     C                     KFLD           ADCUNO
+     C                     KFLD           ADAREA
+     C                     KFLD           ADORNO
+     C*FILE==>RCVDTZ
+     C           K#RCVZ    KLIST
+     C                     KFLD           F#RVNO
+     C                     KFLD           F#ITEM
+     C*
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C*寫入暫收資料
+     C                     Z-ADD0         I       50
+     C                     MOVEL*ALL'9'   ARY1
+     C                     MOVELRVNO      F#RVNO
+     C                     Z-ADD0         F#ITEM
+     C           K#RCVZ    SETLLRVRECZ
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RVRECZ                   40
+     C   40                LEAVE
+     C*
+     C           F#RVNO    IFNE RVNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           F#ACTP    IFEQ 'C'
+     C           F#ACNO    ANDEQ'2159'
+0109AC           F#ACTP    OREQ 'C'
+0109AC           F#ACNO    ANDEQ'211301'
+     C                     Z-ADDF#ITEM    D#ITEM
+     C                     MOVELF#RLNO    D#ORNO
+     C                     Z-ADDF#RAMT    D#RAMT
+     C                     ADD  1         I
+     C                     MOVELD#ARY1    ARY1,I
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C* 初值設定
+     C                     MOVE '*'       D#RESV
+     C                     UPDATRVREC
+     C*
+     C                     CALL 'ARQ015R'
+     C                     PARM           RVNO
+     C                     PARM           RVITEM
+9011 C                     PARM '0'       P#MODE  1
+     C                     PARM 0         P#RAMT 110
+     C*
+     C           K#2159    CHAINARREC                69
+     C           *IN69     IFEQ '0'
+     C                     MOVEL'C'       ARFLAG
+     C                     ADD  P#RAMT    ARAMT1
+     C                     SUB  P#RAMT    ARAMT3
+     C                     UPDATARREC
+     C                     EXSR SR2159
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2159    BEGSR
+     C*****************************************************************
+     C                     Z-ADDP#RAMT    W#XAMT 110
+     C                     SORTAARY1
+     C           1         DO   100       I
+     C                     MOVELARY1,I    D#ARY1
+     C*
+     C           D#ITEM    IFEQ 99
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           W#XAMT    IFLE D#RAMT
+     C                     Z-ADDW#XAMT    W#DAMT 110       全轉
+     C                     SUB  W#XAMT    D#RAMT
+     C                     Z-ADD0         W#XAMT
+9808 C                     MOVELD#ARY1    ARY1,I
+     C                     ELSE
+     C                     Z-ADDD#RAMT    W#DAMT
+     C                     SUB  D#RAMT    W#XAMT
+     C                     Z-ADD0         D#RAMT
+9808 C                     MOVELD#ARY1    ARY1,I
+     C                     ENDIF
+     C*
+     C                     MOVELRVCUNO    ADCUNO
+     C                     MOVELRVNO      ADAREA
+     C                     MOVELD#ORNO    ADORNO
+     C           K#ARD     CHAINRAR2159D             53
+     C                     MOVEL'C'       ADFLAG
+     C                     ADD  W#DAMT    ADAMT1           新增已兌現
+     C                     SUB  W#DAMT    ADAMT3           減少未兌現
+     C                     UPDATRAR2159D
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+

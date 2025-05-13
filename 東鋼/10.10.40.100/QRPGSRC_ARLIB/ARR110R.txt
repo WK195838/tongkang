@@ -1,0 +1,196 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR110R
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     應收帳款發票異常檢核表
+     H*            5.DATE-WRITTEN  92/03/05
+     H*            6.DATE-MODIFY
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARSTTX  IP  E           K        DISK
+     FARCUDT  IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FRCVDTL  IF  E           K        DISK
+     FARR110T O   E             69     PRINTER
+     E                    TABA1   1   6  1   TABA2  12
+     E*****************************************************************
+     IAXREC
+     I                                              AXCUNOL2
+     I                                              AXINNOL1
+     I           UDS
+     I                                     10011010 U#USID
+     I                                      300 3020T#DAY
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN69
+     C*
+     C                     MOVEL*ALL'='   T#LIN1
+     C                     MOVEL*ALL'='   T#LIN2
+     C                     MOVEL*ALL'-'   T#LIN3
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR110T1S
+     C                     Z-ADD0         W#TXAS 110
+     C                     MOVE *BLANK    W#CUN2  6
+     C                     MOVE *BLANK    W#ORNO  6
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR110T1D
+     C                     Z-ADD0         W#TXAM 110
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR110T1D
+     C*
+     C           AXINDU    IFGE T#DAY
+     C                     MOVELAXCUNO    W#CUNO  5
+     C                     MOVELW#CUNO    W#CUN1  6
+     C           W#CUN1    CHAINRARCUDT              40
+     C           *IN40     IFEQ *ON
+     C*
+     C                     ADD  AXTXAM    W#TXAM           出貨金額暫存
+     C*
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           W#TXAM    IFNE 0
+     C                     CLEARAR110T1D
+     C*
+     C           AXRVNO    CHAINRVREC                44    票據別
+     C  N44      RVNTTP    IFEQ 'I'
+     C                     GOTO L1END
+     C                     ELSE
+     C  N44      RVNTTP    LOKUPTABA1     TABA2          60
+     C   60N44             MOVE TABA2     T#NTTP
+     C                     ENDIF
+     C*
+     C           AXCUNO    CHAINCBREC                42
+     C  N42                MOVELCBCUNM    T#CUNM           客戶名稱
+     C                     MOVELAXCUNO    T#CUNO           客戶代號
+     C                     MOVELAXORNO    T#ORNO           訂單編號
+     C                     MOVELAXINNO    T#INNO           發票號碼
+     C           AXINNO    CHAININVMST               43
+     C  N43                Z-ADDININDT    T#INDT           發票日期
+     C                     MOVELAXAPNO    T#APNO           請款單號
+     C                     Z-ADDAXINDU    T#INDU           應收帳齡
+     C                     Z-ADDW#TXAM    T#TXAM           出貨金額
+     C                     MOVELAXRVNO    T#RCNO           繳款單號
+     C                     Z-ADDAXRVDT    T#RVDT           繳款日期
+     C                     Z-ADDAXRVLD    T#RVLD           兌現日
+     C*
+     C*兌現日若為０，則省略不印
+     C           T#RVLD    IFEQ 0
+     C                     MOVE *ON       *IN54
+     C                     ELSE
+     C                     MOVE *OFF      *IN54
+     C                     ENDIF
+     C*
+     C*繳款日若為０，則省略不印
+     C           T#RVDT    IFEQ 0
+     C                     MOVE *ON       *IN55
+     C                     ELSE
+     C                     MOVE *OFF      *IN55
+     C                     ENDIF
+     C*
+     C*客戶編號，名稱相同省略不印
+     C           W#CUN2    IFEQ T#CUNO
+     C                     MOVE *ON       *IN52
+     C                     ELSE
+     C                     MOVE *OFF      *IN52
+     C                     MOVELT#CUNO    W#CUN2
+     C                     ENDIF
+     C*
+     C*訂單編號相同省略不印
+     C           W#ORNO    IFEQ T#ORNO
+     C                     MOVE *ON       *IN53
+     C                     ELSE
+     C                     MOVE *OFF      *IN53
+     C                     MOVELT#ORNO    W#ORNO
+     C                     ENDIF
+     C*
+     C*
+     C   69                WRITEAR110T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR110T1D
+     C*
+     C                     ENDIF
+     C*
+     C                     ADD  T#TXAM    W#TXAS           出貨金額小計暫存
+     C*
+     C           L1END     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C           W#TXAS    IFNE 0
+     C*
+     C                     Z-ADDW#TXAS    T#TXAS           出貨金額
+     C*
+     C   69                WRITEAR110T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR110T1L
+     C                     WRITEAR110T1S
+     C*
+     C                     ENDIF
+     C*
+     C                     ADD  T#TXAS    T#TXAA           出貨金額合計暫存
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C           T#TXAA    IFNE 0
+     C*
+     C   69                WRITEAR110T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR110T1A
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*
+     C   69                WRITEAR110T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR110T1M
+     C*
+     C                     ENDSR
+** TAB11 TABA2
+A      支票
+G      現金
+H      現金
+I    信用狀
+J  　　現金
+

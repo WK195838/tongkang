@@ -1,0 +1,128 @@
+    /*****************************************************************/
+    /*                                                               */
+    /*            >>   PROGRAM INTRODUCTION  <<                      */
+    /*            1.PROGRAM-ID     ARP099P                           */
+    /*            2.PROGRAM-TYPE   CLP                               */
+    /*            3.AUTHOR         S02CSF                            */
+    /*            4.FUNCTION      磅單與運費調整對照檔傳輸作業     */
+    /*            5.DATE-WRITTEN   91/12/16                          */
+    /*            6.DATE-MODIFY                                      */
+    /*                                                               */
+    /*****************************************************************/
+    /*  ＝＝＝＜台北　磅單與運費調整對照檔ARDLWT傳輸程式＞＝＝＝ */
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ARA)  TYPE(*CHAR) LEN(3)
+             DCL        VAR(&ARA1) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ARA2) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ARA3) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&CNT1) TYPE(*DEC) LEN(1 0)
+             RTVJOBA    TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+ START:
+             SBMJOB     JOB(ARP099P) JOBD(ARJOBD) JOBQ(QCTL) +
+                          RQSDTA('CALL ARLIB/ARP099P')
+             GOTO       CMDLBL(ENDCLPGM)
+ BATCH:
+        /*  建立　DDMF & DTAARA ............................ */
+             DLTF       FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMT)
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMK)
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMH)
+             DLTDTAARA  DTAARA(QTEMP/ARA)
+             MONMSG     MSGID(CPF0000)
+             CRTDTAARA  DTAARA(QTEMP/ARA) TYPE(*CHAR) LEN(3) +
+                          VALUE('   ')
+ STEP1: /*  台北　抓　桃園  ARLIB/ARDLWT  .................. */
+             RTVDTAARA  DTAARA(QTEMP/ARA (1 1)) RTNVAR(&ARA1)
+             IF         COND(&ARA1 *EQ '0') THEN(GOTO CMDLBL(STEP2))
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP099PA)') +
+                        DDMFILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             CHGDTAARA  DTAARA(QTEMP/ARA (1 1)) VALUE('1')
+             GOTO       CMDLBL(STEP2)
+                        ENDDO
+             CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(*NONSTD +
+                          'ARLIB/ARDLWTW') LVLCHK(*NO)
+             OVRDBF     FILE(ARDLWTW) TOFILE(QTEMP/DDMT)
+             OVRDBF     FILE(ARDLWT)  TOFILE(ARDLWT)
+             CHGDTAARA  DTAARA(*LDA (301 1)) VALUE('T')
+             CALL       PGM(ARLIB/ARP099R)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             CHGDTAARA  DTAARA(QTEMP/ARA (1 1)) VALUE('1')
+             GOTO       CMDLBL(STEP2)
+                        ENDDO
+             DLTOVR     FILE(*ALL)
+             CHGDTAARA  DTAARA(QTEMP/ARA (1 1)) VALUE('0')
+             CLRPFM     FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+
+ STEP2: /*  台北　抓　苗栗  ARLIB/ARDLWT  .................. */
+             RTVDTAARA  DTAARA(QTEMP/ARA (2 1)) RTNVAR(&ARA2)
+             IF         COND(&ARA2 *EQ '0') THEN(GOTO CMDLBL(STEP3))
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP099PA)') +
+                        DDMFILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             CHGDTAARA  DTAARA(QTEMP/ARA (2 1)) VALUE('1')
+             GOTO       CMDLBL(STEP3)
+                        ENDDO
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(*NONSTD +
+                          'ARLIB/ARDLWTW') LVLCHK(*NO)
+             OVRDBF     FILE(ARDLWTW) TOFILE(QTEMP/DDMH)
+             OVRDBF     FILE(ARDLWT)  TOFILE(ARDLWT)
+             CHGDTAARA  DTAARA(*LDA (301 1)) VALUE('H')
+             CALL       PGM(ARLIB/ARP099R)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             CHGDTAARA  DTAARA(QTEMP/ARA (2 1)) VALUE('1')
+             GOTO       CMDLBL(STEP3)
+                        ENDDO
+             DLTOVR     FILE(*ALL)
+             CHGDTAARA  DTAARA(QTEMP/ARA (2 1)) VALUE('0')
+             CLRPFM     FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+
+ STEP3: /*  台北　抓　高雄  ARLIB/ARDLWT  .................. */
+             RTVDTAARA  DTAARA(QTEMP/ARA (3 1)) RTNVAR(&ARA3)
+             IF         COND(&ARA3 *EQ '0') THEN(GOTO CMDLBL(LOOP))
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP099PA)') +
+                        DDMFILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             CHGDTAARA  DTAARA(QTEMP/ARA (3 1)) VALUE('1')
+             GOTO       CMDLBL(LOOP)
+                        ENDDO
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(*NONSTD +
+                          'ARLIB/ARDLWTW') LVLCHK(*NO)
+             OVRDBF     FILE(ARDLWTW) TOFILE(QTEMP/DDMT)
+             OVRDBF     FILE(ARDLWT)  TOFILE(ARDLWT)
+             CHGDTAARA  DTAARA(*LDA (301 1)) VALUE('K')
+             CALL       PGM(ARLIB/ARP099R)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             CHGDTAARA  DTAARA(QTEMP/ARA (3 1)) VALUE('1')
+             GOTO       CMDLBL(LOOP)
+                        ENDDO
+             DLTOVR     FILE(*ALL)
+             CHGDTAARA  DTAARA(QTEMP/ARA (3 1)) VALUE('0')
+             CLRPFM     FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+
+ LOOP:  /*   CLEAR .... TEMP-FILE  TAIPEI  & DLCOBJ .......... */
+             RTVDTAARA  DTAARA(QTEMP/ARA (1 3)) RTNVAR(&ARA)
+             IF         COND(&ARA *NE '000') THEN(CHGVAR VAR(&CNT1) +
+                          VALUE(&CNT1 + 1))
+             IF         COND(&CNT1 *GT 2) THEN(GOTO CMDLBL(ENDCLPGM))
+             ELSE       DO
+                        IF         COND(&ARA *NE '000') THEN(DO)
+                                   DLYJOB   DLY(60)
+                                   GOTO     CMDLBL(STEP1)
+                                   ENDDO
+                        ENDDO
+ ENDCLPGM:   ENDPGM
+

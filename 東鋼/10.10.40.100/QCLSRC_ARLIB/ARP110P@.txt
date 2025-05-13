@@ -1,0 +1,130 @@
+        /******************************************************/
+        /*                                                    */
+        /*        >>   PROGRAM INTRODUCTION  <<               */
+        /*        1.PROGRAM-ID     ARP110P                    */
+        /*        2.PROGRAM-TYPE   CLP                        */
+        /*        3.AUTHOR         S02CSF                     */
+        /*        4.FUNCTION    發票與銷貨資料重新下載處理*/
+        /*        5.DATE-WRITTEN   93/09/02                   */
+        /*        6.DATE-MODIFY                               */
+        /*                                                    */
+        /******************************************************/
+            PGM
+            DCLF       FILE(ARP110S)
+            DCL        VAR(&C#DATS)   TYPE(*CHAR) LEN(8)
+            DCL        VAR(&C#DATE)   TYPE(*CHAR) LEN(8)
+            DCL        VAR(&D#DATE)   TYPE(*DEC)  LEN(8 0)
+            DCL        VAR(&W#QDAT)   TYPE(*CHAR) LEN(6)
+            DCL        VAR(&W#YARS)   TYPE(*CHAR) LEN(4)
+            DCL        VAR(&W#YARE)   TYPE(*CHAR) LEN(2)
+            DCL        VAR(&W#MONS)   TYPE(*CHAR) LEN(2)
+            DCL        VAR(&W#MONE)   TYPE(*CHAR) LEN(4)
+            DCL        VAR(&W#DAYS)   TYPE(*CHAR) LEN(2)
+            DCL        VAR(&W#DAYE)   TYPE(*CHAR) LEN(2)
+            DCL        VAR(&OUTQ)     TYPE(*CHAR) LEN(10)
+            DCL        VAR(&TYPE)     TYPE(*CHAR) LEN(1)
+            DCL        VAR(&DSPID)    TYPE(*CHAR) LEN(10)
+
+            RTVJOBA    JOB(&DSPID) USER(&S#USER) OUTQ(&OUTQ) +
+                       TYPE(&TYPE)
+            IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+            RTVDTAARA  DTAARA(*LDA (1011 10))   RTNVAR(&S#DEVN)
+            RTVSYSVAL  SYSVAL(QDATE)  RTNVAR(&W#QDAT)
+            CHGVAR     VAR(&D#DATE)   VALUE(&C#DATE)
+            CHGVAR     VAR(&D#DATE)   VALUE(&D#DATE - 1)
+            CHGVAR     VAR(&S#DAT1)   VALUE(&D#DATE)
+            CHGVAR     VAR(&S#DAT2)   VALUE(&D#DATE)
+
+ START:     SNDRCVF
+
+            IF         COND(&IN03 *EQ '1') THEN(RETURN)
+            IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+            CHGVAR     VAR(&IN50)     VALUE('0')
+            CHGVAR     VAR(&IN51)     VALUE('0')
+            CHGVAR     VAR(&S#ERR)    VALUE(' ')
+
+       /*    CHECK   起迄年月　　*/
+            IF         COND(&S#DAT1 *EQ 0   ) THEN(DO)
+            CHGVAR     VAR(&IN50)     VALUE('1')
+            CHGVAR     VAR(&S#ERR)    VALUE('起始年月日不可空白')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+            IF         COND(&S#DAT2 *EQ 0   ) THEN(DO)
+            CHGVAR     VAR(&IN51)     VALUE('1')
+            CHGVAR     VAR(&S#ERR)    VALUE('終止年月日不可空白')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+            IF         COND(&S#DAT1 *GT &S#DAT2) THEN(DO)
+            CHGVAR     VAR(&IN50)     VALUE('1')
+            CHGVAR     VAR(&IN51)     VALUE('1')
+            CHGVAR     VAR(&S#ERR)    VALUE('起始年月不得大於終止年!')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+  /*    CHECK  起始年月　　*/
+             CHGVAR     VAR(&C#DATS)  VALUE(&S#DAT1)
+             CHGVAR     VAR(&W#MONS)  VALUE(%SST(&C#DATS 5 2))
+             CHGVAR     VAR(&W#YARS)  VALUE(%SST(&C#DATS 3 2))
+             CHGVAR     VAR(&W#DAYS)  VALUE(%SST(&C#DATS 7 2))
+             IF         COND((&W#MONS *LT '01') *OR +
+                             (&W#MONS *GT '12') *OR +
+                             (&W#DAYS *LT '01') *OR +
+                             (&W#DAYS *GT '32') *OR +
+                             (&W#YARS *LT '01') *OR +
+                             (&W#YARS *GT '99')) THEN(DO)
+             CHGVAR     VAR(&IN50)   VALUE('1')
+             CHGVAR     VAR(&S#ERR)  VALUE('起始年月日錯誤!')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+       /*    CHECK   終止年月   */
+             CHGVAR     VAR(&C#DATE) VALUE(&S#DAT2)
+             CHGVAR     VAR(&W#MONE)   VALUE(%SST(&C#DATE 5 2))
+             CHGVAR     VAR(&W#YARE)   VALUE(%SST(&C#DATE 3 2))
+             CHGVAR     VAR(&W#DAYE)   VALUE(%SST(&C#DATE 7 2))
+             IF         COND((&W#MONE *LT '01') *OR +
+                             (&W#MONE *GT '12') *OR +
+                             (&W#DAYE *LT '01') *OR +
+                             (&W#DAYE *GT '32') *OR +
+                             (&W#YARE *LT '01') *OR +
+                             (&W#YARE *GT '99')) THEN(DO)
+             CHGVAR     VAR(&IN51)   VALUE('1')
+             CHGVAR     VAR(&S#ERR)  VALUE('終止年月日錯誤!')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             /* MOVE Screen Field */
+             CHGVAR     VAR(&C#DATS)  VALUE(&S#DAT1)
+             CHGVAR     VAR(&C#DATE)  VALUE(&S#DAT2)
+             CHGDTAARA  DTAARA(*LDA (400 8))   VALUE(&C#DATS)
+             CHGDTAARA  DTAARA(*LDA (408 8))   VALUE(&C#DATE)
+
+        /*  SBMJOB     CMD(CALL PGM(ARP110P)) JOB(ARP110P) +
+                       JOBD(ARJOBD)   */
+            SNDBRKMSG  MSG('<<資料下載已開始處理請稍待，......>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+        /*  RETURN   */
+
+ BATCH:
+            RTVDTAARA  DTAARA(*LDA (400 8)) RTNVAR(&C#DATS)
+            RTVDTAARA  DTAARA(*LDA (408 8)) RTNVAR(&C#DATE)
+
+     /* STEP 1 : 下載TNDLOG檔內的銷貨資料 */
+
+            OVRDBF     FILE(TNDLOG) TOFILE(ARLIB/TNDLOG) SHARE(*YES)
+            OPNQRYF    FILE((TNDLOG)) QRYSLT('         +
+                       (DATE   *GE "' || &C#DATS || '")    *AND +
+                       (DATE   *LE "' || &C#DATE || '")')       +
+                       MAPFLD((DATE  TWDATE *CHAR 8))
+            CALL       ARP110R
+            CLOF       OPNID(TNDLOG)
+            DLTOVR     *ALL
+
+            SNDBRKMSG  MSG('<< 資料下載以處理完成.........>>')  +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+            ENDPGM
+

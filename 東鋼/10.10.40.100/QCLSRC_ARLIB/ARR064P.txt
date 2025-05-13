@@ -1,0 +1,75 @@
+     /***************************************************************/
+     /*                                                             */
+     /*            1.PROGRAM-ID    ARR064P                          */
+     /*            2.PROGRAM-TYPE  CLP                              */
+     /*            4.FUNCTION     每月開立發票彙總表              */
+     /*            5.DATE-WRITTEN  85/09/19                         */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&TYPE)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR) LEN(10)
+             DCL        VAR(&AREA)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&S#M1)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&W#DATE)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&W#ERR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&YEAR)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&MONTH)   TYPE(*CHAR) LEN(2)
+
+             DCL        VAR(&P#DATE)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&P#MODE)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&P#MTL)   TYPE(*CHAR) LEN(24)
+             DCL        VAR(&P#LEAP)  TYPE(*CHAR) LEN(1)
+
+             DCLF       FILE(ARR064S)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&TYPE)
+             IF         COND(&TYPE='0') THEN(GOTO CMDLBL(BATCH))
+             RTVDTAARA  DTAARA(*LDA (951 35))  RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVN)
+             RTVDTAARA  DTAARA(*LDA (1021 1))  RTNVAR(&AREA)
+             RTVSYSVAL  SYSVAL(QYEAR) RTNVAR(&YEAR)
+             RTVSYSVAL  SYSVAL(QMONTH) RTNVAR(&MONTH)
+             CHGVAR     VAR(&S#YM1) VALUE(&YEAR *CAT &MONTH)
+  START:     SNDRCVF
+             CHGVAR     VAR(&IN30) VALUE('0')
+             IF         COND(&IN03 *EQ '1' *OR &IN12 *EQ '1') +
+                          THEN(RETURN)
+             CHGDTAARA  DTAARA(*LDA (1 4))  VALUE(&S#YM1)
+             /*        */
+             IF         COND(&S#YM1 *EQ '    ') THEN(DO)
+               CHGVAR     VAR(&IN30)  VALUE('1')
+               CHGVAR     VAR(&S#ERR) VALUE('日期不可空白！！')
+               GOTO       CMDLBL(START)
+             ENDDO
+             CHGVAR     VAR(&W#DATE) VALUE(&S#YM1 *CAT '01')
+             CHGVAR     VAR(&P#DATE) VALUE('00' || &W#DATE)
+             CHGVAR     VAR(&P#MODE) VALUE('1')
+             CALL       PGM(UTS102R) PARM(&P#DATE &P#MODE +
+                        &P#MTL &P#LEAP &W#ERR)
+             IF         COND(&W#ERR *NE '0' ) THEN(DO)
+               CHGVAR     VAR(&IN30)  VALUE('1')
+               CHGVAR     VAR(&S#ERR) VALUE('日期錯誤！')
+               GOTO       CMDLBL(START)
+             ENDDO
+             CHGDTAARA  DTAARA(*LDA (1 4))  VALUE(&S#YM1)
+             SBMJOB     JOB(ARR064P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR064P')
+             RETURN
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 4))   RTNVAR(&S#YM1)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             OVRDBF     FILE(INVMST) TOFILE(INVMST) SHARE(*YES)
+             OPNQRYF    FILE((INVMST)) QRYSLT('indt *eq "' || &S#YM1 +
+                          || '" *AND ( Intype *eq "1" *or intype +
+                          *eq "9") *and indecd *ne "D" *and inarea +
+                          *eq "' || &AREA || '"') KEYFLD((INTYPE) +
+                          (INKIND) (INNO)) MAPFLD((ZONE61 ININDT +
+                          *ZONED 6) (CHAR61 ZONE61 *CHAR 6) (INDT +
+                          '%SST(CHAR61 1 4)' *CHAR 4))
+             CALL       PGM(ARR064R)
+             CLOF       OPNID(INVMST)
+
+             DLTOVR     FILE(*ALL)
+             RETURN     /* BATCH JOB */
+             ENDPGM
+

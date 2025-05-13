@@ -1,0 +1,53 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP050P2                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02YSH                                  */
+     /*     4.FUNCTION     進倉履約折讓自動處理作業-開立處理    */
+     /*     5.DATE-WRITTEN  91/02/22                                */
+     /*     6.UPDATE  DATE 104/07/03 S00WCJ (0407A)                 */
+     /*        增加檢核ARE050P5一次僅能一個USER使用           */
+     /*                    109/06/02 S00WCJ (0906A)                 */
+     /*                     增加廠區參數傳入                      */
+     /*                                                             */
+     /***************************************************************/
+             PGM        PARM(&P#CUNO &P#YYMM &P#CONT &P#ARE1)
+
+             DCL        VAR(&P#CUNO)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&P#YYMM)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&P#CONT)  TYPE(*CHAR)  LEN(3)
+
+             DCL        VAR(&JOB)      TYPE(*CHAR) LEN(10)
+             DCL        VAR(&UDATE)    TYPE(*CHAR) LEN(7)
+             DCL        VAR(&WDATE)    TYPE(*DEC) LEN(8 0)
+             DCL        VAR(&LOC)      TYPE(*CHAR) LEN(1)
+             DCL        VAR(&REPLAY)   TYPE(*CHAR) LEN(1)
+/*0906A*/    DCL        VAR(&P#ARE1)   TYPE(*CHAR) LEN(1)
+
+             RTVJOBA    JOB(&JOB) CYMDDATE(&UDATE)
+
+ ALCSTR:     ALCOBJ     OBJ((*LIBL/ARE050P5 *PGM *EXCLRD)) WAIT(0) +
+
+             MONMSG     MSGID(CPF1002) EXEC(DO)
+             SNDUSRMSG   +
+                          MSG('ARLIB/ARE050P2同時兩個USER使用 +
+                          此作業!') MSGTYPE(*INFO) TOUSR(S00WCJ)
+             SNDUSRMSG  +
+                          MSG('※進倉履約折讓開立作業正在執行中+
+                          ，是否再試？　空白或Ｙ＝是　Ｎ＝否') +
+                          VALUES('Y' 'N') DFT('Y') MSGTYPE(*INQ) +
+                          MSGRPY(&REPLAY)
+
+             IF         COND(&REPLAY *EQ 'Y') THEN(GOTO CMDLBL(ALCSTR))
+             IF         COND(&REPLAY *EQ 'N') THEN(GOTO +
+                          CMDLBL(ENDCLPGM))
+             ENDDO
+/*0906A*/    CALL       PGM(ARE050P5)   PARM(&P#CUNO &P#YYMM &P#CONT +
+                                             &P#ARE1)
+
+             DLCOBJ     OBJ((*LIBL/ARE050P5 *PGM *EXCLRD))
+
+ ENDCLPGM:   ENDPGM
+

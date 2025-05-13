@@ -1,0 +1,169 @@
+        /**********************************************************/
+        /*                                                        */
+        /*        >>   PROGRAM INTRODUCTION  <<                   */
+        /*        1.PROGRAM-ID     ARR129P                        */
+        /*        2.PROGRAM-TYPE   CLP                            */
+        /*        3.AUTHOR         S02LBU                         */
+        /*        4.FUNCTION      銷貨調整單開立發票彙總表      */
+        /*        5.DATE-WRITTEN   96/11/06                       */
+        /*        6.UPDATE  DATE   99/10/19 2010AR534 S00WCJ(9910A)*/
+        /*                        100/12/02 S00WCJ (0012A)_      */
+        /*                         將處理代號為D之資料排除   */
+        /*                                                        */
+        /**********************************************************/
+              PGM
+              DCLF       FILE(ARR129S)
+              DCL        VAR(&TYPE)    TYPE(*CHAR)  LEN(1)
+              DCL        VAR(&S#DEVN)  TYPE(*CHAR)  LEN(10)
+              DCL        VAR(&S#USER)  TYPE(*CHAR)  LEN(10)
+              DCL        VAR(&C#DAT1)  TYPE(*CHAR)  LEN(8)  /*發票日期暫存*/
+              DCL        VAR(&C#DAT2)  TYPE(*CHAR)  LEN(8)  /*發票日期暫存*/
+              DCL        VAR(&W#FLAG)  TYPE(*CHAR)  LEN(1)
+              DCL        VAR(&P#PDAT)  TYPE(*CHAR)  LEN(8)  /*輸入日期*/
+              DCL        VAR(&P#MODE)  TYPE(*CHAR)  LEN(1)  /*年份別*/
+              DCL        VAR(&P#MTL)   TYPE(*CHAR)  LEN(24) /*月日數*/
+              DCL        VAR(&P#LEAP)  TYPE(*CHAR)  LEN(1)  /*閏年碼*/
+
+              RTVJOBA    JOB(&S#DEVN) USER(&S#USER) +
+                         TYPE(&TYPE)
+
+              IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+              RTVDTAARA  DTAARA(*LDA (1011 10))   RTNVAR(&S#DEVN)
+              RTVDTAARA  DTAARA(*LDA (1001 10))   RTNVAR(&S#USER)
+
+   START:   SNDRCVF
+
+            CHGVAR     VAR(&IN30)      VALUE('0')
+            CHGVAR     VAR(&IN31)      VALUE('0')
+            CHGVAR     VAR(&IN32)      VALUE('0')
+            CHGVAR     VAR(&S#ERR)     VALUE(*BLANK)
+
+            IF         COND(&IN03 *EQ '1') THEN(RETURN)
+            IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+        /*    CHECK調整單開立區間   */
+            IF         COND(&S#DAT1 *EQ 0) THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('請輸入調整單開立起日')
+            CHGVAR     VAR(&IN30)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+            IF         COND(&S#DAT2 *EQ 0) THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('請輸入調整單開立止日')
+            CHGVAR     VAR(&IN31)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+            IF         COND(&S#DAT1 *GT &S#DAT2 ) THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('開立止日不可大於開立起日')
+            CHGVAR     VAR(&IN30)      VALUE('1')
+            CHGVAR     VAR(&IN31)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+            CHGVAR     VAR(&P#PDAT)    VALUE(&S#DAT1)
+            CHGVAR     VAR(&P#MODE)    VALUE('1')
+            CALL       PGM(UTS102R)    PARM(&P#PDAT &P#MODE +
+                                            &P#MTL  &P#LEAP &W#FLAG)
+            IF         COND(&W#FLAG *NE '0') THEN(DO)
+            CHGVAR     VAR(&IN30)      VALUE('1')
+            CHGVAR     VAR(&S#ERR)     VALUE('調整單開立起日錯誤！')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+            CHGVAR     VAR(&P#PDAT)    VALUE(&S#DAT2)
+            CHGVAR     VAR(&P#MODE)    VALUE('1')
+            CALL       PGM(UTS102R)    PARM(&P#PDAT &P#MODE +
+                                            &P#MTL  &P#LEAP &W#FLAG)
+            IF         COND(&W#FLAG *NE '0') THEN(DO)
+            CHGVAR     VAR(&IN31)      VALUE('1')
+            CHGVAR     VAR(&S#ERR)     VALUE('調整單開立止日錯誤！')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+        /*    CHECK選項  */
+
+            IF         COND((&S#OPT  *NE '1')  *AND +
+                            (&S#OPT  *NE '2')  *AND +
+                            (&S#OPT  *NE '3')) THEN(DO)
+            CHGVAR     VAR(&IN32)      VALUE('1')
+            CHGVAR     VAR(&S#ERR)     VALUE('選項輸入錯誤！')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+            CHGVAR     VAR(&C#DAT1)    VALUE(&S#DAT1)
+            CHGVAR     VAR(&C#DAT2)    VALUE(&S#DAT2)
+
+            CHGDTAARA  DTAARA(*LDA  (301  8))  VALUE(&C#DAT1)
+            CHGDTAARA  DTAARA(*LDA  (309  8))  VALUE(&C#DAT2)
+            CHGDTAARA  DTAARA(*LDA  (317  1))  VALUE(&S#OPT)
+
+            SBMJOB     JOB(ARR129P) JOBD(ARJOBD) +
+                       RQSDTA('CALL ARR129P')
+            SNDBRKMSG  MSG('<<銷貨調整單開立發票彙總表+
+                           ,已開始處理,請稍待...>>')    +
+                           TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+            RETURN
+
+   BATCH:
+
+            RTVDTAARA  DTAARA(*LDA (301 8))    RTNVAR(&C#DAT1)
+            RTVDTAARA  DTAARA(*LDA (309 8))    RTNVAR(&C#DAT2)
+            RTVDTAARA  DTAARA(*LDA (317 1))    RTNVAR(&S#OPT)
+
+            CLRPFM     FILE(ARR129F)
+            CLRPFM     FILE(ARR129F1)  /*9910A*/
+            OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+
+   /*鋼筋*/
+            IF         COND(&S#OPT  *EQ '1') THEN(DO)
+  /*0012A*/ OPNQRYF    FILE(TRNDTL)  OPTION(*ALL) QRYSLT('    +
+                       (TXCODE  *EQ "AR05"             ) *AND +
+                       (TXFLAG  *NE "D" ) *AND +
+                       (ORN1    *NE "H"                ) *AND +
+                       (DATE    *GE "' || &C#DAT1 || '") *AND +
+                       (DATE    *LE "' || &C#DAT2 || '")')    +
+                       KEYFLD((TXTXAR) (TXPDNM))              +
+                       MAPFLD((DATE  TXDATE  *CHAR 8)         +
+                              (ORN1  '%SST(TXORNO 1 1)' *CHAR 1))
+            ENDDO
+
+   /*型鋼*/
+            IF         COND(&S#OPT  *EQ '2') THEN(DO)
+ /*0012A*/  OPNQRYF    FILE(TRNDTL)  OPTION(*ALL) QRYSLT('    +
+                       (TXCODE  *EQ "AR05"             ) *AND +
+                       (TXFLAG  *NE "D")   *AND +
+                       (ORN1    *EQ "H"                ) *AND +
+                       (DATE    *GE "' || &C#DAT1 || '") *AND +
+                       (DATE    *LE "' || &C#DAT2 || '")')    +
+                       KEYFLD((TXTXAR) (TXPDNM))              +
+                       MAPFLD((DATE  TXDATE  *CHAR 8)         +
+                              (ORN1  '%SST(TXORNO 1 1)' *CHAR 1))
+            ENDDO
+
+   /*全部*/
+            IF         COND(&S#OPT  *EQ '3') THEN(DO)
+ /*0012A*/  OPNQRYF    FILE(TRNDTL)  OPTION(*ALL) QRYSLT('    +
+                       (TXCODE  *EQ "AR05"             ) *AND +
+                       (TXFLAG  *NE "D")  *AND +
+                       (DATE    *GE "' || &C#DAT1 || '") *AND +
+                       (DATE    *LE "' || &C#DAT2 || '")')    +
+                       KEYFLD((TXTXAR) (TXPDNM))              +
+                       MAPFLD((DATE  TXDATE  *CHAR 8))
+            ENDDO
+
+            CALL       PGM(ARR129R1)
+            CLOF       OPNID(TRNDTL)
+            DLTOVR     FILE(*ALL)
+
+            OVRPRTF    FILE(ARR129T) TOFILE(ARR129T) PAGESIZE(*N 132)   +
+                       CPI(10) HOLD(*YES) USRDTA('調整彙總')
+            CALL       PGM(ARR129R2)
+
+            SNDBRKMSG  MSG('<<銷貨調整單開立發票彙總表+
+                          ,已處理完成,請列印...>>')    +
+                          TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+
+   END:     ENDPGM
+

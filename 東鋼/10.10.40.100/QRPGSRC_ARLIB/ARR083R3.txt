@@ -1,0 +1,122 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR083R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     預收貨款增減明細表
+     H*            5.DATE-WRITTEN  89/02/19
+     H*
+     H*  說明：將本期銷貨預收寫入ARBBALT
+     H*        本期銷貨預收代號'AC01'
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FARBBALT UF  E           K        DISK                      A
+     ITXREC
+     I                                              TXPCNOL2
+     I                                              TXTXARL1
+     I                                              TXIVNOL1
+     I            DS
+     I                                        1   80D#DATE
+     I                                        1   60D#YYMM
+     I            DS
+     I                                        1  10 D#IVNO
+     I                                        1   2 D#IVN1
+     I                                        3  10 D#IVN2
+     I           UDS
+     I                                      501 5060U#YYMM
+     C*****************************************************************
+     C           K#BALT    KLIST
+     C                     KFLD           ATORNO
+     C                     KFLD           ATCODE
+     C                     KFLD           ATNO
+     C*****************************************************************
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1                   EXSR L1SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD1         W#AC01  40
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AMT   90       *銷貨合計
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVELTXIVNO    D#IVNO
+     C           D#IVN1    IFEQ 'QY'
+     C           D#IVN2    ANDEQ'87873007'
+     C                     ADD  1         W#TMP1  10
+     C                     ENDIF
+     C*
+     C           TXIVNO    CHAININREC                40
+     C  N40                Z-ADDININDT    D#DATE
+     C           D#YYMM    IFEQ U#YYMM
+     C                     ADD  TXAMT     W#AMT
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C                     MOVELTXIVNO    D#IVNO
+     C           D#IVN1    IFEQ 'QY'
+     C           D#IVN2    ANDEQ'87873007'
+     C                     ADD  1         W#TMP1  10
+     C                     ENDIF
+     C*
+     C           TXIVNO    IFNE *BLANK
+     C           TXIVNO    CHAININREC                40
+     C  N40      INBAMT    IFNE 0                          *扣預收
+     C           D#YYMM    ANDEQU#YYMM
+     C           INAAMT    SUB  W#AMT     W#SUB   90       *價差
+     C*
+     C           W#SUB     IFGE -2
+     C           W#SUB     ORLE 2
+     C                     Z-ADD1         W#PERT  32       *百分比
+     C                     ELSE
+     C           W#AMT     DIV  INAAMT    W#PERT    H
+     C                     ENDIF                           * W#SUB
+     C*
+     C                     MOVELTXORNO    ATORNO           *訂單編號
+     C                     MOVE 'AC01'    ATCODE           *單據代號
+     C                     Z-ADDW#AC01    ATNO             *單據編號
+     C           K#BALT    CHAINRARBBALT             40
+8912 C                     MOVELTXTXAR    ATAREA           *銷貨廠區
+     C*  891004二聯式扣除預收貨款稅額
+8910 C           INKIND    IFEQ '2'
+ .   C           INTXTP    ANDEQ'1'
+ .   C           INBAMT    DIV  1.05      ATAMT     H
+ .   C                     ELSE
+     C           INBAMT    MULT W#PERT    ATAMT     H      *預收金額
+ .   C                     ENDIF
+     C                     MULT -1        ATAMT
+8912 C                     MOVE TXIVNO    ATINNO           *發票號碼
+     C*TEST START
+     C                     MOVELTXIVNO    W#NO    8
+     C           W#NO      IFEQ 'YB950950'
+     C                     Z-ADD0         W#TEST  10
+     C                     ENDIF
+     C*TEST END
+     C*若作廢日期與開立日期同月份則不計,反之則要寫入
+8907 C           ININDT    DIV  100       W#INDT  40
+ .   C           INDEDT    DIV  100       W#DEDT  40
+ .   C           W#INDT    IFNE W#DEDT
+     C                     WRITERARBBALT
+     C                     ADD  1         W#AC01
+ .   C                     ENDIF
+     C*
+     C                     ENDIF                           * INBAMT
+     C*
+     C                     ENDIF                           * TXIVNO
+     C                     ENDSR
+

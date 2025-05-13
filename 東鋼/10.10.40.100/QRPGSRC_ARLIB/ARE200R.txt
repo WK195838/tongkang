@@ -1,0 +1,568 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARE200R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     銀行基本資料維護
+     H*            5.DATE-WRITTEN  89/05/25
+     H*            6.UPDATE        89/05/25 S02HYS
+     H*                            99/08/24  2010AR517 S00WCJ (9908A)
+     H*
+     H*****************************************************************
+     FCCE500S CF  E                    WORKSTN
+     F                                        RRN1  KSFILE CC500F1
+     FCBGRST  UF  E           K        DISK                      A
+     FCBGRUP  UF  E           K        DISK                      A
+     FCBGRRP  IF  E           K        DISK
+     FCBGRSTL1IF  E           K        DISK
+     F            RCBGRST                           KRENAMERGRSTL
+     E                    ERR     1   6 70               *錯誤訊息
+     IRGRSTL
+     I              CRFLAG                          F#FLAG
+     I              CRCUNO                          F#CUNO
+     I              CRCUNM                          F#CUNM
+     I              CRFNAM                          F#FNAM
+     I              CRFRST                          F#FRST
+     I              CRCMAN                          F#CMAN
+     I              CRCMID                          F#CMID
+     I              CRRESV                          F#RESV
+     I              CRGPNO                          F#GPNO
+     I              CRGPLR                          F#GPLR
+     I              CRSOUR                          F#SOUR
+     I              CRARLM                          F#ARLM
+     I              CRSTP1                          F#STP1
+     I              CRSTP2                          F#STP2
+     I              CRENTM                          F#ENTM
+     I              CRENTD                          F#ENTD
+     I              CRENTT                          F#ENTT
+     I              CRUPDM                          F#UPDM
+     I              CRUPDD                          F#UPDD
+     I              CRUPDT                          F#UPDT
+     I            DS
+     I                                        1   7 D#SOUR
+     I                                        1   6 D#SOU1
+     I                                        7   7 D#SOU2
+     I            DS
+     I                                        1  10 S#SRID
+     I                                        1   8 D#SRI1
+     I                                        9  10 D#SRI2
+     I           UDS
+     I                                     10011010 S#USER
+     I                                     10011001 D#DEPT
+     I                                     10111020 S#DEVN
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*FILE => CBGRST
+     C           K#GRST    KLIST
+     C                     KFLD           CRGPNO           集團代號
+     C                     KFLD           CRCUNO           客戶編號
+     C*FILE => CBGRSTL1
+     C           K#GRSL    KLIST
+     C                     KFLD           F#CUNO           客戶編號
+     C                     KFLD           F#GPNO           集團代號
+     C*FILE => CBGRUP
+     C           K#GRUP    KLIST
+     C                     KFLD           CGGPNO           集團代號
+     C*FILE => CBGRRP
+     C           K#GRRP    KLIST
+     C                     KFLD           CPGPNO           集團代號
+     C                     KFLD           CPGPLR           集團位階
+     C*****************************************************************
+     C*        MAIN    PROGRAM
+     C*****************************************************************
+     C                     EXSR SR0000                     初始
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000            READC
+     C           W#PRID    CASEQ'03'      SR3000           畫面二
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C                     MOVE 'CCE500S-'D#SRI1
+     C                     MOVE *ALL'-'   S#LIN1
+     C                     MOVE *ALL'-'   S#LIN2
+     C                     MOVE '01'      W#PRID  2
+     C                     MOVE *BLANK    S#KEY1
+     C                     MOVE *BLANK    S#KEY2
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         RRN1    40
+     C                     Z-SUB10        S#NBR1
+     C                     MOVEA'01'      *IN,30
+     C                     MOVE '01'      D#SRI1
+     C*
+     C                     MOVE *ON       *IN74             SFLCLR
+     C                     WRITECC500F1C
+     C                     MOVE *OFF      *IN74             SFLCLR
+     C*
+     C                     MOVE S#KEY1    CRGPNO           集團代號
+     C                     MOVE S#KEY2    CRCUNO           客戶編號
+     C           K#GRST    SETLLRCBGRST
+     C                     EXSR SR1100                     讀入
+     C*
+     C           W#PRID    DOWEQ'01'
+     C*
+     C           RRN1      IFEQ 0
+     C                     MOVE ERR,1     S#ERR1
+     C                     MOVE *ON       *IN72             SFLDSP
+     C                     ELSE
+     C                     MOVE *OFF      *IN72
+     C                     ENDIF
+     C*
+     C           W#CNT     IFGE 11
+     C                     MOVE *ON       *IN73             SFLEND
+     C                     ELSE
+     C                     MOVE *OFF      *IN73
+     C                     ENDIF
+     C*
+     C                     WRITECC500H
+     C                     WRITECC500F1M
+     C                     EXFMTCC500F1C
+     C*
+     C                     MOVE *BLANK    S#ERR1
+     C* F3 / F12
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C* PAGEDOWN
+     C           *IN91     IFEQ *ON
+     C  N41                EXSR SR1100
+     C                     ITER
+     C                     ENDIF
+     C*新增客戶
+     C           *IN06     IFEQ *ON
+     C                     Z-ADD1         W#OPT   10
+     C                     MOVE '03'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*新增集團
+     C           *IN08     IFEQ *ON
+     C                     EXSR SR1200
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE '02'      W#PRID
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*讀入
+     C                     Z-ADD0         W#CNT   20
+     C           W#CNT     DOWLE10
+     C                     READ RCBGRST             N    41
+     C   41                LEAVE
+     C*
+     C                     Z-ADD0         S#OPT
+     C                     MOVE CRGPNO    S#GPN1           集團代號
+     C                     MOVE CRCUNO    S#CUN1           客戶編號
+     C                     MOVE CRCUNM    S#CNM1           客戶名稱
+     C                     MOVE CRGPLR    S#GPL1           集團位階
+     C                     MOVE CRFRST    S#FRS1           往來碼
+     C           CRSOUR    IFNE *BLANK
+     C                     MOVE '*'       S#MARK           異常碼
+     C                     ELSE
+     C                     MOVE *BLANK    S#MARK
+     C                     ENDIF
+     C*
+     C                     ADD  1         RRN1
+     C                     ADD  1         W#CNT
+     C*
+     C                     WRITECC500F1
+     C                     ENDDO
+     C*
+     C           W#CNT     IFGT 0
+     C                     ADD  11        S#NBR1
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1200    BEGSR
+     C*****************************************************************
+     C                     CLEARCC500W1
+     C                     MOVE 'Y'       W#LOOP  1
+     C           W#LOOP    DOWEQ'Y'
+     C                     EXFMTCC500W1
+     C                     MOVE '00'      *IN,38
+     C                     MOVE *OFF      *IN99
+     C                     MOVE *BLANK    S#ERRW
+     C*F12=回前畫面
+     C           *IN12     IFEQ *ON
+     C           *IN03     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           S#GPN2    IFEQ *BLANK
+     C                     MOVE *ON       *IN38
+     C                     MOVE *ON       *IN99
+     C                     MOVEAERR,2     S#ERRW
+     C                     ENDIF
+     C*
+     C  N99      S#CUN2    IFEQ *BLANK
+     C                     MOVE *ON       *IN38
+     C                     MOVE *ON       *IN99
+     C                     MOVEAERR,2     S#ERRW
+     C                     ENDIF
+     C*
+     C   99                ITER
+     C*存檔
+     C                     MOVE S#GPN2    CGGPNO
+     C           K#GRUP    CHAINRCBGRUP              55
+     C*
+     C                     MOVE S#GPN2    CGGPNO           集團代號
+     C                     MOVE S#CUN2    CGGPNM           集團名稱
+     C   55                MOVE S#USER    CGENTM           建立人員
+9908AC*  55                MOVE UDATE     CGENTD           建立日期
+9908AC   55      *DATE     SUB  19000000  CGENTD           建立日期
+     C   55                TIME           CGENTT           建立時間
+     C  N55                MOVE S#USER    CGUPDM           異動人員
+9908AC* N55                MOVE UDATE     CGUPDD           異動日期
+9908AC  N55      *DATE     SUB  19000000  CGUPDD           異動日期
+     C  N55                TIME           CGUPDT           異動時間
+     C   55                WRITERCBGRUP
+     C  N55                UPDATRCBGRUP
+     C                     LEAVE
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C           W#PRID    DOWEQ'02'
+     C                     READCCC500F1                  41
+     C   41                MOVE '01'      W#PRID
+     C   41                LEAVE
+     C*
+     C           S#OPT     IFEQ 0
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE S#GPN1    S#KEY1           集團代號
+     C                     MOVE S#CUN1    S#KEY2           客戶代號
+     C*
+     C                     Z-ADDS#OPT     W#OPT   10
+     C                     Z-ADD0         S#OPT
+     C                     UPDATCC500F1
+     C*
+     C                     MOVE '03'      W#PRID
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C                     MOVE '02'      D#SRI2
+     C   50                MOVE *OFF      *IN50
+     C                     CLEARCC500F2
+     C                     SELEC
+     C           W#OPT     WHEQ 1                          新增
+     C                     MOVEA'00000000'*IN,32
+     C                     MOVE *OFF      *IN40
+     C           W#OPT     WHEQ 2                          修改
+     C                     MOVEA'00000001'*IN,32
+     C                     MOVE *OFF      *IN40
+     C                     EXSR SR3100                     讀入
+     C           W#OPT     WHEQ 3                          複製
+     C                     MOVEA'00000000'*IN,32
+     C                     MOVE *OFF      *IN40
+     C                     EXSR SR3100                     讀入
+     C           W#OPT     WHEQ 4                          刪除
+     C                     MOVEA'00000101'*IN,32
+     C                     MOVE *ON       *IN40
+     C                     EXSR SR3100                     讀入
+     C           W#OPT     WHEQ 5                          查詢
+     C                     MOVEA'00001001'*IN,32
+     C                     MOVE *ON       *IN40
+     C                     EXSR SR3100                     讀入
+     C                     ENDSL
+     C*
+8912 C           D#DEPT    IFEQ 'A'
+ .   C           D#DEPT    OREQ 'S'
+ .   C                     MOVE *OFF      *IN42
+ .   C                     ELSE
+ .   C                     MOVE *ON       *IN42
+ .   C                     ENDIF
+     C           W#PRID    DOWEQ'03'
+     C*
+     C                     EXFMTCC500F2
+     C                     MOVE *OFF      *IN99
+     C* F3
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C* F12
+     C           *IN12     IFEQ *ON
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           *IN36     IFEQ *OFF                       非查詢
+     C*
+     C                     MOVE *BLANK    S#ERR2
+     C                     MOVEA'0000000' *IN,32
+     C*
+     C  N40                EXSR SR3200                      CHECK DATA
+     C*儲存
+     C  N99      *IN10     IFEQ *ON
+     C                     EXSR SR3300
+     C                     MOVE '02'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*刪除
+     C  N99      *IN11     IFEQ *ON
+     C                     MOVE S#GPN1    CRGPNO           集團代號
+     C                     MOVE S#CUN1    CRCUNO           客戶代號
+     C           K#GRST    CHAINRCBGRST              41
+     C  N41                DELETRCBGRST
+     C                     MOVE '02'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*全集團處理
+     C  N99N42   *IN09     IFEQ *ON
+     C   50                EXSR SR3300
+     C   50                EXSR SR3400
+     C   50                MOVE '02'      W#PRID
+     C  N50                MOVELERR,4     S#ERR2
+     C  N50                MOVE *ON       *IN50
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     ENDIF                            IN36
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3100    BEGSR
+     C*****************************************************************
+     C*讀入
+     C                     MOVE S#GPN1    CRGPNO           集團代號
+     C                     MOVE S#CUN1    CRCUNO           客戶代號
+     C           K#GRST    CHAINRCBGRST             N41
+     C                     MOVE CRGPNO    S#GPNO           集團代號
+     C                     MOVE CRCUNO    S#CUNO           客戶代號
+     C                     MOVE CRCUNM    S#CUNM           客戶簡稱
+     C                     MOVE CRFNAM    S#FNAM           客戶全稱
+     C                     MOVE CRCMAN    S#CMAN           負責人
+     C                     MOVE CRCMID    S#CMID           身分證字號
+     C                     MOVE CRFRST    S#FRST           往來碼
+     C                     MOVE CRGPLR    S#GPLR           集團階級
+     C                     MOVE CRARLM    S#ARLM           警示碼
+     C                     MOVE CRSTP1    S#STP1           禁止出貨1
+     C                     MOVE CRSTP2    S#STP2           禁止出貨2
+     C                     MOVE CRUPDM    S#UPDM           異動人員
+     C                     Z-ADDCRUPDD    S#UPDD           異動日期
+     C*設定或清除碼
+     C           S#MARK    IFEQ '*'
+     C                     MOVE '1'       H#MARK
+     C                     ELSE
+     C                     MOVE '0'       H#MARK
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3200    BEGSR
+     C*****************************************************************
+     C* CHECK DATA
+     C*集團代號
+     C           S#GPNO    IFEQ *BLANK
+     C                     MOVELERR,2     S#ERR2
+     C                     SETON                     3899
+     C                     ENDIF
+     C*
+     C  N99      W#OPT     IFEQ 1
+     C           S#GPNO    CHAINCBGRUP              N41
+     C   41                MOVELERR,6     S#ERR2
+     C   41                SETON                     3899
+     C                     ENDIF
+     C*客戶代號
+     C  N99      S#CUNO    IFEQ *BLANK
+     C                     MOVELERR,2     S#ERR2
+     C                     SETON                     3299
+     C                     ENDIF
+     C*
+     C  N99      W#OPT     IFEQ 1
+     C                     MOVE S#GPNO    CRGPNO           集團代號
+     C                     MOVE S#CUNO    CRCUNO           客戶代號
+     C           K#GRST    CHAINRCBGRST             N41
+     C  N41                MOVELERR,3     S#ERR2
+     C  N41                SETON                     323899
+     C                     ENDIF
+     C*客戶簡稱
+     C  N99      S#CUNM    IFEQ *BLANK
+     C                     MOVELERR,2     S#ERR2
+     C                     SETON                     3399
+     C                     ENDIF
+     C*客戶全稱
+     C  N99      S#FNAM    IFEQ *BLANK
+     C                     MOVELERR,2     S#ERR2
+     C                     SETON                     3499
+     C                     ENDIF
+     C*集團位階
+     C  N99N42   S#GPLR    IFEQ *BLANK
+     C                     MOVELERR,2     S#ERR2
+     C                     SETON                     3599
+     C                     ENDIF
+     C*
+     C  N42      *IN99     IFEQ *OFF
+     C                     MOVE S#GPNO    CPGPNO           集團編號
+     C                     MOVE S#GPLR    CPGPLR           集團位階
+     C           K#GRRP    CHAINRCBGRRP             N51
+     C   51                MOVELERR,5     S#ERR2
+     C   51                SETON                     353899
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3300    BEGSR
+     C*****************************************************************
+     C* SAVE DATA
+     C                     MOVE S#GPNO    CRGPNO           集團代號
+     C                     MOVE S#CUNO    CRCUNO           客戶代號
+     C           K#GRST    CHAINRCBGRST              41
+     C                     MOVE S#GPNO    CRGPNO           集團代號
+     C                     MOVE S#CUNO    CRCUNO           客戶代號
+     C                     MOVE S#CUNM    CRCUNM           客戶簡稱
+     C                     MOVE S#FNAM    CRFNAM           客戶全稱
+     C                     MOVE S#CMAN    CRCMAN           負責人
+     C                     MOVE S#CMID    CRCMID           身分證字號
+     C                     MOVE S#FRST    CRFRST           往來碼
+     C                     MOVE S#GPLR    CRGPLR           集團階級
+     C                     MOVE S#ARLM    CRARLM           警示碼
+     C                     MOVE S#STP1    CRSTP1           禁止出貨1
+     C                     MOVE S#STP2    CRSTP2           禁止出貨2
+     C           W#OPT     IFEQ 1
+     C                     MOVE S#USER    CRENTM           新增人員
+9908AC*                    MOVE UDATE     CRENTD           新增日期
+9908AC           *DATE     SUB  19000000  CRENTD           新增日期
+     C                     TIME           CRENTT           新增時間
+     C                     ENDIF
+     C                     MOVE S#USER    CRUPDM           異動人員
+9908AC*                    MOVE UDATE     CRUPDD           異動日期
+9908AC           *DATE     SUB  19000000  CRUPDD           異動日期
+     C                     TIME           CRUPDT           異動時間
+     C*
+     C   41                WRITERCBGRST
+     C  N41                UPDATRCBGRST
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3400    BEGSR
+     C*****************************************************************
+     C           H#MARK    IFEQ '1'                        原為異常
+     C*
+     C           S#ARLM    IFEQ *BLANK
+     C           S#STP1    ANDEQ*BLANK
+     C           S#STP2    ANDEQ*BLANK
+     C                     EXSR SR3410                     清除
+     C                     ELSE
+     C                     EXSR SR3420                     集團設定
+     C                     ENDIF
+     C*
+     C                     ELSE
+     C                     EXSR SR3420                     集團設定
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3410    BEGSR
+     C*****************************************************************
+     C                     MOVE S#CUNO    F#CUNO           客戶代號
+     C                     MOVE *BLANK    F#GPNO           集團代號
+     C           K#GRSL    SETLLRGRSTL
+     C                     READ RGRSTL                   52
+     C           *IN52     DOWEQ*OFF
+     C           F#CUNO    IFNE S#CUNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVE F#GPNO    CRGPNO           集團代號
+     C                     MOVE *BLANK    CRCUNO           客戶代號
+     C           K#GRST    SETLLRCBGRST
+     C                     READ RCBGRST                  51
+     C           *IN51     DOWEQ*OFF
+     C           CRGPNO    IFNE F#GPNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVE S#ARLM    CRARLM           警示碼
+     C                     MOVE S#STP1    CRSTP1           禁止出貨1
+     C                     MOVE S#STP2    CRSTP2           禁止出貨2
+     C                     MOVE *BLANK    CRSOUR
+     C                     UPDATRCBGRST
+     C*
+     C                     READ RCBGRST                  51
+     C   51                LEAVE
+     C                     ENDDO
+     C*
+     C                     READ RGRSTL                   52
+     C   52                LEAVE
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3420    BEGSR
+     C*****************************************************************
+     C                     MOVE S#CUNO    F#CUNO           客戶代號
+     C                     MOVE *BLANK    F#GPNO           集團代號
+     C           K#GRSL    SETLLRGRSTL
+     C                     READ RGRSTL                   52
+     C           *IN52     DOWEQ*OFF
+     C           F#CUNO    IFNE S#CUNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVE F#GPNO    CPGPNO           集團編號
+     C                     MOVE F#GPLR    CPGPLR           集團位階
+     C           K#GRRP    CHAINRCBGRRP              51
+     C*
+     C                     MOVE F#GPNO    CRGPNO           集團代號
+     C                     MOVE *BLANK    CRCUNO           客戶代號
+     C           K#GRST    SETLLRCBGRST
+     C                     READ RCBGRST                  51
+     C           *IN51     DOWEQ*OFF
+     C           CRGPNO    IFNE F#GPNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVE CPARLM    CRARLM           警示碼
+     C                     MOVE CPSTP1    CRSTP1           禁止出貨1
+     C                     MOVE CPSTP2    CRSTP2           禁止出貨2
+     C*          S#CUNO    CAT  S#GPLR:0  CRSOUR           反應來源
+     C                     MOVELS#CUNO    D#SOU1
+     C                     MOVELS#GPLR    D#SOU2
+     C                     MOVELD#SOUR    CRSOUR
+     C                     UPDATRCBGRST
+     C*
+     C                     READ RCBGRST                  51
+     C   51                LEAVE
+     C                     ENDDO
+     C*
+     C                     READ RGRSTL                   52
+     C   52                LEAVE
+     C                     ENDDO
+     C*
+     C                     ENDSR
+**  ERR
+01-資料不存在！
+02-欄位不得為空白或0!
+03-該客戶已存在,不得重複新增!
+04-此作業將更改客戶相關集團之授信狀況,確認後按F9執行之!
+05-該集團此位階之反應未設定!
+06-該集團未建立!
+

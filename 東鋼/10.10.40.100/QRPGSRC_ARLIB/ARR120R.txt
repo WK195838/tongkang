@@ -1,0 +1,175 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR120R
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     型鋼折讓資負同在查核明細表
+     H*            5.DATE-WRITTEN  94/08/08
+     H*            6.DATE-MODIFY
+     H*                           101/09/25 2012AR682 S00WCJ (0109A)
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR120F IP  E           K        DISK
+     FARR120F1IF  E           K        DISK
+     FARR120T O   E             69     PRINTER
+     E*****************************************************************
+     IRAR120F
+     I                                              A1CUNML2
+     I                                              A1TXNOL1
+     I           UDS
+     I                                     10011010 U#USID
+     I                                      300 3050U#YYMM
+0109AIIFRS       UDS                             50
+0109AI                                        1   60D#IFYM
+0109AI                                        1   80D#IFRS
+     C*****************************************************************
+     C*          KET  LIST
+     C*****************************************************************
+     C*FILE => ARR120F1(傳票暫存檔)
+     C           K#ACVR    KLIST
+     C                     KFLD           ACNO
+     C                     KFLD           ACDM04
+     C*****************************************************************
+0109AC           *NAMVAR   DEFN ARIFRSCTL IFRS
+0109AC           U#YYMM    IFLT D#IFYM
+0109AC                     MOVEL*ON       *IN77
+0109AC                     ELSE
+0109AC                     MOVEL*OFF      *IN77
+0109AC                     ENDIF
+0109AC                     UNLCKIFRS
+     C  N99                EXSR INISR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN69
+     C*
+     C                     MOVEL*ALL'='   T#LIN1
+     C                     MOVEL*ALL'='   T#LIN2
+     C*
+     C                     Z-ADDU#YYMM    T#YYMH
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR120T1T
+     C*
+     C                     MOVEL*ALL'-'   T#LIN3
+     C                     MOVEL*BLANK    W#CUNO  6
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR120T1S
+     C*
+     C                     MOVEL*BLANK    W#ORNO  6
+     C                     MOVEL*BLANK    W#TXNO  6
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR120T1D
+     C                     MOVELA1CUNO    T#CUNO           客戶代號
+     C                     MOVELA1CUNM    T#CUNM           客戶名稱
+     C                     MOVELA1ORNO    T#ORNO           訂單編號
+     C                     Z-ADDA1ACDT    T#YYMM           折讓年月
+     C                     MOVELA1TXNO    T#TXNO           折讓單號
+     C                     MOVELA1IVNO    T#INNO           發票號碼
+     C                     Z-ADDA1AMT1    T#AMT1           折讓金額
+     C                     Z-ADDA1TAX     T#TAX            折讓稅額
+     C                     Z-ADDA1AMT2    T#AMT2           折讓總額
+0109AC   77                MOVEL'4113'    ACNO
+0109AC  N77                MOVEL'410103'  ACNO
+     C                     MOVELT#TXNO    ACDM04
+     C           K#ACVR    CHAINRAR120F1             44
+     C  N44                MOVELACCARD    T#VRNO
+     C  N44                MOVE ACVRNO    T#VRNO
+     C*客戶代號相同不印
+     C           W#CUNO    IFNE A1CUNO
+     C                     MOVELA1CUNO    W#CUNO
+     C                     MOVE *OFF      *IN50
+     C                     ELSE
+     C                     MOVE *ON       *IN50
+     C                     ENDIF
+     C*訂單編號相同不印
+     C           W#ORNO    IFNE A1ORNO
+     C                     MOVELA1ORNO    W#ORNO
+     C                     MOVE *OFF      *IN51
+     C                     ELSE
+     C                     MOVE *ON       *IN51
+     C                     ENDIF
+     C*磅單編號相同不印
+     C           W#TXNO    IFNE A1TXNO
+     C                     MOVELA1TXNO    W#TXNO
+     C                     MOVE *OFF      *IN52
+     C                     ELSE
+     C                     MOVE *ON       *IN52
+     C                     ENDIF
+     C*
+     C   69                WRITEAR120T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR120T1D
+     C*磅單小計
+     C                     ADD  T#AMT1    T#AM1S
+     C                     ADD  T#TAX     T#TAXS
+     C                     ADD  T#AMT2    T#AM2S
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR120T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR120T1S
+     C*客戶合計
+     C                     ADD  T#AM1S    T#AM1T
+     C                     ADD  T#TAXS    T#TAXT
+     C                     ADD  T#AM2S    T#AM2T
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR120T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR120T1T
+     C*總計
+     C                     ADD  T#AM1T    T#AM1A
+     C                     ADD  T#TAXT    T#TAXA
+     C                     ADD  T#AM2T    T#AM2A
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR120T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR120T1A
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*
+     C   69                WRITEAR120T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR120T1M
+     C*
+     C                     ENDSR
+

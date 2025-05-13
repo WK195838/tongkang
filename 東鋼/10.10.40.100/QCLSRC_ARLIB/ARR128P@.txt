@@ -1,0 +1,94 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR128P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02LBU                                  */
+     /*     4.FUNCTION     銷貨折讓發票資料明細表                 */
+     /*     5.DATE-WRITTEN  96/07/18                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM        PARM(&C#YMS &C#YME &S#IVNO)
+
+             DCL        VAR(&S#YMS)  TYPE(*DEC)  LEN(6)
+             DCL        VAR(&S#YME)  TYPE(*DEC)  LEN(6)
+             DCL        VAR(&C#YMS)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&C#YME)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&C#YS)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&C#MS)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&C#SYM)  TYPE(*CHAR) LEN(4)
+             DCL        VAR(&C#EYM)  TYPE(*CHAR) LEN(4)
+             DCL        VAR(&S#IVNO) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&FILE)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MBR)    TYPE(*CHAR) LEN(10)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+ START:
+
+            CHGDTAARA  DTAARA(*LDA (301  6)) VALUE(&C#YMS)
+            CHGDTAARA  DTAARA(*LDA (307  6)) VALUE(&C#YME)
+            CHGDTAARA  DTAARA(*LDA (313 10)) VALUE(&S#IVNO)
+
+            SBMJOB     JOB(ARR128P) JOBD(ARJOBD) JOBQ(ARJOBQ) +
+                         RQSDTA('CALL PGM(ARR128P) PARM(''' || +
+                         &C#YMS || ''' ''' || &C#YME || '''    +
+                         ''' || &S#IVNO || ''')')
+            RETURN
+
+ BATCH:
+            RTVDTAARA  DTAARA(*LDA (301  6))  RTNVAR(&C#YMS)
+            RTVDTAARA  DTAARA(*LDA (307  6))  RTNVAR(&C#YME)
+            RTVDTAARA  DTAARA(*LDA (313 10))  RTNVAR(&S#IVNO)
+
+             CLRPFM     FILE(ARLIB/ARR128F)
+             MONMSG     MSGID(CPF0000)
+
+             CHGVAR     VAR(&C#SYM) VALUE(%SST(&C#YMS 3 4))
+             CHGVAR     VAR(&C#EYM) VALUE(%SST(&C#YME 3 4))
+             CHGVAR     VAR(&S#YMS) VALUE(&C#YMS)
+             CHGVAR     VAR(&S#YME) VALUE(&C#YME)
+
+ LOOP:       IF         COND(&S#YMS *LE &S#YME) THEN(DO)
+             CHGVAR     VAR(&C#YMS) VALUE(&S#YMS)
+             CHGVAR     VAR(&C#YS)  VALUE(%SST(&C#YMS 3 2))
+             CHGVAR     VAR(&C#MS)  VALUE(%SST(&C#YMS 5 2))
+
+             CHGVAR     VAR(&FILE) VALUE('ACHR' || &C#YS)
+             CHGVAR     VAR(&MBR)  VALUE('VR' || &C#MS)
+             CPYF       FROMFILE(&FILE)  TOFILE(ARLIB/ARR128F)        +
+                          FROMMBR(&MBR) MBROPT(*ADD)                  +
+                          INCREL((*IF ACVRNO *GE 'P000') +
+                          (*AND ACVRNO *LE 'P999')) FMTOPT(*MAP *DROP)
+
+             IF         COND(&C#MS  *EQ '12')   THEN(DO)
+             CHGVAR     VAR(&S#YMS) VALUE(&S#YMS + 89)
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&S#YMS) VALUE(&S#YMS + 1)
+             ENDDO
+
+             GOTO LOOP
+             ENDDO
+
+             OVRPRTF   FILE(ARR128T) TOFILE(ARR128T) PAGESIZE(*N 158) +
+                       CPI(12) HOLD(*YES) USRDTA('銷發明細')
+             OVRDBF     FILE(TRNDTLL3) TOFILE(TRNDTLL3) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTLL3) QRYSLT('                     +
+                            (TXIVNO *EQ "' || &S#IVNO || '")   *AND +
+                            (W#YM   *GE "' || &C#SYM  || '")   *AND +
+                            (W#YM   *LE "' || &C#EYM  || '")   *AND +
+                            (TXFLAG *NE "D")')                      +
+                        KEYFLD(*FILE)                               +
+                        MAPFLD((W#YM  '%SST(TXRESV 1 4)' *CHAR 4))
+             CALL       PGM(ARR128R)
+             CLOF       OPNID(TRNDTLL3)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

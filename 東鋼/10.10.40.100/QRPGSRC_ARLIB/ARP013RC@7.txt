@@ -1,0 +1,142 @@
+     H****************************************************************
+     H*
+     H*            UPDATE  DATE  100/06/10  2011AR607 S00WCJ (0006A)
+     H*                           增加U廠庫別代號寫入摘要三，庫別
+     H*                           代號以品名讀取AMPRODL3自製庫之資
+     H*                           料，由於AMPRODL3各廠區獨立，以
+     H*                          100/11/28  2011AR634 S00WCJ (0011A)
+     H*                           配合IFRS修改
+     H*                            DDMF方式讀取U廠之資料
+     H*                          101/12/13 2012AR704 S00WCJ (0112A)
+     H*                           配合IFRS正式轉換修改
+     H*
+     H****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVDTL  IP  E           K        DISK
+     FARWF02  O   E           K        DISK                      A
+     FINVMST  IF  E           K        DISK
+0006AFAMPRODL3IF  E           K        DISK
+     FACTRAN  UF  E           K        DISK
+     F*---------------------------------------------------------------
+     IIVREC
+     I                                              IVNO  L1
+     I           UDS
+9008 I                                        1   60YM
+     I                                        7   7 TXAR
+0112AI                                      221 2260D#IFRS
+     I            DS
+     I                                        1  10 IVNO
+     I                                        1   2 D#IVN1
+     I                                        3  10 D#IVN2
+     C**-------------------------------------------**
+     C**  MAIN LOGIC                               **
+     C**-------------------------------------------**
+     C           ACKEY     KLIST
+     C                     KFLD           TXAR
+     C                     KFLD           YM
+     C                     KFLD           ACVRNO
+     C                     KFLD           ACITEM
+0006AC           KEY02     KLIST
+0006AC                     KFLD           W2AREA
+0006AC                     KFLD           IVPDCD
+     C*
+     C  N90                EXSR IN#01
+     C   L1                EXSR DL#01
+     C  N11                EXSR DP#01
+     C**-------------------------------------------**
+     C**   INITIAL ROUTINE                         **
+     C**-------------------------------------------**
+     CSR         IN#01     BEGSR
+     C                     MOVEL'E00000'  ACVRNO
+     C                     Z-ADD0         ACITEM
+     C           ACKEY     SETLLACTRAN               95
+     C           *IN95     DOWEQ'0'
+     C                     READ ACTRAN                   95
+     C  N95      ACVRNO    IFGT 'E99999'
+     C                     SETON                     95
+     C                     ENDIF
+     C   95                LEAVE
+     C                     DELETRACVOUR
+     C                     ENDDO
+0011AC                     MOVEL'E00000'  D#VNO1  6
+0011AC                     MOVEL'E99999'  D#VNO2  6
+     C                     SETON                     90
+0112AC           YM        IFLT D#IFRS
+0011AC                     CALL 'ARS888P'
+0011AC                     PARM           TXAR
+0011AC                     PARM           YM
+0011AC                     PARM           D#VNO1
+0011AC                     PARM           D#VNO2
+0112AC                     ENDIF
+     C***
+     CSR                   ENDSR
+     C**-------------------------------------------**
+     C**   L1 PROCESS                              **
+     C**-------------------------------------------**
+     CSR         DL#01     BEGSR
+     C*
+     C           IVNO      CHAININVMST               11
+9112 C  N11      INTYPE    IFEQ '9'                        排除其他類
+ .   C                     SETON                     11
+ .   C                     ENDIF
+     C  N11                SELEC
+     C           TXAR      WHEQ 'P'
+     C           INAREA    IFEQ 'K'
+     C           INAREA    OREQ 'M'
+     C           INAREA    OREQ 'H'
+     C                     SETON                     11
+     C                     ELSE
+     C           INAREA    IFEQ 'P'
+     C*                    MOVEL'L'       INAREA
+     C*       此類折讓台北的發票情形很少，目前依情況修改程式
+CLJ  C                     MOVEL'T'       INAREA
+     C                     ENDIF
+     C                     ENDIF
+     C           TXAR      WHNE 'P'
+     C           INAREA    IFNE TXAR
+     C                     SETON                     11
+     C                     ENDIF
+     C                     ENDSL
+     CSR                   ENDSR
+     C**--------------------------------------**
+     C**   DEATIL TIME PROCESS                **
+     C**--------------------------------------**
+     CSR         DP#01     BEGSR
+     C***
+     C                     MOVELINORNO    IVORNO
+     C                     CLEARRARWF02
+     C                     MOVELIVFLAG    W2FLAG
+     C                     MOVELIVNO      W2NO
+     C                     MOVELIVACNT    W2ACNT
+     C                     MOVELIVITEM    W2ITEM
+     C                     MOVELIVACDT    W2ACDT
+     C                     MOVELIVORNO    W2ORNO
+     C                     MOVELIVPDCD    W2PDCD
+     C                     MOVELIVQTY     W2QTY
+     C                     Z-ADDIVUPRC    W2UPRC
+     C                     MOVELIVAMT     W2AMT
+     C                     MOVELIVDECD    W2DECD
+     C                     MOVELIVDEDT    W2DEDT
+     C                     MOVELIVAPNO    W2APNO
+     C                     MOVELIVACNO    W2ACNO
+     C                     MOVELIVFL01    W2FL01
+     C                     MOVELIVFL02    W2FL02
+     C                     MOVELIVFL03    W2FL03
+     C                     MOVELIVTXAR    W2TXAR
+     C                     MOVELIVTXDT    W2TXDT
+     C                     MOVELIVRESV    W2RESV
+     C  N11                MOVELINKIND    W2KIND
+     C  N11                MOVELINAREA    W2AREA
+     C  N11                MOVELINCUNO    W2CUNO
+     C  N11                MOVELINCUNM    W2CUNM
+9007 C           IVPDCD    IFLT '800'
+9007 C           IVPDCD    ORGT '899'
+0006AC           W2AREA    IFEQ 'U'
+0006AC           KEY02     CHAINAMPRODL3            N52
+0006AC  N52                MOVELAPSTNO    W2STNO
+0006AC   52                MOVEL*BLANKS   W2STNO
+0006AC                     ENDIF
+     C                     WRITERARWF02
+     C                     ENDIF
+     CSR         DP#01Z    ENDSR
+

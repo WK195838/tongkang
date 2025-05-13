@@ -1,0 +1,144 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR079R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     應收帳款帳齡分析表（經管會用）
+     H*            5.DATE-WRITTEN  88/07/19
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARSTTX  IP  E           K        DISK
+     FARSAID  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FARR079T O   E             66     PRINTER
+     E*************************************************************
+     E                    TAB1    1   3  1   TAB1R  16
+     I*****************************************************************
+     IAXREC
+     I                                              AXORNOL1
+     I*------------------------------------------------------
+     I           UDS
+     I                                        1   40U#DAY1
+     I                                        5   80U#DAY2
+     I                                        9  120U#DAY3
+     I                                       13  160U#DAY4
+     I                                       17  17 U#TYPE
+     I*
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C                     Z-ADDU#DAY1    R#TA1B
+     C           U#DAY2    SUB  1         R#TA1E
+     C                     Z-ADDU#DAY2    R#TA2B
+     C           U#DAY3    SUB  1         R#TA2E
+     C                     Z-ADDU#DAY3    R#TA3B
+     C           U#DAY4    SUB  1         R#TA3E
+     C                     Z-ADDU#DAY4    R#TA4B
+     C*
+     C           U#TYPE    LOKUPTAB1      TAB1R          69
+     C   69                MOVELTAB1R     R#TYPE
+     C*
+     C                     Z-ADD0         W#ITEM  30
+     C                     CLEARAR079T1T
+     C                     SETON                     66    首頁表頭
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式換訂單
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     CLEARAR079T1D
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     SELEC
+     C           AXINDU    WHLT U#DAY2
+     C                     ADD  AXINAM    R#AMTA
+     C           AXINDU    WHLT U#DAY3
+     C                     ADD  AXINAM    R#AMTB
+     C           AXINDU    WHLT U#DAY4
+     C                     ADD  AXINAM    R#AMTC
+     C                     OTHER
+     C                     ADD  AXINAM    R#AMTD
+     C                     ENDSL
+     CSR         ESDTL     ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  印出訂單
+     C*********************************
+     CSR         L1SR      BEGSR
+     C           R#AMTA    ADD  R#AMTB    R#AMTE
+     C                     ADD  R#AMTC    R#AMTE
+     C                     ADD  R#AMTD    R#AMTE
+     C*
+     C                     ADD  1         W#ITEM
+     C                     Z-ADDW#ITEM    R#ITEM
+     C           AXCUNO    CHAINCBCUST               69
+     C  N69                MOVELCBCUNM    R#CUNM           客戶名稱
+     C                     MOVELAXORNO    R#ORNO
+     C                     MOVELAXRVID    R#RVID
+     C           R#RVID    CHAINARSAID               69    業務名稱
+     C  N69                MOVELSANAME    R#RVNM
+     C                     MOVELAXDEPT    R#DEPT
+     C*
+     C   66                WRITEAR079T1H
+     C   66                SETOF                     66
+     C                     WRITEAR079T1D
+     C*
+     C                     ADD  R#AMTA    R#TAMA           合計
+     C                     ADD  R#AMTB    R#TAMB
+     C                     ADD  R#AMTC    R#TAMC
+     C                     ADD  R#AMTD    R#TAMD
+     CSR         ESL1      ENDSR
+     C*
+     C*********************************
+     C*  LR 函式 （印出合計）
+     C*********************************
+     CSR         LRSR      BEGSR
+     C           R#TAMA    ADD  R#TAMB    R#TAME
+     C                     ADD  R#TAMC    R#TAME
+     C                     ADD  R#TAMD    R#TAME
+     C*
+     C   66                WRITEAR079T1H
+     C   66                SETOF                     66
+     C                     WRITEAR079T1T
+     C                     WRITEAR079T1X
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     WRITEAR079T1H
+     C                     WRITEAR079T1M
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  子函式集
+     C*********************************
+     C*****************************************************************
+** TAB1
+1應收帳款
+2應收票據
+3應收帳款及票據
+

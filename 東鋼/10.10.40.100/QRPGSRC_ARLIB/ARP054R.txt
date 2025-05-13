@@ -1,0 +1,252 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP054R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     查核發票主檔與明細檔之金額差異
+     H*            5.DATE-WRITTEN  86/12/31
+     H*            6.UPDATE  DATE  104/09/23  2015AR953  S00WCJ (0409A)
+     H*                             產品代碼3碼擴5碼
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  IP  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FARP054T O   E             66     PRINTER
+     F*****************************************************************
+     IINREC
+     I                                              INORNOL1
+     I*------------------------------------------------------
+TEST I            DS
+ .   I                                        1  10 D#INNO
+ .   I                                        3  100D#NO
+     I           UDS
+     I                                        1   6 U#CUNO
+     I                                       11  15 U#ORNO
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C           U#CUNO    IFEQ *BLANK
+     C                     MOVEL'全部'  R#INCU
+     C                     ELSE
+     C                     MOVELU#CUNO    R#INCU
+     C                     ENDIF
+     C*
+     C           U#ORNO    IFEQ *BLANK
+     C                     MOVEL'全部'  R#INOR
+     C                     ELSE
+     C                     MOVELU#ORNO    R#INOR
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         R#RCDS
+     C                     SETON                     66    首頁
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     SETON                     50
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     CLEARAR054T1D
+     C*
+     C                     EXSR SR1000                     檢核是否同
+     C           W#RTNV    IFEQ 'T'
+     C                     GOTO DTLES
+     C                     ENDIF
+     C*
+     C                     ADD  1         R#RCDS
+     C           *IN50     IFEQ '1'                        新訂單
+     C                     MOVELINORNO    R#ORNO
+     C                     SETOF                     50
+     C                     ENDIF
+     C                     MOVELINNO      R#INNO           發票號碼
+     C*
+     C           *IN66     IFEQ '1'
+     C                     WRITEAR054T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR054T1D
+     CSR         DTLES     ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  存檔
+     C*********************************
+     CSR         L1SR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  印核覆
+     C*********************************
+     CSR         LRSR      BEGSR
+     C           R#RCDS    IFEQ 0
+     C                     EXSR MSGSR
+     C                     ELSE
+     C   66                WRITEAR054T1H
+     C                     WRITEAR054T1T
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     EXSR INISR
+     C                     WRITEAR054T1H
+     C                     WRITEAR054T1M
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  子函式集
+     C*********************************
+     C*----------------------------------------
+     C*  檢核金額
+     C*----------------------------------------
+     CSR         SR1000    BEGSR
+TEST C                     MOVE INNO      D#INNO
+  .  C           D#NO      IFEQ 1776355
+  .  C                     Z-ADD111       W#TEST  30
+  .  C                     ENDIF
+     C                     Z-ADDINAAMT    W#AAMT 110       暫存金額
+     C                     Z-ADDINATAX    W#ATAX 110
+     C                     Z-ADDINBAMT    W#BAMT 110
+     C                     Z-ADDINCAMT    W#CAMT 110
+     C                     Z-ADDINCTAX    W#CTAX 110
+     C                     Z-ADDINDAMT    W#DAMT 110
+     C                     Z-ADDINDTAX    W#DTAX 110
+     C                     Z-ADDINEAMT    W#EAMT 110
+     C                     Z-ADDINFAMT    W#FAMT 110
+     C                     Z-ADDINNBAL    W#NBAL 110
+     C*
+     C                     Z-ADD0         INAAMT           出貨金額
+     C                     Z-ADD0         INATAX           出貨稅額
+     C                     Z-ADD0         INBAMT           扣預收
+     C                     Z-ADD0         INCAMT           折退金額
+     C                     Z-ADD0         INCTAX           折退稅額
+     C                     Z-ADD0         INDAMT           扣預金沖回
+     C                     Z-ADD0         INDTAX           扣預稅沖回
+     C                     Z-ADD0         INEAMT           繳款金額
+     C                     Z-ADD0         INFAMT           退票金額
+     C                     Z-ADD0         INNBAL           未收餘額
+     C*
+     C           INNO      CHAINIVREC               N69
+     C           *IN69     DOWEQ'0'
+     C           INDECD    IFEQ 'D'                        已作廢全計
+     C           IVFLAG    ORNE 'D'                        刪除者不計
+     C           IVDECD    ANDNE'D'
+     C                     SELEC
+     C*
+     C           IVACNT    WHEQ '1'                        出貨
+     C                     ADD  IVAMT     INAAMT
+     C           IVACNT    WHEQ '2'                        退貨
+     C                     ADD  IVAMT     INCAMT
+     C           IVACNT    WHEQ '3'                        折讓
+     C           IVFL03    IFEQ 'D'
+     C                     ADD  IVAMT     INCAMT
+     C                     ENDIF
+     C           IVFL03    IFEQ 'K'
+     C                     ADD  IVAMT     INAAMT
+     C                     ENDIF
+     C           IVACNT    WHEQ '4'
+     C           IVAMT     IFLT 0                          負數
+     C           INTYPE    IFEQ '2'                        預收發票
+     C                     ADD  IVAMT     INCAMT           折預收
+     C                     ELSE
+     C                     ADD  IVAMT     INBAMT           扣預收
+     C                     ENDIF
+     C                     ELSE                            正數
+     C           INTYPE    IFEQ '2'                        預收發票
+     C                     ADD  IVAMT     INAAMT           預收金額
+     C                     ELSE
+     C                     ADD  IVAMT     INDAMT           扣預收沖回
+     C                     ENDIF
+     C                     ENDIF
+     C           IVACNT    WHEQ '5'
+     C                     SELEC
+0409AC           IVPDCD    WHEQ *BLANKS                    出貨稅額
+     C                     ADD  IVAMT     INATAX
+0409AC           IVPDCD    WHEQ 'A    '                    預收沖回稅
+     C                     ADD  IVAMT     INDTAX
+0409AC           IVPDCD    WHEQ 'B    '                    退貨稅額
+     C                     ADD  IVAMT     INCTAX
+0409AC           IVPDCD    WHEQ 'C    '                    折讓稅額
+     C                     ADD  IVAMT     INCTAX
+     C                     OTHER                           打錯
+     C                     ADD  IVAMT     INATAX
+     C                     ENDSL
+     C           IVACNT    WHEQ '6'                        繳款
+     C                     ADD  IVAMT     INEAMT
+     C           IVACNT    WHEQ '7'                        退票轉出
+     C                     ADD  IVAMT     INFAMT
+     C           IVACNT    WHEQ '8'                        勞務
+     C                     ADD  IVAMT     INAAMT
+     C           IVACNT    WHEQ '9'                        其他
+     C                     ADD  IVAMT     INAAMT
+     C*
+     C                     ENDSL
+     C                     ENDIF
+     C           INNO      READEIVREC               N    69
+     C                     ENDDO
+     C*
+     C           W#AAMT    ADD  W#ATAX    INNBAL           彙總未收
+     C                     ADD  W#BAMT    INNBAL
+     C                     ADD  W#CAMT    INNBAL
+     C                     ADD  W#CTAX    INNBAL
+     C                     ADD  W#DAMT    INNBAL
+     C                     ADD  W#DTAX    INNBAL
+     C                     ADD  W#EAMT    INNBAL
+     C                     ADD  W#FAMT    INNBAL
+     C*
+     C*                   統計六項差異
+     C           INAAMT    SUB  W#AAMT    R#AMT1           出貨
+     C           INATAX    ADD  INCTAX    R#AMT2           稅額
+     C                     ADD  INDTAX    R#AMT2
+     C                     SUB  W#ATAX    R#AMT2
+     C                     SUB  W#CTAX    R#AMT2
+     C                     SUB  W#DTAX    R#AMT2
+     C           INBAMT    ADD  INDAMT    R#AMT3           預收
+     C                     SUB  W#BAMT    R#AMT3
+     C                     SUB  W#DAMT    R#AMT3
+     C           INCAMT    SUB  W#CAMT    R#AMT4           折退
+     C           INEAMT    SUB  W#EAMT    R#AMT5           繳款
+     C           INFAMT    SUB  W#FAMT    R#AMT6           退票
+     C*
+     C                     MOVEL'T'       W#RTNV  1
+     C*
+     C           INNBAL    IFNE W#NBAL
+     C                     MOVEL'F'       W#RTNV
+     C                     SETON                     51    加錯
+     C                     ENDIF
+     C*
+     C           R#AMT1    IFNE 0
+     C           R#AMT2    ORNE 0
+     C           R#AMT3    ORNE 0
+     C           R#AMT4    ORNE 0
+     C           R#AMT5    ORNE 0
+     C           R#AMT6    ORNE 0
+     C                     MOVEL'F'       W#RTNV
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+

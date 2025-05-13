@@ -1,0 +1,58 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE  98/12/31 2009AR406 S00WCJ (9812A)  */
+    /*                                                              */
+    /****************************************************************/
+
+        /*  ＝＝＝＜作廢已確認折讓單至廠區改發票明細＞＝＝＝   */
+        /*   將傳入的發票號之發票主檔與明細資料傳至開立的廠區 */
+
+             PGM        PARM(&AREA &INNO)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&INNO) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&OBJN) TYPE(*CHAR) LEN(6)
+ BATCH:
+        /*  建立　DDMF          ............................ */
+             IF         COND(&AREA *EQ 'P') THEN(DO)
+                CHGVAR  VAR(&OBJN) VALUE('TPDDM')
+             ENDDO
+             IF         COND(&AREA *EQ 'T') THEN(DO)
+                CHGVAR  VAR(&OBJN) VALUE('TYDDM')
+             ENDDO
+    /*9812A START */
+             IF         COND(&AREA *EQ 'U') THEN(DO)
+                CHGVAR  VAR(&OBJN) VALUE('U01DDM')
+             ENDDO
+    /*9812A  END */
+
+             IF         COND(&AREA *EQ 'H') THEN(DO)
+                CHGVAR  VAR(&OBJN) VALUE('MLDDM')
+             ENDDO
+             IF         COND(&AREA *EQ 'K') THEN(DO)
+                CHGVAR  VAR(&OBJN) VALUE('KSDDM')
+             ENDDO
+
+             DLTF       FILE(QTEMP/DDMIN)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(&OBJN) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMIN)
+             DLTF       FILE(QTEMP/DDMIV)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(&OBJN) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMIV)
+
+             CHGDDMF    FILE(QTEMP/DDMIN) RMTFILE(*NONSTD +
+                          'DALIB/INVMST') LVLCHK(*NO)
+             CHGDDMF    FILE(QTEMP/DDMIV) RMTFILE(*NONSTD +
+                          'DALIB/INVDTL') LVLCHK(*NO)
+
+             OVRDBF     FILE(INVMST) TOFILE(QTEMP/DDMIN)
+             OVRDBF     FILE(INVDTL) TOFILE(QTEMP/DDMIV)
+             OVRDBF     FILE(INVDTLW) TOFILE(DALIB/INVDTL)
+             CALL       PGM(ARLIB/ARP048R) PARM(&INNO)
+             DLTOVR     INVMST
+             DLTOVR     INVDTL
+             DLTOVR     INVDTLW
+
+ ENDCLPGM:   ENDPGM
+

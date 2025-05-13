@@ -1,0 +1,65 @@
+        /*  ＝＝＝＜台北　預收貨款CPRBAL傳輸程式＞＝＝＝   */
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ARA1) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&LOC) TYPE(*CHAR) LEN(1)
+             DCLF       FILE(ARP027S) RCDFMT(TITLE)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&LOC)
+             RTVJOBA    TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+ START:      SNDRCVF    RCDFMT(TITLE)
+             CHGVAR     VAR(&ERRMSG) VALUE('                      ')
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             IF         COND(&AREA1 *EQ &AREA2) THEN(DO)
+                        CHGVAR   VAR(&ERRMSG) VALUE('廠區不可相同')
+                        GOTO START
+                        ENDDO
+             ELSE IF    COND(&AREA1 *EQ &LOC) THEN(DO)
+             CHGVAR     VAR(&ERRMSG) VALUE('欲抓取廠區不可為原廠區')
+                        GOTO START
+                        ENDDO
+             ELSE IF    COND(&AREA2 *NE &LOC) THEN(DO)
+             CHGVAR     VAR(&ERRMSG) VALUE('欲送廠區需為原廠區')
+                        GOTO START
+                        ENDDO
+             CHGDTAARA  DTAARA(*LDA (1 1)) VALUE(&AREA1)
+             CHGDTAARA  DTAARA(*LDA (2 1)) VALUE(&AREA2)
+             CHGDTAARA  DTAARA(*LDA (3 5)) VALUE(&ORNO)
+             SBMJOB     JOB(ARP027P) JOBD(ARJOBD) JOBQ(QSYS/QCTL) +
+                          RQSDTA('CALL ARLIB/ARP027P')
+      /*     SNDPGMMSG  +
+                          MSG('發票主檔傳輸已送入批次作業執行中..+
+                          .') TOPGMQ(*EXT)      */
+             GOTO       CMDLBL(ENDCLPGM)
+ BATCH:
+        /*  　　  ORNO --> ARLIB/BALF   (TEMP-FILE) */
+             CLRPFM     ARLIB/BALF
+             CALL       ARLIB/ARP027R
+             MONMSG     MSGID(CPF0000)
+        /*  建立　DDMF & DTAARA ............................ */
+             DLTF       FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMT)
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMK)
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMH)
+             MONMSG     MSGID(CPF0000)
+ STEP1:      RTVDTAARA  DTAARA(*LDA (1 1)) RTNVAR(&ARA1)
+        /*  台北　抓　桃園  ARLIB/CPRBAL    ................ */
+             IF         COND(&ARA1 *EQ 'T') THEN(DO)
+             SBMRMTCMD  CMD('call arlib/arp027pa') DDMFILE(QTEMP/DDMT)
+         /*  CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(*NONSTD +
+                          'ARLIB/BALF') LVLCHK(*NO)         */
+             OVRDBF     FILE(BALF) TOFILE(QTEMP/DDMT)
+       /*    CALL       PGM(ARLIB/ARP027RB)                 */
+       /*    DLTOVR     FILE(*ALL)                          */
+       /*    CLRPFM     FILE(BALF)                          */
+                        ENDDO
+ ENDCLPGM:   ENDPGM
+

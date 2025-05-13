@@ -1,0 +1,75 @@
+     /************************************************************/
+     /*           1.PROGRAM-ID   ARP042P                         */
+     /*           2.PROGRAM-TYPE CLP                             */
+     /*           3.FUNTION      收款金額分類傳輸作業          */
+     /*           4.DATE         85/07/10                        */
+     /*           5.PROGRAMMER   S01LYC                          */
+     /*           6.UPDATE  DATE 98/12/31 2009AR406 S00WCJ (9812A)*/
+     /************************************************************/
+     /* SCHEDULE JOB CALL BY ARP034# */
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             RTVJOBA    TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+ START:
+             SNDPGMMSG  MSG('應收帳款傳輸已送入批次作業執行中...') +
+                          TOPGMQ(*EXT)
+             SBMJOB     JOB(ARP042P) JOBD(ARJOBD) JOBQ(QCTL) +
+                          RQSDTA('CALL ARLIB/ARP042P')
+             RETURN
+
+        /*   GOTO       CMDLBL(ENDCLPGM)   */
+ BATCH:
+             DLTF       FILE(QTEMP/TYDDM)
+             MONMSG     CPF0000
+             DLTF       FILE(QTEMP/KSDDM)
+             MONMSG     CPF0000
+    /*9812A START*/
+             DLTF       FILE(QTEMP/U01DDM)
+             MONMSG     CPF0000
+    /*9812A END */
+
+             CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+    /*9812A START */
+             CRTDUPOBJ  OBJ(U01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+    /*9812A END */
+
+        /*  台北　抓　桃園  ARLIB/AFCSLC ............ */
+        /*   MONMSG     MSGID(CPF0000)     */
+             CHGDDMF    FILE(QTEMP/TYDDM) RMTFILE(DALIB/AFCSLC) +
+                          LVLCHK(*NO)
+             OVRDBF     FILE(AFCSLCW) TOFILE(QTEMP/TYDDM)
+             OVRDBF     FILE(AFCSLC) TOFILE(DALIB/AFCSLC)
+        /*   OPNQRYF    FILE((AFCSLCW)) OPTION(*ALL) +
+                          QRYSLT('AXFLAG *NE " "')      */
+             CALL       PGM(ARLIB/ARP042R)
+             DLTOVR     FILE(*ALL)
+
+    /*9812A START */
+        /*  台北　抓　新桃  ARLIB/AFCSLC ............ */
+             CHGDDMF    FILE(QTEMP/U01DDM) RMTFILE(DALIB/AFCSLC) +
+                          LVLCHK(*NO)
+             OVRDBF     FILE(AFCSLCW) TOFILE(QTEMP/U01DDM)
+             OVRDBF     FILE(AFCSLC) TOFILE(DALIB/AFCSLC)
+        /*   OPNQRYF    FILE((AFCSLCW)) OPTION(*ALL) +
+                          QRYSLT('AXFLAG *NE " "')      */
+             CALL       PGM(ARLIB/ARP042R)
+             DLTOVR     FILE(*ALL)
+    /*9812A  END */
+
+        /*  台北　抓　高雄  ARLIB/AFCSLC ............ */
+             CHGDDMF    FILE(QTEMP/KSDDM) RMTFILE(DALIB/AFCSLC) +
+                          LVLCHK(*NO)
+             OVRDBF     FILE(AFCSLCW) TOFILE(QTEMP/KSDDM)
+             OVRDBF     FILE(AFCSLC) TOFILE(DALIB/AFCSLC)
+        /*   OPNQRYF    FILE((AFCSLCW)) OPTION(*ALL) QRYSLT('AXFLAG +
+                          *NE " "')   */
+             CALL       PGM(ARLIB/ARP042R)
+             DLTOVR     FILE(*ALL)
+             RETURN
+ ENDCLPGM:   ENDPGM
+

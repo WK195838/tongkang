@@ -1,0 +1,123 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR101P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02CSF                                    */
+        /*        4.FUNCTION      應收帳款承購(E-FACTORING)發票異常檢核表*/
+        /*        5.DATE-WRITTEN   91/09/16                                  */
+        /*        6.DATE-MODIFY    91/11/19  BY S02CSF                       */
+        /*        　　　　新增"計算已開發票未承購之逾期日"               */
+        /*                                                                   */
+        /*********************************************************************/
+            PGM
+            DCLF       FILE(ARR101S)
+            DCL        VAR(&TYPE)   TYPE(*CHAR) LEN(1)
+            DCL        VAR(&DAT1)   TYPE(*CHAR)  LEN(2)
+            DCL        VAR(&DAT2)   TYPE(*CHAR)  LEN(2)
+            DCL        VAR(&DAT3)   TYPE(*CHAR)  LEN(2)
+
+            RTVJOBA    JOB(&S#DEVN) USER(&S#USER) +
+                       TYPE(&TYPE)
+
+            IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+            RTVDTAARA  DTAARA(*LDA (1011 10))   RTNVAR(&S#DEVN)
+            CHGVAR     VAR(&S#DAT1)   VALUE('45')
+            CHGVAR     VAR(&S#DAT2)   VALUE('30')
+            CHGVAR     VAR(&S#DAT3)   VALUE('10')
+
+ START:     SNDRCVF
+
+            IF         COND(&IN03 *EQ '1') THEN(RETURN)
+            IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+            CHGVAR     VAR(&DAT1)      VALUE(&S#DAT1)
+            CHGVAR     VAR(&DAT2)      VALUE(&S#DAT2)
+            CHGVAR     VAR(&DAT3)      VALUE(&S#DAT3)
+            CHGDTAARA  DTAARA(*LDA (300 2))   VALUE(&DAT1)
+            CHGDTAARA  DTAARA(*LDA (302 2))   VALUE(&DAT2)
+            CHGDTAARA  DTAARA(*LDA (304 2))   VALUE(&DAT3)
+
+            SBMJOB     CMD(CALL PGM(ARR101P)) JOB(ARR101P) +
+                       JOBD(ARJOBD)
+            SNDBRKMSG  MSG('<<應收帳款承購(E-FACTORING) +
+                         異常檢核表已開始處理,請稍待.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+            RETURN
+
+ BATCH:      RTVDTAARA  DTAARA(*LDA (300 2)) RTNVAR(&DAT1)
+             RTVDTAARA  DTAARA(*LDA (302 2)) RTNVAR(&DAT2)
+             RTVDTAARA  DTAARA(*LDA (304 2)) RTNVAR(&DAT3)
+
+   /* 開始處理 */
+        /* STEP1:計算Ｂ，Ｃ，Ｄ的預期天數，寫入ARR101F  */
+
+            CLRPFM     ARR101F
+            OVRDBF     FILE(ARINVM) TOFILE(ARINVM) +
+                       SHARE(*YES)
+            OPNQRYF    FILE(ARINVM) QRYSLT('+
+                       (AMCLOC *EQ " " )')
+            CALL       PGM(ARR101R)
+            CLOF       OPNID(ARINVM)
+            DLTOVR     FILE(*ALL)
+
+        /* STEP2:計算Ａ的預期天數，寫入ARR101F  */
+
+            OVRDBF     FILE(INVMST) TOFILE(INVMST) +
+                       SHARE(*YES)
+            OPNQRYF    FILE(INVMST) QRYSLT('+
+                       (INNO *NE "PA87872713" ) *AND +
+                       (INAPNO *EQ "       " ) *AND +
+                       (INTYPE *EQ "1")  *AND +
+                       (INDECD *EQ " ")')
+            CALL       PGM(ARR101R1)
+            CLOF       OPNID(INVMST)
+            DLTOVR     FILE(*ALL)
+
+        /* STEP3:印出符合Ａ：已開發票未承購之符合條件資料*/
+           OVRPRTF     FILE(ARR101T) TOFILE(ARR101T) +
+                       PAGESIZE(*N 198) +
+                       CPI(15) HOLD(*YES)  USRDTA('未承購')
+            OVRDBF     FILE(ARR101F) TOFILE(ARR101F) +
+                       SHARE(*YES)
+            OPNQRYF    FILE(ARR101F) QRYSLT('+
+                       (AFCODE *EQ "A" ) *OR +
+                       (AFCODE *EQ "D" )')  +
+                       KEYFLD((AFCUNO) (AFORNO))
+            CALL       PGM(ARR101R2)
+            CLOF       OPNID(ARR101F)
+            DLTOVR     FILE(*ALL)
+
+        /* STEP4:印出符合Ｂ：已承購未請款之符合條件資料*/
+           OVRPRTF     FILE(ARR101T) TOFILE(ARR101T) +
+                       PAGESIZE(*N 198) +
+                       CPI(15) HOLD(*YES)  USRDTA('未請款')
+            OVRDBF     FILE(ARR101F) TOFILE(ARR101F) +
+                       SHARE(*YES)
+            OPNQRYF    FILE(ARR101F) QRYSLT('+
+                       (AFCODE *EQ "B" ) ') +
+                       KEYFLD((AFCUNO) (AFORNO))
+            CALL       PGM(ARR101R2)
+            CLOF       OPNID(ARR101F)
+            DLTOVR     FILE(*ALL)
+
+
+        /* STEP5:印出符合Ｃ：已請款未繳款之符合條件資料*/
+           OVRPRTF     FILE(ARR101T) TOFILE(ARR101T) +
+                       PAGESIZE(*N 198) +
+                       CPI(15) HOLD(*YES)  USRDTA('未繳款')
+            OVRDBF     FILE(ARR101F) TOFILE(ARR101F) +
+                       SHARE(*YES)
+            OPNQRYF    FILE(ARR101F) QRYSLT('+
+                       (AFCODE *EQ "C" ) ') +
+                       KEYFLD((AFCUNO) (AFORNO))
+            CALL       PGM(ARR101R2)
+            CLOF       OPNID(ARR101F)
+            DLTOVR     FILE(*ALL)
+
+            SNDBRKMSG  MSG('<<應收帳款承購(E-FACTORING) +
+                         異常檢核表已處理完成,請列印.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+            ENDPGM
+

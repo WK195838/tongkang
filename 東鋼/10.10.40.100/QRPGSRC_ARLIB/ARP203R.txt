@@ -1,0 +1,191 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP203R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     業務員基本資料介面傳輸ARSAII->ARSAID
+     H*            5.DATE-WRITTEN  112/09/27 2023AR00043
+     H*            6.UPDATE DATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARSAIIL1UP  E           K        DISK
+     FARSAID  UF  E           K        DISK                      A
+     FARSAIIG O   E           K        DISK
+     F            RARSAII                           KRENAMEARSIIG
+     FPYDEPA  IF  E           K        DISK
+     FARP203T1O   E             69     PRINTER
+     FARP203T O   E             70     PRINTER
+     E                    TAB1    1  14  1   TAB2   28
+     I*
+     I           UDS
+     I                                        1   1 AR#P
+     I                                        2  11 C#USER
+     I                                       12  12 W#ER
+     I                                       13  22 J#USER
+     I                                      801 8080W#DATE
+     C*****************************************************************
+     C*
+     C*****************************************************************
+     C*INITIALIZE
+     C  N90                MOVEA'1111'    *IN,69
+     C  N90                MOVEL*BLANK    W#FLAG  1        *處理代碼
+     C  N90                SETON                     90
+     C*
+     C                     MOVEA'0000'    *IN,11
+     C                     MOVEA'0000000' *IN,51
+     C                     MOVEA'0000000' *IN,58
+     C           SIACD     COMP 'A'                      11
+     C           SIACD     COMP 'C'                      12
+     C           SIACD     COMP 'D'                      13
+     C*寫入報表
+     C   69                WRITEAR03T11
+     C                     MOVE *OFF      *IN69
+     C   70                WRITEAR03T21
+     C                     MOVE *OFF      *IN70
+     C*
+     C           SIACD     IFNE ' '
+     C           SIRVID    CHAINRARSAID              31
+     C                     EXSR MOVE1
+     C*
+     C                     SETOF                     99
+     C*逐筆處理, ACD可連續處理上送
+     C*資料不存在時
+    1C           *IN31     IFEQ '1'                        *NR
+     C*刪除時資料不存在,取消過入並列於上送清單
+     C   13                SETON                     9961  *取消過入
+     C*
+     C*檢核
+     C  N99                EXSR CKRTN
+     C* N99                EXSR CKDATE
+     C  N99                WRITERARSAID
+     C   61                SETOF                     99    *取消過入
+     C                     ENDIF
+     C*
+     C*資料存在時
+     C           *IN31     IFEQ '0'
+0505AC*合約未傳輸各廠不檢核傳送
+     C                     EXSR CKPASS                     *傳送檢核
+     C  N99N13             EXSR CKRTN
+     C*異動檢核
+     C  N99                UPDATRARSAID
+    2C                     ENDIF
+     C*
+     C*傳輸資料正常SISTCL='C'
+     C  N99                MOVEL'C'       SISTCL           *執行碼
+     C  N99 61             MOVEL'D'       SISTCL           *取消過入
+     C*傳輸資料異常SISTCL='E' (未上傳ARSAID)
+     C   99                MOVEL'E'       SISTCL           *執行碼
+     C   99 51             MOVEL'F'       SISTCL           資料已存在
+     C   99 52             MOVEL'G'       SISTCL           廠區錯誤
+     C   99 53             MOVEL'H'       SISTCL           部門錯誤
+     C*  99 54             MOVEL'I'       SISTCL
+     C*  99 55             MOVEL'J'       SISTCL
+     C*  99 56             MOVEL'M'       RISTCL
+     C*  99 57             MOVEL'K'       RISTCL
+     C*  99 58             MOVEL'L'       RISTCL
+     C*  99 60             MOVEL' '       RISTCL           *需重上送
+     C*訊息說明
+     C           SISTCL    LOKUPTAB1      TAB2           34
+     C   34                MOVELTAB2      S#STCL
+     C  N34                MOVEL*BLANK    S#STCL
+     C                     MOVEL'Y'       AR#P             *有資料
+     C*
+     C                     UPDATRARSAII
+     C*記錄處理完後寫介面LOG
+     C                     MOVELJ#USER    SIUSER           *JOB
+     C                     MOVELC#USER    SICUSR           *CUR
+     C                     Z-ADDW#DATE    SIXPDD
+     C                     TIME           SIXPDT
+     C                     WRITEARSIIG
+     C*寫入報表
+     C           *IN99     IFEQ *OFF                       *上送清單
+     C                     WRITEAR03T12
+     C                     ELSE
+     C                     WRITEAR03T22                    *錯誤清單
+     C                     MOVEL'Y'       W#ER             *有錯誤
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     CLR 90                WRITEAR03T13
+     CLR 90                WRITEAR03T23
+     C*****************************************************************
+     C           MOVE1     BEGSR
+     C  N31                MOVELSIACD     W#ACD   1        處理代號
+     C   31                MOVEL*BLANK    W#ACD   1        處理代號
+     C*
+     C                     MOVELSIACD     SAACD            處理代碼
+     C                     MOVELSIRVID    SARVID           業務員代號
+     C                     MOVELSINAME    SANAME           業務員姓名
+     C                     MOVELSILOCA    SALOCA           廠區別
+     C                     MOVELSIDEPT    SADEPT           部門代號
+     C                     MOVELSIWKNO    SAWKNO           工作編號
+     C                     MOVELSIBK20    SABK20           空白
+     C                     Z-ADDSIUPDD    SAUPDD           異動日期
+     C                     Z-ADDSIUPDT    SAUPDT           異動時間
+     C                     MOVELSIUPDR    SAUPDR           異動人員
+     C                     MOVELSIUSID    SAUSID           使用者代號
+     C*
+     C                     ENDSR
+     C****************************************************************
+     C           CKRTN     BEGSR
+     C*
+     C           SIACD     IFEQ 'A'
+     C           SIRVID    CHAINRARSAID             N45
+     C  N45                SETON                     5199
+     C                     ENDIF
+     C*
+     C           SILOCA    IFNE 'P'
+     C           SILOCA    ANDNE'T'
+     C           SILOCA    ANDNE'M'
+     C           SILOCA    ANDNE'K'
+     C           SILOCA    ANDNE'H'
+     C                     SETON                     5299
+     C                     ENDIF
+     C*
+     C           SIDEPT    CHAINRPYDEPA             N53
+     C   53                SETON                     99
+     C*
+     C                     ENDSR
+     C****************************************************************
+     C*檢核日期
+     C           CKDATE    BEGSR
+     C*
+     C*報關日期
+     C*
+     C*                    Z-ADDRICDTE    W#DAY   80
+     C*                    CALL 'C018'
+     C*                    PARM           W#DAY
+     C*                    PARM           W#ERR   1
+     C* N99      W#ERR     IFEQ '1'
+     C*                    SETON                     9957  *日期錯誤
+     C*                    ENDIF
+     C*
+     C                     ENDSR
+     C****************************************************************
+     C*前筆處理至D碼HSCONT未傳輸時
+     C*後面同單據需於下次再送並寫入錯誤清單中告知非資料錯誤
+     C           CKPASS    BEGSR
+     C           W#FLAG    IFEQ 'D'
+     C                     SETON                     9960  *需再上送
+     C                     ENDIF
+     C                     ENDSR
+** AR1
+CC-上送成功
+DD-上送取消(資料不存在)
+EE-資料異常不存在
+FF-資料已存在不可新增
+GG-廠區須為P.T.M.K.H
+HH-部門代號錯誤
+II-
+JJ-
+KK-
+LL-
+MM-
+NN-
+PP-
+  -檔案傳輸中，請稍候再上傳
+

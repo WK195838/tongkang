@@ -1,0 +1,58 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR076P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     銷貨帳款每日應收彙總表                 */
+     /*     5.DATE-WRITTEN  88/06/11                                */
+     /*                                                             */
+     /*  <說明:>                                                  */
+     /*            本作業每日凌晨批次執行完處理後立即執行本程     */
+     /*            式以產生報表。（亦可隨時執行來產生報表）       */
+     /*                                                             */
+     /*  ARXCTLDTA  1 --> 領款日數                                */
+     /*             5 --> 逾期日數                                */
+     /*             9 --> 催收日數                                */
+     /*            21 --> 統計截止日                              */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&USER)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+
+             DCL        VAR(&W#ETXD) TYPE(*CHAR) LEN(8)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+INPUT:
+             CALL       PGM(ARR076RS) PARM(&IN03)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             SBMJOB     JOB(ARR076P1) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARR076P1')
+             CHGDTAARA  DTAARA(*LDA (801 70)) +
+             VALUE('銷貨帳款帳齡分析彙總表已匯入排程中。')
+             RETURN
+
+BATCH:
+             RTVDTAARA  DTAARA(ARXCTLDTA (21 8)) RTNVAR(&W#ETXD)
+             OVRPRTF    FILE(ARR076T) USRDTA('應收彙總') HOLD(*YES) +
+                        PAGESIZE(*N 198) CPI(15)
+             OVRDBF     FILE(ARSTTX) TOFILE(DALIB/ARSTTX) SHARE(*YES)
+             OPNQRYF    FILE(ARSTTX) +
+                        QRYSLT('AXTXDT *LE ' || &W#ETXD || ' *AND +
+                                AXTXCD *NE "    "') +
+                        KEYFLD((AXDEPT) (AXRVID))
+             CALL       ARR076R
+             CLOF       OPNID(ARSTTX)
+             DLTOVR     *ALL
+
+             ENDPGM
+

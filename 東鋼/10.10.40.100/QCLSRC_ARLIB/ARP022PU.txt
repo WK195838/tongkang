@@ -1,0 +1,60 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP022PU                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCJ                                  */
+     /*     4.FUNCTION     發票明細檔即時上傳　（新桃）           */
+     /*     5.DATE-WRITTEN  98/12/30  2009AR406                     */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&USER) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+
+             RTVJOBA    USER(&USER) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             SBMJOB     JOB(ARP022PU) JOBD(ARJOBD) JOBQ(QCTL) +
+                        RQSDTA('CALL ARLIB/ARP022PU')
+             RETURN
+             ENDDO
+
+ BATCH:
+
+ STEP1:
+             DLTF       FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(U01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMU)
+
+ STEP2:       /*  台北　抓　新桃  ARLIB/INVDTLU ............ */
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP022PA) PARM(''U'')') +
+                        DDMFILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP3)
+
+             CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(*NONSTD +
+                        'ARLIB/INVDTLU') LVLCHK(*NO)
+             CPYF       FROMFILE(QTEMP/DDMU) TOFILE(QTEMP/INVDTLU) +
+                        TOMBR(*FROMMBR) MBROPT(*REPLACE) CRTFILE(*YES)
+             MONMSG     MSGID(CPF0000) EXEC(GO STEP3)
+
+             OVRDBF     FILE(INVDTLP) TOFILE(QTEMP/INVDTLU)
+             OVRDBF     FILE(INVDTL)  TOFILE(INVDTL)
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                        CPI(15)
+             CHGDTAARA  DTAARA(*LDA (21 1)) VALUE('U')
+             CALL       PGM(ARLIB/ARP022RJ)
+             DLTOVR     FILE(*ALL)
+
+             CLRPFM     FILE(QTEMP/DDMU)     /* 清除廠區之異動資料*/
+             MONMSG     MSGID(CPF0000) EXEC(GOTO STEP3)
+
+             GOTO       ENDCLPGM
+
+ STEP3:     /* 失敗通知 */
+             SNDMSG     TOUSR(&USER) MSG(+
+                        '桃園廠發票明細檔即時傳輸失敗')
+
+ ENDCLPGM:   ENDPGM
+

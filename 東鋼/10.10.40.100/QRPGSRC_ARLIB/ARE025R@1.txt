@@ -1,0 +1,439 @@
+     H        1   Y                                     1                 BR003
+     FARE025S CF  E                    WORKSTN
+     F                                        RRN3  KSFILE AR025F3
+     FINVMST  UF  E           K        DISK
+     FINVDTL  UF  E           K        DISK                      A
+     FINVTFR  IF  E           K        DISK                      A
+     E*************************************************************
+     E                    ERR     1  13 70
+     I*************************************************************
+     IAADS        DS
+     I                                        1   5 W1CUNO
+     I                                        1   1 S1KIND
+     I                                        2   2 S1CUN1
+     I                                        3   5 S1CUN2
+     I            DS
+     I                                        1  140W#SYST
+     I                                        1   60D#ST
+     I                                        7  100D#SY
+     I                                       11  140D#SMD
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10011010 U#USER
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C**************************************************************
+     C           INKEY     KLIST
+     C                     KFLD           INNO
+     C           IVKEY     KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C**************************************************************
+     C  N90                MOVE '1'       SCRN    1
+     C  N90                MOVE '1'       *IN,90
+     C**************************************************************
+     C           SCRN      DOUEQ'0'
+     C           SCRN      CASEQ'1'       SR#01
+     C           SCRN      CASEQ'2'       SR#02
+     C           SCRN      CASEQ'3'       SR3000           查詢畫面
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     CSR         SR#01     BEGSR
+     C                     EXFMTTITLE
+     C*
+     C                     SELEC
+     C           *IN03     WHEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'0'       SCRN             結束
+     C*
+     C           *IN05     WHEQ '1'
+     C                     EXSR SR3100                     初始畫面三
+     C                     MOVEL'3'       SCRN
+     C*
+     C                     OTHER                           執行鍵
+     C                     EXSR CK#01
+     C  N99                MOVELERR,6     ERRMSG
+     C  N99                EXSR PR#02
+ 9112C  N99                Z-ADDUDATE     S#DATE
+     C  N99                MOVE '2'       SCRN
+     C                     ENDSL
+     CSR         SR#01Z    ENDSR
+     C******
+     CSR         SR#02     BEGSR
+     C                     EXFMTDETAIL
+     C   KC                MOVE '0'       SCRN
+     C   KC                GOTO SR#02Z
+     C   KL                MOVE '1'       SCRN
+     C   KL                MOVE *BLANK    ERRMSG
+     C   KL                GOTO SR#02Z
+     C   KJ                EXSR KJ#02
+     C   KJ                GOTO SR#02Z
+     C                     EXSR CK#02
+     CSR         SR#02Z    ENDSR
+     C*
+     C*
+     CSR         KJ#02     BEGSR
+     C                     EXSR CK#02
+     C  N99                EXSR FL#02
+     C  N99                MOVE '1'       SCRN
+     CSR         KJ#02Z    ENDSR
+     C****
+     C*CHECK畫面一
+     C*
+     CSR         CK#01     BEGSR
+     C                     SETOF                     414299
+     C                     MOVE *BLANK    ERRMSG
+     C******
+     C           NO        IFEQ *BLANK
+     C                     SETON                     4299
+     C                     MOVE ERR,1     ERRMSG
+     C                     ENDIF
+     C**
+     C           *IN99     IFEQ '0'
+     C           NO        CHAININVMST              N97
+     C                     SELEC
+     C           *IN97     WHEQ '1'
+     C                     SETON                     4299
+     C                     MOVE ERR,2     ERRMSG
+     C           *IN97     WHEQ '0'
+     C           INDECD    ANDNE' '
+     C                     SETON                     4299
+     C*          *IN97     WHEQ '0'
+     C*          INAREA    ANDNETXAR
+     C*                    SETON                     4299
+     C*                    MOVE ERR,4     ERRMSG
+8909 C*排除100%用預收繳款   UPDATE  BY  S02YSH
+ .   C           INAAMT    ADD  INATAX    W#AMTX 110
+ .   C           INBAMT    MULT -1        W#AMTB 110
+     C           *IN97     WHEQ '0'
+     C           INEAMT    ANDEQ0
+8909 C           W#AMTB    ANDNEW#AMTX
+     C                     SETON                     4299
+     C                     MOVE ERR,5     ERRMSG
+     C                     ENDSL
+     C                     ENDIF
+     CSR         CK#01Z    ENDSR
+     C******
+     CSR         PR#02     BEGSR
+     C                     MOVEA'000'     *IN,51
+     C                     MOVELINCUNO    CUNO
+     C                     MOVELINCUNM    CUNM
+     C                     MOVELINORNO    ORNO
+     C                     MOVELINTYPE    TYP1
+     C                     MOVELINAREA    AREA
+     C                     MOVELINRVID    RVID
+     C                     Z-ADD0         RAMT
+     C                     Z-ADD0         TAMT
+     C                     Z-ADD0         XAMT
+     C                     Z-ADD0         CAMT
+     C                     Z-SUBINNBAL    NBAL
+     C           NBAL      IFLT 0
+     C                     Z-ADD0         NBAL
+     C                     ENDIF
+     C*
+     C                     MOVEL*BLANK    NO1
+     C**
+     C                     MOVELNO        IVNO
+     C                     MOVE *BLANK    IVACNT
+     C                     Z-ADD0         IVITEM
+     C           IVKEY     SETLLINVDTL               97
+     C  N97      NO        READEINVDTL              N    97
+     C           *IN97     DOWEQ'0'
+     C           IVFLAG    IFNE 'D'
+ 9201C           IVDECD    ANDEQ' '
+     C           IVACNT    IFEQ '6'
+     C                     SUB  IVAMT     RAMT
+     C                     ENDIF
+     C           IVACNT    IFEQ '7'
+     C                     ADD  IVAMT     CAMT
+     C                     ENDIF
+     C                     ENDIF
+     C           NO        READEINVDTL                   97
+     C                     ENDDO
+     C***
+     CSR                   ENDSR
+     C******
+     C           CK#02     BEGSR
+     C                     MOVEA'000'     *IN,51
+     C                     SETOF                     99
+     C                     MOVE *BLANK    ERRMSG
+     C  N99      TAMT      IFEQ 0
+     C                     SETON                     5199
+     C                     MOVELERR,7     ERRMSG
+     C                     ELSE
+     C           TAMT      ADD  CAMT      DAMT    90
+8909 C           NO        CHAININVMST              N97
+ .   C           INAAMT    ADD  INATAX    W#AMTX 110
+ .   C           INBAMT    MULT -1        W#AMTB 110
+     C           DAMT      IFGT RAMT
+8909 C           W#AMTB    ANDNEW#AMTX
+     C                     SETON                     5199
+     C                     MOVELERR,8     ERRMSG
+     C                     ENDIF
+     C                     ENDIF
+     C******
+ 9112C*CHECK轉出日期
+  .  C  N99      S#DATE    IFEQ 0
+  .  C                     MOVELERR,12    ERRMSG
+  .  C                     SETON                     5399
+  .  C                     ELSE
+  .  C*
+  .  C                     MOVE S#DATE    W#DATE  8
+  .  C                     MOVE W#DATE    P#PDAT
+  .  C                     CALL 'UTS102R'
+  .  C                     PARM           P#PDAT  8
+  .  C                     PARM '1'       P#MODE  1
+  .  C                     PARM           P#MTL  24
+  .  C                     PARM           P#LEAP  1
+  .  C                     PARM           P#ERR   1
+  .  C           P#ERR     IFNE '0'
+  .  C                     MOVELERR,13    ERRMSG
+  .  C                     SETON                     5399
+  .  C                     ENDIF
+  .  C                     ENDIF
+ 9112C******
+     C  N99      NO1       IFNE *BLANK
+     C           NO1       CHAININVMST              N97
+9009 C  N97                MOVELINORNO    ORNO1   6
+     C                     SELEC
+     C           *IN97     WHEQ '1'
+     C                     SETON                     5299
+     C                     MOVELERR,9     ERRMSG
+     C           *IN97     WHEQ '0'
+     C           INDECD    ANDNE' '
+     C                     SETON                     5299
+     C                     MOVELERR,10    ERRMSG
+     C           *IN97     WHEQ '0'
+     C           INNBAL    ANDLTTAMT
+     C                     SETON                     5299
+     C                     MOVELERR,11    ERRMSG
+     C                     OTHER
+     C                     Z-ADDTAMT      XAMT
+     C                     ENDSL
+     C                     ENDIF
+     CSR                   ENDSR
+     C****
+     CSR         FL#02     BEGSR
+     C***
+     C***  A INVOICE
+     C***
+     C                     CLEARIVREC
+     C                     MOVELNO        IVNO
+     C                     MOVE '7'       IVACNT
+     C                     Z-ADD0         X
+     C                     SETOF                     75
+     C           *IN75     DOWEQ'0'
+     C                     ADD  1         X       20
+     C                     Z-ADDX         IVITEM
+     C           IVKEY     CHAININVDTL               75
+     C  N75                ITER
+     C   75                EXSR WR#IV
+     C                     SETON                     75
+     C                     ENDDO
+     C****
+     C           NO        CHAININVMST               97
+     C  N97                MOVEL'C'       INFLAG
+     C  N97                MOVELTXAR      INTXAR
+     C  N97                Z-ADDUDATE     INTXDT
+     C  N97                ADD  TAMT      INFAMT
+     C  N97                ADD  TAMT      INNBAL
+     C  N97                UPDATINREC
+     C***
+     C***  B INVOICE
+     C***
+     C           NO1       IFNE *BLANK
+     C                     CLEARIVREC
+     C                     MOVELNO1       IVNO
+     C                     MOVE '6'       IVACNT
+     C                     Z-ADD0         X
+     C                     SETOF                     75
+     C           *IN75     DOWEQ'0'
+     C                     ADD  1         X       20
+     C                     Z-ADDX         IVITEM
+     C           IVKEY     CHAININVDTL               75
+     C  N75                ITER
+     C   75                EXSR WR#IV1
+     C                     SETON                     75
+     C                     ENDDO
+     C****
+     C           NO1       CHAININVMST               97
+     C  N97                MOVEL'C'       INFLAG
+     C  N97                MOVELTXAR      INTXAR
+     C  N97                Z-ADDUDATE     INTXDT
+     C  N97                SUB  TAMT      INEAMT
+     C  N97                SUB  TAMT      INNBAL
+     C  N97                UPDATINREC
+     C                     ENDIF
+     C*
+     C                     EXSR SR2000                     寫轉出記錄
+     C*
+     CSR         FL#02Z    ENDSR
+     C******
+     CSR         WR#IV     BEGSR
+     C******
+     C                     CLEARIVREC
+     C                     MOVEL'A'       IVFLAG
+     C                     MOVELNO        IVNO
+     C                     MOVEL'7'       IVACNT
+     C                     Z-ADDX         IVITEM
+     C                     Z-ADDIVITEM    W#ACIT  20       明細項次
+ 9112C                     Z-ADDS#DATE    IVACDT
+     C                     Z-ADDTAMT      IVAMT
+     C                     MOVELORNO      IVORNO
+     C                     MOVEL*BLANK    IVAPNO
+     C                     MOVELORNO      IVAPNO
+     C                     MOVELTXAR      IVTXAR
+     C                     MOVEL'I'       IVFL03
+     C                     MOVEL'Y'       IVFL02
+     C                     Z-ADDUDATE     IVTXDT
+     C                     WRITEIVREC
+     C***
+     CSR                   ENDSR
+     C******
+     CSR         WR#IV1    BEGSR
+     C******
+     C                     CLEARIVREC
+     C                     MOVEL'A'       IVFLAG
+     C                     MOVELNO1       IVNO
+     C                     MOVEL'6'       IVACNT
+     C                     Z-ADDX         IVITEM
+ 9112C                     Z-ADDS#DATE    IVACDT
+     C                     Z-SUBTAMT      IVAMT
+     C                     MOVELORNO1     IVORNO
+     C                     MOVEL*BLANK    IVAPNO
+     C                     MOVELORNO      IVAPNO
+     C                     MOVELTXAR      IVTXAR
+     C                     MOVEL'I'       IVFL03
+     C                     MOVEL'Y'       IVFL02
+     C                     Z-ADDUDATE     IVTXDT
+     C                     WRITEIVREC
+     C***
+     CSR                   ENDSR
+     C***
+     C*
+     C****************************************************************
+     C*  畫面二:寫入轉出記錄檔
+     C****************************************************************
+     CSR         SR2000    BEGSR
+     C                     CLEARITREC
+     C                     MOVEL'A'       ITFLAG
+     C                     MOVELNO        ITINNO
+     C                     Z-ADDW#ACIT    ITACIT
+     C                     Z-ADDTAMT      ITOTAM
+     C                     MOVELNO1       ITOTNO
+     C                     MOVELTXAR      ITAREA
+     C                     MOVELU#USER    ITUSER
+     C                     Z-ADDUDATE     ITTXDT
+     C                     TIME           W#SYST
+     C                     Z-ADDD#ST      ITTXTM           時間
+     C                     WRITEITREC
+     CSR                   ENDSR
+     C*
+     C****************************************************************
+     C*  畫面三:顯示轉出轉入發票及金額
+     C****************************************************************
+     CSR         SR3000    BEGSR
+     C                     WRITEAR025F3M
+     C           S#SFN3    IFEQ 0
+     C                     SETOF                     7273
+     C                     SETON                     7174
+     C                     ELSE                            有資料
+     C                     SETOF                     73
+     C                     SETON                     717274
+     C                     ENDIF
+     C                     EXFMTAR025F3C
+     C*
+     C                     MOVEL*BLANK    S#MSG3
+     C           S#CRN3    IFNE 0
+     C                     Z-ADDS#CRN3    S#NBR3
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           *IN03     WHEQ '1'                        結束程式
+     C                     MOVEL'0'       SCRN
+     C*
+     C           *IN12     WHEQ '1'                        回前畫面
+     C                     MOVEL'1'       SCRN
+     C*
+     C                     OTHER                           執行鍵
+     C                     MOVEL'1'       SCRN
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*================================================================
+     C*  初始畫面三
+     C*================================================================
+     CSR         SR3100    BEGSR
+     C                     SETOF                     7172
+     C                     SETON                     73    清除 SF
+     C                     WRITEAR025F3C
+     C                     Z-ADD0         RRN3    40
+     C                     Z-ADD0         S#SFN3
+     C                     MOVELDEVNM     S#DEVI
+     C                     MOVELCOMP      S#COMP
+     C*
+     C                     MOVELNO        S#INNO
+     C           S#INNO    CHAININREC                69
+     C           *IN69     IFEQ '1'
+     C                     MOVELERR,2     S#MSG3           發票不存在
+     C                     GOTO ES3100
+     C                     ENDIF
+     C*
+     C                     MOVELINNO      S#INNO           發票號碼
+     C                     Z-ADDININDT    S#INDT           發票日期
+     C           INAAMT    ADD  INBAMT    S#INAM           發票金額
+     C                     ADD  INATAX    S#INAM
+     C                     Z-ADDINNBAL    S#INBN           發票餘額
+     C                     MOVELINTYPE    S#INTP           發票類別
+     C                     MOVELINKIND    S#KIND           發票聯式
+     C                     MOVELINSALE    S#SALE           出貨業務
+     C                     MOVELINRVID    S#RVID           收款業務
+     C                     MOVELINAREA    S#AREA           開立廠區
+     C                     MOVELINSATP    S#SATP           銷售別
+     C                     MOVELINTXTP    S#TXTP           課稅別
+     C*
+     C           S#INNO    CHAINITREC                69
+     C           *IN69     DOWEQ'0'
+     C*
+     C                     CLEARAR025F3
+     C                     ADD  1         RRN3
+     C                     Z-ADDRRN3      S#ITEM
+     C                     Z-ADDITOTAM    S#OTAM
+     C                     MOVELITOTNO    S#OTNO
+     C           S#OTNO    CHAININREC                69
+     C           *IN69     IFEQ '0'
+     C                     MOVELINCUNO    S#OTCU
+     C                     MOVELINORNO    S#OTOR
+     C                     ENDIF
+     C                     MOVELITUSER    S#USER
+     C                     Z-ADDITTXDT    S#TXDT
+     C                     Z-ADDITTXTM    S#TXTM
+     C                     WRITEAR025F3
+     C*
+     C           S#INNO    READEITREC                    69
+     C                     ENDDO
+     C*
+     C                     Z-ADDRRN3      S#SFN3
+     C                     Z-ADD1         S#NBR3
+     CSR         ES3100    ENDSR
+     C*
+     C****************************************************************
+** ERR
+發票號碼必須輸入
+發票號碼不存在
+此張發票已作廢，請查核
+此張發票非屬本廠區，不可執行轉出作業，請查核．
+此張發票尚未繳款，不可執行轉出作業，請查核．
+請確認是否此張發票要轉出繳款金額，若是請輸入轉出金額
+轉出金額不可為０。
+轉出金額不可大於繳款金額與已轉出金額之差額，請查核。
+欲轉入發票號碼不存在
+欲轉入發票號碼已作廢，請查核。
+欲轉入發票號碼之餘額小於轉出金額，請查核。
+轉出日期不可為空白
+轉出日期輸入錯誤
+

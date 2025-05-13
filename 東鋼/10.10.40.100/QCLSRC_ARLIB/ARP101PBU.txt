@@ -1,0 +1,126 @@
+     /****************************************************************/
+     /*                                                              */
+     /*               >>   PROGRAM INTRODUCTION   <<                 */
+     /*                                                              */
+     /*            1.PROGRAM-ID    ARP101P                           */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S02CSF                            */
+     /*            4.FUNCTION     銷貨利息計算                     */
+     /*            5.DATE-WRITTEN  92/04/13                          */
+     /*            6.DATE-UPDATE                                     */
+     /*                                                              */
+     /****************************************************************/
+             PGM
+             DCL        VAR(&INT)     TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSPID)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&C_YY)    TYPE(*CHAR) LEN(2)   /*年度暫存*/
+             DCL        VAR(&D_YY)    TYPE(*DEC)  LEN(2 0) /*年度暫存*/
+             DCL        VAR(&C_MM)    TYPE(*CHAR) LEN(2)   /*月份暫存*/
+             DCL        VAR(&D_MM)    TYPE(*DEC)  LEN(2 0) /*月份暫存*/
+             DCL        VAR(&C_YYMM)  TYPE(*CHAR) LEN(4)   /*年月暫存*/
+             DCL        VAR(&D_YYMM)  TYPE(*DEC)  LEN(4 0) /*年月暫存*/
+             DCL        VAR(&W#DATE)  TYPE(*CHAR) LEN(6)
+             RTVJOBA    JOB(&DSPID)   TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+             RTVSYSVAL  SYSVAL(QDATE)  RTNVAR(&W#DATE)
+             CHGDTAARA  DTAARA(*LDA (300 6))   VALUE(&W#DATE)
+             RTVDTAARA  DTAARA(*LDA (300 2))   RTNVAR(&C_YY)
+             RTVDTAARA  DTAARA(*LDA (302 2))   RTNVAR(&C_MM)
+             RTVDTAARA  DTAARA(*LDA (300 4))   RTNVAR(&C_YYMM)
+
+    /*將年月轉成數字型態再做加減*/
+             CHGVAR     VAR(&D_YY)             VALUE(&C_YY)
+             CHGVAR     VAR(&D_MM)             VALUE(&C_MM)
+             CHGVAR     VAR(&D_YYMM)           VALUE(&C_YYMM)
+             CHGVAR     VAR(&D_MM)             VALUE(&D_MM - 1)
+
+    /*若月份剛好為12月,則年度往前推一年*/
+             IF         COND(&D_MM    *EQ  0) THEN(DO)
+             CHGVAR     VAR(&D_YY)             VALUE(&D_YY - 1)
+             CHGVAR     VAR(&D_MM)             VALUE(&D_MM + 12)
+             ENDDO
+
+    /*將年月轉成數文字型態*/
+             CHGVAR     VAR(&C_YY)             VALUE(&D_YY)
+             CHGVAR     VAR(&C_MM)             VALUE(&D_MM)
+             CHGDTAARA  DTAARA(*LDA (300 2))   VALUE(&C_YY)
+             CHGDTAARA  DTAARA(*LDA (302 2))   VALUE(&C_MM)
+
+             SBMJOB     CMD(CALL PGM(ARP101P)) JOB(ARP101P) +
+                        JOBD(ARJOBD)
+             RETURN
+
+    /*開始處理*/
+    BATCH:
+             RTVDTAARA  DTAARA(*LDA (300 4))   RTNVAR(&C_YYMM)
+
+             OVRDBF     FILE(RCVDTL) TOFILE(RCVDTL) SHARE(*YES)
+             OPNQRYF    FILE(RCVDTL) QRYSLT('+
+                        (DAT1   *GE "' || &C_YYMM || '")') +
+                        MAPFLD((DATE   RVDATE     *CHAR 8    ) +
+                               (DAT1  '%SST(DATE  3 4)' *CHAR 4)) +
+                        KEYFLD((RVDATE))
+             CALL       PGM(ARP101R1)
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(INVMST) TOFILE(INVMST) SHARE(*YES)
+             OPNQRYF    FILE(INVMST) QRYSLT('+
+                        (IND1   *GE "' || &C_YYMM || '") *AND +
+                        (INTYPE *EQ "1"     ) *AND +
+                        (INDECD *NE "D"     )') +
+                        MAPFLD((INDT  ININDT     *CHAR 8        ) +
+                               (IND1  '%SST(INDT  3 4)' *CHAR 4)) +
+                        KEYFLD((INNO))
+             CALL       PGM(ARP101R2)
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+
+
+             OVRDBF     FILE(TRNDTLL2) TOFILE(TRNDTLL2) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTLL2) QRYSLT('+
+                        (TXCODE *EQ "SA04"       ) *AND +
+                        (IVN1   *NE "#"          ) *AND +
+                        (IVN1   *NE "*"          ) *AND +
+                        (IVN2   *NE "000000"     ) *AND +
+                        (TXIVNO *NE "          " ) *AND +
+                        (DAT1   *GE "' || &C_YYMM || '")') +
+                        MAPFLD((DATE  TXDATE     *CHAR 8        ) +
+                               (DAT1  '%SST(DATE   3 4)' *CHAR 4) +
+                               (IVN1  '%SST(TXIVNO 1 1)' *CHAR 1) +
+                               (IVN2  '%SST(TXIVNO 1 6)' *CHAR 6)) +
+                        KEYFLD((TXIVNO))
+             CALL       PGM(ARP101R3)
+             CLOF       OPNID(TRNDTLL2)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(ARP101F4) TOFILE(ARP101F4) SHARE(*YES)
+             OPNQRYF    FILE(ARP101F4) OPTION(*ALL) QRYSLT('+
+                        (YM2    *GE "' || &C_YYMM || '")') +
+                        MAPFLD((YM2    A4YM2    *CHAR 6))
+             CALL       PGM(ARP101R4)
+             CLOF       OPNID(ARP101F4)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(ARP101F3) TOFILE(ARP101F3) SHARE(*YES)
+             OPNQRYF    FILE(ARP101F3) QRYSLT('+
+                        (A3INNO *GE "' || C_YYMM || '")') +
+                        MAPFLD((DAT1   A3DAT1     *CHAR 8  ) +
+                               (A3INNO '%SST(DAT1  3 4)'))
+             CALL       PGM(ARP101R5)
+             CLOF       OPNID(ARP101F3)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(ARP101F4) TOFILE(ARP101F4) SHARE(*YES)
+             OPNQRYF    FILE(ARP101F4) QRYSLT('+
+                        (YM2    *GE "' || &C_YYMM || '")') +
+                        MAPFLD((YM     A4YM2    *CHAR 6)   +
+                               (YM2    '%SST(YM  3 4)' *CHAR 4))  +
+                        KEYFLD((A4YM2) (A4ORNO) (A4PDNM))
+             CALL       PGM(ARP101R)
+             CLOF       OPNID(ARP101F4)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

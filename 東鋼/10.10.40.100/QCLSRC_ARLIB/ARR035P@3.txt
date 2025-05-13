@@ -1,0 +1,108 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE  99/12/01  2010AR555 S00WCJ (9912A) */
+    /*                          100/02/01  2011ARXXX S00WCJ (0002A) */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&W0100)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#OPT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W0101)  TYPE(*DEC)  LEN(6)
+             DCL        VAR(&W0101A) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&W0102)  TYPE(*DEC)  LEN(8)  /*0002A*/
+             DCL        VAR(&W0102A) TYPE(*CHAR) LEN(8)  /*0002A*/
+             DCL        VAR(&W0103)  TYPE(*DEC)  LEN(8)  /*0002A*/
+             DCL        VAR(&W0103A) TYPE(*CHAR) LEN(8)  /*0002A*/
+             DCL        VAR(&W#OPT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#OP1)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#OP1A) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARR035RS) PARM(&IN03 &W0100 &W0101 +
+                          &W0102 &W0103 &W#OPT)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&W0101A) VALUE(&W0101)
+             CHGVAR     VAR(&W0102A) VALUE(&W0102)
+             CHGVAR     VAR(&W0103A) VALUE(&W0103)
+             CHGDTAARA  DTAARA(*LDA (1 1)) VALUE(&W0100)
+             CHGDTAARA  DTAARA(*LDA (2 6)) VALUE(&W0101A)
+             CHGDTAARA  DTAARA(*LDA (8 8)) VALUE(&W0102A) /*0002A*/
+             CHGDTAARA  DTAARA(*LDA (21 8)) VALUE(&W0103A) /*0002A*/
+             CHGDTAARA  DTAARA(*LDA (20 1)) VALUE(&W#OPT)
+             SBMJOB     JOB(ARR035P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR035P')
+             RETURN
+             ENDDO
+
+             RTVDTAARA  DTAARA(*LDA (1 1)) RTNVAR(&W0100)
+             RTVDTAARA  DTAARA(*LDA (2 6)) RTNVAR(&W0101A)
+             RTVDTAARA  DTAARA(*LDA (8 8)) RTNVAR(&W0102A) /*0002A*/
+             RTVDTAARA  DTAARA(*LDA (21 8)) RTNVAR(&W0103A) /*0002A*/
+             RTVDTAARA  DTAARA(*LDA (20 1)) RTNVAR(&W#OPT)
+             CHGVAR     VAR(&W0101) VALUE(&W0101A)
+             CHGVAR     VAR(&W0102) VALUE(&W0102A)
+             CHGVAR     VAR(&W0103) VALUE(&W0103A)
+
+             CLRPFM     ARR035F
+             OVRDBF     FILE(INVMST) TOFILE(INVMST) SHARE(*YES)
+             OVRDBF     FILE(INVDTL) TOFILE(INVDTL)
+             OVRDBF     FILE(INVDTY) TOFILE(INVDTL)
+        /*   OVRDBF     FILE(TRNDTLL2) TOFILE(TRNDTLYY) */
+        /*   OVRDBF     FILE(TRNDTLL3) TOFILE(TRNDTLZZ) */
+             OVRDBF     FILE(TRNDTLL2) TOFILE(TRNDTLL2)
+             OVRDBF     FILE(TRNDTLL3) TOFILE(TRNDTLL3)
+             OVRPRTF    FILE(QPRINT) PAGESIZE(*N 198) CPI(15) +
+                          USRDTA('當月發票')
+
+             IF         COND(&W#OPT = '1') THEN(DO)
+             CHGVAR     VAR(&W#OP1)  VALUE('1')
+             CHGVAR     VAR(&W#OP1A) VALUE('3')
+             ENDDO
+             IF         COND(&W#OPT = '2') THEN(DO)
+             CHGVAR     VAR(&W#OP1)  VALUE('9')
+             CHGVAR     VAR(&W#OP1A) VALUE('9')
+             ENDDO
+             IF         COND(&W#OPT = '3') THEN(DO)
+             CHGVAR     VAR(&W#OP1)  VALUE('1')
+             CHGVAR     VAR(&W#OP1A) VALUE('9')
+             ENDDO
+
+             IF         COND(&W0100 = 'P') THEN(GOTO CMDLBL(#02))
+             OPNQRYF    FILE((INVMST)) QRYSLT('                  +
+                          INAREA *EQ "' || &W0100 || '" & +
+                          ININDT *EQ %RANGE(' || &W0102A || '       +
+                                            ' || &W0103A || ') & +
+                          INTYPE *GE "' || &W#OP1 || '"        & +
+                          INTYPE *LE "' || &W#OP1A || '"') +
+                          KEYFLD((INNO))
+             GOTO       CMDLBL(#03)
+
+#02:
+    /*9912A  STRAT */
+         /*  OPNQRYF    FILE((INVMST)) QRYSLT('                  +
+                          INAREA *EQ %VALUES("P" "L" "T" )  & +
+                          ININDT *EQ %RANGE(' || &W0102A || '    +
+                                            ' || &W0103A || ') & +
+                          INTYPE *GE "' || &W#OP1 || '" & +
+                          INTYPE *LE "' || &W#OP1A || '"') +
+                          KEYFLD((INNO))  */
+
+             OPNQRYF    FILE((INVMST)) QRYSLT('                  +
+                          INAREA *EQ %VALUES("P" "L" "T" "U")  & +
+                          ININDT *EQ %RANGE(' || &W0102A || '    +
+                                            ' || &W0103A || ') & +
+                          INTYPE *GE "' || &W#OP1 || '" & +
+                          INTYPE *LE "' || &W#OP1A || '"') +
+                          KEYFLD((INNO))
+    /*9912A  END */
+
+#03:
+             CALL       PGM(ARR035R)
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

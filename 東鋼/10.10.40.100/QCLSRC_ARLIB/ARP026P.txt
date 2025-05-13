@@ -1,0 +1,80 @@
+   /*  ＝＝＝＜台北　應收帳款統計檔ARSTAT傳輸程式＞＝＝＝   */
+   PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ARA)  TYPE(*CHAR) LEN(2)
+             DCL        VAR(&ARA1) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ARA2) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&CNT1) TYPE(*DEC)  LEN(1 0)
+             RTVJOBA    TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+ START:
+             SBMJOB     JOB(ARP026P) JOBD(ARJOBD) JOBQ(QCTL) +
+                          RQSDTA('CALL ARLIB/ARP026P') LOG(4 0 +
+                          *SECLVL) LOGCLPGM(*YES)
+             SNDPGMMSG  +
+                      MSG('應收帳款統計檔傳輸已送入批次作業執行中..+
+                          .') TOPGMQ(*EXT)
+             GOTO       CMDLBL(ENDCLPGM)
+ BATCH:
+             CALL       PGM(ARLIB/CNV013P)
+             CHGVAR     VAR(&CNT1) VALUE(0)
+        /*  台北  DALIB/ARSTAT--> ARLIB/ARSTATP  (TEMP-FILE) */
+             CALL       PGM(ARLIB/ARP026PA)
+             MONMSG     MSGID(CPF0000)
+        /*  建立　DDMF & DTAARA ............................ */
+             DLTF       FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMT)
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMK)
+             DLTDTAARA  DTAARA(QTEMP/ARA)
+             MONMSG     MSGID(CPF0000)
+             CRTDTAARA  DTAARA(QTEMP/ARA) TYPE(*CHAR) LEN(2) +
+                          VALUE('11')
+ STEP1: /*  台北 ARLIB/ARSTATP 送　桃園 DALIB/ARSTAT      */
+             RTVDTAARA  DTAARA(QTEMP/ARA (1 1)) RTNVAR(&ARA1)
+             IF         COND(&ARA1 *EQ '0') THEN(GOTO CMDLBL(STEP2))
+             CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(*NONSTD +
+                          'DALIB/ARSTAT') LVLCHK(*NO)
+             OVRDBF     FILE(ARSTAT)  TOFILE(QTEMP/DDMT)
+             OVRDBF     FILE(ARSTATP) TOFILE(ARLIB/ARSTATP)
+             CALL       PGM(ARLIB/ARP026RC)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             CHGDTAARA  DTAARA(QTEMP/ARA (1 1)) VALUE('1')
+             GOTO       CMDLBL(STEP2)
+                        ENDDO
+             DLTOVR     FILE(*ALL)
+             CHGDTAARA  DTAARA(QTEMP/ARA (1 1)) VALUE('0')
+ STEP2: /*  台北 ARLIB/ARSTATP 送　高雄 DALIB/ARSTAT      */
+             RTVDTAARA  DTAARA(QTEMP/ARA (2 1)) RTNVAR(&ARA1)
+             IF         COND(&ARA2 *EQ '0') THEN(GOTO CMDLBL(LOOP))
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(*NONSTD +
+                          'DALIB/ARSTAT') LVLCHK(*NO)
+             OVRDBF     FILE(ARSTAT)  TOFILE(QTEMP/DDMK)
+             OVRDBF     FILE(ARSTATP) TOFILE(ARLIB/ARSTATP)
+             CALL       PGM(ARLIB/ARP026RC)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             CHGDTAARA  DTAARA(QTEMP/ARA (2 1)) VALUE('1')
+             GOTO       CMDLBL(LOOP)
+                        ENDDO
+             DLTOVR     FILE(*ALL)
+             CHGDTAARA  DTAARA(QTEMP/ARA (2 1)) VALUE('0')
+ LOOP:  /*   CLEAR .... TEMP-FILE  TAIPEI  & DLCOBJ .......... */
+             RTVDTAARA  DTAARA(QTEMP/ARA (1 2)) RTNVAR(&ARA)
+             IF         COND(&ARA *NE '00') THEN(CHGVAR VAR(&CNT1) +
+                          VALUE(&CNT1 + 1))
+             IF         COND(&CNT1 *GT 2) THEN(GOTO CMDLBL(ENDCLPGM))
+             ELSE       CMD(DO)
+                        IF         COND(&ARA *NE '00') THEN(DO)
+                                   DLYJOB   DLY(60)
+                                   GOTO     CMDLBL(STEP1)
+                                   ENDDO
+                        ENDDO
+
+             CLRPFM     FILE(ARLIB/ARSTATP)
+             MONMSG     MSGID(CPF0000)
+ ENDCLPGM:   ENDPGM
+

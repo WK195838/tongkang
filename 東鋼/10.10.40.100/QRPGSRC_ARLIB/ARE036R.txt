@@ -1,0 +1,353 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE036R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     已確認折讓單更改確認日期
+     H*            5.DATE-WRITTEN  87/02/20
+     H*            6.DATE-UPDATE   93/01/16
+     H*                            99/08/24  2010AR517  S00WCJ (9908A)
+     H*                           104/09/18  2015AR953  S00WCJ (0409A)
+     H*                            產品代碼3碼擴5碼
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARE036S CF  E                    WORKSTN
+     F                                        RRN1  KSFILE AR036F1
+     FTRNDTL  UF  E           K        DISK
+     FINVDTL  UF  E           K        DISK
+     FARALOG  O   E           K        DISK
+     E*************************************************************
+     E                    T#ERR   1   8 70
+     I*************************************************************
+     I           UDS
+     I                                        1   60U#DATE
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1  140W#SYST
+     I                                        1   60D#ST
+     I                                        7  100D#SY
+     I                                       11  140D#SMD
+9710 I            DS
+0409AI                                        1  30 TXRESV
+9710 I                                        1   6 TXYM
+     I            DS
+     I                                        1  10 W#TXNO
+     I                                        1   8 TXNO
+     I                                        9  100TXITEM
+     I            DS
+     I                                        1   6 S#TXNO
+     I                                        1   1 D#TXAR
+     C**************************************************************
+     C*   檔案搜尋關鍵
+     C**************************************************************
+     C           K#TX      KLIST
+     C                     KFLD           TXCODE
+     C                     KFLD           TXNO
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000           畫面二
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C*   副程式開始
+     C**************************************************************
+     C*----------------------------------------
+     C*  宣告及初始變數
+     C*----------------------------------------
+     CSR         SR0000    BEGSR
+     C                     Z-ADD0         RRN1    40
+     C*
+     C                     EXSR SR1100                     初始畫面一
+     C                     MOVEL'01'      W#PRID  2
+     CSR                   ENDSR
+     C*
+     C************************************
+     C*  畫面一:輸入折單號碼及更正日期
+     C************************************
+     CSR         SR1000    BEGSR
+     C                     WRITEAR036F1M
+     C           S#SFN1    IFEQ 0                          無資料
+     C                     SETOF                     727374
+     C                     SETON                     71
+     C                     ELSE                            有資料
+     C                     SETOF                     73
+     C                     SETON                     717274
+     C                     ENDIF
+     C                     EXFMTAR036F1C
+     C*
+     C           S#CRN1    IFNE 0
+     C                     Z-ADDS#CRN1    S#NBR1
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           *IN03     WHEQ '1'                        取消
+     C           *IN12     OREQ '1'
+     C                     MOVEL'00'      W#PRID
+     C*
+     C           *IN09     WHEQ '1'                        重設
+     C                     EXSR SR0000
+     C*
+     C           *IN10     WHEQ '1'                        存檔
+     C                     EXSR SR1200
+     C           W#RTNV    IFEQ 'T'
+     C                     MOVEL'02'      W#PRID
+     C                     ENDIF
+     C*
+     C                     OTHER                           檢核
+     C                     EXSR SR1200
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  初始畫面一
+     C*----------------------------------------
+     CSR         SR1100    BEGSR
+     C                     MOVEL*BLANK    S#MSG1
+     C                     SETOF                     7172
+     C                     SETON                     73
+     C                     WRITEAR036F1C
+     C                     Z-ADD1         S#NBR1
+     C                     Z-ADD0         RRN1
+     C                     Z-ADD50        S#SFN1           初始50項
+     C                     DO   S#SFN1
+     C                     ADD  1         RRN1
+     C                     CLEARAR036F1
+     C                     Z-ADDRRN1      S#ITEM
+     C                     WRITEAR036F1
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*-----------------------------------
+     C*  檢核所輸入是否正確
+     C*-----------------------------------
+     CSR         SR1200    BEGSR
+     C                     MOVEL*BLANK    S#MSG1
+     C                     MOVEL'F'       W#RTNV  1
+     C*
+     C                     Z-ADD0         RRN1
+     C                     DO   S#SFN1
+     C                     ADD  1         RRN1
+     C           RRN1      CHAINAR036F1              69
+     C           S#TXNO    IFEQ *BLANK                     空白跳過
+     C                     Z-ADD0         S#ACDT
+     C                     Z-ADD0         S#TXDT
+     C                     SETOF                     51
+     C                     UPDATAR036F1
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           D#TXAR    IFNE U#AREA                     檢核廠區
+     C                     MOVELT#ERR,1   S#MSG1
+     C                     SETON                     51
+     C                     UPDATAR036F1
+     C                     Z-ADDRRN1      S#NBR1
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*
+9711 C           S#ACDT    IFEQ 999999
+ .   C                     MOVELT#ERR,6   S#MSG1
+ .   C                     SETON                     52
+ .   C                     UPDATAR036F1
+ .   C                     Z-ADDRRN1      S#NBR1
+ .   C                     GOTO ES1200
+ .   C                     ELSE
+ .   C                     SETOF                     52
+ .   C                     ENDIF
+ .   C*
+ .   C           S#ACYM    IFEQ 9999
+ .   C                     MOVELT#ERR,7   S#MSG1
+ .   C                     SETON                     53
+ .   C                     UPDATAR036F1
+ .   C                     Z-ADDRRN1      S#NBR1
+ .   C                     GOTO ES1200
+ .   C                     ELSE
+ .   C                     SETOF                     53
+ .   C                     ENDIF
+9711 C*
+     C                     SETOF                     53
+     C           S#ACYM    IFNE 0
+     C                     MOVELS#ACYM    P#YYMM  6
+     C                     MOVEL*BLANK    P#CODE  1
+     C                     CALL 'ACP101R'
+     C                     PARM           P#YYMM
+     C                     PARM ' '       P#CODE
+     C                     FREE 'ACP101R'
+     C*
+     C           P#CODE    IFEQ '1'
+     C                     MOVELT#ERR,8   S#MSG1
+     C                     SETON                     53
+     C                     UPDATAR036F1
+     C                     Z-ADDRRN1      S#NBR1
+     C                     GOTO ES1200
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVEL'AR06'    TXCODE
+     C                     MOVEL*BLANK    TXNO
+     C                     MOVELS#TXNO    TXNO
+     C           K#TX      CHAINTXREC                69
+     C*
+     C           *IN69     IFEQ '1'                        折讓單不在
+     C                     MOVELT#ERR,2   S#MSG1
+     C                     SETON                     51
+     C                     UPDATAR036F1
+     C                     Z-ADDRRN1      S#NBR1
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*
+     C                     Z-ADDTXACDT    S#TXDT           秀原確認日
+     C                     MOVE TXYM      S#TXYM
+     C*
+     C           *IN69     DOWEQ'0'
+     C           TXFL01    IFNE 'Y'                        未確認
+     C                     MOVELT#ERR,3   S#MSG1
+     C                     SETON                     51
+     C                     UPDATAR036F1
+     C                     Z-ADDRRN1      S#NBR1
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*
+     C           TXIVNO    CHAINIVREC                69
+     C           *IN69     DOWEQ'0'                        檢核未代開
+     C           IVAPNO    IFEQ TXNO
+     C           IVACNO    ANDNE*BLANK                     已代開傳票
+     C                     MOVELT#ERR,4   S#MSG1
+     C                     SETON                     51
+     C                     UPDATAR036F1
+     C                     Z-ADDRRN1      S#NBR1
+     C                     GOTO ES1200
+     C                     ENDIF
+     C           TXIVNO    READEIVREC                    69
+     C                     ENDDO
+     C*
+     C           K#TX      READETXREC                    69
+     C                     ENDDO
+     C*
+     C           S#ACDT    IFNE 0
+     C           S#ACDT    ANDNE99999999
+9710 C                     MOVELS#ACDT    S#ACYM
+     C                     ENDIF
+     C*
+9711 C*9908A               MOVELUDATE     W#YM    40
+9908AC           *DATE     SUB  19000000  W#YMD   80
+9908AC                     MOVELW#YMD     W#YM    60
+ .   C           S#ACDT    IFEQ 99999999
+ .   C           S#ACYM    ANDEQ0
+ .   C                     MOVE W#YM      S#ACYM
+ .   C                     ENDIF
+9711 C*
+     C                     SETOF                     51
+     C                     UPDATAR036F1
+     C                     ENDDO                           檢核明細
+     C*
+     C                     MOVEL'T'       W#RTNV
+     CSR         ES1200    ENDSR
+     C*
+     C************************************
+     C*  畫面二:異動原因輸入
+     C************************************
+     CSR         SR2000    BEGSR
+     C                     EXFMTAR036F2H
+     C*
+     C                     SELEC
+     C           *IN03     WHEQ '1'                        取消
+     C           *IN12     OREQ '1'
+     C                     MOVEL'01'      W#PRID
+     C*
+     C                     OTHER
+     C                     EXSR SR2100                     存檔
+     C                     EXSR SR0000                     初始程式
+     C                     MOVELT#ERR,5   S#MSG1           存檔完畢
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*-----------------------------------
+     C*  異動資料存檔（折讓單存檔）
+     C*-----------------------------------
+     CSR         SR2100    BEGSR
+     C                     Z-ADD0         RRN1
+     C                     DO   S#SFN1
+     C                     ADD  1         RRN1
+     C           RRN1      CHAINAR036F1              69
+     C           S#TXNO    IFEQ *BLANK
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVEL'AR06'    TXCODE
+     C                     MOVEL*BLANK    TXNO
+     C                     MOVELS#TXNO    TXNO
+     C           K#TX      CHAINTXREC                69
+     C           *IN69     DOWEQ'0'
+     C                     Z-ADDS#ACDT    TXACDT
+9908AC*                    Z-ADDUDATE     TXTXDT
+9908AC           *DATE     SUB  19000000  TXTXDT
+9708 C                     MOVE S#ACYM    TXYM
+     C                     MOVEL'C'       TXFLAG
+     C                     UPDATTXREC
+     C*
+     C                     EXSR SR2200                     存發票明細
+     C                     EXSR SR2300                     存異動記錄
+     C*
+     C           K#TX      READETXREC                    69
+     C                     ENDDO
+     C*
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*-----------------------------------
+     C*  發票明細存檔
+     C*-----------------------------------
+     CSR         SR2200    BEGSR
+     C           TXIVNO    CHAINIVREC                69
+     C           *IN69     DOWEQ'0'
+     C           IVAPNO    IFEQ TXNO
+     C                     Z-ADDS#ACDT    IVACDT
+9908AC*                    Z-ADDUDATE     IVTXDT
+9908AC           *DATE     SUB  19000000  IVTXDT
+9708 C                     MOVE S#ACYM    IVRESV
+     C                     MOVEL'C'       IVFLAG
+     C                     UPDATIVREC
+     C                     ENDIF
+     C           TXIVNO    READEIVREC                    69
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*-----------------------------------
+     C*  異動記錄存檔
+     C*-----------------------------------
+     CSR         SR2300    BEGSR
+     C                     CLEARRARALOG                    異動登錄
+9908AC*                    Z-ADDUDATE     AGDATE           日期
+9908AC           *DATE     SUB  19000000  AGDATE           日期
+     C                     TIME           W#SYST
+     C                     Z-ADDD#ST      AGTIME           時間
+     C                     MOVELU#USID    AGURID           使用者
+     C                     MOVEL'AIB'     AGTRID           異動代號
+     C                     MOVELW#TXNO    AGRENO           相關號碼
+     C                     MOVELS#CGCA    AGCGCA           修改原因
+     C                     WRITERARALOG
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+** T#ERR
+０１－折讓單廠區別錯誤
+０２－所輸入之折讓單不存在
+０３－所輸入之折讓單尚未確認
+０４－折讓已代開傳票，不可更改。請通知財會人員進還原後重做
+０５－異動已經處理完畢，請用折讓單維護作業及發票維護作業查核
+０６－更正日期輸入錯誤，應為９９９９９９９９
+０７－年月輸入錯誤，請重新輸入
+０８－此折讓單所屬的年月已關帳，不可修改！
+

@@ -1,0 +1,204 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR131R1
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     外銷出口報單核對明細表(先前處理)
+     H*          5.DATE-WRITTEN  97/02/20
+     H*          6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FHSCINV  IP  E           K        DISK
+     FTRNDTLL4IF  E           K        DISK
+     FARR131F1UF  E           K        DISK                      A
+     I*****************************************************************
+     IRHSCINV     01
+     I*
+     I            DS
+     I                                        1   6 RVCUNO
+     I                                        1   2 D#MARK
+     I*
+     I            DS
+     I                                        1   9 TXORNO
+     I                                        7   90D#ITEM
+     I*
+     I            DS
+     I                                        1  20 D#APNO
+     I                                        1   8 D#APN1
+     I                                        9  16 D#APN2
+     I                                       17  20 D#APN3
+     I*
+     I           UDS
+     I                                      301 3080D#DAT1
+     I                                      309 3160D#DAT2
+     C*****************************************************************
+     C*          KET  LIST
+     C*****************************************************************
+     C*FILE => ARR131F1(出口報單暫存檔)
+     C           K#131F    KLIST
+     C                     KFLD           K#ORNO  6        訂單號碼
+     C                     KFLD           K#AREA  1        廠區
+     C                     KFLD           K#ITEM  30       項次
+     C*
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVEL*OFF      *IN40
+     C           C1ORNO    SETLLTXREC
+     C           *IN40     DOWEQ*OFF
+     C           C1ORNO    READETXREC                    40
+     C*
+     C   40                LEAVE
+     C*
+     C           C1OITM    IFNE D#ITEM
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           D#DAT1    IFNE 0
+     C           D#DAT2    ANDNE0
+     C           TXDATE    IFLT D#DAT1
+     C           TXDATE    ORGT D#DAT2
+     C                     ITER
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           TXTXAR    WHEQ 'H'
+     C           C1AMTH    ANDEQ0
+     C                     ITER
+     C           TXTXAR    WHEQ 'K'
+     C           C1AMTK    ANDEQ0
+     C                     ITER
+     C                     ENDSL
+     C*
+     C*同廠同月份有上、中兩種匯率
+     C           C1ORNO    IFEQ 'H10468'
+     C                     EXSR EX1000
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVEL*OFF      *IN30
+     C                     MOVELTXORN5    K#ORNO           訂單號碼
+     C                     MOVELTXTXAR    K#AREA           廠區
+     C                     Z-ADDD#ITEM    K#ITEM           項次
+     C*
+     C           K#131F    CHAINRAR131F1             30
+1F   C           *IN30     IFEQ *ON
+     C                     MOVELC1ORNO    W1ORNO           訂單號碼
+     C                     MOVELC1APNO    W1APNO           報單號碼
+     C                     MOVELTXTXAR    W1AREA           廠區
+     C                     MOVELC1WKAR    W1WKAR           交運地點
+     C                     MOVELC1OCUS    W1CUNO           客戶代號
+     C                     MOVELC1OCNM    W1CUNM           客戶簡稱
+     C                     Z-ADDC1CDTE    W1DATE           報關日期
+     C                     Z-ADDC1TRAT    W1TRAT           實際匯率
+     C                     Z-ADDTXQTY     W1QTY            數量
+     C                     Z-ADDC1UPRC    W1UPRC           美金單價
+     C                     Z-ADDC1OITM    W1ITEM           訂單項次
+     C*
+2F   C           TXTXAR    IFEQ 'H'
+     C                     Z-ADDC1AMTH    W1NAMT           台幣金額
+     C                     ELSE
+     C*
+     C*訂單因介於上、中旬時間，導致有兩種匯率，
+     C*苗栗為報關匯率，高雄之報關設於參考匯率。
+     C*
+3F   C           C1ORNO    IFEQ 'H10001'
+     C           C1ORNO    OREQ 'H10002'
+     C           C1ORNO    OREQ 'H10003'
+     C           C1ORNO    OREQ 'H10005'
+     C           C1ORNO    OREQ 'H10006'
+     C                     Z-ADDC1RRAT    W1TRAT           實際匯率
+3E   C                     ENDIF
+     C                     Z-ADDC1AMTK    W1NAMT
+2E   C                     ENDIF
+     C*
+     C                     WRITERAR131F1
+     C                     ELSE
+     C                     ADD  TXQTY     W1QTY            數量
+     C*
+4F   C           TXTXAR    IFEQ 'H'
+     C                     Z-ADDC1AMTH    W1NAMT           台幣金額
+     C                     ELSE
+     C                     Z-ADDC1AMTK    W1NAMT
+4E   C                     ENDIF
+     C*
+     C                     UPDATRAR131F1
+1E   C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           EX1000    BEGSR
+     C*****************************************************************
+     C                     MOVEL*OFF      *IN31
+     C                     MOVELTXORN5    K#ORNO           訂單號碼
+     C                     MOVELTXTXAR    K#AREA           廠區
+     C*
+     C           TXNO      IFGE 'H2100470'
+     C           TXNO      ANDLE'H2100688'
+     C                     Z-ADD1         K#ITEM           項次
+     C                     ELSE
+     C                     Z-ADD2         K#ITEM           項次
+     C                     ENDIF
+     C*
+     C           K#131F    CHAINRAR131F1             31
+     C                     MOVELC1ORNO    W1ORNO           訂單號碼
+     C                     MOVELTXTXAR    W1AREA           廠區
+     C                     MOVELC1WKAR    W1WKAR           交運地點
+     C                     MOVELC1OCUS    W1CUNO           客戶代號
+     C                     MOVELC1OCNM    W1CUNM           客戶簡稱
+     C                     Z-ADDC1UPRC    W1UPRC           美金單價
+     C*
+1F   C           TXNO      IFGE 'H2100470'
+     C           TXNO      ANDLE'H2100688'
+     C*
+2F   C           *IN31     IFEQ *ON
+     C                     Z-ADD32.755    W1TRAT           實際匯率
+     C                     Z-ADD971114    W1DATE           報關日期
+     C                     Z-ADD55584579  W1NAMT           台幣金額
+     C                     Z-ADDTXQTY     W1QTY            數量
+     C                     Z-ADD1         W1ITEM           訂單項次
+     C                     MOVEL'DA/97/HR'D#APN1           報單號碼
+     C                     MOVEL'50/0001 'D#APN2           報單號碼
+     C                     MOVEL*BLANK    D#APN3           報單號碼
+     C                     MOVELD#APNO    W1APNO           報單號碼
+     C                     WRITERAR131F1
+     C                     ELSE
+     C                     ADD  TXQTY     W1QTY            數量
+     C                     UPDATRAR131F1
+2E   C                     ENDIF
+     C*
+     C                     ELSE
+3F   C           *IN31     IFEQ *ON
+     C                     Z-ADD32.025    W1TRAT           實際匯率
+     C                     Z-ADD971121    W1DATE           報關日期
+     C                     Z-ADD52919611  W1NAMT           台幣金額
+     C                     Z-ADDTXQTY     W1QTY            數量
+     C                     Z-ADD2         W1ITEM           訂單項次
+     C                     MOVEL'DA/97/HS'D#APN1           報單號碼
+     C                     MOVEL'62/0001 'D#APN2           報單號碼
+     C                     MOVEL*BLANK    D#APN3           報單號碼
+     C                     MOVELD#APNO    W1APNO           報單號碼
+     C                     WRITERAR131F1
+     C                     ELSE
+     C                     ADD  TXQTY     W1QTY            數量
+     C                     UPDATRAR131F1
+3E   C                     ENDIF
+1E   C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+

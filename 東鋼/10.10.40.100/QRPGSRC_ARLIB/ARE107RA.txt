@@ -1,0 +1,263 @@
+     H*****************************************************************
+     H*
+     H*        *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*        1.PROGRAM-ID    ARE107RA
+     H*        2.PROGRAM-TYPE  RPG/400
+     H*        3.AUTHOR        S00WCJ
+     H*        4.FUNCTION     電子押匯還原確認作業
+     H*        5.DATE-WRITTEN  113/03/19 2024AR00011
+     H*        6.UPDATE
+     H*
+     H*****************************************************************
+     H            Y
+     FARE107SACF  E                    WORKSTN
+     FARELCD  UF  E           K        DISK
+     FARELCDG O   E           K        DISK
+     F            RARELCD                           KRENAMEARELCG
+     FARELCE  UF  E           K        DISK
+1301AFARELCEG O   E           K        DISK
+1301AF            RARELCE                           KRENAMEARELEG
+     FRCVDTL  UF  E           K        DISK
+     FSARCVF  UF  E           K        DISK
+     E                    ERR     1  10 70               *錯誤訊息
+     I*
+     I            DS
+     I                                        1  12 RVRES2
+     I*上傳確認碼
+     I                                        1   1 D#RVCD
+     I            DS
+     I                                        1  16 SRREV2
+     I*上傳確認碼
+     I                                        1   1 D#SRCD
+     I            DS
+     I                                        1  16 EDRVNO
+     I                                        1   6 D#RVNO
+     I            DS
+     I                                        1  16 W#RVNO
+     I                                        7   8 D#RVN1
+     I            DS
+     I                                        1  30 EDMAR3
+     I                                       30  30 D#DLCK
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVN
+     I                                     10011010 U#USID
+     I                                     10211021 T#TXAR
+     C*****************************************************************
+     C*          Parameter List
+     C*****************************************************************
+     C*
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C*SR0000 => Initialize Screen Number
+     C*SR1000 => Screen Number = '01' Process
+     C*SR2000 => Screen Number = '01' Process Read Subfile Screen
+     C*
+     C                     EXSR SR0000
+     C           PRCID     DOUEQ'00'
+     C           PRCID     CASEQ'01'      SR1000
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*
+     C*Initialize Screen Number
+     C*
+     C           *DATE     SUB  19000000  U#SYSD  80
+     C                     MOVEL*BLANKS   S#RVNO
+     C                     MOVE '01'      PRCID   2
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C*Screen Number = '02' Process
+     C*
+     C           PRCID     DOWEQ'01'
+     C*
+     C*Check Write Subfile Record Found ?
+     C*
+     C*
+     C                     EXFMTAR07F2
+     C*
+     C                     MOVE *BLANK    S#ERR
+     C                     MOVEA'0'       *IN,45
+     C                     MOVEL*OFF      *IN99
+     C*
+     C*PF3=Exit,PF12=Cancel
+     C*
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*Check Screen Filed
+     C*
+     C                     EXSR SR1200
+     C*
+     C           S#ERR     IFNE *BLANKS
+     C           *IN99     ANDEQ*ON
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           S#ERR     IFEQ *BLANKS
+     C                     EXSR SR2000
+     C                     MOVELERR,6     S#ERR
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1200    BEGSR
+     C*****************************************************************
+     C*
+     C           S#RVNO    IFEQ *BLANKS
+     C                     MOVELERR,3     S#ERR
+     C                     SETON                     9945
+     C                     GOTO END120
+     C                     ENDIF
+     C*
+     C                     MOVELS#RVNO    W#RVNO 16
+     C                     MOVEL'99'      D#RVN1
+     C*
+     C           W#RVNO    SETGTRARELCD
+     C                     READPRARELCD             N    51
+     C           S#RVNO    IFNE D#RVNO
+     C                     MOVELERR,2     S#ERR
+     C                     SETON                     9945
+     C                     ENDIF
+     C*
+     C           S#RVNO    IFEQ D#RVNO
+     C           D#DLCK    IFNE ' '
+     C                     MOVELERR,4     S#ERR
+     C                     SETON                     9945
+     C                     GOTO END120
+     C                     ENDIF
+     C*
+     C           EDSTCL    IFEQ 'Y'
+     C           *IN10     ANDEQ*OFF
+     C                     MOVELERR,5     S#ERR
+     C                     SETON                     9945
+     C                     ENDIF
+     C*
+     C                     MOVELEDRVNO    W1RVNO 16
+     C                     ENDIF
+     C*
+     C           END120    ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*
+     C                     EXSR SR2100                     刪除ARELCE
+     C                     EXSR SR2200                     刪除ARELCD
+     C                     EXSR SR2300                     修改SARCVF
+     C                     EXSR SR2400                     修改RCVDTL
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C*刪除ARELCE
+     C*
+     C                     MOVEL*OFF      *IN58
+     C           W1RVNO    SETLLRARELCE
+     C           *IN58     DOWEQ*OFF
+     C           W1RVNO    READERARELCE                  58
+     C   58                LEAVE
+     C           EESTCL    IFEQ 'Y'
+     C                     MOVEL'D'       EEFLAG
+     C                     UPDATRARELCE
+     C*
+     C                     MOVEL'ARE107RA'EEAPNM
+     C                     Z-ADDU#SYSD    EECHDD
+     C                     TIME           EECHDT
+     C                     MOVELU#USID    EECUSR
+     C                     WRITEARELEG
+     C                     ELSE
+     C*
+     C                     MOVEL'D'       EEFLAG
+     C                     MOVEL'ARE107RA'EEAPNM
+     C                     Z-ADDU#SYSD    EECHDD
+     C                     TIME           EECHDT
+     C                     MOVELU#USID    EECUSR
+     C                     WRITEARELEG
+     C                     DELETRARELCE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2200    BEGSR
+     C*****************************************************************
+     C*刪除ARELCD
+     C*
+     C                     MOVEL*OFF      *IN58
+     C           W1RVNO    SETLLRARELCD
+     C           *IN58     DOWEQ*OFF
+     C           W1RVNO    READERARELCD                  58
+     C   58                LEAVE
+     C           EDSTCL    IFEQ 'Y'
+     C                     MOVEL'D'       EDFLAG
+     C                     MOVEL'Y'       D#DLCK
+     C*
+     C                     MOVEL'ARE107RA'ELAPNM
+     C                     Z-ADDU#SYSD    ELCHDD
+     C                     TIME           ELCHDT
+     C                     MOVELU#USID    ELCUSR
+     C                     WRITEARELCG
+     C                     UPDATRARELCD
+     C                     ELSE
+     C*
+     C                     MOVEL'D'       EDFLAG
+     C                     MOVEL'Y'       D#DLCK
+     C                     MOVEL'ARE107RA'ELAPNM
+     C                     Z-ADDU#SYSD    ELCHDD
+     C                     TIME           ELCHDT
+     C                     MOVELU#USID    ELCUSR
+     C                     WRITEARELCG
+     C                     DELETRARELCD
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2300    BEGSR
+     C*****************************************************************
+     C*修改SARCVF
+     C*
+     C           S#RVNO    CHAINSRREC                58
+     C  N58                MOVEL*BLANKS   D#SRCD
+     C  N58                UPDATSRREC
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2400    BEGSR
+     C*****************************************************************
+     C*修改RCVDTL
+     C*
+     C           S#RVNO    CHAINRVREC                58
+     C  N58                MOVEL'C'       RVFLAG
+     C  N58                MOVEL*BLANKS   D#RVCD
+     C  N58                UPDATRVREC
+     C*
+     C                     ENDSR
+     C*****************************************************************
+**  ERR
+01-資料已存在！
+02-繳款單尚未確認，不可還原!
+03-欄位不可空白！
+04-繳款單已還原，不可重覆還原!
+05-繳款單之押匯資料已上傳，確定還原請按F10!
+06-還原完成!
+

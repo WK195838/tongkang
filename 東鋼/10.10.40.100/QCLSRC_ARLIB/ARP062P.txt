@@ -1,0 +1,125 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP062P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     客戶寄放品代開傳票作業（記帳）1K       */
+     /*     5.DATE-WRITTEN  87/11/25                                */
+     /*                                                             */
+     /*  <說明:> 本作業每月進行一次，先刪除該月份之傳票資料     */
+     /*            再進行代開整月的動作。（可重複代開）           */
+     /*            傳票編號：Y000 -- Y500                         */
+     /*            異動代號；1K                                   */
+     /*            目前僅供苗栗廠之型鋼用。                       */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCLF       FILE(ARP062S)
+             DCL        VAR(&P#YYMM) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&P#CODE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)   /*執行狀態*/
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&USER)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)  TYPE(*LGL)  LEN(1)
+             DCL        VAR(&AREA)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&YYMM)  TYPE(*CHAR) LEN(4)
+             DCL        VAR(&YY)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&MM)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&FNAME) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MNAME) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&DELNO) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&ADDNO) TYPE(*CHAR) LEN(4)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             RTVDTAARA  DTAARA(*LDA (951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+             CHGVAR     VAR(&S#AREA) VALUE(&AREA)
+ DISPLAY:
+             SNDRCVF    RCDFMT(AR062F1)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGVAR     VAR(&YYMM) VALUE(&S#YYMM)
+             CHGVAR     VAR(&P#YYMM) VALUE(&S#YYMM)
+             CHGVAR     VAR(&YY) VALUE(%SST(&YYMM 1 2))
+             CHGVAR     VAR(&MM) VALUE(%SST(&YYMM 3 2))
+             CHGVAR     VAR(&FNAME) +
+                        VALUE('AC' || &AREA || 'R' || &YY)
+             CHGVAR     VAR(&MNAME) VALUE('VR' || &MM)
+             CHKOBJ     OBJ(&FNAME) OBJTYPE(*FILE) MBR(&MNAME)
+             MONMSG     CPF0000     EXEC(DO)
+             CHGVAR     VAR(&S#MSG1) +
+                        VALUE('客戶寄放品代開傳票作業，無法找到指定+
+                          的傳票檔：' || &FNAME || ', ' || &MNAME)
+                        GOTO DISPLAY
+             ENDDO
+
+             CALL    PGM(ACP101R) PARM(&P#YYMM &P#CODE)
+             IF         COND(&P#CODE *EQ '1') THEN(DO)
+             CHGVAR     VAR(&S#MSG1) VALUE('關帳日期已過')
+             GOTO       CMDLBL(DISPLAY)
+             ENDDO
+
+             CHGDTAARA  DTAARA(*LDA (1 4)) VALUE(&YYMM)
+             CHGDTAARA  DTAARA(*LDA (7 1)) VALUE(&AREA)
+             SBMJOB     JOB(ARP062P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARP062P')
+             RETURN
+
+BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 4)) RTNVAR(&YYMM)
+             RTVDTAARA  DTAARA(*LDA (1 2)) RTNVAR(&YY)
+             RTVDTAARA  DTAARA(*LDA (3 2)) RTNVAR(&MM)
+             RTVDTAARA  DTAARA(*LDA (7 1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&FNAME) +
+                        VALUE('AC' || &AREA || 'R' || &YY)
+             CHGVAR     VAR(&MNAME) VALUE('VR' || &MM)
+
+
+STEP1:       /* 刪除已代開過的資料 */
+
+             OVRDBF     FILE(ACTRAN) TOFILE(&FNAME) MBR(&MNAME) +
+                        SHARE(*YES)
+             OPNQRYF    FILE(ACTRAN) OPTION(*ALL) +
+                        QRYSLT('ACVRNO *GE "Y001" *AND +
+                                ACVRNO *LE "Y499"')
+
+             CALL       PGM(ARP062R1)  /*刪除輸入日期後的資料*/
+             CLOF       OPNID(ACTRAN)
+             DLTOVR     *ALL
+
+
+STEP2:       /* 代開1K   */
+
+             OVRDBF     FILE(ACTRAN) TOFILE(&FNAME) MBR(&MNAME) +
+                        SHARE(*YES)
+             OVRPRTF    FILE(ARP062T) TOFILE(ARP062T) HOLD(*YES) +
+                        USRDTA('寄放清單')
+             OVRDBF     FILE(HSVOUR) TOFILE(HSVOUR) SHARE(*YES)
+             OPNQRYF    FILE(HSVOUR) +
+                        QRYSLT('S4FLAG *NE "D" *AND +
+                                S4TRCD *EQ "1K" *AND +
+                                C#YYMM *EQ "' || &YYMM || '"') +
+                        MAPFLD((C#DATE S4ENTD *CHAR 6) +
+                               (C#YYMM '%SST(C#DATE 1 4)' *CHAR 4) +
+                               (S4TFBT '%SST(S4ORNO 1 5)' )) +
+                        KEYFLD((S4AREA) (S4ENTD) (S4TFBT) (S4NAME))
+
+             CALL       PGM(ARP062R2)  /*傳票代開及列表*/
+             DLTOVR     FILE(*ALL)
+
+
+ ENDDING:
+             RTVDTAARA  DTAARA(*LDA (21 4)) RTNVAR(&DELNO)
+             RTVDTAARA  DTAARA(*LDA (31 4)) RTNVAR(&ADDNO)
+             SNDMSG     TOUSR(&USER) +
+                        MSG('客戶寄放品代開傳票已完成，合計' ||   +
+                            '刪除原傳票' || &DELNO || '筆，' || +
+                            '寫入傳票' || &ADDNO || '筆。')
+
+             ENDPGM
+

@@ -1,0 +1,107 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARP100R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     補運費發票開立檢核──ｔｅｓｔ
+     H*          5.DATE-WRITTEN  91/12/26
+     H*          6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FSAVOUR  IP  E           K        DISK
+     FARDLWT  UF  E           K        DISK                      A
+     FSASLPD  IF  E           K        DISK
+     FSADLVY  IF  E           K        DISK
+     FWTMASPL2IF  E           K        DISK
+     IRSAVOUR     01
+     I            DS
+     I                                        1   8 D#WTNO
+     I                                        1   1 D#WTN1
+     I                                        2   3 D#WTN2
+     I                                        4   80D#WTN3
+     I            DS
+     I                                        1   6 D#OTNO
+     I                                        1   1 D#VEAR
+     I                                        2   6 D#VRNO
+     I            DS
+     I                                        1   6 D#DVNO
+     I                                        1   1 D#DVN1
+     I                                        2   60D#DVN2
+     C*FILE==>ARDLWT
+     C           W#DLWT    KLIST
+     C                     KFLD           AWORNO
+     C                     KFLD           AWWTNO
+     C*FILE==>SASLPD
+     C           W#SLPD    KLIST
+     C                     KFLD           S3VREA
+     C                     KFLD           S3VRNO
+     C                     KFLD           S3VRTM
+     C*FILE==>SADLVY
+     C           W#DLVY    KLIST
+     C                     KFLD           S2AREA
+     C                     KFLD           S2DVNO
+     C                     KFLD           S2ITEM
+     C*FILE==>WTMASPL2
+     C           W#MASP    KLIST
+     C                     KFLD           W6AREA
+     C                     KFLD           W6VNO1
+     C                     KFLD           W6VNO2
+     C*
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C           DTLSR     BEGSR
+     C                     MOVELS4VREA    W6AREA           廠區別
+     C                     MOVELS4PCOD    W6VNO1           進出別
+     C                     Z-ADDS4VRNO    W6VNO2           磅單編號
+     C* 找出單編號
+     C           W#MASP    CHAINRWTMASP             N40
+     C           *IN40     IFEQ *OFF
+     C                     MOVELW6OTNO    D#OTNO
+     C                     MOVELD#VEAR    S3VREA           地區別
+     C                     MOVELD#VRNO    S3VRNO           出貨通知編號
+     C                     Z-ADD0         S3VRTM           出貨通知序號
+     C*找交單編號
+     C           W#SLPD    SETLLRSASLPD
+     C                     READ RSASLPD             N    41
+     C                     MOVELD#VRNO    W#VRNO  50
+     C           D#VEAR    IFEQ S3VREA
+     C           W#VRNO    ANDEQS3VRNO
+     C                     MOVELS3DVN1    S2AREA           填單廠區
+     C                     MOVELS3DVN2    S2DVNO           流水號
+     C                     MOVELS3DVN3    S2ITEM           項次
+     C*
+     C*          S2AREA    IFEQ 'P'
+     C*          S2DVNO    ANDEQ12611
+     C*                    Z-ADD0         W#TEST  10
+     C*                    ENDIF
+     C*
+     C  N41      W#DLVY    CHAINRSADLVY              42
+     C*
+     C           S2AREA    IFEQ 'P'                        填單廠區
+     C           S2TXAR    ANDEQ'Y'                        補運費碼
+     C                     MOVELS4VREA    D#WTN1           地區別
+     C                     MOVELS4TRCD    D#WTN2           異動碼
+     C                     Z-ADDS4VRNO    D#WTN3           磅單編號
+     C                     MOVELD#WTNO    AWWTNO
+     C                     MOVELS4ORNO    AWORNO           訂單號碼
+     C           W#DLWT    CHAINRARDLWT              40
+     C                     MOVELS3DVN1    D#DVN1
+     C                     Z-ADDS3DVN2    D#DVN2
+     C                     MOVELD#DVNO    AWDLVY           交單編號
+     C                     MOVELS4CUNO    AWCUNO
+     C                     MOVELS4CUST    AWCUNM
+     C                     Z-ADDS4DATE    AWWTDT           出貨日期
+     C*
+     C   40                WRITERARDLWT
+     C  N40                UPDATRARDLWT
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+

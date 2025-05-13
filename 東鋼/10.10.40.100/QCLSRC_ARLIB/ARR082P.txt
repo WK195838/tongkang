@@ -1,0 +1,130 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR082P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     信用狀押匯月報表                       */
+     /*     5.DATE-WRITTEN  88/12/08                                */
+     /*     6.UPDATE  DATE  99/05/06  2010AR476  S00WCJ (9905A)     */
+     /*                    111/11/17  2022AR00050 S00WCJ (1111A)    */
+     /*                     增加篩選條件                          */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)     TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)   LEN(10)
+             DCL        VAR(&W#YY)    TYPE(*CHAR)   LEN(4)
+             DCL        VAR(&W#MM)    TYPE(*CHAR)   LEN(2)
+             DCL        VAR(&W#YYMM)  TYPE(*CHAR)   LEN(6)
+/*1111A*/    DCL        VAR(&W#NTTP)  TYPE(*CHAR)   LEN(1)
+
+             DCLF       FILE(ARR082S)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+ INPUT:
+             SNDRCVF    RCDFMT(AR082F1)
+             IF         COND(&IN03 *EQ '1' *OR &IN12 *EQ '1') +
+                        THEN(RETURN)
+
+             IF         COND(&S#MM *GT 12 *OR &S#MM *LT 1) THEN(DO)
+                CHGVAR  VAR(&S#MSG1) VALUE('無該月份！')
+                GOTO    INPUT
+             ENDDO
+
+
+             CHGVAR     VAR(&W#YY) VALUE(&S#YY)
+             CHGVAR     VAR(&W#MM) VALUE(&S#MM)
+
+             CHGDTAARA  DTAARA(*LDA (1 4)) VALUE(&W#YY)
+             CHGDTAARA  DTAARA(*LDA (5 2)) VALUE(&W#MM)
+/*1111A*/    CHGDTAARA  DTAARA(*LDA (8 1)) VALUE(&S#NTTP)
+
+             SBMJOB     JOB(ARR082P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                        RQSDTA('CALL ARR082P')
+    /*9905A  START */
+         /*  CHGDTAARA  DTAARA(*LDA (801 70)) +
+             VALUE('信用狀押匯月報表已匯入排程中。')  */
+             CHGDTAARA  DTAARA(*LDA (601 70)) +
+/*1111A*/    VALUE('財務用應收款項月報表已匯入排程中。')
+    /*9905A  END */
+             RETURN
+
+
+ BATCH:
+
+/*1111A*/    DLTF       FILE(QTEMP/ARR082F)
+/*1111A*/    MONMSG     MSGID(CPF0000)
+
+/*1111A*/    CRTDUPOBJ  OBJ(ARR082F)  FROMLIB(DALIB) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&W#YYMM)
+/*1111A*/    RTVDTAARA  DTAARA(*LDA (8 1)) RTNVAR(&W#NTTP)
+
+/*1111A*/    OVRPRTF    FILE(ARR082T) TOFILE(ARR082T) +
+                        PAGESIZE(*N 198)  CPI(15) +
+                         HOLD(*YES) USRDTA('應收月報')
+
+/*1111A*/    OVRPRTF    FILE(ARR082T1) TOFILE(ARR082T1) +
+                        PAGESIZE(*N 198)  CPI(15) +
+                         HOLD(*YES) USRDTA('應收月１')
+
+             OVRDBF     FILE(CBCUST) TOFILE(CBCUST)
+             OVRDBF     FILE(LLCMST) TOFILE(LLCMST)
+             OVRDBF     FILE(RCVDTL) TOFILE(RCVDTL) SHARE(*YES)
+/*1111A*/    OVRDBF     FILE(ARR082F) TOFILE(QTEMP/ARR082F) SHARE(*YES)
+/*1111A*/
+/*1111A*/  IF      COND(&W#NTTP *EQ 'A' *OR &W#NTTP *EQ 'I') THEN(DO)
+/*1111A*/    OPNQRYF    FILE(RCVDTL) +
+                        QRYSLT( +
+                              'RVACTP *EQ "D" *AND   +
+                               RVNTTP *EQ "' || &W#NTTP || '" *AND   +
+                               RVDUDT *GE ' || &W#YYMM || '01 *AND  +
+                               RVDUDT *LE ' || &W#YYMM || '31') +
+                        KEYFLD((RVCUNO) (RVDUDT))
+/*1111A*/  ENDDO
+/*1111A*/  IF      COND(&W#NTTP *EQ 'J')   THEN(DO)
+/*1111A*/    OPNQRYF    FILE(RCVDTL) +
+                        QRYSLT( +
+                              'RVACTP *EQ "D" *AND   +
+                               RVNTTP *EQ "' || &W#NTTP || '" *AND   +
+                               RVDATE *GE ' || &W#YYMM || '01 *AND  +
+                               RVDATE *LE ' || &W#YYMM || '31') +
+                        KEYFLD((RVCUNO) (RVDATE))
+/*1111A*/  ENDDO
+/*1111A*/  IF      COND(&W#NTTP *EQ ' ')   THEN(DO)
+/*1111A*/    OPNQRYF    FILE(RCVDTL) +
+                        QRYSLT( +
+                              'RVACTP *EQ "D" *AND   +
+                               ((RVNTTP *EQ "I" *OR +
+                                 RVNTTP *EQ "A" ) *AND +
+                               (RVDUDT *GE ' || &W#YYMM || '01 *AND  +
+                                RVDUDT *LE ' || &W#YYMM || '31)) *OR +
+                               ( RVNTTP *EQ "J" *AND +
+                                 (RVDATE *GE ' || &W#YYMM || '01 *AND +
+                                  RVDATE *LE ' || &W#YYMM || '31)) +
+                                 ') +
+                        KEYFLD((RVCUNO) (RVDUDT) (RVDATE))
+/*1111A*/  ENDDO
+
+/*1111A*/    CALL       PGM(ARR082RA)
+/*1111A*/    CLOF       OPNID(RCVDTL)
+/*1111A*/    OPNQRYF    FILE((ARR082F))  KEYFLD((RVCUNO) (RVDUDT))
+
+/*        CPYFRMQRYF    FROMOPNID(RCVDTL) TOFILE(S00WCJ/RCVT) +
+              MBROPT(*REPLACE)  CRTFILE(*YES)    */
+
+             CALL       PGM(ARR082R)
+             CLOF       OPNID(ARR082F)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

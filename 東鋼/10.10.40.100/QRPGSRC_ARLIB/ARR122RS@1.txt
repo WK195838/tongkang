@@ -1,0 +1,245 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR122RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     未開立發票明細表－即時
+     H*            5.DATE-WRITTEN  94/08/18
+     H*            6.DATE-UPDATE
+     H*                            99/09/03  2010AR517  S00WCJ (9909A)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR122S CF  E                    WORKSTN
+     FARSAID  IF  E           K        DISK
+     FARSAIDL1IF  E           K        DISK
+     F            RARSAID                           KRENAMERARSAIX
+     FSAMAST  IF  E           K        DISK
+     E*************************************************************
+     E                    ERR     1   8 70
+     I*************************************************************
+     IRARSAIX
+     I              SAACD                           F#ACD
+     I              SARVID                          F#RVID
+     I              SANAME                          F#NAME
+     I              SALOCA                          F#LOCA
+     I              SADEPT                          F#DEPT
+     I              SAWKNO                          F#WKNO
+     I              SABK20                          F#BK20
+     I              SAUPDD                          F#UPDD
+     I              SAUPDT                          F#UPDT
+     I              SAUPDR                          F#UPDR
+     I              SAUSID                          F#USID
+     I           UDS
+     I                                      300 305 U#YMS
+     I                                      306 311 U#YME
+     I                                      312 312 U#AREA
+     I                                      313 316 U#DEPT
+     I                                      317 318 U#SAID
+     I                                      319 319 U#SAIS
+     I                                      320 320 U#SAIE
+     I                                      321 326 U#ORNO
+     I                                      327 327 U#KIND
+     I                                     10011010 U#USID
+     I            DS
+     I                                        1   8 D#UDAT
+     I                                        1   6 D#UYM
+     I            DS
+     I                                        1   60D#YMS
+     I                                        1   40D#YYS
+     I                                        5   60D#MMS
+     I            DS
+     I                                        1   60D#YME
+     I                                        1   40D#YYE
+     I                                        5   60D#MME
+     C*****************************************************************
+     C*          KEY  LIST
+     C*****************************************************************
+     C           K#SAMT    KLIST
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+9909AC           *DATE     SUB  19000000  U#SYSD  80
+     C                     EXSR SR0000                     初始程式
+     C*
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C           SR0000    BEGSR
+     C**************************************************************
+     C                     MOVEL'01'      W#PRID  2        畫面一
+     C                     MOVEL*BLANK    W#SAIS  2        業務代號最小值
+     C                     MOVEL'99'      W#SAIE  2        業務代號最大值
+     C*
+9909AC                     MOVE U#SYSD    D#UDAT
+     C                     MOVE D#UYM     S#YMS            銷貨起日
+     C                     MOVE D#UYM     S#YME            銷貨止日
+     C*
+     C                     MOVELU#USID    S#DEPT
+     C                     MOVE '0'       S#DEPT           部門代號
+     C*
+     C           U#USID    CHAINRARSAIX              42
+     C  N42                MOVELF#RVID    S#SAID           業務代號
+     C*
+     C                     ENDSR
+     C**************************************************************
+     C           SR1000    BEGSR
+     C**************************************************************
+     C*W#PRID='01'-->畫面一
+     C           W#PRID    DOWEQ'01'
+     C                     EXFMTAR122F1                    螢幕輸入
+     C                     MOVEL*BLANK    S#ERR
+     C*
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03           回前畫面
+     C                     MOVEL'00'      W#PRID           結束
+     C                     LEAVE
+     C                     ENDIF
+     C*檢核
+     C                     EXSR SR1100                     檢核
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         SR1100    BEGSR
+     C**************************************************************
+     C                     MOVEA'000000'  *IN,30
+     C*
+     C                     SETOF                     99
+     C           S#YME     IFEQ 0
+     C                     MOVELERR,1     S#ERR
+     C                     SETON                     3199
+     C                     ENDIF
+     C*
+     C  N99      S#YMS     IFNE 0
+     C                     Z-ADDS#YMS     D#YMS
+     C           D#MMS     IFLT 0
+     C           D#MMS     ORGT 12
+     C                     MOVELERR,2     S#ERR
+     C                     SETON                     3099
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      S#YME     IFNE 0
+     C                     Z-ADDS#YME     D#YME
+     C           D#MME     IFLT 0
+     C           D#MME     ORGT 12
+     C                     MOVELERR,3     S#ERR
+     C                     SETON                     3199
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      S#YMS     IFGT S#YME
+     C                     MOVELERR,4     S#ERR
+     C                     SETON                     303199
+     C                     ENDIF
+     C*
+     C  N99      S#AREA    IFNE *BLANK
+     C           S#AREA    IFNE 'T'
+     C           S#AREA    ANDNE'M'
+     C           S#AREA    ANDNE'H'
+     C           S#AREA    ANDNE'K'
+     C                     MOVELERR,5     S#ERR
+     C                     SETON                     3299
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      S#DEPT    IFNE *BLANK
+     C           S#DEPT    IFNE 'B010'
+     C           S#DEPT    ANDNE'B020'
+     C           S#DEPT    ANDNE'B030'
+     C           S#DEPT    ANDNE'B040'
+     C           S#DEPT    ANDNE'B050'
+     C                     MOVELERR,6     S#ERR
+     C                     SETON                     3399
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      S#SAID    IFNE *BLANK
+     C           S#SAID    CHAINRARSAID              40
+     C   40                MOVELERR,7     S#ERR
+     C   40                SETON                     3499
+     C                     ENDIF
+     C*
+     C  N99      S#ORNO    IFNE *BLANK
+     C                     MOVELS#ORNO    S1OREA
+     C                     MOVE S#ORNO    S1ORNO
+     C           K#SAMT    CHAINRSAMAST              41
+     C   41                MOVELERR,8     S#ERR
+     C   41                SETON                     3599
+     C                     ENDIF
+     C*
+     C  N99                EXSR SR1110
+     C*
+     C                     ENDSR
+     C**************************************************************
+     CSR         SR1110    BEGSR
+     C**************************************************************
+     C*當營業門不為空白時，須找出該部門所屬的業務
+     C*
+     C           S#DEPT    IFNE *BLANK
+     C                     MOVEL'99'      W#SAIS  2        業務代號最小值
+     C                     MOVEL*BLANK    W#SAIE  2        業務代號最大值
+     C           *LOVAL    SETLLRARSAID
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RARSAID                  40
+     C   40                LEAVE
+     C*
+     C           SADEPT    IFNE S#DEPT
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           SARVID    IFLT W#SAIS
+     C                     MOVELSARVID    W#SAIS           業務最小值
+     C                     ENDIF
+     C           SARVID    IFGT W#SAIE
+     C                     MOVELSARVID    W#SAIE           業務最大值
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDIF
+     C*
+     C           S#SAID    IFNE *BLANK
+     C                     MOVELS#SAID    W#SAIS
+     C                     MOVELS#SAID    W#SAIE
+     C                     ENDIF
+     C*
+     C                     MOVEL'00'      W#PRID
+     C                     MOVELS#YMS     U#YMS
+     C                     MOVELS#YME     U#YME
+     C                     MOVELS#AREA    U#AREA
+     C                     MOVELS#DEPT    U#DEPT
+     C                     MOVELS#SAID    U#SAID
+     C                     MOVELW#SAIS    U#SAIS
+     C                     MOVELW#SAIE    U#SAIE
+     C                     MOVELS#ORNO    U#ORNO
+     C                     MOVELS#KIND    U#KIND
+     C*
+     C                     ENDSR
+     C*****************************************************************
+** ERR
+０１－請輸入銷貨止日！
+０２－銷貨起日輸入錯誤！
+０３－銷貨止日輸入錯誤！
+０４－銷貨起日不可大於銷貨止日！
+０５－銷貨廠區輸入錯誤！
+０６－營業部門輸入錯誤！
+０７－該業務代號不存在！
+０８－該訂單編號不存在！
+

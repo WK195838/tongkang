@@ -1,0 +1,214 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR051R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LBU
+     H*            4.FUNCTION     折讓開立簽回彙總表（出表）
+     H*            5.DATE-WRITTEN  95/08/22
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR051F#IP  E                    DISK
+     FARR051T#O   E             69     PRINTER
+     I*****************************************************************
+     E                    TAB1    3   3  1   TAB2   10   *折讓種類
+     E*----------------------------------------------------------------
+     IAR051F#
+     I                                              TFFLAGL3
+     I                                              TFCUNOL2
+     I                                              TFACNTL1
+     I                                              TFNO  L1
+     I*
+     I           UDS
+     I                                        2   70T#YM
+     I                                       10  10 U#TYPE
+     I                                     10111020 DEVNM
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C  N99                EXSR INZ#01
+     C  N99                SETON                     99
+     C   L3                EXSR DL#L3
+     C   L2                EXSR DL#L2
+     C   L1                EXSR DL#L1
+     C                     EXSR DP#01
+     CL1 99                EXSR TL#L1
+     CL2 99                EXSR TL#L2
+     CL3 99                EXSR TL#L3
+     CLR 99                EXSR TL#LR
+     CLRN99                EXSR MSGSR
+     C*****************************************************************
+     C***        SET INITIAL
+     C*****************************************************************
+     CSR         INZ#01    BEGSR
+     C*
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C                     MOVE *ON       *IN69
+     C*
+     C                     Z-ADD0         W#AMT3 100       總折讓金額
+     C                     Z-ADD0         W#TAX3 100       總折讓稅額
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C*          DETAIL    PROCESS L3
+     C*****************************************************************
+     CSR         DL#L3     BEGSR
+     C*
+     C                     MOVELTFFLAG    T#AREA
+     C*
+     C                     SELEC
+     C           TFFLAG    WHEQ 'P'
+     C                     MOVEL'台北'  T#ARNM
+     C           TFFLAG    WHEQ 'T'
+     C                     MOVEL'桃園'  T#ARNM
+     C           TFFLAG    WHEQ 'K'
+     C                     MOVEL'高雄'  T#ARNM
+     C           TFFLAG    WHEQ 'L'
+     C                     MOVEL'林口'  T#ARNM
+     C           TFFLAG    WHEQ 'M'
+     C                     MOVEL'台中'  T#ARNM
+     C           TFFLAG    WHEQ 'H'
+     C                     MOVEL'苗栗'  T#ARNM
+     C                     OTHER
+     C                     MOVEL'　　'  T#ARNM
+     C                     ENDSL
+     C*
+     C                     MOVE *ON       *IN69
+     C                     Z-ADD0         W#AMT2 100       廠折讓金額
+     C                     Z-ADD0         W#TAX2 100       廠折讓稅額
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C*          DETAIL    PROCESS L2
+     C*****************************************************************
+     CSR         DL#L2     BEGSR
+     C*
+     C                     Z-ADD0         W#AMT1 100       客折讓金額
+     C                     Z-ADD0         W#TAX1 100       客折讓稅額
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C*          DETAIL    PROCESS L1
+     C*****************************************************************
+     CSR         DL#L1     BEGSR
+     C*
+     C                     Z-ADD0         W#SAMT 100       折讓金額
+     C                     Z-ADD0         W#STAX 100       折讓稅額
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C*          DETAIL    PROCESS
+     C*****************************************************************
+     CSR         DP#01     BEGSR
+     C*
+     C*折讓別小計
+     C*
+     C                     ADD  TFAMT     W#SAMT           折讓金額
+     C                     ADD  TFTAX     W#STAX           折讓稅額
+     C*
+     CSR         DP#01Z    ENDSR
+     C*****************************************************************
+     C**         TOTAL TIME L1 PROCESS
+     C*****************************************************************
+     CSR         TL#L1     BEGSR
+     C*
+     C                     CLEARAR051T1D
+     C*
+     C                     MOVELTFCUNO    T#CUNO           客戶代號
+     C                     MOVELTFCUNM    T#CUNM           客戶名稱
+     C                     MOVELTFNO      T#NO             折讓單號
+     C                     Z-ADDTFDATE    T#DATE           開立日期
+     C                     Z-ADDW#SAMT    T#AMT            金額
+     C                     Z-ADDW#STAX    T#TAX            稅額
+     C                     Z-ADDTFACDT    T#ACDT           簽回日期
+     C*
+     C           TFACNT    LOKUPTAB1      TAB2           55 *EQ
+     C  N55                MOVE *ALL'*'   T#TYPM           折讓種類
+     C   55                MOVE TAB2      T#TYPM
+     C*
+     C           T#CUNO    IFEQ W#CUNO
+     C                     MOVE *BLANK    T#CUNO
+     C                     MOVE *BLANK    T#CUNM
+     C                     ELSE
+     C                     MOVELT#CUNO    W#CUNO  6
+     C                     ENDIF
+     C*
+     C   69                WRITEAR051T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR051T1D
+     C*
+     C*客戶合計
+     C*
+     C                     ADD  W#SAMT    W#AMT1           折讓金額
+     C                     ADD  W#STAX    W#TAX1           折讓稅額
+     C*
+     CSR         TL#L1Z    ENDSR
+     C*****************************************************************
+     C**         TOTAL TIME L2 PROCESS
+     C*****************************************************************
+     CSR         TL#L2     BEGSR
+     C*
+     C                     Z-ADDW#AMT1    T#AMT1           折讓金額
+     C                     Z-ADDW#TAX1    T#TAX1           折讓稅額
+     C*
+     C   69                WRITEAR051T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR051T1T
+     C*
+     C*廠區合計
+     C*
+     C                     ADD  W#AMT1    W#AMT2           折讓金額
+     C                     ADD  W#TAX1    W#TAX2           折讓稅額
+     C*
+     CSR         TL#L2Z    ENDSR
+     C*****************************************************************
+     C**         TOTAL TIME L3 PROCESS
+     C*****************************************************************
+     CSR         TL#L3     BEGSR
+     C*
+     C                     Z-ADDW#AMT2    T#AMT2           折讓金額
+     C                     Z-ADDW#TAX2    T#TAX2           折讓稅額
+     C*
+     C   69                WRITEAR051T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR051T2T
+     C*
+     C*總合計
+     C*
+     C                     ADD  W#AMT2    W#AMT3           折讓金額
+     C                     ADD  W#TAX2    W#TAX3           折讓稅額
+     C*
+     CSR         TL#L3Z    ENDSR
+     C*****************************************************************
+     C**         TOTAL TIME LR PROCESS
+     C*****************************************************************
+     CSR         TL#LR     BEGSR
+     C*
+     C                     Z-ADDW#AMT3    T#AMT3           折讓金額
+     C                     Z-ADDW#TAX3    T#TAX3           折讓稅額
+     C*
+     C   69                WRITEAR051T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR051T3T
+     C*
+     CSR         TL#LRZ    ENDSR
+     C*****************************************************************
+     C**        查無資料函式
+     C*****************************************************************
+     CSR         MSGSR     BEGSR
+     C*
+     C                     EXSR INZ#01
+     C*
+     C   69                WRITEAR051T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR051T1M
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+**  TAB1 TAB2
+2銷貨退回3銷貨折讓4預收折讓
+

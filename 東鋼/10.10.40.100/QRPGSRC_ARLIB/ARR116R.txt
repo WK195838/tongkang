@@ -1,0 +1,176 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR116R1
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     請款別出貨及發票明細表─ＦＯＲ型鋼（先前處理）
+     H*          5.DATE-WRITTEN  93/06/10
+     H*          6.DATE-MODIFY   93/08/31 BY S02CSF
+     H*                         104/10/28 2015AR958 S00WCJ (0410A)
+     H*                         配合營業產品代碼擴檔修改
+     H*
+     H* 93/08/31新增欄位客戶代號。工程案號。出貨日期
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FINVMSTL5IP  E           K        DISK
+     FTRNDTLL2IF  E           K        DISK
+     FHSVOUR  IF  E           K        DISK
+     FHSMAST  IF  E           K        DISK
+     FHSDLVY  IF  E           K        DISK
+     FARR116F O   E           K        DISK
+     IINREC       01
+     I            DS
+     I                                        1  10 D#TXNO
+     I                                        1   1 D#AREA
+     I                                        2   3 D#VNO1
+     I                                        4   80D#VNO2
+     I            DS
+     I                                        1   7 S4SPE5
+     I                                        1   42D#SPE5
+     I            DS
+     I                                        1   9 D#ORN1
+     I                                        1   1 D#OREA
+     I                                        2   60D#ORNO
+     I                                        7   90D#ORTM
+0410AI            DS
+0410AI                                        1   5 S4NAME
+0410AI                                        4   4 D#PDN4
+     I            DS
+     I                                        1   9 S4DVNO
+     I                                        1   1 D#DVEA
+     I                                        2   60D#DVNO
+     I                                        7   90D#ITEM
+     C*****************************************************************
+     C*          KET  LIST
+     C*****************************************************************
+     C*FILE==>HSVOUR(成品磅單明細檔)
+     C           K#HSVR    KLIST
+     C                     KFLD           S4AREA
+     C                     KFLD           S4VNO1
+     C                     KFLD           S4VNO2
+     C                     KFLD           S4SQIT
+     C*FILE==>HSMAST(訂單主檔)
+     C           K#MAST    KLIST
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C                     KFLD           S1ORTM
+     C*FILE => HSDLVY(交貨通知單檔)
+     C           K#DLVA    KLIST
+     C                     KFLD           S2AREA
+     C                     KFLD           S2DVNO
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVEL*BLANK    W#TXNO  8
+     C                     MOVELINNO      TXIVNO
+     C           TXIVNO    SETLLTXREC
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ TXREC                    40
+     C   40                LEAVE
+     C*
+     C           TXIVNO    IFNE INNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           TXNO      IFNE W#TXNO
+     C                     MOVELTXNO      W#TXNO
+     C                     MOVELTXIVNO    A6INNO           發票號碼
+     C                     MOVELTXORNO    A6ORNO           訂單編號
+     C                     MOVELTXNO      A6VRNO           磅單編號
+     C                     Z-ADDTXITEM    A6VRTM           磅單項次
+     C                     MOVELTXPDNM    A6PDNM           品名
+     C                     Z-ADDTXDATE    A6DATE           出貨日期
+     C                     MOVELTXCUNO    A6CUNO           客戶代號
+     C                     MOVELTXCUNM    A6CUNM           客戶名稱
+     C                     EXSR SR1000                     找磅單
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C                     MOVELTXNO      D#TXNO
+     C                     MOVELD#AREA    S4AREA
+     C                     MOVELD#VNO1    S4VNO1
+     C                     Z-ADDD#VNO2    S4VNO2
+     C                     Z-ADD0         S4SQIT
+     C           K#HSVR    SETLLRHSVOUR
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ RHSVOUR                  41
+     C   41                LEAVE
+     C*
+     C           S4AREA    IFNE D#AREA
+     C           S4VNO1    ORNE D#VNO1
+     C           S4VNO2    ORNE D#VNO2
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVELS4ORNO    W#ORNO  6
+     C           W#ORNO    IFNE A6ORNO
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     Z-ADDS4SQIT    A6VRTM
+     C                     MOVELS4STND    A6STND
+     C                     MOVELS4QULT    A6QULT
+     C                     MOVELS4SPE1    A6SPE1
+     C                     MOVELS4SPE2    A6SPE2
+     C                     MOVELS4SPE3    A6SPE3
+     C                     MOVELS4SPE4    A6SPE4
+     C                     MOVELS4PNUM    A6PNUM
+     C           S4TYPE    IFEQ '0'                        *理論重
+     C                     Z-ADDS4STDW    A6WGHT
+     C                     ELSE
+     C                     Z-ADDS4NWGT    A6WGHT           *實重
+     C                     ENDIF
+     C           S4NAME    IFEQ '485'                      *理論重
+0410AC           D#PDN4    ANDEQ' '
+0410AC           S4NAME    OREQ '3458'
+0410AC           S4NAME    OREQ '3468'
+0410AC           S4NAME    OREQ '3478'
+     C           D#SPE5    DIV  10        A6SPE5
+     C                     ELSE
+     C                     Z-ADDD#SPE5    A6SPE5           *實重
+     C                     ENDIF
+     C*CHAIN單價
+     C                     MOVELS4ORNO    D#ORN1           *訂單編號
+     C                     MOVELD#OREA    S1OREA           *訂單編號
+     C                     Z-ADDD#ORNO    S1ORNO           *訂單編號
+     C                     Z-ADDD#ORTM    S1ORTM           *訂單編號
+     C           K#MAST    CHAINRHSMAST              60
+     C  N60                Z-ADDS1UPRC    A6UPRC    H
+     C  N60      A6WGHT    MULT S1UPRC    A6AMT     H
+     C  N60                Z-ADDS1ORTM    A6ORTM
+     C  N60                MOVELS1CTNO    A6CTNO           工程編號
+     C  N60                MOVELS1CTNM    A6CTNM           工程名稱
+     C*
+     C*CHAIN交貨地點
+     C                     MOVE D#DVEA    S2AREA
+     C                     MOVE D#DVNO    S2DVNO
+     C                     MOVE D#ITEM    S2ITEM
+     C           K#DLVA    CHAINRHSDLVY              42
+     C  N42                MOVE S2PLE1    A6PLE1
+     C   42                MOVE *BLANK    A6PLE1
+     C           A6PLE1    IFEQ *BLANK
+     C                     MOVELS4DEST    A6PLE1
+     C                     ENDIF
+     C  N60                MOVE S2MRK     A6NOTE
+     C   60                MOVE *BLANK    A6NOTE
+     C                     WRITERAR116F
+     C                     ENDDO
+     C*
+     C*
+     C                     ENDSR
+     C*****************************************************************
+

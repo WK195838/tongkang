@@ -1,0 +1,348 @@
+     H        1   Y                                     1                 BR003
+     FRCVDTL  IP  E                    DISK
+     FINVDTLL1IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FQPRINT  O   F     132            PRINTER
+      *************************************************************
+     I*************************************************************
+     IRVREC
+     I                                              RVCUNOL2
+     I                                              RVNO  L1
+     I****
+     IAADS        DS
+     I              'も票據票期分析表も'C         CON3                       X
+     I              'も預收票據票期分析-C         CON5                       X
+     I              '表も'
+     I              '東和鋼鐵企業股份有-C         CON4                       X
+     I              '限公司'
+     IBBDS        DS
+     I                                       21  260YMD
+     I                                       21  240YM
+     I                                       21  220YY
+     I                                       23  240MM
+     I                                       25  260DD
+     I           UDS
+     I                                        1   60DATE1
+     I                                        7  120DATE2
+     I                                       13  18 BCUNO
+     I                                       19  24 ECUNO
+     I                                       25  25 CODE
+     I                                       26  26 PRE
+     I                                      951 985 COMP
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C**************************************************************
+     C  N90                EXSR INZ#01
+     C  N90                SETON                     90
+     C   L2                EXSR DL#L2
+     C   L1                EXSR DL#L1
+     C  N95                EXSR DP#01
+     CL1N95                EXSR TL#L1
+     CL2                   EXSR TL#L2
+     CLR                   EXSR TL#LR
+     C**************************************************************
+     C*** SET INITIAL
+     CSR         INZ#01    BEGSR
+     C           IVKEY     KLIST
+     C                     KFLD           IVACNT
+     C                     KFLD           IVAPNO
+      *
+     C                     Z-ADD0         PAG     30
+     C                     Z-ADD80        LCNT    30
+     C                     Z-ADD60        TCNT    30
+     C                     MOVE *ALL'='   ALS   132
+     C                     MOVE *ALL'-'   ALQ    70
+     C                     Z-ADD0         KTOT   130
+     C                     Z-ADD0         LTOT   130
+     C           CODE      IFEQ ' '
+     C                     SETON                     51
+     C                     ELSE
+     C                     SETOF                     51
+     C                     ENDIF
+     C           PRE       IFEQ 'Y'
+     C                     SETON                     52
+     C                     ELSE
+     C                     SETOF                     52
+     C                     ENDIF
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS                                **
+     C**----------------------------------------------**
+     CSR         @CHKCT    BEGSR
+     C           LCNT      COMP TCNT                 75  75
+     C   75                ADD  1         PAG
+     C   75                EXCPTEH#01
+     C   75                Z-ADD8         LCNT
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS L2                             **
+     C**----------------------------------------------**
+     CSR         DL#L2     BEGSR
+     C                     Z-ADD0         GTOT   130
+     C                     Z-ADD0         JTOT   130
+     C                     Z-ADD0         CNT     20
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS L1                             **
+     C**----------------------------------------------**
+     CSR         DL#L1     BEGSR
+     C                     Z-ADD0         NTOT   110
+     C                     Z-ADD0         ITOT   110
+     C                     Z-ADD0         FTOT   130
+     C                     Z-ADD0         HTOT   130
+     C                     Z-ADD0         DUDT    60
+     C                     MOVEL'6'       IVACNT
+     C                     MOVELRVNO      IVAPNO
+     C           IVKEY     SETLLINVDTLL1             95
+     C           IVKEY     READEINVDTLL1                 95
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS                                **
+     C**----------------------------------------------**
+     CSR         DP#01     BEGSR
+     C                     ADD  RVRAMT    NTOT
+     C****
+     C                     Z-ADDRVRAMT    DEC9    90
+      *
+     C*                    CALL 'C04'
+     C*                    PARM           RVDATE
+     C*                    PARM           RVDUDT
+     C*                    PARM 0         DAYS    40
+     C*                    FREE 'C04'
+     C                     MOVE *ALL'0'   P#PDAT
+     C                     MOVE RVDATE    P#PDAT
+     C                     MOVE *ALL'0'   P#EDAT
+     C                     MOVE RVDUDT    P#EDAT
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT  8
+     C                     PARM           P#EDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM 0         P#DAY1  50
+     C                     PARM           P#ERR   1
+     C                     Z-ADDP#DAY1    DAYS    40
+     C****
+     C           RVDATE    IFGT RVDUDT
+     C           DAYS      MULT -1        DAYS
+     C                     ENDIF
+     C***
+     C           RVRAMT    MULT DAYS      TEMP1  130
+     C                     ADD  TEMP1     HTOT   130
+     C****
+     C                     ADD  1         LCNT
+     C                     EXSR @CHKCT
+     C   75                ADD  1         LCNT
+     C                     EXCPTED#01
+     CSR         DP#01Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME L1 PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#L1     BEGSR
+     C***
+     C           HTOT      DIV  NTOT      DAYS      H
+     C           DAYS      IFGE 0
+     C*                    Z-ADD2         C03I9
+     C                     MOVE 2         C03I9   1
+     C                     ELSE
+     C*                    Z-ADD1         C03I9
+     C                     MOVE 1         C03I9
+     C           DAYS      MULT -1        DAYS
+     C                     ENDIF
+     C**
+     C                     Z-ADDDAYS      DAY3    30
+     C*                    CALL 'C03'
+     C*                    PARM           RVDATE
+     C*                    PARM           DAY3
+     C*                    PARM           C03I9   10
+     C*                    PARM 0         DUDT    60
+     C*                    FREE 'C03'
+     C                     MOVE *ALL'0'   P#PDAT
+     C                     MOVE RVDATE    P#PDAT
+     C                     MOVE *ALL'0'   P#DAY2
+     C                     MOVE DAY3      P#DAY2
+     C                     MOVE *ALL'0'   P#RDAT
+     C                     CALL 'UTS104R'
+     C                     PARM           P#PDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM C03I9     P#OMOD  1
+     C                     PARM           P#DAY2  4
+     C                     PARM           P#RDAT  8
+     C                     PARM           P#ERR   1
+     C                     MOVE P#RDAT    W#RDAT  80
+     C                     Z-ADDW#RDAT    DUDT    60
+     C                     EXCPTED#AL
+     C****
+     C                     MOVEL'6'       IVACNT
+     C                     MOVELRVNO      IVAPNO
+     C           IVKEY     SETLLINVDTLL1             97
+     C           *IN97     DOWEQ'0'
+     C           IVKEY     READEINVDTLL1                 97
+     C   97                LEAVE
+     C           IVNO      CHAININVMST               31
+     C   31                ITER
+     C  N51      INTYPE    IFNE '2'
+     C                     ITER
+     C                     ENDIF
+     C   51N52   INTYPE    IFEQ '2'
+     C                     ITER
+     C                     ENDIF
+     C*                    CALL 'C04'
+     C*                    PARM           ININDT
+     C*                    PARM           DUDT
+     C*                    PARM 0         DAYS    40
+     C*                    FREE 'C04'
+     C                     MOVE *ALL'0'   P#PDAT
+     C                     MOVE ININDT    P#PDAT
+     C                     MOVE *ALL'0'   P#EDAT
+     C                     MOVE DUDT      P#EDAT
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT
+     C                     PARM           P#EDAT
+     C                     PARM '1'       P#MODE
+     C                     PARM 0         P#DAY1
+     C                     PARM           P#ERR
+     C                     Z-ADDP#DAY1    DAYS
+     C****
+     C                     Z-ADDIVAMT     IAMT    90
+     C                     ADD  IAMT      ITOT   110
+     C           IVAMT     MULT DAYS      TEMP   130
+     C                     ADD  TEMP      FTOT
+     C***
+     C                     ADD  1         LCNT
+     C                     EXSR @CHKCT
+     C   75                ADD  1         LCNT
+     C                     EXCPTET#L1
+     C                     ENDDO
+     C***
+     C           ITOT      IFEQ 0
+     C                     Z-ADDDAYS      AVD
+     C                     ELSE
+     C           FTOT      DIV  ITOT      AVD     40H
+     C                     ENDIF
+     C****
+     C           NTOT      MULT AVD       TEMP2  130
+     C                     ADD  TEMP2     GTOT
+     C                     ADD  NTOT      JTOT
+     C                     ADD  1         CNT
+     C                     ADD  3         LCNT
+     C                     EXSR @CHKCT
+     C   75                ADD  3         LCNT
+     C                     EXCPTET#01
+     CSR         TL#L1Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME L2 PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#L2     BEGSR
+     C                     ADD  GTOT      KTOT
+     C                     ADD  JTOT      LTOT
+     C           JTOT      IFEQ 0
+     C           CNT       ORLT 2
+     C                     GOTO TL#L2Z
+     C                     ENDIF
+     C***
+     C  N51      CNT       IFLT 2
+     C                     GOTO TL#L2Z
+     C                     ENDIF
+     C***
+     C           GTOT      DIV  JTOT      AVD1    40H
+     C****
+     C                     ADD  2         LCNT
+     C                     EXSR @CHKCT
+     C   75                ADD  2         LCNT
+     C                     EXCPTET#02
+     CSR         TL#L2Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME LR PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#LR     BEGSR
+     C***
+     C           KTOT      DIV  LTOT      AVD2    40H
+     C****
+     C                     EXCPTET#LR
+     CSR                   ENDSR
+      ***********************************************************
+      ****   DEFINE OUPUT FORMAT                             ****
+      ***********************************************************
+     OQPRINT  E   02           EH#01
+     O                 51                17 '報表編號: AR047'
+     O                N51                17 '報表編號: AR048'
+     O                         CON4      75                                    X
+     O                                  123 '製表日期'
+     O                                  124 ':'
+     O                         UDATE Y  132
+     O        E 1              EH#01
+     O                 51      CON3      65                                    X
+     O                N51      CON5      73                                    X
+     O                 51 52             79 '（包含預收）'
+     O                 51N52             79 '（不含預收）'
+     O                                  123 '頁　　次'
+     O                                  124 ':'
+     O                         PAG   Z  127
+     O        E 2              EH#01
+     O                                   11 '客戶編號:'
+     O                         BCUNO   +  1
+     O                                 +  1 '-'
+     O                         ECUNO   +  1
+     O                                   58 '繳款日期:'
+     O                         DATE1   +  1 '  /  /  '
+     O                                 +  1 '-'
+     O                         DATE2   +  1 '  /  /  '
+     O        E 1              EH#01
+     O                         ALS      132
+     O        E 1              EH#01
+     O                                   10 '客戶名稱'
+     O                                   20 '繳款單號'
+     O                                   30 '票據號碼'
+     O                                   40 '繳款日期'
+     O                                   50 '到期日期'
+     O                                   62 '票據金額'
+     O                                   72 '發票號碼'
+     O                                   82 '發票日期'
+     O                                   92 '請款日期'
+     O                                  104 '繳款金額'
+     O                                  114 '兌現天數'
+     O                                  132 '加權平均數'
+     O        E 1              EH#01
+     O                         ALS      132
+     O        E 1              ED#01
+     O                 L2      RVCUNM    10
+     O                 75      RVCUNM    10
+     O                 L1      RVNO      17
+     O                 75      RVNO      17
+     O                         RVNTNO    30
+     O                         RVDATE    39 '  /  /  '
+     O                         RVDUDT    49 '  /  /  '
+     O                         DEC9  1   61
+     O        E 00             ED#AL
+     O                                   81 '加權平均到期日:'
+     O                         DUDT      91 '  /  /  '
+     O        E 1              ET#L1
+     O                 75      RVCUNM    10
+     O                         IVNO      72
+     O                         ININDT    81 '  /  /  '
+     O                         INAPDT    91 '  /  /  '
+     O                         IAMT  1  103
+     O                         DAYS  1  110
+     O                         TEMP  1  131
+     O        E 1              ET#01
+     O                         ALQ      132
+     O        E 1              ET#01
+     O                                   85 '票據加權平均票期:'
+     O                         ITOT  1  103
+     O                         AVD   1  110
+     O                                  114 '天'
+     O                         FTOT  1  131
+     O        E 1              ET#01
+     O                         ALQ      132
+     O        E 1              ET#02
+     O                                   85 '客戶加權平均票期:'
+     O                         AVD1  1  110
+     O                                  114 '天'
+     O        E 1              ET#02
+     O                         ALQ      132
+     O        E 1              ET#LR
+     O                                   85 '　總加權平均票期:'
+     O                         AVD2  1  110
+     O                                  114 '天'
+     O        E 1              ET#LR
+     O                         ALQ      132
+

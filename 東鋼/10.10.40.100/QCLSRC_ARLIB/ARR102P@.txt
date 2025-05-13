@@ -1,0 +1,167 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR102P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02CSF                                    */
+        /*        4.FUNCTION      補運費發票開立檢核表                     */
+        /*        5.DATE-WRITTEN   91/12/26                                  */
+        /*        6.DATE-MODIFY                                              */
+        /*                                                                   */
+        /*********************************************************************/
+            PGM
+            DCLF       FILE(ARR102S)
+            DCL        VAR(&TYPE)   TYPE(*CHAR) LEN(1)
+            DCL        VAR(&CUN1)   TYPE(*CHAR) LEN(6)
+            DCL        VAR(&CUN2)   TYPE(*CHAR) LEN(6)
+            DCL        VAR(&C_WTD1) TYPE(*CHAR) LEN(6)
+            DCL        VAR(&C_WTD2) TYPE(*CHAR) LEN(6)
+            DCL        VAR(&W#WTD1) TYPE(*CHAR) LEN(8)  /*出貨起日暫存*/
+            DCL        VAR(&W#WTD2) TYPE(*CHAR) LEN(8)  /*出貨止日暫存*/
+            DCL        VAR(&W#FLAG) TYPE(*CHAR) LEN(1)
+            DCL        VAR(&P#PDAT) TYPE(*CHAR) LEN(8)  /*輸入日期*/
+            DCL        VAR(&P#MODE) TYPE(*CHAR) LEN(1)  /*年份別*/
+            DCL        VAR(&P#MTL)  TYPE(*CHAR) LEN(24) /*月日數*/
+            DCL        VAR(&P#LEAP) TYPE(*CHAR) LEN(1)  /*閏年碼*/
+
+            RTVJOBA    JOB(&S#DEVN) USER(&S#USER) +
+                       TYPE(&TYPE)
+
+            IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+            RTVSYSVAL  SYSVAL(QDATE)  RTNVAR(&S#WTD2)
+
+ START:     SNDRCVF
+
+            CHGVAR     VAR(&IN30)      VALUE('0')
+            CHGVAR     VAR(&IN31)      VALUE('0')
+            CHGVAR     VAR(&IN32)      VALUE('0')
+            CHGVAR     VAR(&S#ERR)     VALUE(*BLANK)
+
+            IF         COND(&IN03 *EQ '1') THEN(RETURN)
+            IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+  /*  CHECK 出貨起日*/
+            IF         COND(&S#WTD1 *EQ ' ' ) THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('請輸入出貨起日')
+            CHGVAR     VAR(&IN30)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+  /*  CHECK 出貨止日*/
+            IF         COND(&S#WTD2 *EQ ' ' ) THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('請輸入出貨止日')
+            CHGVAR     VAR(&IN31)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+            IF         COND(&S#WTD1 *GT &S#WTD2) THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('出貨起日不可大於出貨止日')
+            CHGVAR     VAR(&IN30)      VALUE('1')
+            CHGVAR     VAR(&IN31)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+            CHGDTAARA  DTAARA(*LDA (400 2))   VALUE('  ')
+            CHGDTAARA  DTAARA(*LDA (402 6))   VALUE(&S#WTD1)
+            RTVDTAARA  DTAARA(*LDA (400 8))   RTNVAR(&W#WTD1)
+            CHGVAR     VAR(&P#PDAT)    VALUE(&W#WTD1)
+            CHGVAR     VAR(&P#MODE)    VALUE('1')
+            CALL       PGM(UTS102R)    PARM(&P#PDAT &P#MODE +
+                                            &P#MTL  &P#LEAP &W#FLAG)
+            IF         COND(&W#FLAG *NE '0') THEN(DO)
+            CHGVAR     VAR(&IN30)      VALUE('1')
+            CHGVAR     VAR(&S#ERR)     VALUE('出貨起日錯誤！')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+  /*  CHECK 列印時是否包含已開發票*/
+            IF         COND(&S#CODE *EQ ' ' ) THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('請輸入列印時是否包含已開發票碼')
+            CHGVAR     VAR(&IN32)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+            CHGDTAARA  DTAARA(*LDA (408 2))   VALUE('  ')
+            CHGDTAARA  DTAARA(*LDA (410 6))   VALUE(&S#WTD2)
+            RTVDTAARA  DTAARA(*LDA (408 8))   RTNVAR(&W#WTD2)
+            CHGVAR     VAR(&P#PDAT)    VALUE(&W#WTD2)
+            CHGVAR     VAR(&P#MODE)    VALUE('1')
+            CALL       PGM(UTS102R)    PARM(&P#PDAT &P#MODE +
+                                            &P#MTL  &P#LEAP &W#FLAG)
+            IF         COND(&W#FLAG *NE '0') THEN(DO)
+            CHGVAR     VAR(&IN31)      VALUE('1')
+            CHGVAR     VAR(&S#ERR)     VALUE('出貨止日錯誤！')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+  /*  CHECK 客戶代號*/
+            IF         COND(&S#CUNO *EQ ' ') THEN(DO)
+            CHGVAR     VAR(&CUN1)     VALUE('      ')
+            CHGVAR     VAR(&CUN2)     VALUE('999999')
+            ENDDO
+            ELSE (DO)
+            CHGVAR     VAR(&CUN1)     VALUE(&S#CUNO)
+            CHGVAR     VAR(&CUN2)     VALUE(&S#CUNO)
+            ENDDO
+
+            CHGDTAARA   DTAARA(*LDA  (300  6))  VALUE(&S#WTD1)
+            CHGDTAARA   DTAARA(*LDA  (306  6))  VALUE(&S#WTD2)
+            CHGDTAARA   DTAARA(*LDA  (312  6))  VALUE(&CUN1)
+            CHGDTAARA   DTAARA(*LDA  (318  6))  VALUE(&CUN2)
+            CHGDTAARA   DTAARA(*LDA  (324  1))  VALUE(&S#CODE)
+
+            SBMJOB     CMD(CALL PGM(ARR102P)) JOB(ARR102P) +
+                          JOBD(ARJOBD)
+            SNDBRKMSG  MSG('<<補運費發票開立檢核表+
+                             ,已開始處理，請稍待　....>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+            RETURN
+ BATCH:
+          RTVDTAARA   DTAARA(*LDA (300 6))  RTNVAR(&C_WTD1)
+          RTVDTAARA   DTAARA(*LDA (306 6))  RTNVAR(&C_WTD2)
+          RTVDTAARA   DTAARA(*LDA (312 6))  RTNVAR(&CUN1)
+          RTVDTAARA   DTAARA(*LDA (318 6))  RTNVAR(&CUN2)
+          RTVDTAARA   DTAARA(*LDA (324 1))  RTNVAR(&S#CODE)
+
+  /*     開始處理      */
+       /*      STEP1:先前處理 */
+          OVRDBF     FILE(ARDLWT) TOFILE(ARDLWT)
+          CALL       ARR102R
+          DLTOVR     FILE(*ALL)
+
+       /*      STEP2:出  表 */
+          OVRPRTF    FILE(ARR102T) TOFILE(ARLIB/ARR102T) +
+                     PAGESIZE(*N 132) CPI(10) HOLD(*YES) +
+                     USRDTA('補運費')
+          OVRDBF     FILE(ARDLWT) TOFILE(ARDLWT) SHARE(*YES)
+
+          IF         COND(&S#CODE *EQ 'N') THEN( +
+          OPNQRYF    FILE(ARDLWT) OPTION(*ALL) QRYSLT(' +
+                         (AWCOD3    *EQ " ") *AND +
+                         (AWIVNO    *EQ " ") *AND +
+                         (AWCUNO    *GE "' || &CUN1   || '") *AND +
+                         (AWCUNO    *LE "' || &CUN2   || '") *AND +
+                         (WTD1      *GE "' || &C_WTD1 || '") *AND +
+                         (WTD1      *LE "' || &C_WTD2 || '")') +
+                     KEYFLD((AWWTDT) (AWCUNO))  +
+                     MAPFLD((WTDT  AWWTDT *CHAR 8) +
+                            (WTD1  '%SST(WTDT  3 6)' *CHAR 6)))
+          ELSE         CMD( +
+          OPNQRYF    FILE(ARDLWT) OPTION(*ALL) QRYSLT(' +
+                         (AWCOD3    *EQ " ") *AND +
+                         (AWCUNO    *GE "' || &CUN1   || '") *AND +
+                         (AWCUNO    *LE "' || &CUN2   || '") *AND +
+                         (WTD1      *GE "' || &C_WTD1 || '") *AND +
+                         (WTD1      *LE "' || &C_WTD2 || '")') +
+                     KEYFLD((AWWTDT) (AWCUNO))  +
+                     MAPFLD((WTDT  AWWTDT *CHAR 8) +
+                            (WTD1  '%SST(WTDT  3 6)' *CHAR 6)))
+          CALL       ARR102R1
+          CLOF       OPNID(ARDLWT)
+          DLTOVR     FILE(*ALL)
+          SNDBRKMSG  MSG('<< 補運費發票開立檢核表　+
+                            已處理完成，請列印......>>') +
+                     TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+         ENDPGM
+

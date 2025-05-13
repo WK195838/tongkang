@@ -1,0 +1,118 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR085R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     他廠出貨本廠開立發票明細表(處理)
+     H*            5.DATE-WRITTEN  89/04/08
+     H*
+     H*  說明：將符合條件的資料寫入TRNDTLX
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FTRNDTLX UF  E           K        DISK                      A
+     F            TXREC                             KRENAMETXRECX
+     ITXREC       01
+     ITXRECX
+     I              TXCODE                          F#CODE
+     I              TXNO                            F#NO
+     I              TXCUNO                          F#CUNO
+     I              TXCUNM                          F#CUNM
+     I              TXITEM                          F#ITEM
+     I              TXDATE                          F#DATE
+     I              TXORNO                          F#ORNO
+     I              TXPDNM                          F#PDNM
+     I              TXUPRC                          F#UPRC
+     I              TXQTY                           F#QTY
+     I              TXAMT                           F#AMT
+     I              TXIVNO                          F#IVNO
+     I              TXACDT                          F#ACDT
+     I              TXTXAR                          F#TXAR
+     I              TXTAX                           F#TAX
+     I              TXPCNO                          F#PCNO
+     I            DS
+     I                                        1   60D#DATE
+     I                                        1   40D#DAT1
+     I            DS
+     I                                        1   8 D#NO
+     I                                        1   1 D#AREA
+     I                                        1   6 D#TEST
+     C*****************************************************************
+     C           K#NDTL    KLIST
+     C                     KFLD           TXCODE
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+     C*****************************************************************
+     C*              MAIN  PROGRAM
+     C*****************************************************************
+     C           TXNO      IFEQ 'M01554'
+     C                     Z-ADD0         W#TMP   10
+     C                     ENDIF
+     C*
+     C  N99                MOVE *BLANK    W#NO    8
+     C   99                MOVE *ON       *IN99
+     C                     MOVE *ON       *IN41
+     C                     CLEARTXRECX
+     C           K#NDTL    CHAINTXRECX               40
+     C           TXCODE    IFEQ 'SA04'
+     C                     MOVE TXNO      D#NO             磅單號
+     C                     ELSE
+     C                     MOVE TXPCNO    D#NO             磅單號
+     C                     ENDIF
+     C                     MOVE TXCODE    F#CODE
+     C                     MOVE TXNO      F#NO             磅單號
+     C                     Z-ADDTXITEM    F#ITEM           項次
+     C                     MOVE TXCUNO    F#CUNO           客戶編號
+     C                     MOVE TXCUNM    F#CUNM           客戶名稱
+     C                     Z-ADDTXDATE    F#DATE           單據日期
+     C                     MOVE TXPDNM    F#PDNM           品名
+     C                     Z-ADDTXUPRC    F#UPRC           單價
+     C                     Z-ADDTXQTY     F#QTY            數量
+     C                     Z-ADDTXAMT     F#AMT            金額
+     C                     MOVE TXIVNO    F#IVNO           發票號碼
+     C                     MOVE TXPCNO    F#PCNO
+     C                     Z-ADDTXDATE    D#DATE
+     C                     Z-ADDD#DAT1    W#DAT1  40
+     C           TXIVNO    CHAININREC                41
+     C  N41                Z-ADDININDT    D#DATE
+     C  N41                Z-ADDD#DAT1    W#DAT2  40
+     C           *IN41     IFEQ *OFF
+     C           D#AREA    ANDNEINAREA
+     C           INDECD    ANDNE'D'
+     C           W#DAT1    ANDEQW#DAT2
+     C                     MOVE INAREA    F#TXAR           開立廠區
+     C                     Z-ADDININDT    F#ACDT           開立日期
+     C                     Z-ADDINAAMT    F#TAX            發票金額
+9008 C                     MOVELINORNO    F#ORNO           訂單號碼
+     C*
+     C*台北桃園視為同廠區
+     C           D#AREA    IFEQ 'T'
+     C           F#TXAR    ANDEQ'P'
+     C                     MOVE *ON       *IN50
+     C                     ELSE
+ 9303C                     MOVE *OFF      *IN50
+     C                     ENDIF
+     C*
+     C           TXCODE    IFEQ 'AR05'
+     C           TXNO      IFNE W#NO
+     C                     MOVE TXNO      W#NO
+     C   40N50             WRITETXRECX
+     C  N40N50             UPDATTXRECX
+     C                     ENDIF
+     C                     ELSE
+     C   40N50             WRITETXRECX
+     C  N40N50             UPDATTXRECX
+     C                     ENDIF
+     C*
+     C                     ENDIF                            IN41
+     C*
+     CLR                   RETRN
+     C*****************************************************************
+     C           WTRSR     BEGSR
+     C*****************************************************************
+     C                     ENDSR
+

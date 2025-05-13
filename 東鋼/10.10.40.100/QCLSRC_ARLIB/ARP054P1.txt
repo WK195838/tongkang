@@ -1,0 +1,90 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP054P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     查核發票主檔與明細檔之金額是否相符     */
+     /*     5.DATE-WRITTEN  86/12/31                                */
+     /*                                                             */
+     /*    <說明>: 本作業檢核發票主檔之各項金額彙總結論與相對之 */
+     /*            發票明細檔內的各項金額彙總，兩者是否相同。將 */
+     /*              不同的發票號碼印出。                         */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)     TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&W#SQLS)  TYPE(*CHAR)  LEN(100)
+             DCLF       FILE(ARP054S)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+ INPUT:
+             SNDRCVF
+             CHGVAR     VAR(&S#MSG1) VALUE(' ')
+
+             IF         COND(&IN03 *EQ '1' *OR &IN12 *EQ '1') +
+                        THEN(RETURN)
+
+             IF         COND(&S#CUNO *NE '      ' *AND +
+                             &S#ORNO *NE '     ') THEN(DO)
+             CHGVAR     VAR(&S#MSG1) VALUE('請指定一個條件即可。')
+             GOTO       INPUT
+             ENDDO
+
+             CHGDTAARA  DTAARA(*LDA ( 1 6)) VALUE(&S#CUNO)
+             CHGDTAARA  DTAARA(*LDA (11 5)) VALUE(&S#ORNO)
+             SBMJOB     JOB(ARP054P) JOBD(ARJOBD) JOBQ(QCTL) +
+                        OUTQ(&OUTQ) RQSDTA('CALL ARP054P')
+             RETURN
+
+
+ BATCH:
+             CHGJOB  RUNPTY(25)  /* 調高處理權限 */
+             MONMSG  CPF0000
+
+             OVRPRTF    FILE(ARP054T) TOFILE(ARLIB/ARP054T) +
+                        HOLD(*YES) USRDTA('發票不同')
+             OVRDBF     FILE(INVDTL) TOFILE(DALIB/INVDTL)
+             OVRDBF     FILE(INVMST) TOFILE(DALIB/INVMSTL2) SHARE(*YES)
+
+             RTVDTAARA  DTAARA(*LDA ( 1 6)) RTNVAR(&S#CUNO)
+             RTVDTAARA  DTAARA(*LDA (11 5)) RTNVAR(&S#ORNO)
+
+             CHGVAR     VAR(&W#SQLS) VALUE(' ')
+             IF         COND(&S#CUNO *NE ' ') THEN(DO)
+             CHGVAR     VAR(&W#SQLS) +
+                        VALUE('INCUNO *EQ "' || &S#CUNO || '"')
+             ENDDO
+
+             IF         COND(&S#ORNO *NE ' ') THEN(DO)
+                IF      COND(&W#SQLS *EQ ' ') THEN(+
+                CHGVAR  VAR(&W#SQLS) +
+                        VALUE('INORNO *EQ "' || &S#ORNO || '"'))
+                ELSE    CMD(+
+                CHGVAR  VAR(&W#SQLS) +
+                        VALUE(&W#SQLS || ' *AND ' || +
+                              'INORNO *EQ "' || &S#ORNO || '"'))
+             ENDDO
+
+             IF         COND(&W#SQLS *NE ' ') THEN(DO)
+             OPNQRYF    FILE(INVMST) +
+                        QRYSLT(&W#SQLS) +
+                        KEYFLD((INORNO))
+             CALL       ARP054R
+             CLOF       OPNID(INVMST)
+             ENDDO
+
+             ELSE       CMD(CALL ARP054R)
+
+             DLTOVR     FILE(*ALL)
+
+             RETURN
+             ENDPGM
+

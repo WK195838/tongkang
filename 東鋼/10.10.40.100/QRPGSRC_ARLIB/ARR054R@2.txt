@@ -1,0 +1,217 @@
+     H        1   Y                                     1                 BR003
+     FARSTWF  IP  E                    DISK
+     FQPRINT  O   F     132            PRINTER
+8909 FBSYSDT  IF  E           K        DISK
+      *************************************************************
+     IASREC
+     I                                              ASCUNML3
+     I                                              ASORNOL2
+     I                                              ASRVIDL1
+     I****
+     IAADS        DS
+     I              'も應收帳款明細表も'C         CON3                       X
+     I              '東和鋼鐵企業股份有-C         CON4                       X
+     I              '限公司'
+      *
+     IBBDS        DS
+     I                                       21  260YMD
+     I                                       21  240YM
+     I                                       21  220YY
+     I                                       23  240MM
+     I                                       25  260DD
+     I           UDS
+     I                                        1   40YMA
+     I                                      951 985 COMP
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C**************************************************************
+     C  N90                EXSR INZ#01
+     C  N90                SETON                     90
+     C   L3                EXSR DL#L3
+     C   L2                EXSR DL#L2
+     C   L1                EXSR DL#L1
+     C                     EXSR DP#01
+     C*
+     CL1                   EXSR TL#L1
+     CL2                   EXSR TL#L2
+     CL3                   EXSR TL#L3
+     CLR                   EXSR TL#LR
+     C**************************************************************
+     C*** SET INITIAL
+     CSR         INZ#01    BEGSR
+     C                     Z-ADD0         PAG     30
+     C                     Z-ADD80        LCNT    30
+     C                     Z-ADD0         HAMT4  100
+     C                     Z-ADD0         HAMT5  100
+     C                     Z-ADD0         HAMT6  100
+     C                     Z-ADD55        OVRFLW  30
+     C                     MOVE *ALL'='   ALS   132
+     C                     MOVE *ALL'-'   ALQ    70
+     C                     MOVE *ALL'*'   ALP    70
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS                                **
+     C**----------------------------------------------**
+     CSR         @CHKCT    BEGSR
+     C           LCNT      COMP OVRFLW               75  75
+     C   75                ADD  1         PAG
+     C   75                EXCPTEH#01
+     C   75                Z-ADD10        LCNT
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS L3                             **
+     C**----------------------------------------------**
+     CSR         DL#L3     BEGSR
+     C                     Z-ADD0         GAMT4   90
+     C                     Z-ADD0         GAMT5   90
+     C                     Z-ADD0         GAMT6   90
+     C*                    Z-ADDOVRFLW    LCNT
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS L1                             **
+     C**----------------------------------------------**
+     CSR         DL#L1     BEGSR
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS L2                             **
+     C**----------------------------------------------**
+     CSR         DL#L2     BEGSR
+     C                     Z-ADD0         FAMT4   90
+     C                     Z-ADD0         FAMT5   90
+     C                     Z-ADD0         FAMT6   90
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS                                **
+     C**----------------------------------------------**
+     CSR         DP#01     BEGSR
+8909 C* 890905  排除催收款
+ .   C           ASIVNO    CHAINYSREC                40
+ .   C           *IN40     IFEQ *ON
+ .   C           YSCODE    OREQ ' '
+     C                     Z-ADDASAAMT    TAMTP   80
+     C                     Z-ADDASBAMT    TAMT0   70
+     C                     Z-ADDASCAMT    TAX     70
+     C                     Z-ADDASDAMT    TAMT1   80
+     C                     Z-ADDASEAMT    TAMT2   80
+     C                     Z-ADDASFAMT    TAMT4   80
+     C                     Z-ADDASGAMT    TAMT5   80
+     C                     Z-ADDASHAMT    TAMT6   80
+      *
+     C                     ADD  1         LCNT
+     C                     EXSR @CHKCT
+     C   75                ADD  1         LCNT
+     C                     EXCPTED#01
+      *
+     C                     ADD  TAMT4     GAMT4
+     C                     ADD  TAMT5     GAMT5
+     C                     ADD  TAMT6     GAMT6
+     C                     ADD  TAMT4     FAMT4
+     C                     ADD  TAMT5     FAMT5
+     C                     ADD  TAMT6     FAMT6
+     C                     ADD  TAMT6     HAMT6
+8909 C                     ENDIF
+     CSR         DP#01Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME L2 PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#L2     BEGSR
+     C                     EXCPTET#L1
+     C                     ADD  3         LCNT
+     CSR         TL#L2Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME L1 PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#L1     BEGSR
+     CSR         TL#L1Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME L3 PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#L3     BEGSR
+     C                     EXCPTET#L2
+     C                     ADD  2         LCNT
+     CSR         TL#L3Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME LR PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#LR     BEGSR
+     C                     EXCPTET#LR
+     CSR         TL#LRZ    ENDSR
+      ***********************************************************
+      ****   DEFINE OUPUT FORMAT                             ****
+      ***********************************************************
+     OQPRINT  E   03           EH#01
+     O                                   17 '報表編號: AR054'
+     O                         CON4      75                                    X
+     O                                  123 '製表日期'
+     O                                  124 ':'
+     O                         UDATE Y  132
+     O        E 1              EH#01
+     O                         CON3      71                                    X
+     O                                  123 '頁　　次'
+     O                                  124 ':'
+     O                         PAG   Z  127
+     O        E 2              EH#01
+     O                                   11 '截止年月:'
+     O                         YMA     +  1 '  /  '
+     O        E 1              EH#01
+     O                         ALS      132
+     O        E 1              EH#01
+     O                                   16 '客戶'
+     O                                   22 '訂單'
+     O                                   96 '銷退／　'
+     O        E 1              EH#01
+     O                                   10 '客戶名稱'
+     O                                   16 '編號'
+     O                                   22 '號碼'
+     O                                   28 '業務'
+     O                                   38 '發票號碼'
+     O                                   50 '貨　款'
+     O                                   60 '扣預收款'
+     O                                   72 '銷項稅額'
+     O                                   84 '發票金額'
+     O                                   96 '折讓金額'
+     O                                  108 '應收貨款'
+     O                                  120 '已收金額'
+     O                                  132 '應收帳款'
+     O        E 1              EH#01
+     O                         ALS      132
+     O        E 1              ED#01
+     O                 L3      ASCUNM    10
+     O                 75      ASCUNM    10
+     O                 L3      ASCUNO    16
+     O                 75      ASCUNO    16
+     O                 L2      ASORNO    22
+     O                 75      ASORNO    22
+     O                 L1      ASRVID    26
+     O                 75      ASRVID    26
+     O                         ASIVNO    38
+     O                         TAMTP O   50
+     O                         TAMT0 O   62
+     O                         TAX   O   72
+     O                         TAMT1 O   84
+     O                         TAMT2 O   96
+     O                         TAMT4 O  108
+     O                         TAMT5 O  120
+     O                         TAMT6 O  132
+     O        E 1              ET#L1
+     O                         ALQ      132
+     O        E 1              ET#L1
+     O                                   82 '訂單小計：'
+     O                         FAMT4 O  108
+     O                         FAMT5 O  120
+     O                         FAMT6 O  132
+     O        E 1              ET#L1
+     O                         ALQ      132
+     O        E 1              ET#L2
+     O                                   82 '客戶小計：'
+     O                         GAMT4 O  108
+     O                         GAMT5 O  120
+     O                         GAMT6 O  132
+     O        E 1              ET#L2
+     O                         ALP      132
+     O        E 1              ET#LR
+     O                                  110 '應收帳款總計：'
+     O                         HAMT6 O  132
+     O        E 1              ET#LR
+     O                         ALQ      132
+

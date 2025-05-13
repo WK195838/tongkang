@@ -1,0 +1,133 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARI049R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     客戶訂單暫收款查詢 (財會)
+     H*            5.DATE-WRITTEN  91/04/01
+     H*            6.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARI049S CF  E                    WORKSTN
+     F                                        RRN1  KSFILE AR049F1
+     FAR2159X IF  E           K        DISK
+     E                    ERR     1   2 70               *錯誤訊息
+     I           UDS
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVI
+     C*****************************************************************
+     C*        KEY   LIST
+     C*****************************************************************
+     C*FILE => AR2159X
+     C           K#2159    KLIST
+     C                     KFLD           AXCUNO           客戶代號
+     C                     KFLD           AXORNO           訂單編號
+     C*****************************************************************
+     C*        MAIN  PROGRAM
+     C*****************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVE *ALL'='   S#LIN3
+     C                     MOVE '01'      W#PRID  2
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->ARI049S-1畫面
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN74             SFLCLR
+     C                     WRITEAR049F1C
+     C                     MOVE *OFF      *IN74             SFLCLR
+     C*
+     C                     Z-ADD0         RRN1    40
+     C                     MOVE S#KEY1    AXCUNO
+     C                     MOVE *LOVAL    AXORNO
+     C           K#2159    SETLLRAR2159X
+     C                     EXSR SR1100                     讀入資料
+     C*
+     C           W#PRID    DOWEQ'01'
+     C*
+     C           RRN1      IFEQ 0
+     C                     MOVE *ON       *IN72
+     C                     MOVE ERR,1     S#ERR1
+     C                     ELSE
+     C                     MOVE *OFF      *IN72
+     C                     ENDIF
+     C*
+     C                     WRITEAR049H
+     C                     WRITEAR049F1M
+     C                     EXFMTAR049F1C
+     C                     MOVE *BLANK    S#ERR1
+     C*IN03 IN12
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*列印
+     C           *IN05     IFEQ *ON
+     C                     CALL 'ARI049R2'
+     C                     MOVE ERR,2     S#ERR1
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RAR2159X                 40
+     C   40                LEAVE
+     C*
+     C           AXAMT     IFEQ 0
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE AXCUNO    S#CUNO
+     C                     MOVE AXCUNM    S#CUNM
+     C                     MOVELAXORNO    W#ORNO  1
+9105 C*
+     C           W#ORNO    IFGE 'A'
+     C           W#ORNO    ANDLE'Z'
+     C                     MOVELAXORNO    S#ORNO
+     C                     ELSE
+     C                     MOVE *BLANK    S#ORNO
+     C                     ENDIF
+     C                     Z-ADDAXAMT     S#AMT
+     C           AXMODE    IFEQ '1'
+     C                     MOVE '營業'  S#MODE
+     C                     ELSE
+     C                     MOVE '非營業'S#MODE
+     C                     ENDIF
+     C                     ADD  1         RRN1
+     C                     WRITEAR049F1
+     C                     ENDDO
+     C*
+     C           RRN1      IFGT 0
+     C                     Z-ADD1         S#NBR1
+     C                     ENDIF
+     C*
+     C                     ENDSR
+**  ERR
+01-資料不存在！
+02-財會暫收報表已送至批次佇列執行。
+

@@ -1,0 +1,115 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARR143R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION    反傾銷用計算銷貨之平均收款日
+     H*            5.DATE-WRITTEN  105/09/02 S00WCJ
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTLLDIP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FRCVDTL  IF  E           K        DISK
+     FARR143F1O   E           K        DISK
+     ITXREC       01
+     I                                              TXNO  L1
+     I*
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10011010 D#USER
+     I                                     10011001 D#DEPT
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C*****************************************************************
+     C*          Parameter List
+     C*****************************************************************
+     C*傳入執行之日期區間
+     C*
+     C           *ENTRY    PLIST
+     C                     PARM           D#DATS  8
+     C                     PARM           D#DATE  8
+     C*
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C  N99                EXSR SR0000
+     C   01                EXSR SR1000
+     CL1 99                EXSR SR2000
+     CLR                   RETRN
+     C*
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*
+     C           *DATE     SUB  19000000  W#DATE  80
+     C                     Z-ADD0         W#TXAM 110
+     C                     CLEARRAR143F1
+     C                     MOVEL*ON       *IN99
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C                     ADD  TXAMT     W#TXAM
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*
+     C                     MOVELTXCUNO    A1CUNO           客戶編號
+     C                     MOVELTXCUNM    A1CUNM           客戶簡稱
+     C                     MOVELTXORNO    A1ORNO           訂單號碼
+     C                     MOVELTXCODE    A1TXCD           單據類別
+     C                     MOVELTXNO      A1TXNO           磅單編號
+     C                     Z-ADDTXDATE    A1TXDT           磅單日期
+     C                     Z-ADDW#TXAM    A1TXAM           出貨金額
+     C                     MOVELTXIVNO    A1INNO           發票號碼
+     C           TXIVNO    CHAININREC                55
+     C           *IN55     IFEQ *OFF
+     C                     MOVELINAPNO    A1APNO           請款單號
+     C                     MOVELINRCNO    A1RVNO           繳款單號
+     C                     Z-ADDINRCDT    A1RVDT           繳款日期
+     C                     ENDIF
+     C           INRCNO    SETLLRVREC
+     C                     MOVEL*OFF      *IN55
+     C           *IN55     DOWEQ*OFF
+     C           INRCNO    READERVREC                    55
+     C   55                LEAVE
+     C           RVFLAG    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C           RVACTP    IFNE 'D'
+     C                     ITER
+     C                     ENDIF
+     C           RVDUDT    IFNE 0
+     C                     Z-ADDRVDUDT    A1RVLD           繳款最後兌現日
+     C                     ELSE
+     C                     Z-ADDRVDATE    A1RVLD
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           A1RVLD    IFNE 0
+     C                     MOVE A1TXDT    P#DAT1  8
+     C                     MOVE A1RVLD    P#DAT2  8
+     C                     CALL 'UTS103R'
+     C                     PARM           P#DAT1
+     C                     PARM           P#DAT2
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM 0         P#RTND  50
+     C                     PARM           P#ERR   1
+     C                     Z-ADDP#RTND    A1DELY           收款天數
+     C                     ENDIF
+     C*
+     C                     MOVELD#USER    A1ENTM           執行人員
+     C                     MOVE W#DATE    A1ENTD           執行日期
+     C                     TIME           A1ENTT           執行時間
+     C                     WRITERAR143F1
+     C                     Z-ADD0         W#TXAM
+     C                     CLEARRAR143F1
+     C                     ENDSR
+     C*****************************************************************
+

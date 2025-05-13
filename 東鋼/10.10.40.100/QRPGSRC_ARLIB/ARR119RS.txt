@@ -1,0 +1,218 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR119RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     折讓單開立統計表
+     H*            5.DATE-WRITTEN  94/07/22
+     H*            6.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR119S CF  E                    WORKSTN
+     FCBCUST  IF  E           K        DISK
+     E*************************************************************
+     E                    ERR     1   7 70
+     I*************************************************************
+     I           UDS
+     I                                     10011010 S#USID
+     I                                     10111020 S#DEVN
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C                     PARM           P#ARE1  1
+     C                     PARM           P#ARE2  1
+     C                     PARM           P#CUN1  6
+     C                     PARM           P#CUN2  6
+     C                     PARM           P#DAT1  8
+     C                     PARM           P#DAT2  8
+     C                     PARM           P#ACN1  1
+     C                     PARM           P#ACN2  1
+     C                     PARM           P#RES1  1
+     C                     PARM           P#RES2  1
+     C**************************************************************
+     C*          KEY  LIST
+     C**************************************************************
+     C*FILE==>ACCTRL(傳票程序控制檔)
+     C*          K#AC      KLIST
+     C*                    KFLD           AAAREA            廠區別
+     C*                    KFLD           AAYYMM            年月
+     C*                    KFLD           AAFSYS            作業來源
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C                     EXSR SR0000                     初始程式
+     C*
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C           SR0000    BEGSR
+     C**************************************************************
+     C                     MOVEL'01'      W#PRID  2        畫面一
+     C*
+     C                     ENDSR
+     C**************************************************************
+     C           SR1000    BEGSR
+     C**************************************************************
+     C*W#PRID='01'-->畫面一
+     C           W#PRID    DOWEQ'01'
+     C                     EXFMTAR119F1                    螢幕輸入
+     C                     MOVEL*BLANK    S#ERR
+     C*
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03           回前畫面
+     C                     MOVEL'00'      W#PRID           結束
+     C                     LEAVE
+     C                     ENDIF
+     C*檢核
+     C                     EXSR SR1100                     檢核
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         SR1100    BEGSR
+     C**************************************************************
+     C                     MOVE *OFF      *IN99
+     C                     MOVEA'000000'  *IN,30
+     C*
+     C           S#AREA    IFNE *BLANK
+     C           S#AREA    IFNE 'P'
+     C           S#AREA    ANDNE'T'
+     C           S#AREA    ANDNE'M'
+     C           S#AREA    ANDNE'H'
+     C           S#AREA    ANDNE'K'
+     C                     MOVELERR,1     S#ERR
+     C                     SETON                     3099
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      S#CUNO    IFNE *BLANK
+     C           S#CUNO    CHAINCBREC                40
+     C           *IN40     IFEQ *ON
+     C                     MOVELERR,2     S#ERR
+     C                     SETON                     3199
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      S#DAT1    IFNE 0
+     C                     MOVEL*BLANK    P#DATE
+     C                     MOVE S#DAT1    P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM ' '       P#FLAG  1
+     C           P#FLAG    IFNE '0'
+     C                     SETON                     3299
+     C                     MOVELERR,3     S#ERR
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      S#DAT2    IFNE 0
+     C                     MOVEL*BLANK    P#DATE
+     C                     MOVE S#DAT2    P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM ' '       P#FLAG  1
+     C           P#FLAG    IFNE '0'
+     C                     SETON                     3399
+     C                     MOVELERR,4     S#ERR
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      S#DAT1    IFGT S#DAT2
+     C                     SETON                     323399
+     C                     MOVELERR,5     S#ERR
+     C                     ENDIF
+     C*
+     C  N99      S#ACNT    IFNE *BLANK
+     C           S#ACNT    IFNE '2'
+     C           S#ACNT    ANDNE'3'
+     C           S#ACNT    ANDNE'4'
+     C                     SETON                     3499
+     C                     MOVELERR,6     S#ERR
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      S#RESV    IFNE *BLANK
+     C           S#RESV    IFNE '1'
+     C           S#RESV    ANDNE'3'
+     C                     SETON                     3599
+     C                     MOVELERR,7     S#ERR
+     C                     ENDIF
+     C                     ENDIF
+     C*成功=>搬值
+     C           *IN99     IFEQ *OFF
+     C                     MOVEL'00'      W#PRID
+     C*
+     C           S#AREA    IFEQ *BLANK                     廠區
+     C                     MOVEL*BLANK    P#ARE1
+     C                     MOVEL'9'       P#ARE2
+     C                     ELSE
+     C                     MOVELS#AREA    P#ARE1
+     C                     MOVELS#AREA    P#ARE2
+     C                     ENDIF
+     C*
+     C           S#CUNO    IFEQ *BLANK                     客戶代號
+     C                     MOVEL*BLANK    P#CUN1
+     C                     MOVEL'999999'  P#CUN2
+     C                     ELSE
+     C                     MOVELS#CUNO    P#CUN1
+     C                     MOVELS#CUNO    P#CUN2
+     C                     ENDIF
+     C*
+     C           S#DAT1    IFEQ 0                          開立起日
+     C                     MOVE *BLANK    P#DAT1
+     C                     ELSE
+     C                     MOVE S#DAT1    P#DAT1
+     C                     ENDIF
+     C*                                                    　　　　
+     C           S#DAT2    IFEQ 0                          開立止日
+     C                     MOVE 99999999  P#DAT2
+     C                     ELSE
+     C                     MOVE S#DAT2    P#DAT2
+     C                     ENDIF
+     C*                                                    　　　　
+     C           S#ACNT    IFEQ *BLANK                     折讓種類
+     C                     MOVE *BLANK    P#ACN1
+     C                     MOVE '9'       P#ACN2
+     C                     ELSE
+     C                     MOVELS#ACNT    P#ACN1
+     C                     MOVELS#ACNT    P#ACN2
+     C                     ENDIF
+     C*
+     C           S#RESV    IFEQ *BLANK                     折讓原因
+     C                     MOVE *BLANK    P#RES1
+     C                     MOVE '9'       P#RES2
+     C                     ELSE
+     C                     MOVELS#RESV    P#RES1
+     C                     MOVELS#RESV    P#RES2
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+** ERR
+０１－廠區別需為Ｐ或Ｔ或Ｍ或Ｈ或Ｋ！
+０２－此客戶代號不存在！
+０３－折讓單開立起日輸入錯誤！
+０４－折讓單開立止日輸入錯誤！
+０５－折讓單開立起日不可大於開立止日！
+０６－折讓種類別需為２或３或４！
+０７－折讓原因別需為１或３！
+

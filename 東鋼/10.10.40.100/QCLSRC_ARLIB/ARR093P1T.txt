@@ -1,0 +1,59 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR093P1                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CSF                                  */
+     /*     4.FUNCTION     應收帳款承購客戶請款單開立             */
+     /*     5.DATE-WRITTEN  91/12/03                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM        PARM(&APN2)
+
+             DCL        VAR(&APN2)    TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&TYPE)    TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&S#DEVN)  TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&S#USER)  TYPE(*CHAR)  LEN(10)
+
+             RTVJOBA    JOB(&S#DEVN) USER(&S#USER) +
+                        TYPE(&TYPE)
+
+             IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+   START:
+              CHGDTAARA  DTAARA(*LDA (300   6))   VALUE(&APN2)
+              SBMJOB     JOB(ARR093P1T)  JOBD(ARJOBD) +
+                         RQSDTA('CALL ARR093P1T ' || 'PARM(' || &APN2 || ')')
+              RETURN
+   BATCH:
+              RTVDTAARA  DTAARA(*LDA (300  6))   RTNVAR(&APN2)
+             /*寫入暫存檔*/
+             CLRPFM    ARLIB/ARR093F
+             OVRDBF    FILE(ARINVML3) TOFILE(DALIB/ARINVML3) +
+                       SHARE(*YES)
+             OPNQRYF   FILE(ARINVML3) QRYSLT(' +
+                            (AMAPN2 *EQ "' || &APN2 || '") *AND +
+                            (AMDELT *EQ " ") *AND +
+                            (AMCLOC *EQ " ") *AND +
+                            (AMFLAG *NE "D")')
+             CALL      PGM(ARLIB/ARR093R1)
+             DLTOVR    FILE(*ALL)
+             CLOF      OPNID(ARINVML3)
+
+             /* 列印報表 */
+             OVRPRTF    FILE(ARR093TT) TOFILE(ARLIB/ARR093TT) +
+                        CPI(12)  HOLD(*YES) USRDTA('請款單')
+             OVRDBF     FILE(ARR093F) TOFILE(ARLIB/ARR093F) SHARE(*YES)
+             OPNQRYF    FILE(ARR093F) +
+                        KEYFLD((ARORNO) (ARINDT) (ARINNO))
+             CALL       PGM(ARLIB/ARR093R2T)
+             DLTOVR     FILE(*ALL)
+             CLOF       OPNID(ARR093F)
+
+           SNDBRKMSG    MSG('<< 應收帳款承購客戶請款單開立　+
+                              已處理完成，請列印......>>') +
+                      TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+
+ ENDCLPGM:   ENDPGM
+

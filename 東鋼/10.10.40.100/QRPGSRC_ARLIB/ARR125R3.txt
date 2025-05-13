@@ -1,0 +1,284 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR125R3
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LBU
+     H*            4.FUNCTION     廠區別隨車折扣明細表-品名
+     H*            5.DATE-WRITTEN  95/04/26
+     H*            6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARDSLG  IP  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FARR125T2O   E             66     PRINTER
+     E*****************************************************************
+     IRARDSLG
+     I                                              ADAREAL3
+     I                                              ADPDNML2
+     I                                              ADINNOL1
+     I*================================================================
+     I           UDS
+     I                                        1   80T#BGDT
+     I                                       11  180T#ENDT
+     I                                     10011010 T#USID
+     I                                     10111020 D#DEVI
+     C*****************************************************************
+     C*         KEY   LIST
+     C*****************************************************************
+     C*FILE==>INVDTL(發票明細檔)
+     C*
+     C           K#INVD    KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L3                EXSR L3CLR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CL3 99                EXSR L3SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C  N99                MOVE *ON       *IN99
+     C                     MOVE *ON       *IN66
+     C*
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C                     MOVE *ALL'='   T#LIN3
+     C                     MOVE *ALL'-'   T#LIN4
+     C                     MOVE *ALL'-'   T#LIN5
+     C                     MOVE *ALL'-'   T#LIN6
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L3CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD1         W#CNT   20
+     C*
+     C                     SELEC
+     C           ADAREA    WHEQ 'P'
+     C                     MOVEL'台　北'W#ARE1  8
+     C           ADAREA    WHEQ 'M'
+     C                     MOVEL'台　中'W#ARE1
+     C           ADAREA    WHEQ 'T'
+     C                     MOVEL'桃　園'W#ARE1
+     C           ADAREA    WHEQ 'H'
+     C                     MOVEL'苗　栗'W#ARE1
+     C           ADAREA    WHEQ 'K'
+     C                     MOVEL'高　雄'W#ARE1
+     C                     ENDSL
+     C*
+     C                     CLEARAR125T1S
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR125T1D
+     C*
+     C*只有第一筆明細要寫入廠區
+     C*
+     C           W#CNT     IFEQ 1
+     C                     MOVELW#ARE1    T#AREA
+     C                     ELSE
+     C                     MOVEL*BLANK    T#AREA
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AMTE 110       外銷發票金額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*排除發票主檔中已刪除之發票
+     C*
+     C                     MOVE *OFF      *IN50
+     C           ADINNO    CHAININVMST               50
+     C  N50      INDECD    IFEQ 'D'
+     C                     GOTO ENDTSR
+     C                     ENDIF
+     C*
+     C                     MOVELADCUNO    W#CUNO  1
+     C*內銷
+     C           W#CUNO    IFEQ 'D'
+     C           W#CUNO    OREQ 'G'
+     C                     ADD  ADQTY2    T#QTYD
+     C                     ADD  ADAMT2    T#AMTD
+     C                     ADD  ADQTY2    T#QTY
+     C                     ADD  ADAMT2    T#AMT
+     C                     ENDIF
+     C*外銷
+     C           W#CUNO    IFEQ 'E'
+     C           ADINNO    IFEQ *BLANK
+     C                     ADD  ADAMT2    T#AMTE
+     C                     ADD  ADQTY2    T#QTYE
+     C                     ADD  ADQTY2    T#QTY
+     C                     ADD  ADAMT2    T#AMT
+     C                     ELSE
+     C                     ADD  ADQTY2    T#QTYE
+     C                     ADD  ADQTY2    T#QTY
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     CSR         ENDTSR    ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           W#CUNO    IFEQ 'E'
+     C*
+     C           ADINNO    IFNE *BLANK
+     C                     MOVELADINNO    IVNO             發票號碼
+     C                     MOVEL'1'       IVACNT           類別
+     C                     Z-ADD0         IVITEM           項次
+     C*
+     C           K#INVD    SETLLIVREC
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ IVREC                    40
+     C   40                LEAVE
+     C*
+     C           IVNO      IFNE ADINNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           IVPDCD    IFNE ADPDNM
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     ADD  IVAMT     T#AMTE
+     C                     ADD  IVAMT     T#AMT
+     C                     ENDDO
+     C*
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C                     MOVELADPDNM    T#PDNM
+     C*
+     C           W#AMTE    IFNE 0
+     C                     Z-ADDW#AMTE    T#AMTE
+     C                     ENDIF
+     C*內銷
+     C           T#QTYD    IFEQ 0
+     C                     Z-ADD0         T#UPRD           平均單價
+     C                     ELSE
+     C           T#AMTD    DIV  T#QTYD    T#UPRD    H
+     C                     ENDIF
+     C*外銷
+     C           T#QTYE    IFEQ 0
+     C                     Z-ADD0         T#UPRE           平均單價
+     C                     ELSE
+     C           T#AMTE    DIV  T#QTYE    T#UPRE    H
+     C                     ENDIF
+     C*內外銷
+     C           T#QTY     IFEQ 0
+     C                     Z-ADD0         T#UPR            平均單價
+     C                     ELSE
+     C           T#AMT     DIV  T#QTY     T#UPR     H
+     C                     ENDIF
+     C*
+     C   66                WRITEAR125T1H
+     C   66                WRITEAR125T1L
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR125T1D
+     C*
+     C                     ADD  1         W#CNT
+     C*小計
+     C                     ADD  T#QTYD    T#QYSD
+     C                     ADD  T#AMTD    T#ATSD
+     C                     ADD  T#QTYE    T#QYSE
+     C                     ADD  T#AMTE    T#ATSE
+     C                     ADD  T#QTY     T#QTYS
+     C                     ADD  T#AMT     T#AMTS
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L3SR      BEGSR
+     C*****************************************************************
+     C           T#QYSD    IFEQ 0
+     C                     Z-ADD0         T#PRSD
+     C                     ELSE
+     C           T#ATSD    DIV  T#QYSD    T#PRSD    H
+     C                     ENDIF
+     C*
+     C           T#QYSE    IFEQ 0
+     C                     Z-ADD0         T#PRSE
+     C                     ELSE
+     C           T#ATSE    DIV  T#QYSE    T#PRSE    H
+     C                     ENDIF
+     C*
+     C           T#QTYS    IFEQ 0
+     C                     Z-ADD0         T#UPRS
+     C                     ELSE
+     C           T#AMTS    DIV  T#QTYS    T#UPRS    H
+     C                     ENDIF
+     C*
+     C   66                WRITEAR125T1H
+     C   66                WRITEAR125T1L
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR125T1I
+     C                     WRITEAR125T1S
+     C*合計
+     C                     ADD  T#QYSD    T#QYTD
+     C                     ADD  T#ATSD    T#ATTD
+     C                     ADD  T#QYSE    T#QYTE
+     C                     ADD  T#ATSE    T#ATTE
+     C                     ADD  T#QTYS    T#QTYT
+     C                     ADD  T#AMTS    T#AMTT
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C           T#QYTD    IFEQ 0
+     C                     Z-ADD0         T#PRTD
+     C                     ELSE
+     C           T#ATTD    DIV  T#QYTD    T#PRTD    H
+     C                     ENDIF
+     C*
+     C           T#QYTE    IFEQ 0
+     C                     Z-ADD0         T#PRTE
+     C                     ELSE
+     C           T#ATTE    DIV  T#QYTE    T#PRTE    H
+     C                     ENDIF
+     C*
+     C           T#QTYT    IFEQ 0
+     C                     Z-ADD0         T#UPRT
+     C                     ELSE
+     C           T#AMTT    DIV  T#QTYT    T#UPRT    H
+     C                     ENDIF
+     C*
+     C   66                WRITEAR125T1H
+     C   66                WRITEAR125T1L
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR125T1T
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         MSGSR     BEGSR
+     C*****************************************************************
+     C                     WRITEAR125T1H
+     C                     WRITEAR125T1M
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+

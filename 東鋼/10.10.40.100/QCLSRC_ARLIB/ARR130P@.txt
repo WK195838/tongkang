@@ -1,0 +1,81 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR130P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02LBU                                  */
+     /*     4.FUNCTION     已開發票押匯狀況彙總表               */
+     /*     5.DATE-WRITTEN  96/11/14                                */
+     /*                                                             */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN12)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&YMD1)   TYPE(*DEC)  LEN(8 0)
+             DCL        VAR(&YMD2)   TYPE(*DEC)  LEN(8 0)
+             DCL        VAR(&YMDA)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&YMDB)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&RVID)   TYPE(*CHAR) LEN(2)
+
+
+             RTVJOBA    TYPE(&INT) OUTQ(&OUTQ)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+ RDSP:
+             CHGVAR     VAR(&IN03)    VALUE('0')
+             CHGVAR     VAR(&IN12)    VALUE('0')
+             CALL       PGM(ARR130RS) PARM(&IN03 &YMD1 &YMD2 &RVID)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGVAR     VAR(&YMDA)        VALUE(&YMD1)
+             CHGVAR     VAR(&YMDB)        VALUE(&YMD2)
+             CHGDTAARA  DTAARA(*LDA (301 8)) VALUE(&YMDA)
+             CHGDTAARA  DTAARA(*LDA (309 8)) VALUE(&YMDB)
+             CHGDTAARA  DTAARA(*LDA (317 2)) VALUE(&RVID)
+
+             SBMJOB     JOB(ARR130P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARR130P')
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (301 8)) RTNVAR(&YMDA)
+             RTVDTAARA  DTAARA(*LDA (309 8)) RTNVAR(&YMDB)
+             RTVDTAARA  DTAARA(*LDA (317 2)) RTNVAR(&RVID)
+
+             OVRPRTF    FILE(ARR130T) TOFILE(ARR130T) PAGESIZE(*N 132)  +
+                        CPI(10) HOLD(*YES) USRDTA('押匯狀況')
+             OVRDBF     FILE(INVMST) TOFILE(INVMST) SHARE(*YES)
+
+    /*業務不為空白*/
+             IF         COND(&RVID *NE '  ') THEN(DO)
+             OPNQRYF    FILE(INVMST) QRYSLT(' +
+                               (DATE   *GE "' || &YMDA || '") *AND  +
+                               (DATE   *LE "' || &YMDB || '") *AND  +
+                               (INDECD *NE "D"            )   *AND  +
+                               (INRVID *EQ "' || &RVID || '")')     +
+                        MAPFLD((DATE  ININDT  *CHAR 8))             +
+                        KEYFLD((INRVID)(INCUNO)(ININDT))
+             ENDDO
+
+    /*業務為空白*/
+             IF         COND(&RVID *EQ '  ') THEN(DO)
+             OPNQRYF    FILE(INVMST) QRYSLT(' +
+                               (DATE   *GE "' || &YMDA || '") *AND  +
+                               (DATE   *LE "' || &YMDB || '") *AND  +
+                               (INTYPE *NE "9"              ) *AND  +
+                               (INDECD *NE "D"            )')       +
+                        MAPFLD((DATE  ININDT  *CHAR 8))             +
+                        KEYFLD((INRVID)(INCUNO)(ININDT))
+             ENDDO
+
+             CALL       PGM(ARR130R)
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+
+             RETURN
+             ENDPGM
+

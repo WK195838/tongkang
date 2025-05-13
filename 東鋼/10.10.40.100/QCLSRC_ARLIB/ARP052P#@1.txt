@@ -1,0 +1,68 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP052P#                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     應收系統主要檔案備份移出作業(排程)   */
+     /*     5.DATE-WRITTEN  86/12/20                                */
+     /*                                                             */
+     /*    <說明>: 本作業會根據使用者所輸入的日期將應收系統中， */
+     /*            銷貨明細檔、發票主檔、發票明細檔等三檔的資料 */
+     /*              移出至BKLIB 的備份檔名上。並將CCLIB/       */
+     /*               ARSTATO應收帳款統計檔結論備份至BKLIB上    */
+     /*                                                             */
+     /*    <注意>: 本程式會呼叫線上執行程式ARP052P，預設系統  */
+     /*              日期的前二個年度之一月一日作為備份的日期。   */
+     /*              此日期可因應需求而改之。                     */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&USER)    TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&LSTBKD)  TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&YYMMDD)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&YMD)     TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&YY_C)    TYPE(*CHAR)  LEN(4)
+             DCL        VAR(&YY_D)    TYPE(*DEC)   LEN(4 0)
+
+             RTVJOBA    OUTQ(&OUTQ)   USER(&USER)
+             RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&YYMMDD)
+
+
+ USERDEF:    /* 依不同的需求而定的日期，（修改程式後重新編譯）*/
+
+             GOTO DEFAULT     /* 如果要使用自定者，註記本行 */
+
+             CHGVAR     VAR(&YYMMDD)  VALUE('860101') /* 自定之日期*/
+             GOTO START
+
+
+ DEFAULT:    /* 設定預設的備份日期（以前二個年度為準）*/
+
+             CHGVAR     VAR(&YMD)     VALUE('  ' || &YYMMDD)
+             CHGVAR     VAR(&YY_C)    VALUE(%SST(&YMD 1 4))
+             CHGVAR     VAR(&YY_D)    VALUE(&YY_C)
+             CHGVAR     VAR(&YY_D)    VALUE(&YY_D - 2)
+             CHGVAR     VAR(&YY_C)    VALUE(&YY_D)
+             CHGVAR     VAR(&YMD)     VALUE(&YY_C || '0101')
+
+
+ START:      /* 發出排程作業需求 */
+
+             RTVDTAARA  DTAARA(ARLIB/ARBACKUP (1 8)) RTNVAR(&LSTBKD)
+             IF         COND(&LSTBKD *GE &YMD)    THEN(DO)
+                SNDMSG  TOUSR(&USER) +
+                        MSG('應收系統主要檔案備份作業取消，所輸入+
+                             之日期已經處理過了。'|| &YYMMDD)
+                RETURN
+             ENDDO
+
+             CHGDTAARA  DTAARA(ARLIB/ARBACKUP (9 8)) VALUE(&LSTBKD)
+             CHGDTAARA  DTAARA(ARLIB/ARBACKUP (1 8)) VALUE(&YMD)
+             SBMJOB     JOB(ARP052P) JOBD(ARJOBD) JOBQ(QCTL) +
+                        OUTQ(&OUTQ)  RQSDTA('CALL ARLIB/ARP052P')
+             RETURN
+             ENDPGM
+

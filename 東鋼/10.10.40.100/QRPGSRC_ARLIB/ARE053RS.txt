@@ -1,0 +1,131 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARE053RS
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     應收帳款承購人工兌現--檢核
+     H*          5.DATE-WRITTEN  92/02/11
+     H*          6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARE053SACF  E                    WORKSTN
+     FARCUDT  IF  E           K        DISK
+     FARE053F1O   E           K        DISK
+     E                    ERR     1   2 70               *錯誤訊息
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10111020 S#DEVN
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C                     PARM           P#CUNO  5
+     C                     PARM           P#BKID  3
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C                     RETRN
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*----------------------------------------------------------------
+     C                     MOVEL'01'      W#PRID  2
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*----------------------------------------------------------------
+     C           W#PRID    DOWEQ'01'
+     C*
+     C                     WRITEAR053H
+     C                     EXFMTAR053F1
+     C*
+     C                     MOVEA'00'      *IN,30
+     C                     MOVE *OFF      *IN99
+     C                     MOVE *OFF      *IN50
+     C                     MOVEL*BLANK    S#ERR1
+     C*-----------
+     C*IN03 IN12 -
+     C*-----------
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     MOVEL'1'       P#IN03
+     C                     ITER
+     C                     ENDIF
+     C*----------------
+     C*CHECK客戶代號-
+     C*----------------
+     C           S#CUN1    IFNE *BLANK
+     C                     MOVELS#CUN1    W#CUNO  6
+     C           W#CUNO    CHAINRARCUDT              40
+     C           *IN40     IFEQ *ON
+     C                     SETON                     3199
+     C                     MOVELERR,1     S#ERR1
+     C                     ENDIF
+     C                     ELSE
+     C                     MOVE *ON       *IN50
+     C                     ENDIF
+     C*----------------
+     C*CHECK承購銀行-
+     C*----------------
+     C  N99      S#BKI1    IFNE *BLANK
+     C           S#BKI1    IFNE '814'
+     C           S#BKI1    ANDNE'807'
+     C                     SETON                     3099
+     C                     MOVELERR,2     S#ERR1
+     C                     ENDIF
+     C                     ELSE
+     C                     MOVE *ON       *IN51
+     C                     ENDIF
+     C*
+     C  N99                EXSR SR1100
+     C*
+     C  N99                MOVEL'00'      W#PRID
+     C  N99                MOVEL'0'       P#IN03
+     C  N99                MOVELS#CUN1    P#CUNO
+     C  N99                MOVELS#BKI1    P#BKID
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*----------------------------------------------------------------
+     C           *LOVAL    SETLLRARCUDT
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RARCUDT                  40
+     C   40                LEAVE
+     C*
+     C  N50      ACCUNO    IFNE S#CUN1
+     C                     ITER
+     C                     ENDIF
+     C*
+     C  N51      ACBKID    IFNE S#BKI1
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVELACCUNO    A1CUNO           客戶代號
+     C                     MOVELACCUNM    A1CUNM           客戶名稱
+     C                     MOVELACBKID    A1BKID           銀行代號
+     C                     MOVELACBKNM    A1BKNM           銀行簡稱
+     C                     WRITERAR053F1
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+**  ERR
+01-此客戶未辦理承購
+02-銀行代號不正確
+

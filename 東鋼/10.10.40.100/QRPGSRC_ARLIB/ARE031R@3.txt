@@ -1,0 +1,296 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE031R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        KRH
+     H*            4.FUNCTION     解除發票列印控制作業
+     H*            5.DATE-WRITTEN  85/12/06
+     H*            6.UPDATE  DATE 106/12/06  2017AR1112  S00WCJ (0612A)
+     H*                            配合電子發票上送，增加檢核及處理
+     H*                           107/06/15  2018AR1162  S00WCJ (0706A)
+     H*                            電子發票介面檔增加處理代號及廠區
+     H*                           107/11/14  2018AR00029 S00WCJ (0711A)
+     H*                            電子發票上線後，此作業不使用
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARALOG  O   E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FINVMSTL4UF  E           K        DISK
+     F            INREC                             KRENAMEINREC1
+0612AFINEMST  UF  E           K        DISK
+0612AFINEMSTG O   E           K        DISK
+0612AF            RINEMST                           KRENAMEINMSTG
+0612AFINEDTL  UF  E           K        DISK
+0612AFINEDTLG O   E           K        DISK
+0612AF            RINEDTL                           KRENAMEINDTLG
+     FARE031S CF  E                    WORKSTN
+     F                                        RECNUMKSFILE AR031F1
+0612AE                    ERR     1   9 70               *錯誤訊息
+     I            DS
+     I                                        1  140W#SYST
+     I                                        1   60D#ST
+     I                                        7  100D#SY
+     I                                       11  140D#SMD
+     I            DS
+     I                                        1   60W#DATE
+     I                                        1   20D#YY
+     I                                        3   60D#MD
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVN
+     I                                     10211021 W#LOCA
+0711AIINTR       UDS                             50
+0711AI                                        1   80D#INTR
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*FILE => WTWEGH
+     C           KEY       KLIST
+     C                     KFLD           W#INDT
+     C                     KFLD           W#NO
+     C*******************************************
+     C                     TIME           W#SYST
+     C                     Z-ADDD#SY      D#YY
+     C                     MOVE D#SMD     D#MD
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C                     EXSR SR0000                     *初值設定
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           *畫面一
+     C           W#PRID    CASEQ'02'      SR2000           * READC
+     C*          W#PRID    CASEQ'03'      SR3000           *畫面二
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*初值設定
+     C*                    MOVE 'WTE609S-'W#SID1
+0711AC           *DATE     SUB  19000000  U#SYSD  80
+0711AC           *NAMVAR   DEFN ARINTRCTL INTR
+0711AC                     UNLCKINTR
+     C                     Z-ADD0         S#IND
+     C                     MOVE *BLANK    S#NO1
+     C                     MOVE '01'      W#PRID  2
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->畫面
+     C* Clear subfile
+     C           SR1       TAG
+     C                     MOVE *ON       *IN74            *SFLCLR
+     C                     WRITEAR031F1C
+     C                     MOVE *OFF      *IN74            *SFLCLR
+     C                     Z-ADD*ZEROS    RECNUM  40
+     C                     Z-ADD*ZEROS    RRN     40
+     C                     Z-SUB9         S#SFRN
+     C*
+     C                     MOVE S#NO1     W#NO   10
+9009 C                     MOVE S#IND     W#INDT  80
+     C           W#INDT    SETLLINVMSTL4             78    *NR
+     C  N78      S#NO1     IFNE *BLANK
+     C           W#NO      CHAININVMST               79    *用發票CHAIN
+     C  N79                MOVE ININDT    W#INDT           * 出日期
+     C  N79                MOVE ININDT    S#IND
+     C   79                MOVE ERR,2     S#ERR            *NOT FIND
+     C           KEY       SETLLINVMSTL4             78
+     C                     MOVE *BLANK    S#NO1
+     C                     ENDIF
+     C  N78                READ INVMSTL4                 78*EOF
+     C  N78                EXSR SR1100                     *讀入SFL
+     C                     MOVEA'000'     *IN,71
+     C           RECNUM    IFEQ *ZEROS
+     C                     MOVE ERR,2     S#ERR
+     C                     MOVE *ON       *IN72            *SFLDSP OFF
+     C                     ENDIF
+     C*=======
+     C           W#PRID    DOWEQ'01'
+     C           W#CNT     IFGE 10
+     C                     MOVE *ON       *IN73            *SFLEND OFF
+     C                     ELSE
+     C                     MOVE *OFF      *IN73            *SFLEND ON
+     C                     ENDIF
+     C                     WRITEAR031FH
+     C                     WRITEAR031F1M
+     C                     EXFMTAR031F1C
+     C*                    Z-ADD0         S#IND
+     C                     MOVE *BLANK    S#ERR
+     C*PF3=Exit
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*F12=Exit
+     C           *IN12     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*PA1=翻下頁
+     C           *IN91     IFEQ *ON
+     C  N78                EXSR SR1100
+     C                     ITER
+     C                     ENDIF
+     C*F10=修改
+     C           *IN10     IFEQ '1'
+     C           S#CGCA    IFEQ *BLANK                     *欄位是否
+     C                     MOVE ERR,3     S#ERR            *空白
+     C                     ELSE
+     C                     MOVE '02'      W#PRID           *READC
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     GOTO SR1
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*讀入SUBFILE AR031F1
+     C                     Z-ADD*ZERO     W#CNT   20
+     C                     MOVE RRN       RECNUM
+     C           W#CNT     DOWLT10
+     C*
+     C           INDECD    IFEQ ' '
+     C           INPRTC    ANDEQ'X'
+     C           INAREA    ANDEQW#LOCA
+     C                     MOVE INNO      S#NO
+     C                     MOVE ININDT    S#INDT
+     C                     MOVE INCUNO    S#CUNO
+     C                     MOVE INORNO    S#ORNO
+     C                     MOVE INAAMT    S#AAMT
+     C                     MOVE INATAX    S#ATAX
+     C                     MOVE INTYPE    S#TYPE
+     C                     ADD  1         RECNUM
+     C                     WRITEAR031F1
+     C                     ADD  1         W#CNT
+     C                     ENDIF
+     C                     MOVE RECNUM    RRN
+     C*
+     C                     READ INVMSTL4                 78*EOF
+     C   78                LEAVE
+     C                     ENDDO
+     C*
+     C           W#CNT     IFGT *ZERO                      *至少一筆
+     C                     ADD  10        S#SFRN
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*W#PRID='02'--->AR031F1畫面逐筆處理
+     C           W#PRID    DOWEQ'02'
+     C                     READCAR031F1                9898*ER*EOF
+     C                     SETOF                     70
+     C   98                MOVE '01'      W#PRID
+     C   98                LEAVE
+     C                     MOVE S#OP      W#OP    10
+     C                     Z-ADD0         S#OP
+0612AC                     MOVEL*BLANKS   W#CHK
+0612AC                     MOVEL*BLANKS   S#ERR1
+0711AC                     MOVEL*OFF      *IN87
+     C                     UPDATAR031F1
+     C  N98      RECNUM    CHAINAR031F1              85
+     C  N85                MOVE S#NO      W#NO
+     C  N85                MOVE S#INDT    W#INDT
+0711AC  N85      S#INDT    IFGT D#INTR
+0711AC                     MOVELERR,9     S#ERR1
+0711AC                     MOVEL'Y'       W#CHK
+0711AC                     MOVEL*ON       *IN87
+0711AC                     ENDIF
+     C  N85      KEY       CHAININVMSTL4             90
+     C  N90                MOVE S#NO      S#NO2
+0711AC  N90N87   S#NO      CHAININEMST              N75
+0612AC  N90N75   EMTMDT    IFNE 0
+0612AC           EMSTCL    ORNE *BLANKS
+0612AC                     MOVELERR,8     S#ERR1
+0612AC                     MOVEL'Y'       W#CHK   1
+0612AC                     ENDIF
+     C  N90                WRITEAR031FH
+     C  N90                EXFMTAR031F2                    *確定是否
+0612AC           W#CHK     IFEQ 'Y'
+0612AC                     MOVEL*ON       *IN90
+0612AC                     ENDIF
+     C                     MOVE *BLANK    S#NO2            *修改
+     C           *IN12     IFEQ '1'
+     C           *IN03     OREQ '1'
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C           *IN90     IFEQ '0'
+     C                     MOVE ' '       INPRTC
+0612AC                     EXSR SR1400
+     C                     UPDATINREC1
+     C                     EXSR SR1300
+     C                     SETOF                     10
+     C                     ENDIF
+     C                     ENDDO
+     C                     MOVE *BLANK    S#CGCA
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1300    BEGSR
+     C*****************************************************************
+     C                     MOVE W#DATE    AGDATE
+     C                     MOVE D#ST      AGTIME
+     C                     MOVE S#USER    AGURID
+     C                     MOVE 'AI1'     AGTRID
+     C                     MOVELS#NO      AGRENO
+     C                     MOVE S#CGCA    AGCGCA
+     C                     WRITERARALOG
+     C*
+     C                     ENDSR
+0612AC*****************************************************************
+0612AC           SR1400    BEGSR
+0612AC*****************************************************************
+0612AC*
+0612AC*
+0612AC           S#NO      SETLLRINEDTL
+0612AC                     MOVEL*OFF      *IN75
+0612AC           *IN75     DOWEQ*OFF
+0612AC           S#NO      READERINEDTL                  75
+0612AC   75                LEAVE
+0706AC                     MOVEL'D'       EDFLAG
+0706AC                     MOVELW#LOCA    EDAREA
+0612AC           *DATE     SUB  19000000  EDXPDD
+0612AC                     TIME           EDXPDT
+0612AC                     MOVELS#USER    EDXUSR
+0612AC                     MOVEL'ARE031R' EDAPNM
+0612AC                     WRITEINDTLG
+0706AC                     UPDATRINEDTL
+0612AC*                    DELETRINEDTL
+0612AC                     ENDDO
+0612AC*
+0612AC           S#NO      CHAINRINEMST              75
+0706AC                     MOVEL'D'       EMFLAG
+0706AC                     MOVELW#LOCA    EMAREA
+0612AC           *DATE     SUB  19000000  EMXPDD
+0612AC                     TIME           EMXPDT
+0612AC                     MOVELS#USER    EMXUSR
+0612AC                     MOVEL'ARE031R' EMAPNM
+0612AC                     WRITEINMSTG
+0706AC  N75                UPDATRINEMST
+0612AC* N75                DELETRINEMST
+     C*
+     C                     ENDSR
+     C*****************************************************************
+**  ERR
+01-資料已存在！
+02-資料不存在！
+03-重印原因欄位不可空白！
+04-請按功能鍵<F10>刪除！
+05-廠區代號錯誤！
+06-已到檔頭！
+07-已到檔尾！
+08-資料已上送，不可重新列印
+09-電子發票已上線，請使用補印功能
+

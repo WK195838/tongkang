@@ -1,0 +1,685 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP119R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LBU
+     H*            4.FUNCTION     票據退回收入傳票代開－暫收其他
+     H*            5.DATE-WRITTEN  98/08/31
+     H*            6.UPDATE  DATE  99/08/31  2010AR517  S00WCJ (9908A)
+     H*                           100/12/07  2011AR634 S00WCJ (0012A)
+     H*                            配合IFRS修改
+     H*                           101/09/21  2012AR682  S00WCJ (0109A)
+     H*                           102/12/25  2013AR791  S00WCJ (0212A)
+     H*                            修改八德往來與桃園往來
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FRCVDTLL1IP  E           K        DISK
+     FRCVDTL  UF  E           K        DISK
+     F            RVREC                             KRENAMERVREC1
+     FRCADTL  UF  E           K        DISK
+     FBANKAC  IF  E           K        DISK
+     FBCNAME  IF  E           K        DISK
+     FACTRAN  UF  E           K        DISK                      A
+     FQPRINT  O   F     176            PRINTER
+     F*****************************************************************
+     E                    TAB1    1   3  1   TABR1  19
+0109AE                    TAB2    1   6  1   TABR2  21
+     E*----------------------------------------------------------------
+     IRVREC
+     I                                              RVWRNOL1
+     I*
+     IRVREC1
+     I              RVVNO2                          F#VNO2
+     I              RVFLAG                          F#FLAG
+     I              RVTXAR                          F#TXAR
+     I              RVTXDT                          F#TXDT
+     I              RVRLNO                          F#RLNO
+     I              RVACNO                          F#RACN
+     I              RVRESV                          F#RRES
+     I*
+     IACREC
+     I              ACTYPE                          F#TYPE
+     I              ACCURR                          F#CURR
+     I              ACACNO                          F#ACNO
+     I              ACBNAM                          F#BNAM
+     I              ACNAME                          F#NAME
+     I              ACAREA                          F#AREA
+     I              ACBAID                          F#BAID
+     I              ACOLID                          F#OLID
+     I              ACRESV                          F#RESV
+     ****
+     I            DS
+     I                                        1  19 KGRP
+     I                                        1   5 KACNO
+     I                                        6  15 KACNON
+     I                                       16  19 KDPNO
+0109AI            DS
+0109AI                                        1  21 K#GRP
+0109AI                                        1   7 K#ACNO
+0109AI                                        8  17 K#ACNN
+0109AI                                       18  21 K#DPNO
+     I            DS
+     I                                        1   6 VRNOX
+     I                                        2   60NO1
+     I                                       11  16 VRNON
+     I                                       12  160NO3
+     I            DS
+     I                                        1   6 VRNOY
+     I                                        2   60NO2
+     I                                       11  17 VRNOG
+     I                                       11  11 VRNOG1
+     I                                       12  12 VRNOG2
+     I                                       13  16 VRNOG3
+     I                                       14  160VRNOG4
+     I                                       17  17 VRNOG5
+     I                                       21  30 RVSANO
+     I                                       21  21 ANTYPE
+     I                                       22  22 ANCURR
+     I                                       23  30 ANACNO
+     I            DS
+     I                                        1  40 DSC0
+     I                                        1  20 DSC1
+     I                                       21  40 DSC2
+     I            DS
+     I                                        1  10 ACNOM
+     I                                        1   9 ACNOM1
+     I                                       10  10 ACNOM2
+     I                                       41  47 VUNOG
+     I                                       41  41 VUNOG1
+     I                                       42  42 VUNOG2
+     I                                       43  43 VUNOG3
+     I                                       44  47 VUNOG4
+     I            DS
+     I                                        1  12 F#RRES
+     I                                       11  11 D#RES1
+     I           UDS
+9008 I                                        1   80YMD
+     I                                        1   60YM
+0012AI                                      201 206 D#VNO1
+0012AI                                      211 216 D#VNO2
+     I                                     10011010 D#USER
+     I                                     10211021 TXAR
+0109AIIFRS       UDS                             50
+0109AI                                        1   60D#IFYM
+0109AI                                        1   80D#IFRS
+     C*****************************************************************
+     C*          KEY  LIST
+     C*****************************************************************
+     C           ACKEY1    KLIST
+     C                     KFLD           TXAR
+     C                     KFLD           YM
+     C                     KFLD           ACVRNO
+     C                     KFLD           ACITEM
+     C*
+     C           RVKEY     KLIST
+     C                     KFLD           RVNO
+     C                     KFLD           RVITEM
+     C*
+     C           RAKEY     KLIST
+     C                     KFLD           RANO
+     C                     KFLD           RAITEM
+     C*
+     C           RAKTY     KLIST
+     C                     KFLD           RANO
+     C*
+     C           ACKEY     KLIST
+     C                     KFLD           ACVRNO
+     C*
+     C           ANKEY     KLIST
+     C                     KFLD           ANTYPE
+     C                     KFLD           ANCURR
+     C                     KFLD           ANACNO
+     C*****************************************************************
+     C*          MAIN   PROGRAM
+     C*****************************************************************
+9908AC           *DATE     SUB  19000000  U#SYSD  80
+0109AC           *NAMVAR   DEFN ARIFRSCTL IFRS
+0109AC           YM        IFLT D#IFYM
+0109AC                     MOVEL*ON       *IN77
+0109AC                     ELSE
+0109AC                     MOVEL*OFF      *IN77
+0109AC                     ENDIF
+0109AC                     UNLCKIFRS
+     C  N10                EXSR IN#01
+     C   L1 10             EXSR DL#01
+     C      10             EXSR DP#01
+     CL1    10             EXSR TL#01
+     CLR    10             EXSR TL#LR
+     C**--------------------------------------------------**
+     CSR         IN#01     BEGSR
+     C                     Z-ADD0         AMTI   132
+     C                     Z-ADD0         AMTT   132
+     C                     Z-ADD0         VAMT   132
+     C                     Z-ADD0         AMTTT  132
+     C                     Z-ADD0         ITEM    30
+     C                     Z-ADD0         ITEM1   30
+     C                     Z-ADD80        LCNT    20
+     C                     Z-ADD60        TCNT    20
+     C                     Z-ADD0         PAG     30
+     C                     MOVEL*ALL'-'   ADASH 163
+     C                     MOVEL*BLANK    VUNOG
+     C*
+     C           TXAR      IFEQ 'P'
+     C                     SETON                     32
+     C                     ELSE
+     C                     SETOF                     32
+     C                     ENDIF
+     C*
+     C                     MOVE *BLANK    KGRP
+0109AC                     MOVEL*BLANK    K#GRP
+0109AC  N32 77   TXAR      LOKUPTAB1      TABR1          31
+0109AC  N32 31 77          MOVELTABR1     KGRP
+0109AC  N32N77   TXAR      LOKUPTAB2      TABR2          31
+0109AC  N32 31N77          MOVELTABR2     K#GRP
+     C                     SETON                     10
+0012AC                     MOVEL*BLANKS   D#VNO1
+0012AC                     MOVEL*BLANKS   D#VNO2
+     C***
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C**    L1 DETAIL TIME                            **
+     C**----------------------------------------------**
+     CSR         DL#01     BEGSR
+     C   32                Z-ADD0         ITEM
+     C  N32                Z-ADD1         ITEM
+     C                     Z-ADD0         AMTT
+     C                     Z-ADD0         AMTI
+9008 C                     Z-ADD0         DYMD    80
+     ****
+     C                     EXSR @FDNO
+     C                     MOVELVRNOX     VRNOY
+     C           NO1       ADD  1         NO2
+0012AC           D#VNO2    IFLT VRNOY
+0012AC                     MOVELVRNOY     D#VNO2
+0012AC                     ENDIF
+     C*
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C**  FIND LAST NO                                **
+     C**----------------------------------------------**
+     CSR         @FDNO     BEGSR
+     C                     MOVEL'I99999'  ACVRNO
+     C                     Z-ADD999       ACITEM
+     C                     SETOF                     95
+     C           ACKEY1    SETLLACTRAN
+     C                     READPACTRAN                   95
+     C  N95                MOVELACVRNO    TYPE    1
+     C  N95      TYPE      COMP 'I'                  9595
+     C  N95                MOVELACVRNO    VRNON
+     C  N95                ADD  1         NO3
+     C  N95                MOVELVRNON     VRNOX
+     C   95                MOVEL'I00001'  VRNOX
+0012AC           D#VNO1    IFEQ *BLANKS
+0012AC                     MOVELVRNOX     D#VNO1
+0012AC                     MOVELVRNOX     D#VNO2
+0012AC                     ENDIF
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C**       DETAIL TIME                            **
+     C**----------------------------------------------**
+     CSR         DP#01     BEGSR
+     C                     ADD  1         ITEM
+     C**
+     C                     ADD  RVRAMT    AMTTT
+     C                     ADD  RVRAMT    AMTT
+     C***
+     C                     Z-ADDRVRAMT    VAMT   132
+     C                     EXSR WR#01
+     C                     EXSR PR#01
+     C*
+     C           RVKEY     CHAINRCVDTL               95
+     C     N95             MOVELTXAR      VUNOG1
+     C     N95             MOVELTXAR      VUNOG2
+     C     N95             MOVELVRNOX     VUNOG3
+     C     N95             MOVE VRNOX     VUNOG4
+     C     N95             MOVELVUNOG     F#VNO2
+     C     N95             MOVEL'C'       F#FLAG
+     C     N95             MOVELTXAR      F#TXAR
+9908AC     N95             Z-ADDU#SYSD    F#TXDT
+     C     N95             UPDATRVREC1
+     C*
+     CSR                   ENDSR
+     C**----------------------------------**
+     C**   L1 BREAK PROCESS TOTAL TIME    **
+     C**----------------------------------**
+     CSR         TL#01     BEGSR
+     C**
+     C                     MOVELRVWRNO    RANO
+     C                     Z-ADD0         RAITEM
+     C           RAKEY     SETLLRCADTL               97
+     C           *IN97     DOWEQ'0'
+     C           RAKTY     READERCADTL                   97
+     C   97                LEAVE
+     C                     MOVELRAACNO    W#ACNO  9
+     C           W#ACNO    CHAINBCNAME               31
+     C   31                MOVEL*BLANK    ACNOM
+     C  N31                MOVELACCHNM    ACNOM1
+     C  N31                MOVE ''      ACNOM2
+     C                     ADD  1         ITEM
+     C           RAACTP    IFEQ 'C'
+     C                     ADD  RAAAMT    AMTTT
+     C                     ADD  RAAAMT    AMTT
+     C                     ELSE
+     C                     SUB  RAAAMT    AMTTT
+     C                     SUB  RAAAMT    AMTT
+     C                     ENDIF
+     C***
+     C           RAACTP    IFEQ 'D'
+     C                     SETON                     18
+     C                     ELSE
+     C                     SETOF                     18
+     C                     ENDIF
+     C                     Z-ADDRAAAMT    VAMT
+     C                     MOVELRARESV    BKNO   10
+0109AC                     MOVELRAACNO    R#ACNO  6
+     C                     EXSR WR#011
+     C                     EXSR PR#011
+     C                     MOVELVUNOG     RAVUNO
+     C                     MOVEL'C'       RAFLAG
+     C                     MOVELTXAR      RATXAR
+9908AC                     Z-ADDU#SYSD    RATXDT
+     C                     UPDATRAREC
+     C                     ENDDO
+     C***
+     C           TL#01A    TAG
+     C***
+     C   32                Z-ADDITEM      ITEM1   30
+     C  N32                Z-ADD1         ITEM1
+     C***
+     C           DYMD      IFEQ 0
+     C                     Z-ADDYMD       DYMD
+     C                     ENDIF
+     C****
+     C   32                EXCPTSP#01
+     C   32                ADD  1         LCNT
+     C  N32                EXSR WR#03
+     C  N32                EXSR PR#03
+     CSR         TL#01Z    ENDSR
+     C**----------------------------------**
+     C**   LR BREAK PROCESS TOTAL TIME    **
+     C**----------------------------------**
+     CSR         TL#LR     BEGSR
+     C                     EXSR WR#02
+     C                     EXSR PR#02
+     C                     EXCPTET#LR
+     CSR                   ENDSR
+     C*****
+     C**------------------------------------------**
+     C**    CHECK   存入帳號 820101             **
+     C**------------------------------------------**
+     CSR         CK#SNO    BEGSR
+     C           YMD       IFLT 820101
+     C           ANKEY     CHAINBANKAC               97
+     C  N97                MOVELF#OLID    RVSANO
+     C                     ENDIF
+     CSR                   ENDSR
+     C**------------------------------------------**
+     C**    DETAIL TIME  WRITE DATA TO ACTRAN     **
+     C**------------------------------------------**
+     CSR         WR#01     BEGSR
+     C****  WRITE  TO LOCAL
+     C                     MOVE *BLANK    DSC0
+     C                     CLEARRACVOUR
+     C                     MOVEL'O'       ACVRTY
+     C                     MOVE TXAR      ACDM03
+     C                     MOVELTXAR      ACCARD
+     C                     MOVEL'A'       ACKIND
+     C                     MOVELTXAR      ACAREA           廠區
+     C                     Z-ADDYM        ACYM             年月
+     C                     Z-ADDYMD       ACYMD
+     C                     MOVELVRNOX     ACVRNO
+     C                     Z-ADDITEM      ACITEM
+     C                     MOVEL'C'       ACDC
+0109AC   77                MOVEL'1131'    ACNO
+0109AC  N77                MOVEL'111001'  ACNO
+     C                     MOVEL'H'       ACTYCO
+     C                     MOVE RVDUDT    ACDUE
+     C                     MOVELRVCUNM    ACCSNM
+     C                     MOVELRVPANO    DSC1
+     C                     MOVELRVNTNO    ACRLNO
+     C                     Z-ADDVAMT      ACAMT
+     C                     MOVELRVWRNO    DSC2
+     C                     MOVEL'A'       ACSEPT
+     C                     MOVELDSC1      ACDSC1
+     C                     MOVELDSC2      ACDSC2
+     C*
+     C                     MOVELD#USER    ACENTM           建檔人員
+9908AC                     MOVE U#SYSD    ACENTD           建檔日期
+     C                     TIME           ACENTT           建檔時間
+     C                     MOVELD#USER    ACUPDM           異動人員
+9908AC                     MOVE U#SYSD    ACUPDD           異動日期
+     C                     TIME           ACUPDT           異動時間
+     C                     WRITERACVOUR
+     C*
+     CSR                   ENDSR
+     C**--------------------------------------**
+     C**  PRINT OUT DETAIL RECORD             **
+     C**--------------------------------------**
+     CSR         PR#01     BEGSR
+     C*
+     C           LCNT      COMP TCNT                 75  75
+     C   75                ADD  1         PAG
+     C   75                Z-ADD10        LCNT
+     C   75                EXCPTEH#01
+     C                     EXCPTED#01
+     C                     ADD  1         LCNT
+     C*
+     CSR                   ENDSR
+     C**------------------------------------------**
+     C**    TOTAL  TIME  WRITE DATA TO ACTRAN     **
+     C**------------------------------------------**
+     CSR         WR#011    BEGSR
+     C****  WRITE  TO LOCAL
+     C                     MOVE *BLANK    DSC0
+     C                     CLEARRACVOUR
+     C                     MOVEL'O'       ACVRTY
+     C                     MOVE TXAR      ACDM03
+     C                     MOVELTXAR      ACCARD
+     C                     MOVEL'A'       ACKIND
+     C                     MOVELTXAR      ACAREA           廠區
+     C                     Z-ADDYM        ACYM             年月
+     C*                    Z-ADDRVNTDT    ACYMD
+     C                     Z-ADDYMD       ACYMD
+     C                     MOVELVRNOX     ACVRNO
+     C                     Z-ADDITEM      ACITEM
+     C                     MOVELRAACTP    ACDC
+     C                     MOVELRAACNO    ACNO
+     C                     MOVELRAWAYC    ACTYCO
+     C                     MOVELRARLNO    ACRLNO
+     C                     MOVELRAMUID    ACCSNM
+     C                     MOVELRARESV    ACBKNO
+     C*
+     C           RADUDT    IFNE 0
+     C                     MOVE RADUDT    ACDUE
+     C                     ENDIF
+     C                     Z-ADDVAMT      ACAMT
+     C*
+     C           RAWAYC    IFEQ 'B'
+     C           RAWAYC    OREQ 'L'
+     C           RAWAYC    OREQ 'M'
+     C                     MOVELRADEPT    ACDPNO
+     C                     ENDIF
+     C                     MOVELRANO      DSC2
+     C                     MOVEL'A'       ACSEPT
+     C                     MOVELDSC1      ACDSC1
+     C                     MOVELDSC2      ACDSC2
+     C*
+     C                     MOVELD#USER    ACENTM           建檔人員
+9908AC                     MOVE U#SYSD    ACENTD           建檔日期
+     C                     TIME           ACENTT           建檔時間
+     C                     MOVELD#USER    ACUPDM           異動人員
+9908AC                     MOVE U#SYSD    ACUPDD           異動日期
+     C                     TIME           ACUPDT           異動時間
+     C                     WRITERACVOUR
+     C*
+     CSR                   ENDSR
+     C**--------------------------------------**
+     C**  PRINT OUT DETAIL RECORD             **
+     C**--------------------------------------**
+     CSR         PR#011    BEGSR
+     C           LCNT      COMP TCNT                 75  75
+     C   75                ADD  1         PAG
+     C   75                Z-ADD10        LCNT
+     C   75                EXCPTEH#01
+     C                     EXCPTED#02
+     C                     ADD  1         LCNT
+     CSR                   ENDSR
+     C**------------------------------------------**
+     C**    L1     TIME  WRITE DATA TO ACTRAN     **
+     C**------------------------------------------**
+     CSR         WR#02     BEGSR
+     C****  WRITE  TO TAIPEI
+     C                     CLEARRACVOUR
+     C                     MOVEL'O'       ACVRTY
+     C                     MOVE TXAR      ACDM03
+     C                     MOVEL'P'       ACCARD
+     C                     MOVEL'A'       ACKIND
+     C                     MOVELTXAR      ACAREA           廠區
+     C                     Z-ADDYM        ACYM             年月
+     C*                    Z-ADDIVACDT    ACYMD
+     C                     Z-ADDYMD       ACYMD
+     C   32                MOVELVRNOX     ACVRNO
+     C  N32                MOVELVRNOY     ACVRNO
+     C                     ADD  1         ITEM1
+     C                     Z-ADDITEM1     ACITEM
+     C                     MOVEL'D'       ACDC
+0109AC   77                MOVEL'2159'    ACNO
+0109AC  N77                MOVEL'211301'  ACNO
+     C                     MOVEL'D'       ACTYCO
+     C                     Z-ADDAMTT      ACAMT
+     C                     MOVE *BLANK    ACDUE
+     C                     MOVEL*BLANK    ACCSNM
+     C                     MOVELDYMD      ACDSC1
+     C                     MOVEL'A'       ACSEPT
+     C*
+     C                     MOVELD#USER    ACENTM           建檔人員
+9908AC                     MOVE U#SYSD    ACENTD           建檔日期
+     C                     TIME           ACENTT           建檔時間
+     C                     MOVELD#USER    ACUPDM           異動人員
+9908AC                     MOVE U#SYSD    ACUPDD           異動日期
+     C                     TIME           ACUPDT           異動時間
+     C*
+     C                     MOVEL*OFF      *IN60
+     C           RVNO      SETLLRVREC1
+     C           *IN60     DOWEQ*OFF
+     C           RVNO      READERVREC1              N    60
+     C*
+     C   60                LEAVE
+     C*
+     C           F#RACN    IFNE '2159'
+     C           D#RES1    ORNE '9'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVELF#RLNO    ACRLNO
+     C                     LEAVE
+     C                     ENDDO
+     C*
+     C                     WRITERACVOUR
+     C                     Z-ADD0         DYMD
+     C*
+     CSR                   ENDSR
+     C**--------------------------------------**
+     C**  PRINT OUT DETAIL RECORD             **
+     C**--------------------------------------**
+     CSR         PR#02     BEGSR
+     C           LCNT      COMP TCNT                 75  75
+     C   75                ADD  1         PAG
+     C   75                Z-ADD10        LCNT
+     C   75                EXCPTEH#01
+     C                     EXCPTET#01
+     C                     ADD  1         LCNT
+     CSR                   ENDSR
+     C**------------------------------------------**
+     C**    L2     TIME  WRITE DATA TO ACTRAN     **
+     C**------------------------------------------**
+     CSR         WR#03     BEGSR
+     C*
+     C****  WRITE  TO TAIPEI
+     C                     CLEARRACVOUR
+     C                     MOVEL'O'       ACVRTY
+     C                     MOVE TXAR      ACDM03
+     C                     MOVEL'P'       ACCARD
+     C                     MOVEL'A'       ACKIND
+     C                     MOVELTXAR      ACAREA           廠區
+     C                     Z-ADDYM        ACYM             年月
+     C                     Z-ADDYMD       ACYMD
+     C                     MOVELVRNOY     ACVRNO
+     C                     Z-ADD01        ACITEM
+     C                     MOVEL'C'       ACDC
+     C                     MOVEL'C'       DC1     1
+     C                     Z-ADDAMTI      ACAMT
+0109AC   77                MOVELKACNO     ACNO
+0109AC  N77                MOVELK#ACNO    ACNO
+     C                     MOVEL'A'       ACTYCO
+     C                     MOVEL'A'       ACSEPT
+     C*
+     C                     MOVELD#USER    ACENTM           建檔人員
+9908AC                     MOVE U#SYSD    ACENTD           建檔日期
+     C                     TIME           ACENTT           建檔時間
+     C                     MOVELD#USER    ACUPDM           異動人員
+9908AC                     MOVE U#SYSD    ACUPDD           異動日期
+     C                     TIME           ACUPDT           異動時間
+     C                     WRITERACVOUR
+     C*
+     C****  WRITE  TO NON-TAIPEI
+     C                     CLEARRACVOUR
+     C                     MOVEL'O'       ACVRTY
+     C                     MOVE TXAR      ACDM03
+     C                     MOVELTXAR      ACCARD
+     C                     MOVEL'A'       ACKIND
+     C                     MOVELTXAR      ACAREA           廠區
+     C                     Z-ADDYM        ACYM             年月
+     C                     Z-ADDYMD       ACYMD
+     C                     MOVELVRNOX     ACVRNO
+     C                     Z-ADD01        ACITEM
+     C                     MOVEL'D'       ACDC
+     C                     Z-ADDAMTT      ACAMT
+0109AC   77                MOVEL'3511'    ACNO
+0109AC  N77                MOVEL'390101'  ACNO
+     C                     MOVEL'A'       ACTYCO
+     C                     Z-ADDAMTT      ACAMT
+     C                     MOVE *BLANK    ACDUE
+     C                     MOVEL'A'       ACSEPT
+     C*
+     C                     MOVELD#USER    ACENTM           建檔人員
+9908AC                     MOVE U#SYSD    ACENTD           建檔日期
+     C                     TIME           ACENTT           建檔時間
+     C                     MOVELD#USER    ACUPDM           異動人員
+9908AC                     MOVE U#SYSD    ACUPDD           異動日期
+     C                     TIME           ACUPDT           異動時間
+     C                     WRITERACVOUR
+     C*
+     CSR                   ENDSR
+     C**--------------------------------------**
+     C**  PRINT OUT DETAIL RECORD             **
+     C**--------------------------------------**
+     CSR         PR#03     BEGSR
+     C                     EXCPTET#03
+     C                     ADD  3         LCNT
+     CSR                   ENDSR
+     O*****************************************************************
+     OQPRINT  E  103           EH#01
+     O                                   12 '報表編號：'
+     O                                   18 'ARP119'
+     O                                   83 '應收票據退回入帳清單'
+     O                                  140 '列表日期:'
+9908AO                         U#SYSD   150 '    /  /  '
+     O        E  1             EH#01
+     O                                   82 '********************'
+     O                                  140 '頁　　數:'
+     O                         PAG   Z  143
+     O        E  1             EH#01
+     O                                   73 '入帳日期:'
+     O                         YMD       83 '    /  /  '
+     O        E  1             EH#01
+     O                                   24 '借'
+     O        E  1             EH#01
+     O                                   10 '退回單號'
+     O                                   20 '客　戶'
+     O                                   24 '貸'
+     O                                   40 '會　計　科　目'
+0109AO                                   62 '借方金額'
+0109AO                                   82 '貸方金額'
+0109AO                                   92 '到期日期'
+0109AO                                  104 '票據號碼'
+0109AO                                  126 '付款銀行'
+0109AO                                  142 '票據帳號'
+0109AO                                  156 '傳票編號'
+0109AO                                  166 '部門'
+     O        E  1             EH#01
+0109AO                         ADASH    165
+     O        E  1             ED#01
+     O                         RVWRNO     9
+     O*                                   8 '-'
+     O*                        RVITEM    10
+     O                         RVCUNM    20
+     O                                   22 'C'
+0109AO                 77                29 '1131  '
+0109AO                N77                29 '111001'
+0109AO                                   39 '應收票據'
+0109AO                                   40 'H'
+0109AO                         VAMT  K   82
+0109AO                         RVDUDT    91 '    /  /  '
+0109AO                         RVNTNO   114
+0109AO                         RVPBID   130
+0109AO                         RVPANO   142
+0109AO                         TXAR     148
+0109AO                         TXAR     149
+0109AO                         VRNOX    155
+0109AO                                  156 '-'
+0109AO                         ITEM     159
+0109AO                         RVDPNO   165
+     O        E  1             ED#02
+     O                         RAACTP    22
+0109AO*                        RAACNO    27
+0109AO                         R#ACNO    29
+0109AO                         ACNOM     39
+0109AO                         RAWAYC    40
+0109AO                 18      VAMT  K   62
+0109AO                N18      VAMT  K   82
+0109AO                         RADUDT    91 '    /  /  '
+0109AO                         RARLNO   104
+0109AO                         RAMUID   120
+0109AO                         BKNO     132
+0109AO                         TXAR     148
+0109AO                         TXAR     149
+0109AO                         VRNOX    155
+0109AO                                  156 '-'
+0109AO                         ITEM     159
+0109AO                         RADEPT   165
+     O        E  1             ET#01
+     O                         RVCUNM    20
+     O                         DYMD      89 '    /  /  '
+     O                                   22 'D'
+0109AO                 77                40 '2159  暫收其他D'
+0109AO                N77                40 '211301暫收其他D'
+0109AO                         AMTT  K   62
+     O*                        IVNO     130
+0109AO                         RVRLNO    99
+0109AO                         TXAR     148
+0109AO                                  149 'P'
+0109AO                    32   VRNOX    155
+0109AO                   N32   VRNOY    155
+0109AO                                  156 '-'
+0109AO                         ITEM1    159
+     O        E  1             SP#01
+     O        E  1             ET#03
+     O                                   22 'D'
+0109AO                 77                39 '3511  公司往來'
+0109AO                N77                39 '390101公司往來'
+0109AO                         AMTT  K   62
+0109AO                         TXAR     148
+0109AO                         TXAR     149
+0109AO                         VRNOX    155
+0109AO                                  159 '-001'
+     O        E  2             ET#03
+     O                                   32 'C'
+0109AO                 77      KACNO     38
+0109AO                 77      KACNON    48
+0109AO                N77      K#ACNO    40
+0109AO                N77      K#ACNN    50
+0109AO                         AMTI  K   82
+0109AO                         TXAR     148
+0109AO                                  149 'P'
+0109AO                         VRNOY    155
+0109AO                                  159 '-001'
+     O        E  1             ET#LR
+     O                                   62 '應收票據　退回總額:'
+0109AO                         AMTTT K   82
+** TAB1
+K3512 高雄往來K210
+H3514 苗栗往來H800
+T3513 桃園往來T380
+** TAB2
+K390102 高雄往來K210
+T390103 八德往來T380
+H390104 苗栗往來H800
+M390105 台中往來W040
+L390106 林口往來L080
+U390108 桃園往來U380
+

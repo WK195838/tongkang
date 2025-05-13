@@ -1,0 +1,141 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*
+     H*          1.PROGRAM-ID    ARP120RS
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S00WCJ
+     H*          4.FUNCTION     獎勵金製票代開處理報表(畫面)
+     H*          5.DATE-WRITTEN  101/02/10 2011AR641
+     H*          6.UPDATE DATE
+     H*
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARP120S CF  E                    WORKSTN
+     FARRDTLL1UF  E           K        DISK
+     FACCTRL  IF  E           K        DISK
+     E*************************************************************
+     E                    ERR     1   8 70
+     I*************************************************************
+     IAADS        DS
+     I                                       21  260DATE
+     I                                       21  240DATE1
+     I                                       21  220DATE2
+     I            DS
+     I                                        1   8 D#YMD
+     I                                        1   60S#DATE
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C                     PARM           YMA     6
+     C                     PARM           ACYM    6
+     C*
+     C****************************************************************
+     C*          KEY       KLIST
+     C*****************************************************************
+     C           KEY01     KLIST
+     C                     KFLD           K#AREA  1
+     C                     KFLD           S#DATE
+     C                     KFLD           K#FSYS  3
+     C**************************************************************
+     C           *DATE     SUB  19000000  U#SYSD  80
+     C                     MOVE U#SYSD    D#YMD
+     C**************************************************************
+     C           *IN03     DOUEQ'1'
+     C                     EXFMTTITLE
+     C   KC                EXSR KC#01
+     C                     EXSR CK#01
+     C   13N99             EXSR UP#01
+     C  N99                SETON                     LR
+     C  N99                RETRN
+     C                     ENDDO
+     C******
+     CSR         KC#01     BEGSR
+     C                     MOVE '1'       *IN03
+     C                     SETON                     LR
+     C                     RETRN
+     CSR                   ENDSR
+     C**************************
+     C***                    ***
+     C***  SCREEN 01 CHECK   ***
+     C***                    ***
+     C**************************
+     CSR         CK#01     BEGSR
+     C                     SETOF                     414299
+     C                     MOVE *BLANK    ERRMSG
+     C                     MOVELS#DATE    APDT    80
+     C                     MOVE 01        APDT
+     C                     MOVE *ALL'0'   P#DATE
+     C                     MOVE APDT      P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM '0'       FLAG    1
+     C           FLAG      IFNE '0'
+     C                     SETON                     9941
+     C                     MOVELERR,1     ERRMSG
+     C                     ENDIF
+      *
+     C                     MOVEL'P'       K#AREA
+     C                     MOVEL'AC'      K#FSYS
+     C           KEY01     CHAINRACCTRL              60
+     C           AAESFG    IFEQ 'Y'
+     C                     MOVELERR,2     ERRMSG
+     C                     SETON                     9941
+     C   99                GOTO CK#01Z
+     C                     ENDIF
+     C*
+     C           S#DATE    CHAINARRDTLL1             40
+     C           *IN40     IFEQ *OFF
+     C           TLGLNO    ANDNE*BLANKS
+     C                     MOVELERR,3     ERRMSG
+     C                     SETON                     9941
+     C   99                GOTO CK#01Z
+     C                     ENDIF
+     C*
+     C  N13N45   *IN40     IFEQ *OFF
+     C           TLGLNO    ANDEQ*BLANKS
+     C                     MOVELERR,4     ERRMSG
+     C                     SETON                     9945
+     C                     ENDIF
+     C*
+     C           *IN40     IFEQ *OFF
+     C           TLYN      ANDEQ'Y'
+     C                     MOVELERR,5     ERRMSG
+     C                     SETON                     99
+     C                     ENDIF
+     C*
+     C                     MOVELS#DATE    YMA
+     C*
+     CSR         CK#01Z    ENDSR
+     C*****************************************************************
+     C           UP#01     BEGSR
+     C****************************************************************
+     C                     MOVEL*OFF      *IN40
+     C           S#DATE    SETLLARRDTLL1
+     C           *IN40     DOWEQ*OFF
+     C           S#DATE    READEARRDTLL1                 40
+     C   40                LEAVE
+     C                     MOVEL'Y'       TLYN
+     C                     UPDATRARRDTL
+     C                     ENDDO
+     C                     MOVELERR,5     ERRMSG
+     C                     SETON                     9941
+     C                     SETOF                     45
+     C                     ENDSR
+     C****************************************************************
+** ERR
+ 01-年月不合邏輯．
+ 02-該年月會計帳已關帳請查核．
+ 03-此年月已代開製票，不可再執行
+ 04-此年月已有製票資料，請按F13執行確認，或按執行鍵重新產生資料!!
+ 05-此年月資料已確認!!
+

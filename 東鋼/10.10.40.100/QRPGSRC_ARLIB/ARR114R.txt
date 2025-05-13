@@ -1,0 +1,87 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR114R1
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     折讓單統計表（含銷折／銷退／預收）
+     H*          5.DATE-WRITTEN  93/01/08
+     H*          6.DATE-MODIFY  112/06/19 2023AR00034 S00WCJ (1206A)
+     H*                          新增大業廠N
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FTRNDTLL3IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FARR114F O   E           K        DISK
+     ITXREC       01
+     I           UDS
+     I                                      300 300 U#AREA
+     I                                      301 3060U#YYMM
+     I                                      307 307 U#KIND
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C           TXNO      IFEQ 'P09774'
+     C                     Z-ADD0         W#TMP   10
+     C                     ENDIF
+     C*
+     C           TXIVNO    CHAININREC                40
+     C           *IN40     IFEQ *OFF
+     C                     CLEARRAR114F
+     C                     MOVELTXNO      A4NO             折讓單號
+     C                     MOVELTXITEM    A4ITEM           折讓項次
+     C                     Z-ADDTXACDT    A4ACDT           入帳日期
+     C                     MOVELTXCUNM    A4CUNM           客戶名稱
+     C                     MOVELTXORNO    A4ORNO           訂單編號
+     C                     MOVELTXIVNO    A4INNO           發票號碼
+     C                     Z-ADDTXAMT     A4AMT            未稅
+     C                     Z-ADDTXTAX     A4TAX            稅額
+     C           A4AMT     ADD  A4TAX     A4TOT            金額
+     C                     MOVELTXACNT    A4ACNT           折讓原因別
+     C                     MOVELINAREA    A4AREA
+     C*
+     C*TXACNT='4'且TXAMT>0 --->  預收折讓
+     C*TXACNT='4'且TXAMT<0 --->  扣預沖回
+     C*
+     C           TXACNT    IFEQ '4'
+     C           TXAMT     IFGT 0
+     C                     MOVELTXACNT    A4ACNT           折讓原因別
+     C                     ELSE
+     C                     MOVEL'5'       A4ACNT
+     C                     ENDIF
+     C*
+     C*TXACNT='4'且TXACDT=999999  --->  扣預沖回
+     C*扣預沖回一律掛P
+     C*
+     C           TXACDT    IFEQ 99999999
+     C                     MOVEL'6'       A4ACNT
+     C           INAREA    IFEQ 'K'
+     C           INAREA    OREQ 'H'
+     C           INAREA    OREQ 'M'
+1206AC           INAREA    OREQ 'N'
+     C                     MOVELINAREA    A4AREA
+     C                     ELSE
+     C                     MOVEL'P'       A4AREA
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     WRITERAR114F
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+

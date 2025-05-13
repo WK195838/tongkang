@@ -1,0 +1,85 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR081P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     信用狀押匯提示明細表                   */
+     /*     5.DATE-WRITTEN  88/12/3                                 */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)     TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)   LEN(10)
+             DCL        VAR(&W#FLAG)  TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&W#UDATE) TYPE(*CHAR)   LEN(6)
+             DCL        VAR(&W#RVDT)  TYPE(*CHAR)   LEN(8)
+
+             DCL        VAR(&P#PDAT) TYPE(*CHAR) LEN(8)  /*輸入日期*/
+             DCL        VAR(&P#MODE) TYPE(*CHAR) LEN(1)  /*年份別*/
+             DCL        VAR(&P#MTL)  TYPE(*CHAR) LEN(24) /*月日數*/
+             DCL        VAR(&P#LEAP) TYPE(*CHAR) LEN(1)  /*閏年碼*/
+
+             DCLF       FILE(ARLIB/ARR081S)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+             RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&W#UDATE)
+             CHGVAR     VAR(&S#RVDT) VALUE(&W#UDATE)
+             CHGVAR     VAR(&P#PDAT) VALUE(&S#RVDT)
+             CALL       PGM(UTS104R) PARM(&P#PDAT '1' '2' '0001' +
+                                          &W#RVDT &W#FLAG)
+             CHGVAR     VAR(&S#RVDT) VALUE(&W#RVDT)
+ INPUT:
+             SNDRCVF    RCDFMT(AR081F1)
+             IF         COND(&IN03 *EQ '1' *OR &IN12 *EQ '1') +
+                        THEN(RETURN)
+
+             CHGVAR     VAR(&IN51) VALUE('0')
+             CHGVAR     VAR(&P#PDAT) VALUE(&S#RVDT)
+             CHGVAR     VAR(&P#MODE) VALUE('1')
+             CALL       PGM(UTS102R) PARM(&P#PDAT &P#MODE +
+                                          &P#MTL &P#LEAP &W#FLAG)
+             IF         COND(&W#FLAG *NE '0') THEN(DO)
+                CHGVAR  VAR(&IN51) VALUE('1')
+                CHGVAR  VAR(&S#MSG1) VALUE('日期格式錯誤！')
+                GOTO    INPUT
+             ENDDO
+
+             CHGVAR     VAR(&W#RVDT) VALUE(&S#RVDT)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&W#RVDT)
+             SBMJOB     JOB(ARR081P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                        RQSDTA('CALL ARR081P')
+             CHGDTAARA  DTAARA(*LDA (801 70)) +
+             VALUE('信用狀押匯提示表已匯入排程中。')
+             RETURN
+
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 8)) RTNVAR(&W#RVDT)
+
+             OVRPRTF    FILE(ARR081T) TOFILE(ARLIB/ARR081T) +
+                        PAGESIZE(66 132) LPI(6) CPI(10) +
+                        OVRFLW(57) HOLD(*YES) USRDTA('押匯提示')
+             OVRDBF     FILE(CBCUST) TOFILE(DALIB/CBCUST)
+             OVRDBF     FILE(LLCMST) TOFILE(DALIB/LLCMST)
+             OVRDBF     FILE(SARCVF) TOFILE(DALIB/SARCVF) SHARE(*YES)
+             OPNQRYF    FILE(SARCVF) +
+                        QRYSLT( +
+                              'SRACTP *EQ "D" *AND   +
+                               SRNTTP *EQ "I" *AND   +
+                               SRDUDT *EQ ' || &W#RVDT ) +
+                        KEYFLD((SRPBID) (SRCUNO))
+
+             CALL       PGM(ARR081R)
+             CLOF       OPNID(SARCVF)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

@@ -1,0 +1,136 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARP083RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     承購發票下載試算作業--檢核
+     H*            5.DATE-WRITTEN  91/02/04
+     H*            6.UPDATE
+     H*****************************************************************
+     H        1   Y                                     1
+     FARP083SACF  E                    WORKSTN
+     FARBANK  IF  E           K        DISK
+     FARCUDT  IF  E           K        DISK
+     E                    ERR     1   6 70               *錯誤訊息
+     I           UDS
+     I                                      301 303 D#BKID
+     I                                      304 309 D#CUID
+     I                                      310 321 D#AMT1
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVI
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C**************************************************************
+     C*                  MAIN  PROGRAM
+     C**************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C           SR0000    BEGSR
+     C**************************************************************
+     C                     MOVE '01'      W#PRID  2
+     C                     MOVEA'11'      *IN,50
+     C                     ENDSR
+     C**************************************************************
+     C           SR1000    BEGSR
+     C**************************************************************
+     C           W#PRID    DOWEQ'01'
+     C                     EXFMTAR083F1
+     C                     MOVEA'00'      *IN,30
+     C                     MOVEA'11'      *IN,50
+     C                     MOVE *OFF      *IN99
+     C                     MOVE *BLANK    S#ERR
+     C*
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03
+     C                     MOVEL'00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     EXSR SR1100                     畫面檢核
+     C*
+     C           *IN99     IFEQ *OFF
+     C                     MOVELERR,5     S#ERR
+     C                     EXSR SR1200                     紀錄資料
+     C                     CALL 'ARP083P1'
+     C                     PARM           P#BKID
+     C                     PARM           P#CUID
+     C                     PARM           P#AMT1
+     C*
+     C                     MOVEL'00'      W#PRID
+     C                     LEAVE
+     C*
+     C                     ENDIF
+     C                     ENDDO
+     C                     ENDSR
+     C**************************************************************
+     C           SR1100    BEGSR
+     C**************************************************************
+     C*資料檢核
+     C           S#BKID    IFEQ *BLANK
+     C                     MOVELERR,1     S#ERR
+     C                     SETON                     3099
+     C                     ENDIF
+     C*
+     C  N99      S#CUID    IFEQ *BLANK
+     C                     MOVELERR,1     S#ERR
+     C                     SETON                     3199
+     C                     ELSE
+     C           S#CUID    CHAINRARCUDT             N40
+     C   40                SETON                     3199
+     C   40                MOVELERR,3     S#ERR
+     C                     ENDIF
+     C*
+     C           S#BKID    CHAINRARBANK             N40
+     C  N99      *IN40     IFEQ *ON
+     C                     MOVELERR,2     S#ERR
+     C                     SETON                     3099
+     C                     ENDIF
+     C*
+     C  N99      ACBKID    IFNE S#BKID
+     C                     SETON                     3199
+     C                     MOVELERR,6     S#ERR
+     C                     ENDIF
+     C*
+     C  N99      ACAAMT    SUB  ACAAM1    S#AMT2           可承購金額
+     C  N99                ADD  ACDAMT    S#AMT2
+     C*
+     C  N99      S#AMT1    IFGT S#AMT2
+     C                     MOVELERR,4     S#ERR
+     C                     SETON                     99
+     C                     SETOF                     5051
+     C                     ENDIF
+     C*
+     C*
+     C                     ENDSR
+     C**************************************************************
+     C           SR1200    BEGSR
+     C**************************************************************
+     C*紀錄資料
+     C                     MOVE S#BKID    D#BKID
+     C                     MOVE S#CUID    D#CUID
+     C                     MOVE S#AMT1    D#AMT1
+     C                     MOVE S#BKID    P#BKID  3
+     C                     MOVE S#CUID    P#CUID  6
+     C                     MOVE S#AMT1    P#AMT1 12
+     C*
+     C                     ENDSR
+**  ERR
+01-欄位值不得空白或為零！
+02-銀行代號未建檔！             　
+03-客戶代號不存在或未辦理承購業務！             　
+04-承購金額大於可承購金額！             　
+05-下載試算先前處理作業中,請稍後！
+06-客戶與承購銀行不符！             　
+

@@ -1,0 +1,166 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARS201R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION      區間發票試算訂單查詢試算單號副程式
+     H*            5.DATE-WRITTEN  107/06/01  2018AR1168
+     H*
+     H*****************************************************************
+     H            Y
+     FARS201S CF  E                    WORKSTN
+     F                                        RRN   KSFILE AR01F2
+     FINVTRLL2IF  E           K        DISK
+     E                    ERR     1   7 22
+     I*
+     C*****************************************************************
+     C*          Parameter List
+     C*****************************************************************
+     C*I:P#TKCD
+     C           *ENTRY    PLIST
+     C                     PARM           P#ORNO  6
+     C                     PARM           P#ITNO 10
+     C*
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C*SR0000 => Initialize Screen Number
+     C*SR1000 => Screen Number = '01' Process
+     C*SR2000 => Screen Number = '01' Process Subfile
+     C*
+     C                     EXSR SR0000
+     C           PRCID     DOUEQ'00'
+     C           PRCID     CASEQ'01'      SR1000
+     C           PRCID     CASEQ'02'      SR2000
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*
+     C*Initialize Screen Number
+     C*
+     C                     CLEARAR01F2CL
+     C                     MOVEL'N'       UPDSCR
+     C           P#ORNO    IFNE *BLANKS
+     C                     MOVELP#ORNO    S#ORNO
+     C                     ELSE
+     C                     MOVEL*BLANKS   S#ORNO
+     C                     ENDIF
+     C                     MOVEL*BLANKS   W#ITNO 10
+     C                     MOVEL*BLANKS   W#ORNO  6
+     C                     MOVE '01'      PRCID   2
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C*Screen Number = '01' Process
+     C*
+     C           UPDSCR    IFEQ 'Y'
+     C                     EXSR SR1100
+     C                     ENDIF
+     C           PRCID     DOWEQ'01'
+     C*
+     C*Check Write Subfile Record Found ?
+     C*
+     C           RRN       COMP *ZEROS                   72*SFLDSP OFF
+     C   72      S#ERR     IFEQ *BLANKS
+     C                     MOVELERR,2     S#ERR
+     C                     ENDIF
+     C*
+     C                     WRITEAR01F2MG
+     C                     EXFMTAR01F2CL
+     C                     MOVEL*BLANKS   S#ERR
+     C*
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVEL'00'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           S#ORNO    CHAININVTRLL2             55
+     C   55                MOVELERR,2     S#ERR
+     C   55                SETON                     33
+     C   55                GOTO END100
+     C*
+     C  N65      S#ORNO    IFNE *BLANKS
+     C           S#ORNO    ORNE W#ORNO
+     C                     MOVEL'Y'       UPDSCR
+     C                     MOVEL'01'      PRCID
+     C                     MOVELS#ORNO    W#ORNO
+     C                     MOVEL*ON       *IN65
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVE '02'      PRCID
+     C*
+     C                     ENDDO
+     C           END100    ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*
+     C*Initialize Subfile Screen => WB03F2
+     C*
+     C                     MOVE *BLANKS   UPDSCR  1
+     C                     MOVEA'111'     *IN,71           *SFLCLR
+     C                     WRITEAR01F2CL
+     C                     MOVEA'000'     *IN,71           *SFLCLR
+     C                     Z-ADD*ZEROS    RRN     40
+     C*
+     C           S#ORNO    SETLLINVTRLL2
+     C                     MOVE *OFF      *IN52
+     C           *IN52     DOWEQ*OFF
+     C           S#ORNO    READEINVTRLL2            N    52*EOF
+     C   52                LEAVE
+     C*
+     C                     CLEARAR01F2
+     C           W#ITNO    IFEQ ITNO
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           ITFLAG    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVELITNO      S#ITNO
+     C                     MOVELITNO      W#ITNO
+     C                     Z-ADDITDAT1    S#DAT1
+     C                     Z-ADDITDAT2    S#DAT2
+     C*
+     C                     ADD  1         RRN
+     C                     WRITEAR01F2
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*
+     C*Screen Number = '01' Process Read Subfile Screen
+     C*
+     C           PRCID     DOWEQ'02'
+     C                     READCAR01F2                 5353*ER*EOF
+     C   53                MOVE '00'      PRCID
+     C   53                LEAVE
+     C*
+     C*If S#OPT = " " Iter
+     C*
+     C           S#OPT     IFEQ *BLANKS
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVELS#ORNO    P#ORNO
+     C                     MOVELS#ITNO    P#ITNO
+     C                     MOVE '00'      PRCID
+     C                     LEAVE
+     C                     ENDDO
+     C                     ENDSR
+**  ERR
+01
+02資料不存在
+

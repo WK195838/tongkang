@@ -1,0 +1,137 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP120P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCJ                                  */
+     /*     4.FUNCTION     獎勵金製票代開處理報表                 */
+     /*     5.DATE-WRITTEN  101/02/10 2012AR641                     */
+     /*     6.UPDATE  DATE                                          */
+     /*                                                             */
+     /***************************************************************/
+
+             PGM
+             DCL        VAR(&P#YYMM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&P#DATE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&P#CODE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&ACYM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&YM)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&Y)    TYPE(*CHAR) LEN(4)
+             DCL        VAR(&M)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DATE1) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATE2) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&WSID)  TYPE(*CHAR) LEN(10)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&WSID)
+             RTVJOBA    CYMDDATE(&DATE1)
+
+
+             CHGVAR     VAR(&DATE2) VALUE('0' *CAT &DATE1)
+             CHGVAR     VAR(&ACYM)  VALUE(%SST(&DATE2 1 6))
+
+             OVRDBF     FILE(ACCTRL) TOFILE(ACLIBN/ACCTRL)
+
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+  DISPLY:    CALL       PGM(ARP120RS) PARM(&IN03 &YM &ACYM)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGDTAARA  DTAARA(*LDA (1 6)) VALUE(&YM)
+             CHGDTAARA  DTAARA(*LDA (7 2)) VALUE('01')
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&P#YYMM)
+             RTVDTAARA  DTAARA(*LDA (1 8)) RTNVAR(&P#DATE)
+
+       /*    CALL    PGM(ACP101R) PARM(&P#YYMM &P#CODE)  */
+             IF         COND(&P#CODE *EQ '1') THEN(DO)
+             SNDBRKMSG  MSG('關帳日期已過，請與相關人員聯絡！') +
+                          TOMSGQ(&WSID)
+             GOTO       CMDLBL(DISPLY)
+             ENDDO
+
+             SBMJOB     JOB(ARP120P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARP120P')
+             SNDBRKMSG  MSG('<<獎勵金製票代開處理報表+
+                         已開始處理,請稍待.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             RETURN
+
+BATCH:
+             RTVDTAARA  DTAARA(*LDA (1    6)) RTNVAR(&YM)
+             RTVDTAARA  DTAARA(*LDA (1    4)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (5    2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+
+
+STEP1:       /*前期處理*/
+             OVRDBF     FILE(ARRDTL)  TOFILE(ARRDTL) SHARE(*YES)
+             OPNQRYF    FILE((ARRDTL)) OPTION(*ALL) QRYSLT('      +
+                          CHAR6  *EQ  "'|| &YM ||'"')           +
+                          MAPFLD((ZONE6  TLYYMM *ZONED 6)      +
+                                 (CHAR6 ZONE6 *CHAR 6))
+
+             CALL    ARP120R0
+             CLOF       ARRDTL
+             DLTOVR     *ALL
+
+
+STEP2:       /* 價格補助*/
+
+             OVRPRTF    FILE(ARP120T1) TOFILE(ARP120T1) PAGESIZE(*N +
+                          132) CPI(10) HOLD(*YES) USRDTA('價格補助')
+             OVRDBF     FILE(HSVOUR) TOFILE(HSVOUR) SHARE(*YES)
+             OPNQRYF    FILE((HSVOUR)) QRYSLT('                +
+                          S4YM   *EQ  "' || &YM || '"  *AND    +
+                        (S4AREA *EQ "H" *OR S4AREA *EQ "K")    +
+                    *AND  (S4TRCD *EQ "11" *OR S4TRCD *EQ "1F" +
+                          *OR S4TRCD *EQ "1K")')               +
+                          KEYFLD((S4AREA)(S4CUNO)(S4NAME)      +
+                                 (S4QULT))                     +
+                          MAPFLD((ZONE6 S4ENTD *ZONED 8)       +
+                                 (CHAR6 ZONE6  *CHAR  8)       +
+                                 (S4YM '%SST(CHAR6 1 6)' *CHAR 6))
+
+  /* CPYFRMQRYF     FROMOPNID(HSVOUR) TOFILE(S00WCJ/HST) +
+          MBROPT(*REPLACE) CRTFILE(*YES)    */
+
+             CALL       ARP120R1
+             CLOF       HSVOUR
+             DLTOVR     *ALL
+
+STEP3:       /* 獎勵金一&特別補助*/
+
+             OVRPRTF    FILE(ARP120T2) TOFILE(ARP120T2) PAGESIZE(*N +
+                          132) CPI(10) HOLD(*YES) USRDTA('獎勵金一')
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE((TRNDTL)) QRYSLT('                +
+                          TXYM   *EQ  "' || &YM || '"  *AND    +
+                          TXCODE *EQ "SA04"            *AND    +
+                          TXACNT *NE "3"               *AND    +
+                        (TXFL02 *EQ "H" *OR TXFL02 *EQ "K")')  +
+                          KEYFLD((TXFL02)(TXCUNO)(TXPDNM))     +
+                          MAPFLD((ZONE6 TXDATE *ZONED 8)       +
+                                 (CHAR6 ZONE6  *CHAR  8)       +
+                                 (TXYM '%SST(CHAR6 1 6)' *CHAR 6) +
+                                 (TXFL02 '%SST(TXNO 1 1)'))
+
+  /* CPYFRMQRYF     FROMOPNID(TRNDTL) TOFILE(S00WCJ/TR1) +
+          MBROPT(*REPLACE) CRTFILE(*YES) */
+
+             CALL       ARP120R2
+
+             POSDBF     OPNID(TRNDTL)  POSITION(*START)
+
+             OVRPRTF    FILE(ARP120T3) TOFILE(ARP120T3) PAGESIZE(*N +
+                          132) CPI(10) HOLD(*YES) USRDTA('特別補助')
+
+             CALL       ARP120R3
+
+             CLOF       TRNDTL
+             DLTOVR     *ALL
+  ENDCL:     ENDPGM
+

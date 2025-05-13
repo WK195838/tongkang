@@ -1,0 +1,199 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR076R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     銷貨帳款帳齡分析彙總表
+     H*            5.DATE-WRITTEN  88/06/06
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARSTTX  IP  E           K        DISK
+     FARSAID  IF  E           K        DISK
+     FARR076T O   E             66     PRINTER
+     E*****************************************************************
+     E                    TAB1    1   5  4   TAB1R  12
+     I*****************************************************************
+     IAXREC
+     I                                              AXDEPTL2
+     I                                              AXRVIDL1
+     I*------------------------------------------------------
+     IAXDTA      UDS                             28
+     I                                        1   4 X#DAT1
+     I                                        5   8 X#DAT2
+     I                                        9  12 X#DAT3
+     I                                       21  28 X#ETXD
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C           *NAMVAR   DEFN ARXCTLDTA AXDTA  28
+     C                     MOVE X#DAT1    R#DAY1
+     C                     MOVE X#DAT2    R#DAY2
+     C                     MOVE X#DAT3    R#DAY3
+     C                     MOVE X#ETXD    R#ETXD
+     C*
+     C                     Z-ADD1         R#DA1B
+     C           R#DAY1    SUB  1         R#DA1E
+     C                     Z-ADDR#DAY1    R#DA2B
+     C           R#DAY2    SUB  1         R#DA2E
+     C                     Z-ADDR#DAY2    R#DA3B
+     C           R#DAY3    SUB  1         R#DA3E
+     C                     Z-ADDR#DAY3    R#DA4B
+     C*
+     C                     CLEARAR076T1T
+     C                     SETON                     66    首頁表頭
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2清除函式換部門
+     C*********************************
+     CSR         L2CLR     BEGSR
+     C                     CLEARAR076T1S
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式換業務
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     CLEARAR076T1D
+     C*
+     C                     MOVELAXDEPT    R#DEPT
+     C           R#DEPT    LOKUPTAB1      TAB1R          69
+     C   69                MOVELTAB1R     R#DEPN
+     C                     MOVELAXRVID    R#RVID
+     C           R#RVID    CHAINRARSAID              69
+     C                     MOVELSANAME    R#RVNM
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     SELEC
+     C           AXINDU    WHLT R#DAY1
+     C                     ADD  AXINAM    R#AMTA
+     C           AXINDU    WHLT R#DAY2
+     C                     ADD  AXINAM    R#AMTB
+     C           AXINDU    WHLT R#DAY3
+     C                     ADD  AXINAM    R#AMTC
+     C                     OTHER
+     C                     ADD  AXINAM    R#AMTD
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  印出業務
+     C*********************************
+     CSR         L1SR      BEGSR
+     C           R#AMTA    ADD  R#AMTB    R#AMTE
+     C                     ADD  R#AMTC    R#AMTE
+     C                     ADD  R#AMTD    R#AMTE
+     C*
+     C           R#AMTB    MULT 100       W#TMPA 163
+     C           W#TMPA    DIV  R#AMTE    R#RATB    H      領款比
+     C           R#AMTC    MULT 100       W#TMPA 163
+     C           W#TMPA    DIV  R#AMTE    R#RATC    H      逾期比
+     C           R#AMTD    MULT 100       W#TMPA
+     C           W#TMPA    DIV  R#AMTE    R#RATD    H      催收比
+     C           100       SUB  R#RATB    R#RATA
+     C                     SUB  R#RATC    R#RATA
+     C                     SUB  R#RATD    R#RATA           正常比
+     C*
+     C   66                WRITEAR076T1H
+     C   66                SETOF                     66
+     C                     WRITEAR076T1D
+     C*
+     C                     ADD  R#AMTA    R#SAMA           小計
+     C                     ADD  R#AMTB    R#SAMB
+     C                     ADD  R#AMTC    R#SAMC
+     C                     ADD  R#AMTD    R#SAMD
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2 函式 （印出部門小計）
+     C*********************************
+     CSR         L2SR      BEGSR
+     C           R#SAMA    ADD  R#SAMB    R#SAME
+     C                     ADD  R#SAMC    R#SAME
+     C                     ADD  R#SAMD    R#SAME
+     C*
+     C           R#SAMB    MULT 100       W#TMPA
+     C           W#TMPA    DIV  R#SAME    R#SRTB    H      領款比
+     C           R#SAMC    MULT 100       W#TMPA
+     C           W#TMPA    DIV  R#SAME    R#SRTC    H      逾期比
+     C           R#SAMD    MULT 100       W#TMPA
+     C           W#TMPA    DIV  R#SAME    R#SRTD    H      催收比
+     C           100       SUB  R#SRTB    R#SRTA
+     C                     SUB  R#SRTC    R#SRTA
+     C                     SUB  R#SRTD    R#SRTA           正常比
+     C*
+     C   66                WRITEAR076T1H
+     C   66                SETOF                     66
+     C                     WRITEAR076T1S
+     C*
+     C                     ADD  R#SAMA    R#TAMA           小計
+     C                     ADD  R#SAMB    R#TAMB
+     C                     ADD  R#SAMC    R#TAMC
+     C                     ADD  R#SAMD    R#TAMD
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式 （印出合計）
+     C*********************************
+     CSR         LRSR      BEGSR
+     C           R#TAMA    ADD  R#TAMB    R#TAME
+     C                     ADD  R#TAMC    R#TAME
+     C                     ADD  R#TAMD    R#TAME
+     C*
+     C           R#TAMB    MULT 100       W#TMPA
+     C           W#TMPA    DIV  R#TAME    R#TRTB    H      領款比
+     C           R#TAMC    MULT 100       W#TMPA
+     C           W#TMPA    DIV  R#TAME    R#TRTC    H      逾期比
+     C           R#TAMD    MULT 100       W#TMPA
+     C           W#TMPA    DIV  R#TAME    R#TRTD    H      催收比
+     C           100       SUB  R#TRTB    R#TRTA
+     C                     SUB  R#TRTC    R#TRTA
+     C                     SUB  R#TRTD    R#TRTA           正常比
+     C*
+     C   66                WRITEAR076T1H
+     C   66                SETOF                     66
+     C                     WRITEAR076T1T
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     WRITEAR076T1H
+     C                     WRITEAR076T1M
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  子函式集
+     C*********************************
+** TAB1
+B010台北營業課
+B020桃園營業課
+B030高雄營業課
+B040台中營業課
+B050型鋼營業課
+

@@ -1,0 +1,242 @@
+     H        1   Y                                     1                 BR003
+     FAFCBAL  UP  E           K        DISK
+     FINVDTLL2IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FRCVDTL  IF  E           K        DISK
+     FAFCSLC  IF  E           K        DISK
+     I            DS
+     I                                        1   6 XXAPNO
+     I                                        6   6 XXNO
+     I           UDS
+     I                                        1   1 AREA
+     I*
+     IBKDTA      UDS                             36
+     I                                        1   60U#BKDT
+     C*----------------------------------------------------
+     C           IVKEY     KLIST
+     C                     KFLD           IVORNN
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVAPNO
+     C           RVKEY     KLIST
+     C                     KFLD           RVNO
+     C                     KFLD           RVITEM
+     C*
+     C           *NAMVAR   DEFN ARBACKUP  BKDTA  36
+     C           *LOCK     IN   BKDTA
+     C                     UNLCKBKDTA
+     C*
+     C                     EXSR INT#1
+     C                     EXSR D#PR
+     C                     EXSR UP#AR
+     C*
+     C****
+     CSR         INT#1     BEGSR
+     C                     Z-ADD0         FAMT   110
+     C                     Z-ADD0         NAMT   110
+     C                     Z-ADD0         EAMT   110
+     C                     Z-ADD0         GAMT   110
+     C                     Z-ADD0         HAMT   110
+     C                     Z-ADD0         SAMT   110
+     C                     Z-ADD0         XAMT   110
+     C                     Z-ADD0         XAMTS  110
+     C                     Z-ADD0         XAMTA  110
+     C                     Z-ADD0         NAMT1  110
+     C                     Z-ADD0         FAMTX  110
+     C                     Z-ADD0         GAMTX  110
+     C                     Z-ADD0         HAMTX  110
+     C                     Z-ADD0         NAMTX  110
+     CSR         INT#1Z    ENDSR
+     C****
+     CSR         D#PR      BEGSR
+     C*                    MOVEL*BLANK    IVORNN
+     C                     MOVELAFORNO    IVORNN  5
+     C                     MOVEL*BLANK    WAPNO
+     C                     MOVEL*BLANK    IVNO
+     C                     MOVEL*BLANK    WNO    10
+     C                     MOVEL*BLANK    IVACNT
+     C                     MOVEL*BLANK    IVAPNO
+     C           IVKEY     SETLLINVDTLL2             95
+     C           *IN95     DOWEQ'0'
+     C           AFORNO    READEINVDTLL2                 95
+     C         95          LEAVE
+     C*
+     C           IVNO      IFNE WNO
+     C                     Z-ADD0         XAMTS
+     C                     Z-ADD0         XAMTA
+     C                     Z-ADD0         FAMTX
+     C                     Z-ADD0         GAMTX
+     C                     Z-ADD0         HAMTX
+     C                     Z-ADD0         NAMTX
+     C                     MOVELIVNO      WNO
+     C                     ENDIF
+     C*          ---------------------------------------------------
+CLJ  C*          將已備份移出作業前的資料忽略，但預收發票之明細仍計
+     C*
+     C           IVNO      CHAININREC                69
+     C   69                MOVEL'D'       INDECD
+     C*
+     C           INDECD    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           IVACDT    IFLT U#BKDT
+     C           INTYPE    IFNE '2'                        非預收
+     C                     ITER
+     C                     ENDIF
+---  C                     ENDIF
+     C*          ----------------------------------------------------
+     C*
+     C           IVDECD    IFEQ ' '
+     C                     SELEC
+     C           IVACNT    WHEQ '4'
+     C                     EXSR C4#RTN
+     C           IVACNT    WHEQ '5'
+     C                     EXSR C5#RTN
+     C           IVACNT    WHEQ '6'
+     C                     MOVELIVAPNO    XXAPNO
+     C           IVNO      CHAININVMST               97
+     C           *IN97     IFEQ '0'
+     C           INTYPE    ANDEQ'2'
+     C           XXNO      IFEQ ' '
+     C                     ADD  IVAMT     NAMT
+     C                     ADD  IVAMT     NAMTX
+     C                     ELSE
+     C*          IVAPNO    IFNE WAPNO
+     C                     EXSR C6#RTN
+     C                     MOVELIVAPNO    WAPNO   8
+     C*                    ENDIF
+     C                     ENDIF
+     C           NAMTX     IFNE 0
+     C           NAMTX     ADD  GAMTX     WNG    110
+     C                     ADD  XAMTS     WNG
+     C           FAMTX     ADD  HAMTX     WHG    110
+     C                     ADD  XAMTA     WNG
+     C                     Z-SUBWNG       WNG1   110
+     C           WNG1      IFGE WHG
+     C                     SUB  FAMTX     NAMT1  110
+     C                     ELSE
+     C                     ADD  NAMTX     NAMT1
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C           IVACNT    WHEQ '7'
+     C                     EXSR C7#RTN
+     C                     ENDSL
+     C                     ENDIF
+     C                     ENDDO
+     C***
+     CSR         D#PRZ     ENDSR
+     C****
+     CSR         C4#RTN    BEGSR
+     C                     SELEC
+     C           IVFL03    WHEQ 'E'
+     C                     ADD  IVAMT     EAMT
+     C           IVFL03    WHEQ 'F'
+     C                     ADD  IVAMT     FAMT
+     C                     ADD  IVAMT     FAMTX
+     C           IVFL03    WHEQ 'G'
+     C                     ADD  IVAMT     GAMT
+     C                     ADD  IVAMT     GAMTX
+     C           IVFL03    WHEQ 'H'
+     C                     ADD  IVAMT     HAMT
+     C                     ADD  IVAMT     HAMTX
+     C                     ENDSL
+     CSR                   ENDSR
+     C****
+     CSR         C5#RTN    BEGSR
+     C           IVFL03    IFEQ 'F'
+     C                     ADD  IVAMT     XAMT
+     C                     ENDIF
+     C           IVAMT     IFGT 0
+     C                     ADD  IVAMT     XAMTA  110
+     C                     ELSE
+     C                     ADD  IVAMT     XAMTS  110
+     C                     END
+     CSR                   ENDSR
+     C****
+     CSR         C6#RTN    BEGSR
+     C                     SETOF                     20
+     C                     MOVELIVAPNO    RVNO
+     C                     MOVELIVAPNO    APNO    6
+     C                     Z-ADD0         RVITEM
+     C           RVKEY     SETLLRCVDTL               97
+     C           *IN97     DOWEQ'0'
+     C           APNO      READERCVDTL                   97
+     C         97          LEAVE
+     C           RVUSTP    IFEQ 'A2'
+     C           RVNTTP    IFGE 'A'
+     C           RVNTTP    ANDLE'E'
+     C           RVNTCD    IFEQ '1'
+     C                     SUB  RVRAMT    NAMT
+     C                     SUB  RVRAMT    NAMTX
+     C*                    SETON                     20
+     C                     ENDIF
+     C                     ELSE
+     C           RVNTTP    IFGE 'F'
+     C           RVNTTP    ANDLE'J'
+     C                     SUB  RVRAMT    NAMT
+     C                     SUB  RVRAMT    NAMTX
+     C*                    SETON                     20
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           RVUSTP    IFNE 'A2'
+     C                     EXSR D#SLC
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     CSR                   ENDSR
+     C****
+     CSR         C7#RTN    BEGSR
+     C                     ADD  IVAMT     SAMT
+     CSR                   ENDSR
+     C****
+     CSR         D#SLC     BEGSR
+     C           RVKEY     CHAINAXREC                96
+     C           *IN96     IFEQ '0'
+     C           AXFLAG    ANDNE'D'
+     C           RVNTCD    IFEQ '1'
+     C           RVNTTP    ORGE 'F'
+     C           RVNTTP    ANDLE'J'
+     C                     SUB  RVRAMT    NAMT
+     C                     SUB  RVRAMT    NAMTX
+     C                     ENDIF
+     C                     ENDIF
+     CSR                   ENDSR
+     C****
+     CSR         UP#AR     BEGSR
+     C                     Z-SUBGAMT      AFGAMT
+     C                     Z-SUBEAMT      AFEAMT
+     C                     Z-SUBNAMT1     AFNAMT
+     C                     MOVEL'C'       AFFLAG
+     C                     Z-ADDFAMT      AFFAMT
+     C                     Z-ADDHAMT      AFHAMT
+     C                     Z-ADDSAMT      AFSAMT
+     C                     Z-ADDXAMT      AFXAMT
+     C           AFNAMT    IFGT AFFAMT
+     C                     Z-ADDAFFAMT    AFNAMT
+     C                     ENDIF
+     C*
+CLJ  C                     Z-ADDAFNBAL    W#NBAL 110       財會餘額
+     C*
+     C           AFNAMT    SUB  AFEAMT    AFNBAL
+     C                     ADD  AFHAMT    AFNBAL
+     C                     SUB  AFGAMT    AFNBAL
+     C*                    SUB  AFSAMT    AFNBAL
+     C                     MOVE UDATE     AFCHDT
+     C*
+     C           W#NBAL    IFLT AFNBAL                     財會餘額小
+     C                     MOVE AFNBAL    AFRESV
+     C                     MOVEL'*'       AFRESV
+     C                     Z-ADDW#NBAL    AFNBAL           用財會
+     C*
+     C                     ELSE
+     C                     MOVE W#NBAL    AFRESV
+     C                     MOVEL'#'       AFRESV
+     C                     ENDIF
+     C*
+     C                     UPDATAFREC
+     CSR         UP#ARZ    ENDSR
+

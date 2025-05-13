@@ -1,0 +1,104 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR083R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     預收貨款增減明細表
+     H*            5.DATE-WRITTEN  89/02/19
+     H*            6.UPDATE  DATE 104/10/05  2015AR953  S00WCJ (0409A)
+     H*                            產品代碼3碼擴5碼
+     H*
+     H*  說明：將本期預收折讓寫入ARBBALT (單據代號AR06)
+     H*  　　　將本期預收轉回寫入ARBBALT (單據代號AR07)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FARBBALT UF  E           K        DISK                      A
+     FINVMST  IF  E           K        DISK
+     ITXREC       01
+     I                                              TXORNOL2
+     I                                              TXTXARL1
+     I            DS
+0409AI                                        1  30 D#RESV
+     I                                        1   60D#YYMM
+     I           UDS
+     I                                      501 5060U#YYMM
+     I*****************************************************************
+     C           K#BALT    KLIST
+     C                     KFLD           ATORNO
+     C                     KFLD           ATCODE
+     C                     KFLD           ATNO
+     C*****************************************************************
+     C  N99                MOVE *ON       *IN99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD1         W#AR06  40
+     C                     Z-ADD1         W#AR07  40
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AMT   90
+     C                     Z-ADD0         W#AMT1  90
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVE TXRESV    D#RESV
+     C           D#YYMM    IFEQ U#YYMM                     *入帳年月
+     C           TXAMT     IFGT 0
+     C                     ADD  TXAMT     W#AMT
+     C                     ELSE
+     C                     ADD  TXAMT     W#AMT1
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           D#YYMM    IFEQ U#YYMM                     *入帳年月
+     C                     MOVELTXORNO    ATORNO           *訂單編號
+     C                     MOVE 'AR06'    ATCODE           *單據代號
+     C                     Z-ADDW#AR06    ATNO             *單據編號
+     C           K#BALT    CHAINRARBBALT             40
+     C                     MOVELTXTXAR    ATAREA           *銷貨廠區
+     C                     Z-ADDW#AMT     ATAMT     H      *預收金額
+     C                     MOVELTXNO      ATINNO           *發票號碼
+     C*  891004扣除預收貨款稅額
+     C           ATINNO    CHAININREC               N50
+8910 C  N50      INKIND    IFEQ '2'
+ .   C           INTXTP    ANDEQ'1'
+ .   C           ATAMT     DIV  1.05      ATAMT     H
+ .   C                     ENDIF
+     C                     WRITERARBBALT
+     C                     ADD  1         W#AR06
+     C*
+     C           W#AMT1    IFNE 0
+     C                     MOVE 'AR07'    ATCODE           *單據代號
+     C                     Z-ADDW#AR07    ATNO             *單據編號
+     C           K#BALT    CHAINRARBBALT             40
+     C                     MOVELTXTXAR    ATAREA           *銷貨廠區
+     C                     Z-ADDW#AMT1    ATAMT     H      *預收金額
+     C                     MOVELTXNO      ATINNO           *發票號碼
+     C*  891004扣除預收貨款稅額
+     C           ATINNO    CHAININREC               N50
+8910 C  N50      INKIND    IFEQ '2'
+ .   C           INTXTP    ANDEQ'1'
+ .   C           ATAMT     DIV  1.05      ATAMT     H
+ .   C                     ENDIF
+     C                     WRITERARBBALT
+     C                     ADD  1         W#AR07
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C                     ENDSR
+

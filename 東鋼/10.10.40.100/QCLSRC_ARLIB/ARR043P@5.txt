@@ -1,0 +1,171 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE  98/06/15 2009AR323 S00WCJ (9806A)  */
+    /*                           99/03/17 2010AR450 S00WCJ (9903A)  */
+    /*                          101/08/06 S00WCJ (0108A)            */
+    /*                           發票EW52015668因折讓單稅額多   */
+    /*                            KEY，造成無法完全沖帳，因折讓單 */
+    /*                           已與客戶確認，故於此報表排除     */
+    /*                         101/10/01  S00WCJ (0110A)            */
+    /*                         101/11/05  2012AR698 S00WCJ (0111A)  */
+    /*                           增加訂單編號及請款日期區間為篩選 */
+    /*                           條件                             */
+    /*                         101/11/22  2012AR702 S00WCJ (0111B)  */
+    /*                           發票WP70907132無法完全沖帳，於 */
+    /*                           此報表排除                       */
+    /*                         103/08/04  2014AR857 S00WCJ (0308A)  */
+    /*                           發票AS73522926無法完全沖帳，於 */
+    /*                           此報表排除                       */
+    /*                         103/08/22  2014AR864 S00WCJ (0308B)  */
+    /*                          發票ZC73519717.ZX73522533無法完 */
+    /*                          全沖帳，於此報表排除              */
+    /*                         103/09/22  2014AR873 S00WCJ (0309A)  */
+    /*                          發票AS73522686無法完全沖帳，於  */
+    /*                          此報表排除                        */
+    /*                         104/01/22  2015AR903 S00WCJ (0401A)  */
+    /*                          發票DB73519214因為總帳與發票    */
+    /*                           AS73522926互沖為零，但應收部份無 */
+    /*                          法沖銷，故排除                    */
+    /*                         105/02/03 2016AR978 S00WCJ (0502A)   */
+    /*                          發票QW60003001，因稅額四捨五入  */
+    /*                          無法沖銷，故排除                  */
+    /*                                                              */
+    /****************************************************************/
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&S)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&E)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ST)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&EN)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&SYSN) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&CUNO) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&CUNS) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&CUNE) TYPE(*CHAR) LEN(6)
+/*0111A*/    DCL        VAR(&W#ORNO) TYPE(*CHAR) LEN(6)
+/*0111A*/    DCL        VAR(&W#ORNS) TYPE(*CHAR) LEN(6)
+/*0111A*/    DCL        VAR(&W#ORNE) TYPE(*CHAR) LEN(6)
+/*0111A*/    DCL        VAR(&W#DATS) TYPE(*CHAR) LEN(8)
+/*0111A*/    DCL        VAR(&W#DATE) TYPE(*CHAR) LEN(8)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             RTVNETA    SYSNAME(&SYSN)
+
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARR043RS) PARM(&IN03 &S &E &AREA &CUNO)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGDTAARA  DTAARA(*LDA (1 1)) VALUE(&S)
+             CHGDTAARA  DTAARA(*LDA (2 1)) VALUE(' ')
+             CHGDTAARA  DTAARA(*LDA (3 1)) VALUE(&E)
+             CHGDTAARA  DTAARA(*LDA (4 1)) VALUE(' ')
+             CHGDTAARA  DTAARA(*LDA (5 1)) VALUE(&AREA)
+             CHGDTAARA  DTAARA(*LDA (6 6)) VALUE(&CUNO)
+
+             SBMJOB     JOB(ARR043P) JOBD(CCJOBD)            +
+                          OUTQ(&OUTQ) RQSDTA('CALL ARR043P')
+             RETURN
+             ENDDO
+BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 2))   RTNVAR(&ST)
+             RTVDTAARA  DTAARA(*LDA (3 2))   RTNVAR(&EN)
+             RTVDTAARA  DTAARA(*LDA (5 1))   RTNVAR(&AREA)
+             RTVDTAARA  DTAARA(*LDA (6 6))   RTNVAR(&CUNO)
+             RTVDTAARA  DTAARA(*LDA (21 6)) RTNVAR(&W#ORNO)
+             RTVDTAARA  DTAARA(*LDA (31 8)) RTNVAR(&W#DATS)
+             RTVDTAARA  DTAARA(*LDA (41 8)) RTNVAR(&W#DATE)
+
+ /*客戶代號如為空白，則顯示全部*/
+             IF         COND(&CUNO *EQ '      ') THEN(DO)
+             CHGVAR     VAR(&CUNS) VALUE('      ')
+             CHGVAR     VAR(&CUNE) VALUE('999999')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&CUNS) VALUE(&CUNO)
+             CHGVAR     VAR(&CUNE) VALUE(&CUNO)
+             ENDDO
+
+ /*0111A*訂單編號空白，顯示全部*/
+ /*0111A*/   IF         COND(&W#ORNO *EQ '      ') THEN(DO)
+ /*0111A*/      CHGVAR     VAR(&W#ORNS) VALUE('      ')
+ /*0111A*/      CHGVAR     VAR(&W#ORNE) VALUE('999999')
+ /*0111A*/   ENDDO
+ /*0111A*/   ELSE (DO)
+ /*0111A*/      CHGVAR     VAR(&W#ORNS) VALUE(&W#ORNO)
+ /*0111A*/      CHGVAR     VAR(&W#ORNE) VALUE(&W#ORNO)
+ /*0111A*/   ENDDO
+
+             OVRPRTF    FILE(QPRINT) PAGESIZE(*N 176) CPI(13.3)
+             OVRDBF     FILE(INVMST) TOFILE(INVMST) SHARE(*YES)
+
+             /*排除發票MW38881554 (因畸零尾差造成負1 ) */
+             /*排除發票BW49428622 (因畸零尾差造成負1 ) */
+             /*排除發票YW49428745 (因畸零尾差造成負1 ) 9806A*/
+             /*排除發票EW52105668                       0108A*/
+             /*排除發票WP70907132 (因畸零尾差造成負1 ) 0110A*/
+             /*排除發票AS73522926                        0308A*/
+             /*排除發票ZC73519717.ZX73522533             0308B*/
+             /*排除發票AS73522686                        0309A*/
+             /*排除發票DB73519214                        0401A*/
+             /*排除發票QW60003001                        0502A*/
+
+                     /* 不依請款單分類（台北） */
+             IF         COND(&SYSN *EQ 'P02') THEN(DO)
+ /*0308A*/   OPNQRYF    FILE(INVMST)                           +
+                        QRYSLT('INRVID *GE "' || &ST   || '"   +
+                           *AND INRVID *LE "' || &EN   || '"   +
+                           *AND INCUNO *GE "' || &CUNS || '"   +
+                           *AND INCUNO *LE "' || &CUNE || '"   +
+                           *AND INORNO *GE "' || &W#ORNS || '" +
+                           *AND INORNO *LE "' || &W#ORNE || '" +
+                           *AND APDT   *GE "' || &W#DATS || '" +
+                           *AND APDT   *LE "' || &W#DATE || '" +
+                           *AND INTYPE *NE "9"                 +
+                           *AND INNO   *NE "MW38881554"        +
+                           *AND INNO   *NE "BW49428622"        +
+                           *AND INNO   *NE "YW49428745"        +
+                           *AND INNO   *NE "EW52105668"        +
+                           *AND INNO   *NE "EP27877440"        +
+                           *AND INNO   *NE "FM27873389"        +
+                           *AND INNO   *NE "FM27873543"        +
+                           *AND INNO   *NE "FM27873550"        +
+                           *AND INNO   *NE "FM27873555"        +
+                           *AND INNO   *NE "WP70907132"        +
+                           *AND INNO   *NE "AS73522926"        +
+                           *AND INNO   *NE "ZC73519717"        +
+                           *AND INNO   *NE "ZX73522533"        +
+                           *AND INNO   *NE "AS73522686"        +
+                           *AND INNO   *NE "DB73519214"        +
+                           *AND INNO   *NE "QW60003001"        +
+                           *AND INDECD *EQ " "')               +
+                        MAPFLD((APDT INAPDT *CHAR 8))          +
+                        KEYFLD((INRVID) (INCUNM) (INCUNO)      +
+                                        (ININDT) (INNO))
+             CALL       PGM(ARR043R1)
+             ENDDO
+
+                     /* 依請款單分類（高雄） */
+             ELSE       DO
+/*0111A*/    OPNQRYF    FILE(INVMST)                           +
+                        QRYSLT('INRVID *GE "' || &ST || '"     +
+                           *AND INRVID *LE "' || &EN || '"     +
+                           *AND INCUNO *GE "' || &CUNS || '"   +
+                           *AND INCUNO *LE "' || &CUNE || '"   +
+                           *AND INORNO *GE "' || &W#ORNS || '" +
+                           *AND INORNO *LE "' || &W#ORNE || '" +
+                           *AND APDT   *GE "' || &W#DATS || '" +
+                           *AND APDT   *LE "' || &W#DATE || '" +
+                           *AND INTYPE *NE "9"                 +
+                           *AND INDECD *EQ " "')               +
+                        MAPFLD((APDT INAPDT *CHAR 8))          +
+                        KEYFLD((INRVID) (INCUNM) (INCUNO)      +
+                               (INAPNO) (ININDT) (INNO))
+             CALL       PGM(ARR043R2)
+             ENDDO
+
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

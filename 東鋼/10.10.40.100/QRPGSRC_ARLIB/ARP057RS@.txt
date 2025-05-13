@@ -1,0 +1,106 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP057RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     重開上月最後一日發票（外銷）
+     H*            5.DATE-WRITTEN  87/03/04
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARP057S CF  E                    WORKSTN
+     FARALOG  O   E           K        DISK
+     I*************************************************************
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1   60W#DATE
+     I                                        1   20W#YY
+     I                                        3   40W#MM
+     I                                        5   60W#DD
+     I            DS
+     I                                        1  140W#SYST
+     I                                        1   60D#ST
+     I                                        7  100D#SY
+     I                                       11  140D#SMD
+     I            DS
+     I                                        1   60W#TMDT
+     I                                        1   40D#TMYM
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C                     PARM           P#DATE  60
+     C                     PARM           P#AREA  1
+     C**************************************************************
+     C                     EXSR SR1000                     上月最後日
+     C                     MOVELW#DATE    S#DATE
+     C                     MOVELU#AREA    S#AREA
+     C*
+     C                     EXFMTAR057F1
+     C           *IN03     IFEQ '1'
+     C                     MOVEL'1'       P#IN03
+     C                     ELSE
+     C                     MOVEL'0'       P#IN03
+     C                     MOVELW#DATE    P#DATE
+     C                     MOVELS#AREA    P#AREA
+     C                     EXSR SR2000                     登錄異動
+     C                     ENDIF
+     C                     SETON                     LR
+     C*
+     C************************************
+     C*  求得上月最後一日之年月日
+     C************************************
+     CSR         SR1000    BEGSR
+     C                     MOVELUDATE     W#DATE
+     C           W#MM      IFEQ 1                          調至上年
+     C                     SUB  1         W#YY
+     C                     Z-ADD12        W#MM
+     C                     ELSE
+     C                     SUB  1         W#MM             調至上月
+     C                     ENDIF
+     C*
+     C                     Z-ADD31        W#DD
+     C           1         DOWEQ1
+     C*                    MOVE '0'       P#FLAG  1
+     C*                    MOVELW#DATE    P#DATE  60
+     C*                    CALL 'C01'
+     C*                    PARM           P#DATE
+     C*                    PARM           P#FLAG  1
+     C                     MOVE *ALL'0'   P#PDAT
+     C                     MOVE W#DATE    P#PDAT
+     C                     CALL 'UTS102R'
+     C                     PARM           P#PDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM ' '       P#FLAG  1
+     C           P#FLAG    IFEQ '0'
+     C                     LEAVE
+     C                     ENDIF
+     C                     SUB  1         W#DD
+     C                     ENDDO
+     C*                    FREE 'C01'
+     CSR                   ENDSR
+     C*
+     C************************************
+     C*  存入異動登錄檔以茲記錄
+     C************************************
+     CSR         SR2000    BEGSR
+     C                     CLEARRARALOG
+     C                     Z-ADDUDATE     AGDATE           日期
+     C                     TIME           W#SYST
+     C                     Z-ADDD#ST      AGTIME           時間
+     C                     MOVELU#USID    AGURID           使用者
+     C                     MOVEL'AI3'     AGTRID           異動代號
+     C                     MOVEL'ARP057P' AGRENO           相關號碼
+     C*                    MOVELS#CGCA    AGCGCA           修改原因
+     C                     WRITERARALOG
+     CSR                   ENDSR
+

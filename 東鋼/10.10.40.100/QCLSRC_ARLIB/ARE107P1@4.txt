@@ -1,0 +1,121 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARE107P1                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCJ                                  */
+     /*     4.FUNCTION     電子押匯上傳處理及報表產生作業         */
+     /*     5.DATE-WRITTEN  112/06/08 2023AR00031                   */
+     /*     6.UPDATE  DATE  112/10/05 2023AR00044 S00WCJ (1210A)    */
+     /*                      配合報表增加託收帳號修改             */
+     /*                     113/03/25 2024AR00011 S00WCJ (1303A)    */
+     /*                      配合K&N上線修改增加DDMF相關處理  */
+     /*                     113/03/25 2024AR00010 S00WCJ (1303B)    */
+     /*                       COPY P廠程式至K&N使用             */
+     /*                     113/04/12 S00WCJ (1304A)                */
+     /*                      高雄廠沖銷桃園廠發票造成電子押匯發票 */
+     /*                      明細介面檔資料無法寫入，改用DDMF讀 */
+     /*                      取P廠電子發票相關檔案，以避免此問題*/
+     /*                     113/10/17 S00WCJ (1310A)                */
+     /*                      增加篩選條件，只讀取會計科目為111001 */
+     /*                      之資料，避免其他會科資料造成程式錯誤 */
+     /*                                                             */
+     /***************************************************************/
+             PGM        PARM(&W#RVNO &W#DUDT)
+
+             DCL        VAR(&W#RVNO)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&W#DUDT)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+/*1303A*/    DCL        VAR(&W#RNAME)  TYPE(*CHAR)  LEN(20)
+/*1303A*/    DCL        VAR(&P#LOC)    TYPE(*CHAR)  LEN(1)
+/*1303A*/    DCL        VAR(&RMTFLG) TYPE(*CHAR) LEN(1) /*遠端通訊碼*/
+/*1303A*/    DCL        VAR(&W#USER) TYPE(*CHAR) LEN(10)
+/*1303A*/    DCL        VAR(&W#CNT)  TYPE(*DEC)  LEN(1 0) VALUE(0)
+/*1303A*/    DCL        VAR(&W#CNTC) TYPE(*CHAR) LEN(1)
+/*1303A*/    DCL        VAR(&W#CNTN) TYPE(*CHAR) LEN(1) VALUE('2') /*PING次*/
+
+/*1303A*/    RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&P#LOC)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+
+/*1303A*/    IF         COND(&P#LOC  *NE 'P')  THEN(DO)
+/*1303A P廠遠端通訊檢核*/
+/*1303A*/    RTVJOBA    USER(&W#USER)
+/*1303A*/    CHGVAR     VAR(&RMTFLG) VALUE('0')    /*遠端通訊正常*/
+
+ PING:       CHGVAR     VAR(&W#CNT)  VALUE(&W#CNT + 1)    /*1303A*/
+/*1303A*/    CHGVAR     VAR(&W#CNTC) VALUE(&W#CNT)
+/*1303A*/    PING       RMTSYS(P02) MSGMODE(*QUIET *ESCAPE) +
+                          PKTLEN(512) NBRPKT(1) WAITTIME(1)
+/*1303A*/    MONMSG     MSGID(TCP0000) EXEC(DO)
+/*1303A*/    IF         COND(&W#CNTC *EQ &W#CNTN) THEN(CHGVAR +
+                          VAR(&RMTFLG) VALUE('1')) /*遠端通訊異常*/
+/*1303A*/    SNDUSRMSG  MSG('P02主機斷線，請待連線正常再操作一次+
+                          ，謝謝！(ARE107P1)') +
+                          MSGTYPE(*INFO) TOUSR(S00WCJ)
+/*1303A*/    IF         COND(&W#CNTC *NE &W#CNTN) THEN(GOTO CMDLBL(PING))
+/*1303A*/    ENDDO
+
+/*1303A*/    IF         COND(&RMTFLG *EQ '1') THEN(DO)  /*遠端通訊異常*/
+             SNDUSRMSG  MSG('P02主機斷線，請待連線正常再操作一次+
+                          ，謝謝！(ARE107P1)') +
+                          MSGTYPE(*INFO) TOUSR(S00WCJ)
+/*1303A*/    SNDUSRMSG  MSG('P02主機斷線，請待連線正常再操作一次+
+                          ，謝謝！(ARE107P1)') +
+                          MSGTYPE(*INFO) TOUSR(&W#USER)
+/*1303A*/    GOTO       CMDLBL(ENDCLPGM)
+/*1303A*/    ENDDO
+ /* P02-P廠遠端通訊檢核END */
+
+/*1303A*/       CHGVAR      VAR(&W#RNAME)  VALUE('P02')
+/*1303A*/       DLTF      FILE(QTMEP/LLCMSN)
+/*1303A*/       MONMSG     MSGID(CPF0000)
+/*1303A*/       CRTDDMF    FILE(QTEMP/LLCMSN) RMTFILE(DALIB/LLCMSN)     +
+                          RMTLOCNAME(&W#RNAME *SNA)
+/*1303A*/       OVRDBF     FILE(LLCMSN)  TOFILE(QTEMP/LLCMSN) +
+                          SECURE(*YES)
+
+/*1304A*/       DLTF      FILE(QTMEP/INEMST)
+/*1304A*/       MONMSG     MSGID(CPF0000)
+/*1304A*/       CRTDDMF    FILE(QTEMP/INEMST) RMTFILE(DALIB/INEMST)     +
+                          RMTLOCNAME(&W#RNAME *SNA)
+/*1304A*/       OVRDBF     FILE(INEMST)  TOFILE(QTEMP/INEMST) +
+                          SECURE(*YES)
+
+/*1304A*/       DLTF      FILE(QTMEP/INEDTL)
+/*1304A*/       MONMSG     MSGID(CPF0000)
+/*1304A*/       CRTDDMF    FILE(QTEMP/INEDTL) RMTFILE(DALIB/INEDTL)     +
+                          RMTLOCNAME(&W#RNAME *SNA)
+/*1304A*/       OVRDBF     FILE(INEDTL)  TOFILE(QTEMP/INEDTL) +
+                          SECURE(*YES)
+
+/*1303A*/    ENDDO
+
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+   /*        SBMJOB     JOB(ARE107P1) JOBD(ARJOBD) JOBQ(ARJOBQ) +
+                           RQSDTA('CALL PGM(ARE107P) +
+                          PARM(''' || &W#RVNO || '''   +
+                               ''' || &W#DUDT || ''')')     */
+   /*        RETURN      */
+
+ BATCH:
+/*1210A*/    OVRPRTF    FILE(ARE107T) PAGESIZE(*N 132) CPI(15) +
+                        HOLD(*YES) SAVE(*YES) +
+                        USRDTA('押匯檢核')
+             OVRDBF     FILE(RCVDTL) TOFILE(RCVDTL) SHARE(*YES)
+/*1310A*/        OPNQRYF    FILE((RCVDTL)) OPTION(*ALL) QRYSLT('  +
+                          (RVACNO  *EQ "111001") *AND +
+                          (RVNO *EQ "' || &W#RVNO || '") ') +
+                          KEYFLD((RVNO) (RVNTNO))
+
+             CALL       PGM(ARE107R1) PARM(&W#RVNO &W#DUDT)
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+
+
+ ENDCLPGM:   ENDPGM
+

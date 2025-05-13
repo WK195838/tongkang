@@ -1,0 +1,144 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR069P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     訂單別出貨及發票明細表                 */
+     /*     5.DATE-WRITTEN  86/10/09                                */
+     /*     6.UPDATE  DATE  99/04/29 2010AR469  S00WCJ (9904A)      */
+     /*                     99/08/20 2010AR519  S00WCJ (9908A)      */
+     /*                    109/06/04 S00WCJ (0906A)                 */
+     /*                     修改TXRESV借用後，ARR069R2讀不到磅*/
+     /*                     單項次資料BUG                         */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&ORNO) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&YMDS) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&YMDE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&ORN1) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&ORN2) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&ORN3) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&ORN4) TYPE(*CHAR) LEN(6)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+             CALL       PGM(ARR069RS) PARM(&IN03)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+       /*    SBMJOB     JOB(ARR069P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR069P')    */
+      /*     RETURN                   */
+
+ BATCH:      RTVDTAARA  DTAARA(*LDA (401 6))      RTNVAR(&ORNO)
+             RTVDTAARA  DTAARA(*LDA (407 8))      RTNVAR(&YMDS)
+             RTVDTAARA  DTAARA(*LDA (415 8))      RTNVAR(&YMDE)
+             RTVDTAARA  DTAARA(*LDA (429 6))      RTNVAR(&ORN1)
+             RTVDTAARA  DTAARA(*LDA (435 6))      RTNVAR(&ORN2)
+             RTVDTAARA  DTAARA(*LDA (441 6))      RTNVAR(&ORN3)
+             RTVDTAARA  DTAARA(*LDA (447 6))      RTNVAR(&ORN4)
+
+             IF         COND(&ORNO *EQ '      ') THEN(DO)
+             CHGVAR     VAR(&ORN1)    VALUE('999999')
+             ENDDO
+
+             IF         COND(&ORN1 *EQ '      ') THEN(DO)
+             CHGVAR     VAR(&ORN1)    VALUE('999999')
+             ENDDO
+
+             IF         COND(&ORN2 *EQ '      ') THEN(DO)
+             CHGVAR     VAR(&ORN2)    VALUE('999999')
+             ENDDO
+
+             IF         COND(&ORN3 *EQ '      ') THEN(DO)
+             CHGVAR     VAR(&ORN3)    VALUE('999999')
+             ENDDO
+
+             IF         COND(&ORN4 *EQ '      ') THEN(DO)
+             CHGVAR     VAR(&ORN4)    VALUE('999999')
+             ENDDO
+
+             DLTF       FILE(S00WCJ/ARR069F)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(ARR069F) FROMLIB(ARLIB) OBJTYPE(*FILE) +
+                          TOLIB(S00WCJ)
+             OVRDBF   FILE(ARR069F) TOFILE(S00WCJ/ARR069F) SHARE(*YES)
+
+ STEP1:                 /* 找出地磅磅單 */
+             OVRDBF   FILE(WTMASPJ1) TOFILE(BKLIB/WTMASPJ1) SHARE(*YES)
+    /*9904A  START */
+         /*  OPNQRYF  FILE(WTMASPJ1) +
+                        QRYSLT( +
+                           'W6FLAG *NE "D" *AND +
+                            W6ENTD *GE ' || &YMDS || ' *AND +
+                            W6ENTD *LE ' || &YMDE || ' *AND +
+                            (W6ORNO *EQ "' || &ORNO || '" *OR +
+                             W6ORNO *EQ "' || &ORN1 || '" *OR +
+                             W6ORNO *EQ "' || &ORN2 || '" *OR +
+                             W6ORNO *EQ "' || &ORN3 || '" *OR +
+                             W6ORNO *EQ "' || &ORN4 || '" ) *AND +
+                            W6TRCD *EQ %VALUES("11" "1E" "1F" "1G" +
+                                               "0A" "14") *AND +
+                            W7SPLT *EQ %VALUES("W" "1" "2" "3" "4" +
+                                    "5" "6" "7" "8" "9") ')     +
+                        KEYFLD((W6ORNO) (W6ENTD) (W7AREA) (W7VNO2) +
+                               (W7NAME) (W7QULT) (W7SPE1) (W7SQIT)) */
+
+             OPNQRYF  FILE(WTMASPJ1) +
+                        QRYSLT( +
+                           'W6FLAG *NE "D" *AND +
+                            W6ENTD *GE ' || &YMDS || ' *AND +
+                            W6ENTD *LE ' || &YMDE || ' *AND +
+                            (W6ORNO *EQ "' || &ORNO || '" *OR +
+                             W6ORNO *EQ "' || &ORN1 || '" *OR +
+                             W6ORNO *EQ "' || &ORN2 || '" *OR +
+                             W6ORNO *EQ "' || &ORN3 || '" *OR +
+                             W6ORNO *EQ "' || &ORN4 || '" ) *AND +
+                            W6TRCD *EQ %VALUES("11" "1E" "1F" "1G" +
+                                          "0A" "14" "1B" "1C") *AND +
+                            W7SPLT *EQ %VALUES("W" "1" "2" "3" "4" +
+                                    "5" "6" "7" "8" "9") ')     +
+                        KEYFLD((W6ORNO) (W6ENTD) (W7AREA) (W7VNO2) +
+                               (W7NAME) (W7QULT) (W7SPE1) (W7SQIT))
+    /*9904A  END */
+             CALL       PGM(ARR069R1)
+             CLOF       OPNID(WTMASPJ1)
+
+ STEP2:                 /* 從銷貨找發票資料 */
+             OVRDBF     FILE(INVMST) TOFILE(DALIB/INVMST1M) SHARE(*YES)
+             OVRDBF     FILE(INVDTL) TOFILE(DALIB/INVDTL1M) SHARE(*YES)
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL1M) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT(   +
+                         '(TXDATE *GE ' || &YMDS || '  *AND    +
+                           TXDATE *LE ' || &YMDE || ') *AND    +
+                          (TXVUNO *EQ "' || &ORNO ||'" *OR   +
+                           TXVUNO *EQ "' || &ORN1 ||'" *OR   +
+                           TXVUNO *EQ "' || &ORN2 ||'" *OR   +
+                           TXVUNO *EQ "' || &ORN3 ||'" *OR   +
+                           TXVUNO *EQ "' || &ORN4 ||'" ) *AND +
+                           TXIVNO *NE "          " *AND       +
+                           IVNO   *NE "000000"     *AND       +
+                           TXCODE *EQ "SA04"') +
+                        MAPFLD((TXVUNO '%SST(TXORNO 1 6)')  +
+                               (IVNO   '%SST(TXIVNO 1 6)')) +
+                        KEYFLD((TXVUNO) (TXNO) (TXIVNO))
+             CALL       PGM(ARR069R2)
+             CLOF       OPNID(TRNDTL)
+
+ STEP3:                 /* 列印報表 */
+             OVRPRTF    FILE(ARR069T) TOFILE(ARLIB/ARR069T) +
+                        PAGESIZE(*N 158) CPI(12) HOLD(*YES)   +
+                        USRDTA('訂出發明')
+             CALL       PGM(ARR069R3)
+
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

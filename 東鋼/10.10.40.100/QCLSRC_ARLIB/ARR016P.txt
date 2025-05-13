@@ -1,0 +1,49 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE  101/09/24  2012AR682 S00WCJ (0109A)*/
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)  TYPE(*LGL)  LEN(1)
+             DCL        VAR(&CUST1) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&CUST2) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&AREA)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&AREAE) TYPE(*CHAR) LEN(1)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARR016RS) PARM(&IN03 &AREA &CUST1 &CUST2)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&AREAE) VALUE(&AREA)
+             IF         COND(&AREA *EQ ' ') THEN(CHGVAR VAR(&AREAE) +
+                          VALUE('9'))
+             CHGDTAARA  DTAARA(*LDA (1 6)) VALUE(&CUST1)
+             CHGDTAARA  DTAARA(*LDA (7 6)) VALUE(&CUST2)
+             CHGDTAARA  DTAARA(*LDA (13 1)) VALUE(&AREA)
+             CHGDTAARA  DTAARA(*LDA (14 1)) VALUE(&AREAE)
+             SBMJOB     JOB(ARR016P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR016P')
+             RETURN
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&CUST1)
+             RTVDTAARA  DTAARA(*LDA (7 6)) RTNVAR(&CUST2)
+             RTVDTAARA  DTAARA(*LDA (13 1)) RTNVAR(&AREA)
+             RTVDTAARA  DTAARA(*LDA (14 1)) RTNVAR(&AREAE)
+             OVRDBF     FILE(RCVDTL) TOFILE(RCVDTL) SHARE(*YES)
+             OPNQRYF    FILE((RCVDTL)) QRYSLT('             +
+                  %SST(RVNO 1 1) = %RANGE("' || &AREA  || '"    +
+                                          "' || &AREAE || '") & +
+                          RVCUNO = %RANGE("' || &CUST1 || '"    +
+                                          "' || &CUST2 || '") & +
+                          RVNTCD *EQ " "                      & +
+                          RVTYPE *NE "3"                      & +
+                          (RVACNO *EQ "1131" *OR *RVACNO *EQ     +
+                          "111001")')                +
+                          KEYFLD((RVCUNO))
+             CALL       PGM(ARR016R) PARM(&AREA &CUST1 &CUST2)
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

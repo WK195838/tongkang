@@ -1,0 +1,223 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARP084R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     承購發票預支試算作業--試算確認
+     H*            5.DATE-WRITTEN  90/11/10
+     H*            6.UPDATE
+     H*****************************************************************
+     H        1   Y                                     1
+     FARP084SBCF  E                    WORKSTN
+     F                                        RRN1  KSFILE AR084F1
+     FARDEPTW UF  E           K        DISK
+     FARBANK  IF  E           K        DISK
+     FARINVM  UF  E           K        DISK
+     FARCUDT  UF  E           K        DISK
+     FARDEPT  O   E           K        DISK
+     E                    ERR     1   3 70               *錯誤訊息
+     I           UDS
+     I                                      307 309 D#BKID
+     I                                      310 3210D#PAMT
+     I                                      322 3270D#PRAT
+     I                                      328 3390D#XAMT
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVN
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*FILE => ARDEPT
+     C           K#DEPT    KLIST
+     C                     KFLD           AWINDT           發票日期
+     C                     KFLD           AWINNO           發票號碼
+     C****************************************************************
+     C*      MAIN           PROGRAM
+     C****************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000            READC
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C                     MOVEL'ARP084SB'S#SRID
+     C                     MOVE '01'      W#PRID  2
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVE *ALL'-'   S#LIN3
+     C                     MOVELERR,2     S#ERR1
+     C*
+     C                     MOVE D#BKID    S#BANK           銀行代號
+     C           S#BANK    CHAINRARBANK             N40
+     C                     MOVE ABBKNM    S#BANM           銀行簡稱
+     C                     Z-ADDD#PAMT    S#PAM1           預支總額
+     C           D#PRAT    DIV  100000    S#RATE           預支利率
+     C                     Z-ADDD#XAMT    S#PAM2           試算總額
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->ARP084SB-1畫面
+     C                     Z-SUB8         S#NBR1
+     C                     MOVE '-1'      S#SRID
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN74            *SFLCLR
+     C                     WRITEAR084F1C
+     C                     MOVE *OFF      *IN74            *SFLCLR
+     C*
+     C                     Z-ADD0         RRN1    40
+     C*
+     C                     Z-ADDS#KEY1    AWINDT
+     C                     MOVE S#KEY2    AWINNO
+     C           K#DEPT    SETLLRARDEPTW
+     C                     EXSR SR1100                     *讀入SFL
+     C*=======(顯示畫面)
+     C           W#PRID    DOWEQ'01'
+     C                     MOVEA'000'     *IN,71
+     C           RRN1      IFEQ 0
+     C                     MOVE *BLANK    S#ERR1
+     C                     MOVELERR,1     S#ERR1
+     C                     MOVE *ON       *IN72            *SFLDSP OFF
+     C                     ENDIF
+     C           W#CNT     IFGE 9
+     C                     MOVE *ON       *IN73            *SFLEND OFF
+     C                     ELSE
+     C                     MOVE *OFF      *IN73
+     C                     ENDIF
+     C*
+     C                     WRITEAR084H
+     C                     WRITEAR084F1M
+     C                     EXFMTAR084F1C
+     C                     MOVE *BLANK    S#ERR1
+     C*IN99=確認後結束
+     C*F3=結束作業
+     C*F12=回前畫面
+     C           *IN03     IFEQ *ON
+     C           *IN99     OREQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*PA1=翻下頁
+     C           *IN91     IFEQ *ON
+     C  N42                EXSR SR1100
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE '02'      W#PRID
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*讀入ARDEPTWL1資料
+     C                     Z-ADD0         W#CNT   20
+     C                     READ RARDEPTW            N    42
+     C  N42      W#CNT     DOWLT8                          讀後10筆
+     C*
+     C                     CLEARAR084F1
+     C                     MOVE AWBACH    S#BACH           客戶代號
+     C                     MOVE AWCUNO    S#CUNO           客戶代號
+     C                     MOVE AWCUNM    S#CUNM           客戶簡稱
+     C                     Z-ADDAWINDT    S#INDT           發票年月
+     C                     MOVE AWINNO    S#INNO           發票號碼
+     C                     Z-ADDAWAAMT    S#CAM1           發票金額
+     C                     Z-ADDAWBAMT    S#CAMX           預支金額
+     C*
+     C                     ADD  1         W#CNT
+     C                     ADD  1         RRN1
+     C*
+     C                     WRITEAR084F1
+     C                     READ RARDEPTW                 42
+     C   42                LEAVE
+     C                     ENDDO
+     C*
+     C           W#CNT     IFGE 1
+     C                     ADD  9         S#NBR1
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C***************************************************************
+     C           SR2000    BEGSR
+     C**************************************************************
+     C*READC  AR084F1
+     C           W#PRID    DOWEQ'02'
+     C                     READCAR084F1                  43
+     C   43                LEAVE
+     C*
+     C           S#OPT1    IFEQ 0
+     C                     ITER
+     C                     ENDIF
+     C*REPOSITION
+     C                     MOVE S#INDT    S#KEY1
+     C                     MOVE S#INNO    S#KEY2
+     C*
+     C                     Z-ADDS#OPT1    W#OPT   10
+     C                     Z-ADD0         S#OPT1
+     C                     UPDATAR084F1
+     C*
+     C           W#OPT     IFEQ 4                          刪除
+     C                     Z-ADDS#KEY1    AWINDT
+     C                     MOVE S#KEY2    AWINNO
+     C           K#DEPT    CHAINRARDEPTW             41
+     C  N41                DELETRARDEPTW
+     C                     SUB  S#CAMX    S#PAM2           試算總額
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C           *IN10     IFEQ *ON                        確認存檔
+     C                     EXSR SR2100
+     C                     MOVE ERR,3     S#ERR1
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C*
+     C                     MOVE '01'      W#PRID
+     C*
+     C                     ENDSR
+     C***************************************************************
+     C           SR2100    BEGSR
+     C**************************************************************
+     C           *LOVAL    SETLLRARDEPTW
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ RARDEPTW            N    41
+     C   41                LEAVE
+     C*寫入預支明細檔
+     C                     CLEARRARDEPT
+     C                     MOVE AWBACH    ADBACH           批次號碼
+     C                     MOVE AWBKID    ADBKID           銀行代號
+     C                     MOVE AWCUNO    ADCUNO           客戶代號
+     C                     MOVE AWCUNM    ADCUNM           客戶簡稱
+     C                     MOVE AWINNO    ADINNO           發票號碼
+     C                     Z-ADDAWINDT    ADINDT           發票日期
+     C                     Z-ADDAWDPDT    ADDPDT           預支日期
+     C                     Z-ADDAWAAMT    ADAAMT           發票金額
+     C                     Z-ADDAWBAMT    ADBAMT           預支金額
+     C                     Z-ADDAWRATE    ADRATE           預支利率
+     C                     MOVE *BLANK    ADCOD1           過入碼
+     C                     MOVE AWADDM    ADADDM           新增人員
+     C                     MOVE UDATE     ADADDD           新增日期
+     C                     TIME           ADADDT           新增時間
+     C*
+     C                     WRITERARDEPT
+     C*更新承購發票主檔
+     C           AWINNO    CHAINRARINVM              41
+     C                     Z-ADDADBAMT    AMEAMT
+     C                     UPDATRARINVM
+     C*更新承購客戶主檔
+     C           AWCUNO    CHAINRARCUDT              41
+     C                     ADD  ADBAMT    ACCAMT
+     C                     UPDATRARCUDT
+     C                     ENDDO
+     C                     ENDSR
+**  ERR
+01-無相關資料！
+02-請按Ｆ１０確認存檔！
+03-請按任何鍵將資料過入財會系統！
+

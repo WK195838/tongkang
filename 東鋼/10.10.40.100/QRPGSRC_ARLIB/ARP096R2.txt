@@ -1,0 +1,112 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    HSP921RF
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     反傾銷WORK FILE處理(磅單)
+     H*            5.DATE-WRITTEN  90/07/31
+     H*****************************************************************
+     H        1   Y                                     1
+     FTRNDTL  IP  E           K        DISK
+     FWTSBMP  IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FARP096F2O   E           K        DISK
+     ITXREC       01
+     I                                              TXNO  L1
+     I                                              TXORNOL1
+     I                                              TXPDNML1
+     I                                              TXIVNOL1
+     I            DS
+     I                                        1   8 D#WTNO
+     I                                        1   1 D#AREA
+     I                                        2   3 D#VNO1
+     I                                        4   80D#VNO2
+     I           UDS
+     I                                      301 3040D#SYM
+     I                                      305 3080D#EYM
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1                   EXSR L1SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C           D#SYM     MULT 100       W#SYM   60
+     C           W#SYM     ADD  1         W#SYMD  60
+     C           D#EYM     MULT 100       W#EYM   60
+     C           W#EYM     ADD  31        W#EYMD  60
+     C                     MOVE *ON       *IN99
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#QTY   90
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*          TXNO      IFEQ 'H1139718'
+     C*                    Z-ADD0         W#TEST  10
+     C*                    ENDIF
+     C                     ADD  TXQTY     W#QTY
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           K#SBMP    KLIST
+     C                     KFLD           W7AREA
+     C                     KFLD           W7VNO1
+     C                     KFLD           W7VNO2
+     C                     KFLD           W7SQIT
+     C*
+     C                     CLEARAR096F2
+     C*
+     C                     MOVE TXNO      A2TXNO
+     C                     MOVE TXPDNM    A2PDNM
+     C                     MOVE TXIVNO    A2IVNO
+     C                     MOVE TXORNO    A2ORNO
+     C                     Z-ADDTXUPRC    A2UPRC
+     C                     Z-ADDW#QTY     A2IVQT
+     C                     Z-ADDW#QTY     A2LAQT
+     C*計算是否有相同之數量
+     C                     MOVE TXNO      D#WTNO
+     C                     MOVE D#AREA    W7AREA
+     C                     MOVE D#VNO1    W7VNO1
+     C                     Z-ADDD#VNO2    W7VNO2
+     C                     Z-ADD0         W7SQIT
+     C           K#SBMP    SETLLRWTSBMP
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RWTSBMP                  40
+     C           *IN40     IFEQ *ON
+     C           W7AREA    ORNE D#AREA
+     C           W7VNO1    ORNE D#VNO1
+     C           W7VNO2    ORNE D#VNO2
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           W#QTY     IFEQ W7STDW
+     C                     MOVE '*'       A2CODE
+     C                     ELSE
+     C                     ITER
+     C                     ENDIF
+     C                     ENDDO
+     C*異常處理啟阜跨月重開H1139718
+     C*          TXNO      IFEQ 'H1139718'
+     C*                    MOVEL'EL'      W1IVNO
+     C*                    MOVE '02665737'W1IVNO
+     C*                    ENDIF
+     C*
+     C           A2IVNO    CHAININREC                40
+     C  N40      ININDT    IFGE W#SYMD
+     C           ININDT    ANDLEW#EYMD
+     C                     WRITEAR096F2
+     C                     ENDIF
+     C                     ENDSR
+

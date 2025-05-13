@@ -1,0 +1,35 @@
+             PGM
+             DCL        VAR(&TITLE) TYPE(*CHAR) LEN(35) VALUE('     +
+                          ** 逾齡應收帳款明細表 **')
+             DCL        VAR(&INT) TYPE(*CHAR) LEN(1)
+             DCLF       FILE(BSLIB/BSR002S) RCDFMT(BS002F1)
+             DCL        VAR(&YR) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&WDATE) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             RTVJOBA    OUTQ(&OUTQ)   TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&DEVNM)
+ RDSPLY:     SNDRCVF    RCDFMT(BS002F1)
+             IF         COND(&IN70 *EQ '1') THEN(RETURN)
+             IF         COND(&YM *EQ 0) THEN(GOTO RDSPLY)
+             CHGVAR     VAR(&WDATE) VALUE(&YM)
+             CHGVAR     VAR(&YR) VALUE('M' *CAT &WDATE)
+             CHGDTAARA  DTAARA(*LDA (10 5)) VALUE(&YR)
+             CHGDTAARA  DTAARA(*LDA (1 4)) VALUE(&WDATE)
+             SBMJOB     JOB(ARR061P) JOBD(ARJOBD) RQSDTA('CALL +
+                          ARR061P') OUTQ(&OUTQ)
+             RETURN
+             ENDDO
+  BATCH:
+             CLRPFM     DALIB/WFILE1
+             RTVDTAARA  DTAARA(*LDA (10 5)) RTNVAR(&YR)
+             OVRDBF     FILE(ARSTWF) MBR(&YR) SHARE(*YES)
+             CALL       PGM(ARR061R)
+             OVRDBF     FILE(WFILE1) SHARE(*YES)
+             OPNQRYF    FILE((DALIB/WFILE1)) KEYFLD((W1SALE) +
+                          (W1CUNO) (W1ORNO) (W1ACDT))
+             CALL       PGM(ARR061RA)
+             CLOF       OPNID(WFILE1)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

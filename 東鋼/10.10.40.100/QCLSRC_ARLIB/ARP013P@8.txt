@@ -1,0 +1,106 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE  100/06/10 2011AR607 S00WCJ (0006A) */
+    /*                            增加庫別代號寫入總帳摘要三      */
+    /*                           100/11/28 2011AR634 S00WCJ (0011A) */
+    /*                            配合IFRS修改                  */
+    /*                           101/12/13 2012AR704 S00WCJ (0112A) */
+    /*                            配合IFRS正式轉換修改          */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCL        VAR(&YM)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&Y)    TYPE(*CHAR) LEN(4)
+             DCL        VAR(&M)    TYPE(*CHAR) LEN(2)
+ /*0011A*/   DCL        VAR(&D#VNO1) TYPE(*CHAR) LEN(6)
+ /*0011A*/   DCL        VAR(&D#VNO2) TYPE(*CHAR) LEN(6)
+ /*0112A*/   DCL        VAR(&IFRSD)  TYPE(*CHAR) LEN(6)
+
+             RTVDTAARA  DTAARA(*LDA (1    6)) RTNVAR(&YM)
+             RTVDTAARA  DTAARA(*LDA (1    4)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (5    2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (7 1)) RTNVAR(&AREA)
+ /*0112A*/   RTVDTAARA  DTAARA(ARIFRSCTL (1  6)) RTNVAR(&IFRSD)
+ /*0112A*/   CHGDTAARA  DTAARA(*LDA (221  6)) VALUE(&IFRSD)
+
+             CLRPFM     ARP013F   /* 930827新增DOWNLOAD */
+             OVRDBF     FILE(INVDTL) TOFILE(INVDTL) SHARE(*YES)
+             OVRDBF     FILE(ACTRAN) TOFILE('AC' || &AREA || +
+                          'R') LVLCHK(*NO)
+       /*    OPNQRYF    FILE((INVDTL)) QRYSLT('                +
+                          IVYM   *EQ  "' || &YM || '"          +
+                    *AND  (IVACNT *EQ  "2"                     +
+                    *OR    IVACNT *EQ  "3")                    +
+                    *AND  IVDECD *NE  "D"                      +
+                    *AND  IVFL03 *NE  "Z"')                    +
+                          KEYFLD((IVNO))                       +
+                          MAPFLD((ZONE6 IVACDT *ZONED 6)       +
+                                 (CHAR6 ZONE6  *CHAR  6)       +
+                                 (IVYM '%SST(CHAR6 1 4)' *CHAR 4))  */
+
+             IF         COND(&AREA *EQ "H") THEN(DO)
+             OPNQRYF    FILE((INVDTL)) QRYSLT('                +
+                          IVYM   *EQ  "' || &YM || '"          +
+                    *AND  (IVACNT *EQ  "2"                     +
+                    *OR    IVACNT *EQ  "3")                    +
+                    *AND  IVDECD *NE  "D"                      +
+                    *AND  IVFL03 *NE  "K"                      +
+                    *AND  IVFL03 *NE  "Z"')                    +
+                          KEYFLD((IVNO))                       +
+                          MAPFLD((ZONE6 IVACDT *ZONED 8)       +
+                                 (CHAR6 ZONE6  *CHAR  8)       +
+                                 (IVYM '%SST(CHAR6 1 6)' *CHAR 6))
+             ENDDO
+             ELSE (DO)
+             OPNQRYF    FILE((INVDTL)) QRYSLT('                +
+                          IVYM   *EQ  "' || &YM || '"          +
+                    *AND  IVACNT *EQ  "3"                     +
+                    *AND  IVDECD *NE  "D"                      +
+                    *AND  IVFL03 *NE  "K"                      +
+                    *AND  IVFL03 *NE  "Z"')                    +
+                          KEYFLD((IVNO))                       +
+                          MAPFLD((ZONE6 IVACDT *ZONED 8)       +
+                                 (CHAR6 ZONE6  *CHAR  8)       +
+                                 (IVYM '%SST(CHAR6 1 6)' *CHAR 6))
+             ENDDO
+
+    /*0006A  START */
+    /*由於AMPROD檔案各廠獨立，所以以DDMF的方式讀取U廠之資料*/
+
+             DLTF       FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(U01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMU)
+             CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(*NONSTD +
+                          'DALIB/AMPRODL3') LVLCHK(*NO)
+             OVRDBF     FILE(AMPRODL3) TOFILE(QTEMP/DDMU)
+    /*0006A   END */
+
+             OVRDBF     FILE(ARWF02) TOFILE(ARWF02) SHARE(*YES)
+             CLRPFM     FILE(ARWF02)
+             MONMSG     MSGID(CPF3130)   /*NO DATA*/
+             CALL       PGM(ARP013RC)
+             CLOF       OPNID(INVDTL)
+             OPNQRYF    FILE((ARWF02))                         +
+                          KEYFLD((W2ACDT) (W2AREA) (W2ACNT) (W2NO))
+
+             OVRPRTF    FILE(QPRINT) PAGESIZE(*N 158) CPI(12) +
+                          USRDTA('扣抵貨款') IGCEXNCHR(*YES)
+
+             CALL       PGM(ARP013R)
+             CLOF       OPNID(ARWF02)
+             DLTOVR     FILE(*ALL)
+
+ /*0112A*/  IF   COND(&YM  *LT &IFRSD)  THEN(DO)
+ /*0011A STRAT */
+
+             RTVDTAARA  DTAARA(*LDA (201 6)) RTNVAR(&D#VNO1)
+             RTVDTAARA  DTAARA(*LDA (211 6)) RTNVAR(&D#VNO2)
+
+             CALL       PGM(ARS888P) PARM(&AREA &YM &D#VNO1 &D#VNO2)
+ /*0011A  END */
+ /*0112A*/  ENDDO
+             ENDPGM
+

@@ -1,0 +1,174 @@
+     H*****************************************************************
+     H*
+     H*         *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*       1.PROGRAM-ID    ARP155R
+     H*       2.PROGRAM-TYPE  RPG/400
+     H*       3.AUTHOR        S00WCJ
+     H*       4.FUNCTION    型鋼外銷繳款金額統計
+     H*       5.DATE-WRITTEN  113/10/01 2024AR00033
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FSARCVF  IP  E           K        DISK
+     FRCVDTL  IF  E           K        DISK
+     FARP155F UF  E           K        DISK                      A
+     FARP155FGO   E           K        DISK
+     F            RAR155F                           KRENAMEARP15G
+     ISRREC       01
+     I                                              SRRVNOL1
+     I*                                             SRRLNOL1
+     I            DS
+     I                                        1  10 SRRLNO
+     I                                        1   6 D#ORNO
+     I*
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10011010 D#USER
+     I                                     10011001 D#DEPT
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C*****************************************************************
+     C*          Parameter List
+     C*****************************************************************
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           W#CUNO  6
+     C                     KFLD           W#ORNO  6
+     C                     KFLD           W#CURR  3
+     C*
+     C           KEY02     KLIST
+     C                     KFLD           SRRVNO
+     C                     KFLD           SRITEM
+     C*
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C  N99                EXSR SR0000
+     C   L1                EXSR SR1000
+     C   01                EXSR SR2000
+     CL1                   EXSR SR3000
+     CLR                   RETRN
+     C*
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*
+     C           *DATE     SUB  19000000  U#SYSD  80
+     C                     MOVEL*ON       *IN99
+     C                     MOVEL*BLANKS   W#ORNO  6
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C                     Z-ADD0         W#CAMT 132       原幣
+     C                     Z-ADD0         W#RAMT 110       台幣
+     C                     Z-ADD0         W#ACAM 132       暫收原幣
+     C                     Z-ADD0         W#ACRM 110       暫收台幣
+     C                     MOVEL*BLANKS   W#CKYN  1
+     C                     MOVEL*BLANKS   W#2159  1
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*
+     C                     MOVELSRCUNO    W#CUNO           客戶編號
+     C*
+     C           D#ORNO    IFNE *BLANKS
+     C                     MOVELD#ORNO    W#ORNO           訂單號碼
+     C                     ENDIF
+     C*
+     C           SRCURY    IFNE *BLANKS
+     C           SRCURY    ANDNE'NTD'
+     C                     MOVELSRCURY    W#CURR
+     C*
+     C                     SELEC
+     C           SRACNO    WHEQ '211301'
+     C                     MOVEL'Y'       W#2159
+     C           SRACTP    IFEQ 'C'
+     C                     ADD  SRRAMT    W#ACAM
+     C*
+     C           KEY02     CHAINRVREC               N50
+     C  N50                ADD  RVRAMT    W#ACRM
+     C  N50      W#CKYN    IFEQ *BLANKS
+     C                     MOVEL'Y'       W#CKYN
+     C                     ENDIF
+     C                     ELSE
+     C                     SUB  SRRAMT    W#ACAM
+     C           W#CKYN    IFEQ *BLANKS
+     C                     SUB  SRNAMT    W#ACRM
+     C                     MOVEL'Y'       W#CKYN
+     C                     ENDIF
+     C                     ENDIF
+     C           SRACNO    WHEQ '710109'
+     C           SRACTP    IFEQ 'D'
+     C                     ADD  SRRAMT    W#CAMT
+     C                     MOVEL'Y'       W#CKYN
+     C                     ELSE
+     C                     SUB  SRRAMT    W#CAMT
+     C                     MOVEL'Y'       W#CKYN
+     C                     ENDIF
+     C                     OTHER
+     C           W#2159    IFNE 'Y'
+     C           SRACTP    IFEQ 'D'
+     C                     ADD  SRRAMT    W#CAMT
+     C                     MOVEL'Y'       W#CKYN
+     C                     ELSE
+     C                     SUB  SRRAMT    W#CAMT
+     C                     MOVEL'Y'       W#CKYN
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDSL
+     C           W#CKYN    IFEQ *BLANKS
+     C           W#2159    ANDNE'Y'
+     C                     ADD  SRNAMT    W#RAMT
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           D#ORNO    IFEQ W#ORNO
+     C           D#ORNO    ANDNE*BLANKS
+     C           SRACNO    ANDEQ'211301'
+     C           SRACTP    ANDEQ'C'
+     C                     Z-ADD0         W#CAMT
+     C*
+     C                     EXSR SR3000
+     C                     EXSR SR1000
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*
+     C           KEY01     CHAINRAR155F              55
+     C*
+     C   55                CLEARRAR155F
+     C                     MOVELW#CUNO    F1CUNO
+     C                     MOVELW#ORNO    F1ORNO
+     C                     MOVELW#CURR    F1CURR
+     C*
+     C                     ADD  W#CAMT    F1CAMT
+     C                     ADD  SRNAMT    F1RAMT
+     C                     ADD  W#ACAM    F1ACAM
+     C                     ADD  W#ACRM    F1ACRM
+     C*
+     C                     MOVELD#USER    F1ENTM           建檔人員
+     C                     Z-ADDU#SYSD    F1ENTD           建檔日期
+     C                     TIME           F1ENTT           建檔時間
+     C                     MOVELD#USER    F1UPDM           異動人員
+     C                     Z-ADDU#SYSD    F1UPDD           異動日期
+     C                     TIME           F1UPDT           異動時間
+     C*
+     C   55                WRITERAR155F
+     C   55                MOVE 'A'       F1ENTM
+     C  N55                UPDATRAR155F
+     C  N55                MOVE 'C'       F1ENTM
+     C                     WRITEARP15G
+     C*
+     C                     ENDSR
+     C*****************************************************************
+

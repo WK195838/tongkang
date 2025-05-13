@@ -1,0 +1,270 @@
+     H************************************************************
+     H*                                                          *
+     H*         PROGRAM   ID        :   ARR033R                  *
+     H*         PROGRAM   FUNCTION  :  銷退或折讓證明單列印    *
+     H*         AUTHER              :   NANCY                    *
+     H*         CREATE    DATE      :   81/09/29                 *
+     H*         MAINTAIN  DATE      :                            *
+     H*         RELATION  PROGRAM   :   ARR033P                  *
+     H*         NOTE                :                            *
+     H*         UPDATE  DATE  99/05/14 2010AR480 S00WCJ (9905A)
+     H*                                                          *
+     H************************************************************
+     H        1   Y                                     1
+     FTRNDTL  IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FHIPROD  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FQPRINT  O   F      96            PRINTER
+     F*---------------------------------------------------------------
+     E                    HD      1  14 40
+9905AE*                   ARY1       12  1
+9905AE                    ARY1       14  1
+     E*---------------------------------------------------------------
+     I            DS
+10001I                                        1   8 YMD
+  .  I                                        1   4 Y
+  .  I                                        5   6 M
+10001I                                        7   8 D
+9008 I                                        7  140ININDT
+9008 I                                        9  140W#INDT
+LYW  I                                        7  100INDT1
+ .   I                                       11  120INDT2
+ .   I                                       13  140INDT3
+ .   I                                       15  24 TXIVNO
+ .   I                                       15  16 IVNO1
+ .   I                                       17  24 IVNO2
+CLJ  I            DS
+     I                                        1   2 W#OEOF
+     I                                        1   1 D#OE
+     I                                        2   2 D#OF
+     I            DS
+9905AI*                                       1  12 PDNM
+9905AI*                                      12  12 D#NOF
+9905AI                                        1  14 PDNM
+9905AI                                       14  14 D#NOF
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C*----------------------------------------------------
+     C           *ENTRY    PLIST
+LYW  C                     PARM           NO      6
+     C           TXKEY     KLIST
+     C                     KFLD           TXCODE
+     C                     KFLD           TXNO
+     C           CBKEY     KLIST
+     C                     KFLD           CBCUNO
+     C*** MAIN LOGIC
+     C                     EXSR IN#01
+     C                     EXSR DP#01
+     C                     SETON                     LR
+     C                     RETRN
+     C**********
+     C* IN#01  *
+     C**********
+     CSR         IN#01     BEGSR
+     C                     Z-ADD0         TOT1    90
+     C                     Z-ADD0         TOT2    70
+     C                     Z-ADD80        LCNT    20
+     C                     Z-ADD55        TOTL    20
+     C                     MOVEL*BLANK    NAME   36
+     C                     MOVEL*BLANK    BCID   10
+     C                     MOVEL*BLANK    ADDR   62
+     CSR         INZ#01    ENDSR
+     C**********
+     C* DP#01  *
+     C**********
+     CSR         DP#01     BEGSR
+     C                     SETOF                     21
+     C                     MOVEL'AR06'    TXCODE
+     C                     MOVEL*BLANK    TXNO
+     C                     MOVELNO        TXNO
+     C           TXKEY     SETLLTRNDTL               97
+     C           *IN97     DOWEQ'0'
+     C           TXKEY     READETRNDTL                   97
+     C   97                LEAVE
+     C           TXFLAG    IFNE 'D'
+     C  N21                EXSR @SET
+     C                     EXSR PR#01
+     C                     ENDIF
+     C                     ENDDO
+     C                     EXCPTET#01
+     CSR         DP#01Z    ENDSR
+     C**---------------------------------------**
+     C**   PRINT  REPORT                       **
+     C**---------------------------------------**
+     CSR         PR#01     BEGSR
+10001C                     Z-ADDTXDATE    W#DATE  70
+9008 C                     MOVE W#DATE    YMD
+LYW  C                     MOVELINKIND    W#KIND  1
+     C           LCNT      COMP TOTL                 75  75
+     C   75                EXCPTEH#01
+     C   75                Z-ADD10        LCNT
+     C   75                MOVELTXCUNO    CBCUNO
+     C   75      CBKEY     CHAINCBCUST               80
+     C  N80 75             MOVELCBFNAM    NAME
+     C  N80 75             MOVELCBMUID    BCID
+     C  N80 75             MOVELCBADR1    ADDR
+     C****
+     C           TXIVNO    CHAININVMST               95
+     C   95                Z-ADD0         ININDT
+     C***:
+     C                     MOVE *BLANK    MARK1   1
+     C                     MOVE *BLANK    MARK2   1
+     C           TXACNT    IFEQ '2'
+     C                     MOVE 'V'       MARK1
+     C                     END
+     C           TXACNT    IFEQ '3'
+     C                     MOVE 'V'       MARK2
+     C                     END
+     C***
+     C           TXACNT    IFEQ '4'
+     C                     MOVE SMARK1    MARK1
+     C                     MOVE SMARK2    MARK2
+     C           TXAMT     IFGE 0
+     C                     MOVE 'V'       MARK1
+     C                     MOVE ' '       MARK2
+     C                     ENDIF
+     C                     ENDIF
+     C***
+     C                     MOVE MARK1     SMARK1  1
+     C                     MOVE MARK2     SMARK2  1
+     C***
+9112 C           INTXTP    IFEQ '1'
+     C                     MOVE 'V'       MARK3   1
+9112 C                     MOVE ' '       MARK4   1
+9112 C                     ENDIF
+9112 C           INTXTP    IFEQ '2'
+9112 C                     MOVE ' '       MARK3   1
+9112 C                     MOVE 'V'       MARK4   1
+9112 C                     ENDIF
+     C*
+     C           TXACNT    IFEQ '4'
+     C           TXAMT     IFGE 0
+9905AC*                    MOVELHD,10     PDNM   12
+9905AC                     MOVELHD,10     PDNM   14
+     C                     ELSE
+     C                     MOVELHD,11     PDNM
+     C                     END
+     C                     ELSE
+     C           TXPDNM    CHAINHIPROD               98
+CLJ  C* N98                MOVELACPRNM    PDNM
+     C           *IN98     IFEQ '0'
+     C                     MOVE ''      W#OEOF
+     C                     MOVELF4CHIN    PDNM
+     C                     MOVEAPDNM      ARY1
+     C                     Z-ADD1         I       20
+9905AC*                    DO   10                         12-2
+9905AC                     DO   12                         14-2
+     C                     ADD  1         I
+     C                     MOVEAARY1,I    W#CHAR  1
+     C           W#CHAR    IFEQ D#OE
+     C           W#CHAR    OREQ D#OF
+     C                     MOVEA' '       ARY1,I
+     C                     ENDIF
+     C                     ENDDO
+     C                     MOVEAARY1      PDNM
+     C                     MOVE D#OF      D#NOF
+---  C                     ENDIF
+     C   98                MOVELTXPDNM    PDNM
+     C                     END
+     C*
+     C                     Z-ADDTXQTY     QTY     70
+     C                     Z-ADDTXUPRC    UPRC    53
+     C                     Z-ADDTXAMT     AMT     90
+     C                     Z-ADDTXTAX     TAX     70
+     C                     ADD  AMT       TOT1
+     C                     ADD  TAX       TOT2
+LYW  C                     MOVELW#KIND    INKIND
+     C                     EXCPTED#01
+     CSR                   ENDSR
+     C**********
+     CSR         @SET      BEGSR
+     C           TXIVNO    CHAININVMST               95
+     C   95                Z-ADD0         ININDT
+     C   95                MOVEL' '       INAREA
+     C                     SELEC
+     C           INAREA    WHEQ 'K'
+     C                     MOVELHD,3      CMPY   40
+     C                     MOVELHD,6      MUID   40
+     C                     MOVELHD,9      MUAD   40
+     C           INAREA    WHEQ 'H'
+     C                     MOVELHD,12     CMPY
+     C                     MOVELHD,13     MUID
+     C                     MOVELHD,14     MUAD
+     C           INAREA    WHEQ 'M'
+CLJ  C           ININDT    IFLT 871101                     仍為台中
+     C                     MOVELHD,2      CMPY
+     C                     MOVELHD,5      MUID
+     C                     MOVELHD,8      MUAD
+     C                     ELSE
+     C                     MOVELHD,1      CMPY
+     C                     MOVELHD,4      MUID
+     C                     MOVELHD,7      MUAD
+---  C                     ENDIF
+     C                     OTHER
+     C                     MOVELHD,1      CMPY
+     C                     MOVELHD,4      MUID
+     C                     MOVELHD,7      MUAD
+     C                     ENDSL
+     C                     SETON                     21
+     CSR                   ENDSR
+     C*---------------------------------------------------------------
+     OQPRINT  E   02           EH#01
+     O*                        CMPY      51
+     O*       E 1              EH#01
+     O                         CMPY      51
+     O        E 2              EH#01
+     O                         MUID      51
+     O        E 1              EH#01
+     O                         Y         67
+     O                         M         73
+     O                         D         80
+     O        E 1              EH#01
+     O                         MUAD      51
+     O                         NO        91
+     O        E 11             EH#01
+     O        E 2              EH#01
+     O        E 1              ED#01
+     O                         TXIVTP B   1
+10001O                         ININDT B  11 '    /  /  '
+     O                         IVNO1  B  13
+     O                         IVNO2  B  23
+     O                         MARK1     27
+     O                         MARK2     29
+9905AO*                        PDNM   B  42
+9905AO                         PDNM   B  43
+     O                         TXPDNM B  47
+     O                         QTY   OB  53
+     O                         UPRC   B  61 '0 .   '
+     O                         TAX   OB  84
+     O                         AMT   OB  76
+     O                         MARK3  B  87
+     O                         MARK4  B  89
+     O        E   21           ET#01
+ 9402O                         TOT2  NB  84
+ 9402O                         TOT1  NB  76
+     O        E 1              ET#01
+     O        E 3              ET#01
+     O                         NAME   B  50
+     O        E 2              ET#01
+     O                         BCID   B  25
+     O        E 2              ET#01
+     O                         ADDR   B  76
+** HD
+東和鋼鐵企業股份有限公司
+東和鋼鐵企業股份有限公司台中營業所
+東和鋼鐵企業股份有限公司（高雄廠）
+７５２８０２０９
+７７６０９１１７
+０７９８９２０６
+台北市長安東路一段９號６樓
+台中市明德里大雅路３３７號８樓
+高雄市小港區嘉興街８號
+預收貨款
+扣預收款
+東和鋼鐵企業股份有限公司（苗栗分公司）
+８４７０７１０８
+苗栗縣西湖鄉二湖村坪頂２２號
+

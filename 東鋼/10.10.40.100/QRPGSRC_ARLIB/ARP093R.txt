@@ -1,0 +1,232 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP093R
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02LYW
+     H*            4.FUNCTION     轉暫收手切傳票傳輸
+     H*            5.DATE-WRITTEN  91/10/04
+     H*
+     H*****************************************************************
+     H            Y                                     1                 BR100
+     FAR2159F UF  E           K        DISK                      A
+     F            ARREC                             KRENAMER2159F
+     FAR2159D UF  E           K        DISK                      A
+     FAR2159TXUF  E           K        DISK
+     FAR2159T UF  E           K        DISK                      A
+     F            RAR2159T                          KRENAMER2159T
+     IR2159T      01
+     I              ARTRFL                          AATRFL
+     I              ARFLAG                          AAFLAG
+     I              ARYMD                           AAYMD
+     I              ARAREA                          AAAREA
+     I              ARCUNO                          AACUNO
+     I              ARCUNM                          AACUNM
+     I              ARORNO                          AAORNO
+     I              ARVUNO                          AAVUNO
+     I              ARITEM                          AAITEM
+     I              ARACDC                          AAACDC
+     I              ARAMT                           AAAMT
+     IR2159F      01
+     I              ARFLAG                          AFFLAG
+     I              ARCUNO                          AFCUNO
+     I              ARAREA                          AFAREA
+     I              ARAMT1                          AFAMT1
+     I              ARAMT2                          AFAMT2
+     I              ARAMT3                          AFAMT3
+     I              ARAMT4                          AFAMT4
+     I              ARAMT5                          AFAMT5
+     I              ARAMT6                          AFAMT6
+     I              ARRESV                          AFRESV
+     I*
+     I            DS
+     I                                        1   6 D#NO
+     I                                        1   1 D#NO1
+     I                                        2   6 D#NO2
+     I            DS
+     I                                        1   6 D#CUNO
+     I                                        1   1 D#CUN1
+     I                                        2   2 D#CUN2
+     I                                        3   5 D#CUN3
+     I                                        6   6 D#CUN4
+     C*****************************************************************
+     C           K#2159    KLIST
+     C                     KFLD           ARYMD
+     C                     KFLD           ARVUNO
+     C                     KFLD           ARITEM
+     C                     KFLD           ARCUNO
+     C           K#FILE    KLIST
+     C                     KFLD           AFCUNO
+     C                     KFLD           AFAREA
+     C           K#ARD     KLIST
+     C                     KFLD           ADCUNO
+     C                     KFLD           ADAREA
+     C                     KFLD           ADORNO
+     C*****************************************************************
+     C*-----處理遠端AR2159T資料-----
+     C           *LOVAL    SETLLRAR2159T
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RAR2159T                 40
+     C   40                LEAVE
+     C*
+     C           ARTRFL    IFNE *BLANK
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE 'Y'       ARTRFL           傳輸碼
+     C                     MOVE 'C'       ARFLAG           處理代碼
+     C                     UPDATRAR2159T
+     C*
+     C                     EXSR SR1000                     處理2159T
+     C*
+     C                     EXSR SR2000                     處理2159F
+     C*
+     C                     EXSR SR3000                     處理2159D
+     C*
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C*****************************************************************
+     CSR         SR1000    BEGSR
+     C*****************************************************************
+     C*-----處理台北AR2159T -----
+     C           K#2159    CHAINR2159T               41
+     C*
+     C                     MOVELARTRFL    AATRFL           傳輸碼
+     C                     MOVELARFLAG    AAFLAG           處理代碼
+     C                     Z-ADDARYMD     AAYMD            資料日期
+     C                     MOVELARAREA    AAAREA           廠區別
+     C                     MOVELARCUNO    AACUNO           客戶編號
+     C                     MOVELARCUNM    AACUNM           客戶名稱
+     C                     MOVELARORNO    AAORNO           訂單編號
+     C                     MOVELARVUNO    AAVUNO           傳票號碼
+     C                     Z-ADDARITEM    AAITEM           資料項次
+     C                     MOVELARACDC    AAACDC           借貸別
+     C                     Z-ADDARAMT     AAAMT            傳票金額
+     C*
+     C                     MOVE 'Y'       ARTRFL           傳輸碼
+     C                     MOVE 'C'       ARFLAG           處理代碼
+     C*
+     C   41                WRITER2159T
+     C  N41                UPDATR2159T
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         SR2000    BEGSR
+     C*****************************************************************
+     C*-----處理AR2159F切傳票金額-----
+     C                     MOVELARCUNO    AFCUNO
+     C                     MOVELARAREA    AFAREA
+     C           K#FILE    CHAINR2159F               41
+     C*
+     C*如果沒有資料直接新增
+     C           *IN41     IFEQ *ON
+     C                     EXSR SR2100                     新增
+     C                     ELSE
+     C                     EXSR SR2200                     重新合計
+     C                     ENDIF
+     C*
+     C   41                WRITER2159F
+     C  N41                UPDATR2159F
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         SR2100    BEGSR
+     C*****************************************************************
+     C*記錄廠區別、客戶編號
+     C                     MOVE ARAREA    W#AREA  1
+     C                     MOVE ARCUNO    W#CUNO  6
+     C*                    MOVE ARORNO    W#ORN1  6
+     C*
+     C                     CLEARR2159F
+     C                     MOVE W#AREA    AFAREA           廠區別
+     C                     MOVE W#CUNO    AFCUNO           客戶編號
+     C*                    MOVE W#ORN1    AFORNO           訂單編號
+     C                     Z-ADDARAMT     AFAMT4           切傳票金額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         SR2200    BEGSR
+     C*****************************************************************
+     C*-----重新合計AR2159F值-----
+     C*1.已兌現－繳貨款＋切傳票=客戶現金餘額
+     C*2.繳貨款>=已兌現＋切傳票，則分別減已兌現、切傳票；
+     C*  否則，已兌現－繳貨款且<0時，再將切傳票之金額加回，避免負值
+     C*
+     C                     ADD  ARAMT     AFAMT4           切傳票金額
+     C           AFAMT1    ADD  AFAMT4    W#AMT  110
+     C           AFAMT2    IFGE W#AMT
+     C           AFAMT2    SUB  AFAMT1    AFAMT2
+     C                     Z-ADD0         AFAMT1           已兌現清0
+     C           AFAMT2    SUB  AFAMT4    AFAMT2
+     C                     Z-ADD0         AFAMT4           切傳票清0
+     C                     ELSE
+     C           AFAMT1    SUB  AFAMT2    AFAMT1
+ { { C           AFAMT1    IFLT 0
+     C           AFAMT1    ADD  AFAMT4    AFAMT4
+     C                     Z-ADD0         AFAMT1           已兌現清0
+   } C                     ENDIF
+     C                     Z-ADD0         AFAMT2           繳貨款清0
+ }   C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         SR3000    BEGSR
+     C*****************************************************************
+     C*-----處理AR2159D切傳票金額-----
+     C                     MOVELARCUNO    ADCUNO
+     C                     MOVELARAREA    ADAREA
+     C                     MOVELARORNO    ADORNO
+     C           K#ARD     CHAINRAR2159D             42
+     C*
+     C*如果沒有資料直接新增
+     C           *IN42     IFEQ *ON
+     C                     EXSR SR3100                     新增
+     C                     ELSE
+     C                     EXSR SR3200                     重新合計
+     C                     ENDIF
+     C*
+     C   42                WRITERAR2159D
+     C  N42                UPDATRAR2159D
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         SR3100    BEGSR
+     C*****************************************************************
+     C*記錄廠區別、客戶編號
+     C                     CLEARRAR2159D
+     C                     MOVE ARAREA    ADAREA
+     C                     MOVE ARCUNO    ADCUNO
+     C                     MOVE ARORNO    ADORNO
+     C                     Z-ADDARAMT     ADAMT4           切傳票金額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         SR3200    BEGSR
+     C*****************************************************************
+     C*-----重新合計AR2159D值-----
+     C*1.已兌現－繳貨款＋切傳票=客戶現金餘額
+     C*2.繳貨款>=已兌現＋切傳票，則分別減已兌現、切傳票；
+     C*  否則，已兌現－繳貨款且<0時，再將切傳票之金額加回，避免負值
+     C*
+     C                     Z-ADD0         W#AMT
+     C                     ADD  ARAMT     ADAMT4           切傳票金額
+     C           ADAMT1    ADD  ADAMT4    W#AMT
+     C           ADAMT2    IFGE W#AMT
+     C           ADAMT2    SUB  ADAMT1    ADAMT2
+     C                     Z-ADD0         ADAMT1           已兌現清0
+     C           ADAMT2    SUB  ADAMT4    ADAMT2
+     C                     Z-ADD0         ADAMT4           切傳票清0
+     C                     ELSE
+     C           ADAMT1    SUB  ADAMT2    ADAMT1
+ { { C           ADAMT1    IFLT 0
+     C           ADAMT1    ADD  ADAMT4    ADAMT4
+     C                     Z-ADD0         ADAMT1           已兌現清0
+   } C                     ENDIF
+     C                     Z-ADD0         ADAMT2           繳貨款清0
+ }   C                     ENDIF
+     C*
+     C                     ENDSR
+

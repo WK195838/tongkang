@@ -1,0 +1,127 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP112P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CSF                                  */
+     /*     4.FUNCTION     營業退款檔傳輸作業                     */
+     /*     5.DATE-WRITTEN  93/11/01                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&USER)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&FLAG1) TYPE(*CHAR) LEN(3) VALUE('X  ')
+
+
+             RTVJOBA    TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+             SBMJOB     JOB(ARP112P) JOBD(ARJOBD) JOBQ(QSYS/QCTL) +
+                        RQSDTA('CALL ARLIB/ARP112P') LOGCLPGM(*YES)
+             SNDBRKMSG  MSG('<<營業退款檔傳輸作業已開始處理+
+                         ,請稍待.........>>') +
+                        TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             RETURN
+
+
+ BATCH:
+
+ STEP0:        /*  建立　DDMF  */
+             DLTF       FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMT)
+
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMK)
+
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMH)
+
+
+ STEP1:        /*  台北　抓　桃園  ARLIB/ARRETNX   */
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP112PA) PARM(''T'')') +
+                        DDMFILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP2)
+
+             CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(ARLIB/ARRETNX)  +
+                        LVLCHK(*NO)
+             OVRDBF     FILE(ARRETNX) TOFILE(QTEMP/DDMT)
+             OVRDBF     FILE(ARRETN)  TOFILE(DALIB/ARRETN)
+             CALL       PGM(ARLIB/ARP112RB)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             DLTOVR     FILE(*ALL)
+             GOTO       CMDLBL(STEP2)
+             ENDDO
+
+             DLTOVR     FILE(*ALL)
+             CLRPFM     FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(%SST(&FLAG1 1 1)) VALUE(' ')
+
+
+ STEP2:        /*  台北　抓　苗栗  ARLIB/ARRETNX  */
+
+             GOTO       STEP3 /*不傳輸苗栗資料，因苗栗資料用代開或是業務在Ｐ*/
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP112PA) PARM(''H'')') +
+                        DDMFILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP3)
+
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(ARLIB/ARRETNX)  +
+                        LVLCHK(*NO)
+             OVRDBF     FILE(ARRETNX) TOFILE(QTEMP/DDMH)
+             OVRDBF     FILE(ARRETN)  TOFILE(DALIB/ARRETN)
+             CALL       PGM(ARLIB/ARP112RB)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             DLTOVR     FILE(*ALL)
+             GOTO       CMDLBL(STEP3)
+             ENDDO
+
+             DLTOVR     FILE(*ALL)
+             CLRPFM     FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(%SST(&FLAG1 2 1)) VALUE(' ')
+
+
+ STEP3:        /*  台北　抓　高雄  ARLIB/ARRETNX  */
+             GOTO       STEP4 /*不傳輸高雄資料，因高雄資料自己做*/
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP112PA) PARM(''K'')') +
+                        DDMFILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP4)
+
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(ARLIB/ARRETNX)  +
+                        LVLCHK(*NO)
+             OVRDBF     FILE(ARRETNX) TOFILE(QTEMP/DDMK)
+             OVRDBF     FILE(ARRETN)  TOFILE(DALIB/ARRETN)
+             CALL       PGM(ARLIB/ARP112RB)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             DLTOVR     FILE(*ALL)
+             GOTO       CMDLBL(STEP4)
+             ENDDO
+
+             DLTOVR     FILE(*ALL)
+             CLRPFM     FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(%SST(&FLAG1 3 1)) VALUE(' ')
+
+ /* -------------------------------------------------------------- */
+
+ STEP4:       /* 未成功廠區之訊息 */
+
+             IF         COND(&FLAG1 *NE '   ') THEN(DO)
+             SNDMSG     TOUSR(&USER) MSG(+
+                        '營業退款檔上傳失敗"' || &FLAG1 || '"')
+             ENDDO
+             ELSE (DO)
+             SNDMSG     TOUSR(&USER) MSG(+
+                        '抓取廠區資料已上傳成功！！')
+             ENDDO
+
+
+             ENDPGM
+

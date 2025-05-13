@@ -1,0 +1,109 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR086P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02YSH                                  */
+     /*     4.FUNCTION     現金流量預估明細表                     */
+     /*     5.DATE-WRITTEN  89/04/19                                */
+     /*     6.UPDATE  DATE  99/08/17  2010AR517 S00WCJ (9908A)      */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCLF       FILE(ARLIB/ARR086S)
+
+             DCL        VAR(&DSPID)   TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&INT)     TYPE(*CHAR)  LEN(1)
+    /*9908A  DCL        VAR(&QDATE)   TYPE(*CHAR)  LEN(6)   */
+    /*9908A*/DCL        VAR(&QDATE)   TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&W#DATE)  TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&W#DAY)   TYPE(*DEC)   LEN(8 0)
+             DCL        VAR(&W#LDAY)  TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&W#CDAY)  TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&W#ERR)   TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&W#MOD)   TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&W#CNT)   TYPE(*CHAR)  LEN(4)
+             DCL        VAR(&W#FUN)   TYPE(*CHAR)  LEN(1)
+
+             RTVJOBA    JOB(&DSPID) OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+       /*           */
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+
+    /*9908A  START */
+        /*   RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&QDATE)   */
+
+             RTVJOBA    CYMDDATE(&QDATE)
+             CHGVAR     VAR(&QDATE)   VALUE('0' *CAT &QDATE)
+    /*9908A  END */
+             CHGVAR     VAR(&S#DATE)  VALUE(&QDATE)
+             CHGVAR     VAR(&S#KIND)  VALUE('1')
+  START:
+             SNDRCVF
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             IF         COND(&IN12 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&IN30)    VALUE('0')
+             CHGVAR     VAR(&IN31)    VALUE('0')
+             CHGVAR     VAR(&S#ERR)   VALUE(' ')
+       /*檢核預計兌現日*/
+             CHGVAR     VAR(&W#DAY)   VALUE(&S#DATE)
+             CHGVAR     VAR(&W#LDAY)  VALUE(&W#DAY)
+             CHGVAR     VAR(&W#MOD)   VALUE('1') /*中國年*/
+             CHGVAR     VAR(&W#CNT)   VALUE('0000') /*天數*/
+             CHGVAR     VAR(&W#FUN)   VALUE('1') /* 1:往前, 2:往後 */
+             CALL       PGM(UTS104R) PARM(&W#LDAY  &W#MOD  &W#FUN &W#CNT +
+                                          &W#CDAY &W#ERR)
+             IF         COND(&W#ERR *NE '0')  THEN(DO)
+               CHGVAR     VAR(&IN30)    VALUE('1')
+               CHGVAR     VAR(&S#ERR)   VALUE('預計兌現日期錯誤!')
+               GOTO       CMDLBL(START)
+             ENDDO
+       /*檢核報表種類*/
+             IF         COND((&S#KIND *NE '1') *AND +
+                             (&S#KIND *NE '2')) THEN(DO)
+               CHGVAR     VAR(&IN31)    VALUE('1')
+               CHGVAR     VAR(&S#ERR)   VALUE('報表種類輸入錯誤!')
+               GOTO       CMDLBL(START)
+             ENDDO
+       /* 紀錄輸入值 */
+             CHGVAR     VAR(&W#DATE)  VALUE(&S#DATE)
+             CHGDTAARA  DTAARA(*LDA (500 8))  VALUE(&W#DATE)
+             CHGDTAARA  DTAARA(*LDA (508 1))  VALUE(&S#KIND)
+             CHGDTAARA  DTAARA(*LDA (509 10)) VALUE(&DSPID)
+
+             SBMJOB     CMD(CALL PGM(ARR086P)) JOB(ARR086P) +
+                        JOBD(ARJOBD)
+             SNDBRKMSG  MSG('<<現金流量預估明細表開始處理+
+                             ，請稍待...>>') +
+                          TOMSGQ(&DSPID) MSGTYPE(*INFO)
+             RETURN     /* INTERACTIVE JOB */
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (500 8))  RTNVAR(&W#DATE)
+             RTVDTAARA  DTAARA(*LDA (508 1))  RTNVAR(&S#KIND)
+             RTVDTAARA  DTAARA(*LDA (509 10)) RTNVAR(&DSPID)
+
+             OVRDBF     FILE(ARSTTX)  TOFILE(DALIB/ARSTTX)  SHARE(*YES)
+             OVRDBF     FILE(CBCUST)  TOFILE(CBCUST)
+             OVRPRTF    FILE(ARR086T) TOFILE(ARR086T) +
+                        USRDTA('現金流量') HOLD(*YES) +
+                        PAGESIZE(*N 158) CPI(12)
+             OPNQRYF    FILE(ARSTTX)  QRYSLT('+
+                         (AXRVNO *NE "      ")  *OR +
+                        ((AXRVNO *EQ "      ") *AND +
+                         (DATE1 *EQ "' || &W#DATE || '"))') +
+                        KEYFLD((AXCUNO) (AXORNO) (AXRVNO) (AXAPNO) +
+                               (AXINNO)) +
+                        MAPFLD((DATES AXORLD *ZONED 8 0) +
+                               (DATE1 DATES *CHAR 8))
+             CALL       PGM(ARR086R)
+             CLOF       OPNID(ARSTTX)
+             DLTOVR     FILE(*ALL)
+
+             SNDBRKMSG  MSG('<<現金流量預估明細表處理完畢+
+                             ，請列印...>>') +
+                          TOMSGQ(&DSPID) MSGTYPE(*INFO)
+             ENDPGM
+

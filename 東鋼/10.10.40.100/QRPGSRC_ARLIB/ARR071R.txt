@@ -1,0 +1,187 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR071R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     未確認營業繳款明細表
+     H*            5.DATE-WRITTEN  87/05/26
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FSARCVF  IP  E           K        DISK
+     FSARVIN  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FARSAID  IF  E           K        DISK
+     FARR071T O   E             66     PRINTER
+     F*****************************************************************
+     ISRREC
+     I                                              SRRVIDL3
+     I                                              SRRVDTL2
+     I                                              SRRVNOL1
+     I*------------------------------------------------------
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L3                EXSR L3CLR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CL3 99                EXSR L3SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L3清除函式換業務員
+     C*********************************
+     CSR         L3CLR     BEGSR
+     C                     Z-ADD0         R#PGNO
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2清除函式換日期
+     C*********************************
+     CSR         L2CLR     BEGSR
+     C                     CLEARAR071T1T
+     C                     SETON                     66    強迫換頁
+     C*
+     C                     Z-ADDSRRVDT    R#RVDT           繳款日期
+     C                     MOVELSRDPNO    R#DPNO           繳款部門
+     C                     MOVELSRRVID    R#RVID           收款業務
+     C           SRRVID    CHAINARSAID               69
+     C   69                MOVEL*BLANK    R#RVNM
+     C  N69                MOVELSANAME    R#RVNM
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式換繳款單
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     CLEARAR071T1S
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     CLEARAR071T1D
+     C*
+     C           *INL1     IFEQ '1'
+     C                     MOVELSRRVNO    R#RVNO
+     C                     MOVELSRCUNO    R#CUNO
+     C           SRCUNO    CHAINCBCUST               69
+     C   69                MOVEL*BLANK    R#CUNM
+     C  N69                MOVELCBCUNM    R#CUNM
+     C                     ENDIF
+     C*
+     C                     MOVELSRUSTP    R#USTP
+     C                     MOVELSRNTTP    R#NTTP
+     C                     MOVELSRACNO    R#ACNO
+     C                     MOVELSRACTP    R#ACTP
+     C                     MOVELSRPBID    R#PBID
+     C                     MOVELSRPANO    R#PANO
+     C                     MOVELSRNTNO    R#NTNO
+     C                     Z-ADDSRDUDT    R#DUDT
+     C                     MOVELSRPLAC    R#PLAC
+     C                     Z-ADDSRRAMT    R#RAMT
+     C*
+     C           *IN66     IFEQ '1'
+     C                     ADD  1         R#PGNO
+     C                     WRITEAR071T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR071T1D
+     C*
+     C           R#ACTP    IFEQ 'D'                        借方
+     C                     ADD  R#RAMT    R#SRNA           小計繳款
+     C                     ELSE                            貸方
+     C                     SUB  R#RAMT    R#SRNA
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  繳款單號更改
+     C*********************************
+     CSR         L1SR      BEGSR
+     C           SRRVNO    CHAINSIREC                69
+     C           *IN69     DOWEQ'0'
+     C                     CLEARAR071T1D
+     C                     MOVELSIINNO    R#INNO
+     C           R#INNO    CHAININREC                69
+     C   69                MOVEL*BLANK    R#APNO
+     C  N69                MOVELINAPNO    R#APNO
+     C                     Z-ADDSIINXA    R#INXA
+     C*
+     C           *IN66     IFEQ '1'
+     C                     ADD  1         R#PGNO
+     C                     WRITEAR071T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR071T1D                   沖銷明細
+     C                     ADD  R#INXA    R#SRXA
+     C*
+     C           SRRVNO    READESIREC                    69
+     C                     ENDDO
+     C*
+     C           *IN66     IFEQ '1'
+     C                     ADD  1         R#PGNO
+     C                     WRITEAR071T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR071T1S                   寫出小計
+     C*
+     C                     ADD  R#SRNA    R#TRNA           合計
+     C                     ADD  R#SRXA    R#TRXA
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2 函式
+     C*********************************
+     CSR         L2SR      BEGSR
+     C           *IN66     IFEQ '1'
+     C                     ADD  1         R#PGNO
+     C                     WRITEAR071T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR071T1T                   寫出合計
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L3 函式 換業務員(NOTHING)
+     C*********************************
+     CSR         L3SR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  印核覆
+     C*********************************
+     CSR         LRSR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     WRITEAR071T1H
+     C                     WRITEAR071T1M
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  子函式集
+     C*********************************
+

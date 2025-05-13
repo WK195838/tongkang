@@ -1,0 +1,216 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP068R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     銷貨帳款應收統計處理－發票兌現銷貨
+     H*            5.DATE-WRITTEN  88/06/11
+     H*
+     H* 說明：從發票主檔統計尚有餘額者，計算其兌現比率。
+     H*       並找出相關的銷貨明細資料。
+     H*        9004  排除催收款   BY  S02YSH
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMSTL3IP  E           K        DISK
+     F            INREC                             KRENAMEINRECP
+     FINVMST  IF  E           K        DISK
+     FTRNDTLL2IF  E           K        DISK
+     FARSTIN  UF  E           K        DISK                      A
+     FARSTTX  UF  E           K        DISK                      A
+9004 FBSYSDT  IF  E           K        DISK
+     F*****************************************************************
+TEST I            DS
+     I                                        1  10 D#INNO
+     I                                        3  10 D#INN1
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10011003 U#DPID
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C                     EXSR DTLSR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C           K#AX      KLIST
+     C                     KFLD           AXTXCD
+     C                     KFLD           AXTXNO
+     C                     KFLD           AXINNO
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C           INNO      CHAINANREC                69
+     C           *IN69     IFEQ '1'
+     C                     CLEARANREC
+     C                     MOVELINNO      ANINNO
+     C                     Z-ADDINNBAL    ANCAMT           發票餘額
+     C                     WRITEANREC
+     C                     ELSE
+     C                     ADD  INNBAL    ANCAMT           發票餘額
+     C                     UPDATANREC
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式
+     C*********************************
+     CSR         LRSR      BEGSR
+     C           *LOVAL    SETLLANREC
+     C           1         DOWEQ1
+     C                     READ ANREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           ANINNO    CHAININREC                69
+     C                     MOVELINAPNO    ANAPNO           請款單號
+     C           INEAMT    ADD  INFAMT    W#TAMT           繳款金額
+     C                     Z-SUBW#TAMT    ANAAMT
+     C*
+     C           INAAMT    ADD  INBAMT    W#TAMT 110       發票金額
+     C                     ADD  INATAX    W#TAMT
+     C           ANBAMT    ADD  ANCAMT    W#AAMT 110       應收金額
+     C           W#TAMT    IFNE 0
+     C           W#AAMT    DIV  W#TAMT    ANRATE    H      未兌現比率
+     C                     ENDIF
+     C           1         SUB  ANRATE    ANRATE           兌現比率
+     C                     UPDATANREC
+     C*
+     C           INAAMT    ADD  INBAMT    W#XAMT 110       出貨扣預收
+     C           W#XAMT    DIV  INAAMT    W#XRAT  65H      應收比率
+     C*
+     C*** 9004 排除催收款寫入ARSTTX  START
+TEST C                     MOVE ANINNO    D#INNO
+ .   C           D#INN1    IFEQ '28143500'
+ .   C                     Z-ADD0         W#TEST  10
+ .   C                     ENDIF
+     C                     MOVE *OFF      *IN51
+     C           ANINNO    CHAINYSREC                50
+     C  N50      YSCODE    IFEQ 'Y'
+     C                     MOVE *ON       *IN51
+     C                     ENDIF
+     C*** 9004 排除催收款END
+ TESTC                     MOVELINNO      W#INN1  2
+ TESTC                     MOVE INNO      W#INN2  8
+ TESTC           W#INN1    IFEQ 'EP'
+ TESTC           W#INN2    ANDEQ'27880312'
+ TESTC                     Z-ADD0         W#TEST  10
+ TESTC                     ENDIF
+ TESTC           W#INN1    IFEQ 'GK'
+ TESTC           W#INN2    ANDEQ'27876108'
+ TESTC                     Z-ADD0         W#TEST  10
+ TESTC                     ENDIF
+     C           ANINNO    CHAINTXREC                69    找出銷貨
+     C           *IN69     IFEQ '1'
+     C                     EXSR SR1000                     無銷貨
+     C                     ELSE
+     C                     EXSR SR2000                     有銷貨
+     C                     ENDIF
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+     C* 公用子函式集
+     C*****************************************************************
+     C*********************************
+     C*  新增一筆應收明細（無銷貨明細）
+     C*********************************
+     CSR         SR1000    BEGSR
+     C                     CLEARAXREC
+     C                     MOVELINCUNO    AXCUNO           客戶編號
+     C                     MOVELINORNO    AXORNO           訂單
+     C                     MOVELINSALE    AXSAID           出貨業務
+     C                     MOVELINRVID    AXRVID           收款業務
+     C*
+     C                     SELEC
+     C           INTYPE    WHEQ '1'                        出貨類發票
+     C                     MOVEL'SA04'    AXTXCD
+     C           INTYPE    WHEQ '2'
+     C                     MOVEL*BLANK    AXTXCD
+     C           INTYPE    WHEQ '3'
+     C                     MOVEL'AR05'    AXTXCD
+     C           INTYPE    WHEQ '9'
+     C                     MOVEL*BLANK    AXTXCD
+     C                     ENDSL
+     C*
+     C                     MOVEL*BLANK    AXTXNO           單據編號
+     C                     Z-ADDININDT    AXTXDT           出貨日期
+     C                     MOVELANINNO    AXINNO           發票號碼
+     C                     MOVELANAPNO    AXAPNO           請款單號
+     C                     MOVELANRVNO    AXRVNO           繳款單號
+     C                     Z-ADDANRVDT    AXRVDT           繳款日期
+     C                     Z-ADDANRVLD    AXRVLD           最後兌現日
+     C                     MOVELANSTCD    AXSTCD           應收狀況
+     C                     Z-ADDANRATE    AXINRT           兌現比率
+     C           INAAMT    ADD  INATAX    AXTXAM           出貨金額
+9004 C  N51                WRITEAXREC
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  新增一筆應收明細（有銷貨明細）
+     C*********************************
+     CSR         SR2000    BEGSR
+     C           ANINNO    SETLLTXREC                69
+     C           1         DOWEQ1                          銷貨明細
+     C           ANINNO    READETXREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           TXFLAG    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVELTXCODE    AXTXCD
+     C                     MOVELTXNO      AXTXNO
+     C                     MOVELANINNO    AXINNO
+     C           K#AX      CHAINAXREC                69
+     C*
+     C           *IN69     IFEQ '1'
+     C                     CLEARAXREC
+     C                     MOVELINCUNO    AXCUNO           客戶編號
+     C                     MOVELINORNO    AXORNO           訂單
+     C                     MOVELINSALE    AXSAID           出貨業務
+     C                     MOVELINRVID    AXRVID           收款業務
+     C*
+     C                     MOVELTXCODE    AXTXCD           單據代碼　
+     C                     MOVELTXNO      AXTXNO           單據編號
+     C                     Z-ADDTXACDT    AXTXDT           出貨日期
+     C           TXAMT     MULT W#XRAT    AXTXAM    H      出貨金額
+     C*
+     C                     MOVELANINNO    AXINNO           發票號碼
+     C                     MOVELANAPNO    AXAPNO           請款單號
+     C                     MOVELANRVNO    AXRVNO           繳款單號
+     C                     Z-ADDANRVDT    AXRVDT           繳款日期
+     C                     Z-ADDANRVLD    AXRVLD           最後兌現日
+     C                     MOVELANSTCD    AXSTCD           應收狀況
+     C                     Z-ADDANRATE    AXINRT           兌現比率
+9004 C  N51                WRITEAXREC
+     C*
+     C                     ELSE
+     C           TXAMT     MULT W#XRAT    W#XAMT    H
+     C                     ADD  W#XAMT    AXTXAM           出貨金額
+9004 C  N51                UPDATAXREC
+     C                     ENDIF
+     C                     ENDDO
+     CSR                   ENDSR
+     C*****************************************************************
+

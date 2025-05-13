@@ -1,0 +1,473 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE042R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     已作廢發票還原作業
+     H*            5.DATE-WRITTEN  88/06/05
+     H*            6.UPDATE  DATE  99/08/24  2010AR517  S00WCJ (9908A)
+     H*                           104/09/18  2015AR953  S00WCJ (0409A)
+     H*                            產品代碼3碼擴5碼
+     H*                           106/12/06  2017AR1112 S00WCJ (0612A)
+     H*                            配合電子發票上送作業，增加檢核及
+     H*                            相關處理
+     H*                           107/06/15  2018AR1162  S00WCJ (0706A)
+     H*                            電子發票介面檔增加處理代號及廠區
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARE042S CF  E                    WORKSTN
+     F                                        RRN2  KSFILE AR042F2
+     FINVMST  UF  E           K        DISK
+     FINVDTL  UF  E           K        DISK
+     FTRNDTL  UF  E           K        DISK
+     FTRNDTLL4IF  E           K        DISK
+     F            TXREC                             KRENAMETXRECW
+     FARALOG  O   E           K        DISK
+0612AFINEDIN  UF  E           K        DISK
+0612AFINEDING O   E           K        DISK
+0612AF            RINEDIN                           KRENAMEINDING
+     E*************************************************************
+0612AE                    T#MSG   1   7 70
+     I*************************************************************
+     ITXRECW      01
+     I              TXFLAG                          TWFLAG
+     I              TXCODE                          TWCODE
+     I              TXNO                            TWNO
+     I              TXITEM                          TWITEM
+     I              TXACNT                          TWACNT
+     I              TXDATE                          TWDATE
+     I              TXACDT                          TWACDT
+     I              TXCUNO                          TWCUNO
+     I              TXCUNM                          TWCUNM
+     I              TXORNO                          TWORNO
+     I              TXIVNO                          TWIVNO
+     I              TXPCNO                          TWPCNO
+     I              TXVUNO                          TWVUNO
+     I              TXRVID                          TWRVID
+     I              TXSALE                          TWSALE
+     I              TXSATP                          TWSATP
+     I              TXIVTP                          TWIVTP
+     I              TXPDNM                          TWPDNM
+     I              TXQTY                           TWQTY
+     I              TXUPRC                          TWUPRC
+     I              TXAMT                           TWAMT
+     I              TXTAX                           TWTAX
+     I              TXFL01                          TWFL01
+     I              TXFL02                          TWFL02
+     I              TXTXAR                          TWTXAR
+     I              TXTXDT                          TWTXDT
+     I              TXRESV                          TWRESV
+     I*
+     I           UDS
+     I                                        1   60U#DATE
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1  140W#SYST
+     I                                        1   60D#ST
+     I                                        7  100D#SY
+     I                                       11  140D#SMD
+     I            DS
+9008 I                                        1   9 TWORNO
+LYW  I                                        1   6 D#ORNO
+     C**************************************************************
+     C*   檔案搜尋關鍵
+     C**************************************************************
+     C           K#TX      KLIST                           銷貨明細
+     C                     KFLD           TXCODE
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C*   副程式開始
+     C**************************************************************
+     C*----------------------------------------
+     C*  宣告及初始變數
+     C*----------------------------------------
+     CSR         SR0000    BEGSR
+     C                     Z-ADD0         RRN2    40
+     C                     MOVEL'01'      W#PRID  2
+     CSR                   ENDSR
+     C*
+     C*
+     C************************************
+     C*  畫面一:發票還原主畫面
+     C************************************
+     CSR         SR1000    BEGSR
+     C                     EXFMTAR042F1                    螢幕輸入
+     C*
+     C                     MOVEL*BLANK    S#MSG1
+     C*
+     C                     SELEC
+     C           *IN03     WHEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'00'      W#PRID           結束
+     C*
+     C           *IN10     WHEQ '1'
+     C                     EXSR SR1200                     存檔
+     C*
+     C                     OTHER
+     C                     EXSR SR1100                     試算
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  檢核程式
+     C*----------------------------------------
+     CSR         SR1100    BEGSR
+     C                     MOVEL'F'       W#RTNV  1
+     C*
+     C           S#INNO    CHAININREC               N69
+     C           *IN69     IFEQ '1'
+     C                     MOVELT#MSG,1   S#MSG1           發票不存在
+     C                     GOTO ES1100
+     C                     ENDIF
+     C*
+     C           INAREA    IFNE U#AREA
+     C                     MOVELT#MSG,2   S#MSG1           發票非本廠
+     C                     GOTO ES1100
+     C                     ENDIF
+     C*
+     C           INDECD    IFNE 'D'
+     C                     MOVELT#MSG,3   S#MSG1           發票未作廢
+     C                     GOTO ES1100
+     C                     ENDIF
+     C*
+     C           S#CGCA    IFEQ *BLANK
+     C                     MOVELT#MSG,4   S#MSG1
+     C                     GOTO ES1100
+     C                     ENDIF
+     C*
+0612AC           S#INNO    CHAININEDIN              N69
+0612AC           *IN69     IFEQ *OFF
+0612AC           DNTMDT    IFNE 0
+0612AC           DNSTCL    ORNE *BLANKS
+0612AC                     MOVELT#MSG,7   S#MSG1
+0612AC                     GOTO ES1100
+0612AC                     ENDIF
+0612AC                     ENDIF
+0612AC*
+     C                     MOVEL'T'       W#RTNV
+     CSR         ES1100    ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一：還原動作
+     C*----------------------------------------
+     CSR         SR1200    BEGSR
+     C                     EXSR SR1100                     檢核
+     C           W#RTNV    IFEQ 'F'
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*
+     C                     EXSR SR2100                     初始畫面二
+     C                     MOVEL'02'      W#PRID
+     CSR         ES1200    ENDSR
+     C*
+     C************************************
+     C*  畫面二:銷貨明細沖銷主函式
+     C************************************
+     CSR         SR2000    BEGSR
+     C                     WRITEAR042F2M
+     C           S#SFN2    IFEQ 0
+     C                     SETOF                     7273
+     C                     SETON                     7174
+     C                     ELSE                            有資料
+     C                     SETOF                     73
+     C                     SETON                     717274
+     C                     ENDIF
+     C                     EXFMTAR042F2C                   螢幕輸入
+     C*
+     C                     MOVEL*BLANK    S#MSG2
+     C           S#CRN2    IFNE 0
+     C                     Z-ADDS#CRN2    S#NBR2           記錄位置
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           *IN03     WHEQ '1'
+     C                     MOVEL'00'      W#PRID
+     C           *IN12     WHEQ '1'
+     C                     MOVEL'01'      W#PRID
+     C                     MOVELT#MSG,5   S#MSG1           取消存檔
+     C           *IN10     WHEQ '1'
+     C                     EXSR SR2300                     存檔二
+     C                     OTHER
+     C                     EXSR SR2200                     試算沖銷
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  初始畫面二
+     C*----------------------------------------
+     CSR         SR2100    BEGSR
+     C                     Z-ADD0         S#TSAM           沖銷金額
+     C                     MOVEL*BLANK    S#MSG2
+     C                     Z-ADD1         S#NBR2
+     C                     SETOF                     7172
+     C                     SETON                     73    清除 SF
+     C                     WRITEAR042F2C
+     C*                                         讀入畫面並計算金額
+     C           S#INNO    CHAININREC               N69
+     C                     MOVELINCUNO    S#CUNO
+     C                     MOVELINORNO    S#ORNO
+     C                     Z-ADDINAAMT    S#INAM
+     C*
+     C                     Z-ADD0         S#SFN2
+     C                     Z-ADD0         RRN2
+     C           S#ORNO    SETLLTRNDTLL4             69
+     C*
+     C           *IN69     DOWNE'1'
+     C                     READ TXRECW                   69
+     C           *IN69     IFEQ '1'
+     C           S#ORNO    ORNE D#ORNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           TWFLAG    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           TWIVNO    IFEQ *BLANK                     未開立
+     C           TWIVNO    OREQ '*'                        或暫不開立
+     C                     ADD  1         RRN2
+     C                     CLEARAR042F2
+     C                     MOVELTWCODE    S#TXCD           單據代號
+     C                     MOVELTWNO      S#TXNO           單據號碼
+     C                     MOVELTWITEM    S#TXIT           項次
+     C                     MOVELTWDATE    S#TXDT           單據日期
+     C                     MOVELTWPDNM    S#TXPD           品名代號
+     C                     MOVELTWQTY     S#TXQT           數量
+     C                     MOVELTWUPRC    S#TXUP           單價
+     C                     MOVELTWAMT     S#TXAM           金額
+     C                     MOVELTWTAX     S#TXTA           稅額
+     C                     MOVELTWSALE    S#TXSA           出貸業務員
+     C                     MOVELTWRVID    S#TXRV           收款業務員
+     C                     WRITEAR042F2
+     C                     ADD  1         S#SFN2
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*-------------------------------
+     C*  試算沖銷金額
+     C*-------------------------------
+     CSR         SR2200    BEGSR
+     C                     Z-ADD0         S#TSAM
+     C                     Z-ADD0         RRN2
+     C                     DO   S#SFN2
+     C                     ADD  1         RRN2
+     C           RRN2      CHAINAR042F2              69
+     C           S#OPT2    IFEQ '1'
+     C                     ADD  S#TXAM    S#TSAM
+     C                     ENDIF
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*-------------------------------
+     C*  畫面二：銷貨明細沖銷存檔
+     C*-------------------------------
+     CSR         SR2300    BEGSR
+     C                     EXSR SR2200                     試算
+     C                     EXSR SR0010                     資料存檔
+     C                     EXSR SR0020                     異動存檔
+     C                     MOVEL'01'      W#PRID           返回一
+     C                     MOVELT#MSG,6   S#MSG1
+     CSR                   ENDSR
+     C*
+     C****************************************************************
+     C*  公用副程式集合
+     C****************************************************************
+     C*----------------------------------------
+     C*  資料存檔
+     C*----------------------------------------
+     CSR         SR0010    BEGSR
+     C           S#INNO    SETLLIVREC                69
+     C           *IN69     DOWEQ'0'
+     C           S#INNO    READEIVREC                    69
+     C   69                LEAVE
+     C*
+     C           IVFLAG    IFEQ 'D'                        已刪除不記
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVEL'C'       IVFLAG
+     C                     MOVEL' '       IVDECD
+     C                     Z-ADD0         IVDEDT
+9908AC*                    Z-ADDUDATE     IVTXDT
+9908AC           *DATE     SUB  19000000  IVTXDT
+     C                     UPDATIVREC                      改發票明細
+     C                     ENDDO
+     C*
+     C*
+     C           S#INNO    CHAININREC                69
+     C                     MOVEL'C'       INFLAG
+     C                     MOVEL' '       INDECD
+     C                     Z-ADD0         INDEDT
+9908AC*                    Z-ADDUDATE     INTXDT
+9908AC           *DATE     SUB  19000000  INTXDT
+     C                     EXSR SR0011                     統計金額
+     C                     UPDATINREC                      改發票主檔
+     C*
+0612AC*刪除電子發票介面檔資料
+0612AC*
+0612AC           S#INNO    CHAINRINEDIN              69
+0706AC                     MOVEL'D'       DNFLAG
+0706AC                     MOVELU#AREA    DNAREA
+0612AC           *DATE     SUB  19000000  DNXPDD
+0612AC                     TIME           DNXPDT
+0612AC                     MOVELU#USID    DNXUSR
+0612AC                     MOVEL'ARE042R' DNAPNM
+0612AC                     WRITEINDING
+0706AC                     UPDATRINEDIN
+0612AC*                    DELETINEDIN
+0612AC*
+     C*
+     C                     Z-ADD0         RRN2             改銷貨明細
+     C                     DO   S#SFN2
+     C                     ADD  1         RRN2
+     C           RRN2      CHAINAR042F2              69
+     C           S#OPT2    IFEQ '1'
+     C                     CLEARTXREC
+     C                     MOVELS#TXCD    TXCODE           單據代號
+     C                     MOVELS#TXNO    TXNO             單據號碼
+     C                     MOVELS#TXIT    TXITEM           項次
+     C           K#TX      CHAINTRNDTL               69
+     C                     MOVEL'C'       TXFLAG           處理代碼
+     C                     MOVELS#INNO    TXIVNO           發票號碼
+     C                     MOVEL'Y'       TXFL02           過發票碼
+     C                     MOVELU#AREA    TXTXAR           異動廠區
+9908AC*                    Z-ADDUDATE     TXTXDT           異動日期
+9908AC           *DATE     SUB  19000000  TXTXDT           異動日期
+     C                     UPDATTXREC
+     C                     ENDIF
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  合計發票各項明細金額
+     C*----------------------------------------
+     CSR         SR0011    BEGSR
+     C                     Z-ADD0         INAAMT           出貨金額
+     C                     Z-ADD0         INATAX           出貨稅額
+     C                     Z-ADD0         INBAMT           扣預收
+     C                     Z-ADD0         INCAMT           折退金額
+     C                     Z-ADD0         INCTAX           折退稅額
+     C                     Z-ADD0         INDAMT           扣預金沖回
+     C                     Z-ADD0         INDTAX           扣預稅沖回
+     C                     Z-ADD0         INEAMT           繳款金額
+     C                     Z-ADD0         INFAMT           退票金額
+     C                     Z-ADD0         INNBAL           未收餘額
+     C*
+     C           INNO      SETLLIVREC                69
+     C           *IN69     DOWEQ'0'
+     C           INNO      READEIVREC               N    69
+     C   69                LEAVE
+     C*
+     C           IVFLAG    IFEQ 'D'                        刪除者不計
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           IVACNT    WHEQ '1'                        出貨
+     C                     ADD  IVAMT     INAAMT
+     C*
+     C           IVACNT    WHEQ '2'                        退貨
+     C                     ADD  IVAMT     INCAMT
+     C*
+     C           IVACNT    WHEQ '3'                        折讓
+     C                     ADD  IVAMT     INCAMT
+     C*
+     C           IVACNT    WHEQ '4'
+     C           IVAMT     IFLT 0                          負數
+     C           INTYPE    IFEQ '2'                        預收發票
+     C                     ADD  IVAMT     INCAMT           折預收
+     C                     ELSE
+     C                     ADD  IVAMT     INBAMT           扣預收
+     C                     ENDIF
+     C                     ELSE                            正數
+     C           INTYPE    IFEQ '2'                        預收發票
+     C                     ADD  IVAMT     INAAMT           預收金額
+     C                     ELSE
+     C                     ADD  IVAMT     INDAMT           扣預收沖回
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           IVACNT    WHEQ '5'
+     C                     SELEC
+0409AC           IVPDCD    WHEQ *BLANKS                    出貨稅額
+     C                     ADD  IVAMT     INATAX
+0409AC           IVPDCD    WHEQ 'A    '                    預收沖回稅
+     C                     ADD  IVAMT     INDTAX
+0409AC           IVPDCD    WHEQ 'B    '                    退貨稅額
+     C                     ADD  IVAMT     INCTAX
+0409AC           IVPDCD    WHEQ 'C    '                    折讓稅額
+     C                     ADD  IVAMT     INCTAX
+     C                     OTHER                           打錯
+     C                     ADD  IVAMT     INATAX
+     C                     ENDSL
+     C*
+     C           IVACNT    WHEQ '6'                        繳款
+     C                     ADD  IVAMT     INEAMT
+     C*
+     C           IVACNT    WHEQ '7'                        退票轉出
+     C                     ADD  IVAMT     INFAMT
+     C*
+     C           IVACNT    WHEQ '8'                        勞務
+     C                     ADD  IVAMT     INAAMT
+     C*
+     C           IVACNT    WHEQ '9'                        其他
+     C                     ADD  IVAMT     INAAMT
+     C                     ENDSL
+     C                     ENDDO
+     C*
+     C           INAAMT    ADD  INATAX    INNBAL           彙總未收
+     C                     ADD  INBAMT    INNBAL
+     C                     ADD  INCAMT    INNBAL
+     C                     ADD  INCTAX    INNBAL
+     C                     ADD  INDAMT    INNBAL
+     C                     ADD  INDTAX    INNBAL
+     C                     ADD  INEAMT    INNBAL
+     C                     ADD  INFAMT    INNBAL
+     CSR                   ENDSR
+     C*
+     C*-----------------------------------
+     C*  異動記錄存檔
+     C*-----------------------------------
+     CSR         SR0020    BEGSR
+     C                     CLEARRARALOG                    異動登錄
+9908AC*                    Z-ADDUDATE     AGDATE           日期
+9908AC           *DATE     SUB  19000000  AGDATE           日期
+     C                     TIME           W#SYST
+     C                     Z-ADDD#ST      AGTIME           時間
+     C                     MOVELU#USID    AGURID           使用者
+     C                     MOVEL'AIF'     AGTRID           異動代號
+     C                     MOVELS#INNO    AGRENO           相關號碼
+     C                     MOVELS#CGCA    AGCGCA           修改原因
+     C                     WRITERARALOG
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+** T#ERR
+０１－發票號碼不存在。
+０２－本發票非本廠區所開立，無權進行異動。
+０３－本發票不是已作廢的發票，無法進行作廢還原。
+０４－異動原因尚未輸入！
+０５－使用者取消存檔動作，尚未進行還原動作。
+０６－還原完畢，請用發票維護作業或發票維護作業異常版查核。
+０７－資料已上送電子發票介面檔，不可還原
+

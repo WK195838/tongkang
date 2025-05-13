@@ -1,0 +1,198 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP051RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     日期訂單別磅單重量差異（畫面）
+     H*            5.DATE-WRITTEN  86/04/14
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARP051S CF  E                    WORKSTN
+     F                                        RRN1  KSFILE AR051F1
+     FARP051FOO   E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     E*************************************************************
+     E                    T#ERR   1   6 70
+     I*************************************************************
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C                     PARM           P#YMS   6
+     C                     PARM           P#YME   6
+     C**************************************************************
+     C                     SETOF                     7172
+     C                     SETON                     73
+     C                     WRITEAR051F1C
+     C                     Z-ADD1         S#NBR1
+     C                     Z-ADD0         RRN1
+     C                     DO   99
+     C                     ADD  1         RRN1
+     C           RRN1      CHAINAR051F1              69
+     C                     Z-ADDRRN1      S#ITEM
+     C                     UPDATAR051F1
+     C                     ENDDO
+     C*
+     C                     SETOF                     73
+     C                     SETON                     717274
+     C                     SETON                     40
+     C*
+     C           1         DOWEQ1
+     C                     WRITEAR051F1M
+     C                     EXFMTAR051F1C
+     C*
+     C           S#CRN1    IFNE 0
+     C                     Z-ADDS#CRN1    S#NBR1
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           *IN03     WHEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03
+     C                     LEAVE
+     C*
+     C           *IN10     WHEQ '1'
+     C                     EXSR SR1000
+     C           W#RTNV    IFEQ 'T'
+     C                     MOVEL'0'       P#IN03
+     C                     MOVELS#YMS     P#YMS
+     C                     MOVELS#YME     P#YME
+     C                     EXSR SR2000
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     OTHER
+     C                     MOVEL*BLANK    S#MSG1
+     C                     EXSR SR1000
+     C                     ENDSL
+     C                     ENDDO
+     C                     SETON                     LR
+     C*
+     C************************************
+     C*  檢核所輸入是否正確
+     C************************************
+     CSR         SR1000    BEGSR
+     C                     MOVEL'F'       W#RTNV  1
+     C                     SETOF                     404142
+     C                     SETOF                     51
+     C*
+     C*                    MOVEL'0'       P#FLAG  1
+     C*                    MOVELS#YMS     P#DATE  60
+     C*                    CALL 'C01'
+     C*                    PARM           P#DATE
+     C*                    PARM           P#FLAG
+     C*                    FREE 'C01'
+     C                     MOVE *ALL'0'   P#PDAT
+     C                     MOVE S#YMS     P#PDAT
+     C                     CALL 'UTS102R'
+     C                     PARM           P#PDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM '0'       P#FLAG  1
+     C*
+     C           P#FLAG    IFNE '0'
+     C                     SETON                     4041
+     C                     MOVELT#ERR,1   S#MSG1
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C                     Z-ADDUDATE     W#DATE  60
+     C           S#YMS     IFGT W#DATE
+     C                     SETON                     4041
+     C                     MOVELT#ERR,3   S#MSG1
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C*                    MOVEL'0'       P#FLAG  1
+     C*                    MOVELS#YME     P#DATE  60
+     C*                    CALL 'C01'
+     C*                    PARM           P#DATE
+     C*                    PARM           P#FLAG
+     C*                    FREE 'C01'
+     C                     MOVE *ALL'0'   P#PDAT
+     C                     MOVE S#YME     P#PDAT
+     C                     CALL 'UTS102R'
+     C                     PARM           P#PDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM '0'       P#FLAG  1
+     C*
+     C           P#FLAG    IFNE '0'
+     C                     SETON                     42
+     C                     MOVELT#ERR,2   S#MSG1
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C                     Z-ADDUDATE     W#DATE  60
+     C           S#YME     IFGT W#DATE
+     C                     SETON                     42
+     C                     MOVELT#ERR,4   S#MSG1
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C           S#YMS     IFGT S#YME
+     C                     SETON                     4142
+     C                     MOVELT#ERR,5   S#MSG1
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*          --------------------------------------  檢核客戶
+     C                     MOVEL'F'       W#SFER  1
+     C                     Z-ADD100       RRN1    40
+     C                     DO   99
+     C                     SUB  1         RRN1
+     C           RRN1      CHAINAR051F1              69
+     C                     SETOF                     51
+     C           S#CUNO    IFNE '     '
+     C           S#CUNO    CHAINCBCUST               69
+     C           *IN69     IFEQ '1'
+     C                     MOVEL'T'       W#SFER
+     C                     Z-ADDRRN1      S#NBR1
+     C                     SETON                     51
+     C                     ENDIF
+     C                     ENDIF
+     C                     UPDATAR051F1
+     C                     ENDDO
+     C*
+     C           W#SFER    IFEQ 'T'
+     C                     MOVELT#ERR,6   S#MSG1
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C                     MOVEL'T'       W#RTNV
+     CSR         ES1000    ENDSR
+     C*
+     C************************************
+     C*  客戶編號存檔
+     C************************************
+     CSR         SR2000    BEGSR
+     C                     Z-ADD0         RRN1
+     C                     DO   99
+     C                     ADD  1         RRN1
+     C           RRN1      CHAINAR051F1              69
+     C           S#CUNO    IFEQ '     '
+     C                     ITER
+     C                     ENDIF
+     C                     MOVELS#CUNO    WXCUNO
+     C                     WRITEWXREC
+     C                     ENDDO
+     CSR                   ENDSR
+     C*****************************************************************
+** T#ERR
+０１－所輸入之起始日期錯誤
+０２－所輸入之終止日期錯誤
+０３－所輸入之起始日期大於系統日期
+０４－所輸入之終止日期大於系統日期
+０５－所輸入之起始日期大於終止日期
+０６－客戶號碼輸入錯誤
+

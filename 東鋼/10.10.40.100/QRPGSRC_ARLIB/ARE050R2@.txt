@@ -1,0 +1,383 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE050R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     進倉履約折讓自動處理作業-開立處理
+     H*            5.DATE-WRITTEN  91/02/22
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FDISMST  UP  E           K        DISK
+     FDISDTL  UF  E           K        DISK
+     FINVMST  UF  E           K        DISK
+     FGENSEQ  UF  E           K        DISK
+     FINVDTL  IF  E           K        DISK                      A
+     FTRNDTL  O   E           K        DISK
+     FARE050T O   E             69     PRINTER
+     IRDISMST     01
+     I                                              DMCUNOL1
+     I            DS
+     I                                        1   6 D#TXNO
+     I                                        1   1 D#TXN1
+     I                                        2   60D#TXN2
+     I           UDS
+     I                                      401 406 D#CUNO
+     I                                      407 410 D#YYMM
+     I                                     10011010 T#USID
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C* KEY LIST
+     C*FILE=> DISDTL
+     C           K#DISD    KLIST
+     C                     KFLD           DSORNO
+     C                     KFLD           DSYYMM
+     C                     KFLD           DSINNO
+     C                     KFLD           DSPROD
+     C*FILE=> GENSEQ
+     C           K#GENS    KLIST
+     C                     KFLD           GEKIND
+     C                     KFLD           GEPRIN
+     C*FILE=> INVDTL
+     C           K#INVD    KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*初始報表
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C*
+     C                     MOVE UDATE     W#DATE  60
+     C                     SETON                     99
+     C                     Z-ADD0         W#TXNO  50       折讓單號
+     C                     Z-ADD0         W#TXIT  20       折讓項次
+     C                     MOVE *BLANK    W#ORNO  6        訂單暫存
+     C                     MOVE *BLANK    W#AREA  1        廠區暫存
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     SETON                     69
+     C                     CLEARAR050T3
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVE *OFF      *IN40
+     C                     Z-ADDDMAMT5    W#AMT5 120       訂單總折讓
+     C*處理DISDTL
+     C                     MOVE DMORNO    DSORNO           訂單號碼
+     C                     MOVE DMYYMM    DSYYMM           處理年月
+     C                     MOVE *LOVAL    DSINNO           發票號碼
+     C                     MOVE *LOVAL    DSPROD           產品類別
+     C           K#DISD    SETLLRDISDTL
+     C           *IN40     DOWEQ*OFF
+     C                     READ RDISDTL                  40
+     C   40                LEAVE
+     C*
+     C           DSORNO    IFNE DMORNO
+     C           DSYYMM    ORNE DMYYMM
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           DSAREA    IFNE DMAREA                     廠區別不同
+     C                     ITER
+     C                     ENDIF
+     C*計算該產品類別之折讓金額
+     C           DMAMT4    MULT DSQTY1    W#AMT1 120H
+     C           W#AMT5    SUB  W#AMT1    W#AMTX 120
+     C           W#AMTX    IFLT 0                          最後一筆
+     C                     Z-ADDW#AMT5    DSAMT1
+     C                     ELSE
+     C                     Z-ADDW#AMT1    DSAMT1
+     C                     Z-ADDW#AMTX    W#AMT5           更新餘額
+     C                     ENDIF
+     C*計算稅額
+     C           DMTYPE    IFEQ '3'                        三聯式
+     C           DSAMT1    MULT 0.05      DSAMT2    H
+     C                     ELSE                            二聯式
+     C                     MULT 1.05      DSAMT1    H
+     C                     ENDIF
+     C*取得折讓單號(每一張只能有一個訂單,最多8項)
+     C           W#TXIT    IFEQ 8                          第8項
+     C           DMORNO    ORNE W#ORNO                     第8項
+     C           DMAREA    ORNE W#AREA                     第8項
+     C                     EXSR SR0010                     初始單號
+     C                     ENDIF
+     C*
+     C           DMORNO    IFNE W#ORNO
+     C                     MOVE DMORNO    W#ORNO
+     C                     ENDIF
+     C*
+     C           DMAREA    IFNE W#AREA
+     C                     MOVE DMAREA    W#AREA
+     C                     ENDIF
+     C*
+     C                     ADD  1         W#TXIT           單據項次
+     C                     MOVE 'H'       D#TXN1
+     C                     Z-ADDW#TXNO    D#TXN2
+     C*
+     C                     MOVELD#TXNO    DSTXNO           折讓單號
+     C                     Z-ADDW#TXIT    DSTXIT           折讓項次
+     C                     UPDATRDISDTL
+     C*開始處理
+     C                     EXSR SR1000
+     C*列印清單
+     C                     EXSR WTRSR
+     C*
+     C                     ENDDO
+     C*
+     C                     MOVE 'Y'       DMCOD3           開立碼
+     C                     MOVE T#USID    DMUPDM           異動人員
+     C                     MOVE W#DATE    DMUPDD           異動日期
+     C                     TIME           DMUPDT           異動時間
+     C                     UPDATRDISMST
+     C*訂單小計
+     C   69                WRITEAR050TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR050T2
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*
+     C   69                WRITEAR050TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR050T3
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C*無資料
+     C           D#CUNO    IFEQ *BLANK
+     C                     MOVE '全部'  T#CUNO
+     C                     ELSE
+     C                     MOVE D#CUNO    T#CUNO
+     C                     ENDIF
+     C*
+     C   69                WRITEAR050TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR050TM
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR0010    BEGSR
+     C*****************************************************************
+     C*初始折讓單號
+     C                     MOVE '06'      GEKIND           折讓單
+     C                     MOVEL'H'       GEPRIN           廠區
+     C           K#GENS    CHAINGEREC                40
+     C           GECUNO    ADD  1         W#TXNO           折讓單號
+     C                     Z-ADDW#TXNO    GECUNO
+     C                     UPDATGEREC
+     C*
+     C                     Z-ADD0         W#TXIT           折讓項次
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR                           處理TRNDTL
+     C*****************************************************************
+     C*
+     C                     CLEARTXREC
+     C*
+     C                     MOVE 'A'       TXFLAG           處理代號
+     C                     MOVE 'AR06'    TXCODE           單據代號
+     C*
+     C                     MOVELDSTXNO    TXNO             單據編號
+     C*
+     C                     Z-ADDDSTXIT    TXITEM           單據項次
+     C                     MOVE '3'       TXACNT           原因別
+     C                     Z-ADDW#DATE    TXDATE           單據日期
+     C*
+     C           DMCOD1    IFEQ '1'                        直接扣抵
+     C                     Z-ADDW#DATE    TXACDT           入帳日期
+     C                     ELSE                            退票
+     C                     Z-ADD999999    TXACDT
+     C                     ENDIF
+     C*
+     C                     MOVE DMCUNO    TXCUNO           客戶代號
+     C                     MOVE DMCUNM    TXCUNM           客戶簡稱
+     C                     MOVELDMORNO    TXORNO           訂單號碼
+     C                     MOVE DSINNO    TXIVNO           發票號碼
+     C                     MOVE DMSALE    TXRVID           收款業務
+     C                     MOVE DMSALE    TXSALE           出貨業務
+     C                     MOVE 'D'       TXSATP           內銷別
+     C                     MOVE DMTYPE    TXIVTP           發票別
+     C                     MOVE DSPROD    TXPDNM           品名代號
+     C                     Z-ADDDSAMT1    TXAMT            金額
+     C                     Z-ADDDSAMT2    TXTAX            稅額
+     C                     MOVE 'Y'       TXFL01           折讓確認
+     C                     MOVE 'Y'       TXFL02           過發票碼
+     C                     MOVE 'H'       TXTXAR           異動廠區
+     C                     Z-ADDW#DATE    TXTXDT           異動日期
+     C           W#DATE    DIV  100       W#YYMM  40
+     C                     MOVELW#YYMM    TXRESV           保留碼
+     C*
+     C                     WRITETXREC
+     C*
+     C                     EXSR SR2000
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR                           處理INVDTL
+     C*****************************************************************
+     C*處理折讓金額
+     C                     CLEARIVREC
+     C*
+     C                     MOVE DSINNO    IVNO
+     C                     MOVE '3'       IVACNT
+     C                     MOVE *HIVAL    IVITEM
+     C           K#INVD    SETGTIVREC
+     C                     READPIVREC                    42
+     C*取得項次
+     C           *IN42     IFEQ *ON
+     C           IVNO      ORNE DSINNO                     發票號碼
+     C           IVACNT    ORNE '3'                        原因別
+     C                     Z-ADD1         IVITEM
+     C                     ELSE
+     C                     ADD  1         IVITEM           發票項次
+     C                     ENDIF
+     C*
+     C                     MOVE 'A'       IVFLAG           處理代號
+     C                     MOVE DSINNO    IVNO             發票號碼
+     C                     MOVE '3'       IVACNT           類別
+     C                     Z-ADDTXACDT    IVACDT           入帳日期
+     C                     MOVELTXORNO    IVORNO           訂單號碼
+     C                     MOVELTXPDNM    IVPDCD           品名代號
+     C           TXAMT     MULT -1        IVAMT            金額
+     C                     MOVELTXNO      IVAPNO           憑證編號
+     C                     MOVE 'Y'       IVFL02           過發票碼
+     C                     MOVE 'D'       IVFL02           類別碼
+     C                     MOVE TXTXAR    IVTXAR           異動廠區
+     C                     Z-ADDW#DATE    IVTXDT           異動日期
+     C                     MOVELTXRESV    IVRESV           保留碼
+     C*
+     C                     WRITEIVREC
+     C                     EXSR SR3000
+     C*處理折讓稅額
+     C                     CLEARIVREC
+     C*
+     C                     MOVE DSINNO    IVNO
+     C                     MOVE '5'       IVACNT
+     C                     MOVE *HIVAL    IVITEM
+     C           K#INVD    SETGTIVREC
+     C                     READPIVREC                    42
+     C*取得項次
+     C           *IN42     IFEQ *ON
+     C           IVNO      ORNE DSINNO                     發票號碼
+     C           IVACNT    ORNE '5'                        原因別
+     C                     Z-ADD1         IVITEM
+     C                     ELSE
+     C                     ADD  1         IVITEM           發票項次
+     C                     ENDIF
+     C*
+     C                     MOVE 'A'       IVFLAG           處理代號
+     C                     MOVE DSINNO    IVNO             發票號碼
+     C                     MOVE '5'       IVACNT           類別
+     C                     Z-ADDTXACDT    IVACDT           入帳日期
+     C                     MOVELTXORNO    IVORNO           訂單號碼
+     C                     MOVEL'C'       IVPDCD           品名代號
+     C           TXTAX     MULT -1        IVAMT            金額
+     C                     MOVELTXNO      IVAPNO           憑證編號
+     C                     MOVE 'Y'       IVFL02           過發票碼
+     C                     MOVE 'D'       IVFL02           類別碼
+     C                     MOVE TXTXAR    IVTXAR           異動廠區
+     C                     Z-ADDW#DATE    IVTXDT           異動日期
+     C                     MOVELTXRESV    IVRESV           保留碼
+     C*
+     C*
+     C                     WRITEIVREC
+     C*
+     C                     EXSR SR3000
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR                           處理INVMST
+     C*****************************************************************
+     C*重新合計金額
+     C           IVNO      CHAININREC                43
+     C*
+     C           IVACNT    IFEQ '3'                        折讓金額
+     C                     ADD  IVAMT     INCAMT
+     C                     ELSE                            折讓稅額
+     C                     ADD  IVAMT     INCTAX
+     C                     ENDIF
+     C*
+     C           IVACDT    IFEQ 999999                     退票
+     C           IVAMT     MULT -1        W#AMT  120
+     C                     ADD  W#AMT     INFAMT
+     C                     ENDIF
+     C*
+     C           INAAMT    ADD  INATAX    INNBAL           彙總未收
+     C                     ADD  INBAMT    INNBAL
+     C                     ADD  INCAMT    INNBAL
+     C                     ADD  INCTAX    INNBAL
+     C                     ADD  INDAMT    INNBAL
+     C                     ADD  INDTAX    INNBAL
+     C                     ADD  INEAMT    INNBAL
+     C                     ADD  INFAMT    INNBAL
+     C*
+     C                     UPDATINREC
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           WTRSR     BEGSR                           列印清單
+     C*****************************************************************
+     C*
+     C           DSORNO    IFNE W#ORNO                     訂單號碼
+     C                     MOVE *OFF      *IN60
+     C                     MOVE DSORNO    W#ORNO  6
+     C                     ELSE
+     C                     MOVE *ON       *IN60
+     C                     ENDIF
+     C*
+     C           DSINNO    IFNE W#INNO                     發票號碼
+     C                     MOVE *OFF      *IN61
+     C                     MOVE DSORNO    W#INNO 10
+     C                     ELSE
+     C                     MOVE *ON       *IN61
+     C                     ENDIF
+     C*
+     C                     MOVELDMCUNO    T#CUNO           客戶代號
+     C                     MOVELDMCUNM    T#CUNM           客戶簡稱
+     C                     MOVE DSORNO    T#ORNO           訂單號碼
+     C                     MOVE DSINNO    T#IVNO           發票號碼
+     C                     Z-ADDININDT    T#IVDT           發票日期
+     C                     MOVE DSPROD    T#PROD           產品類別
+     C                     Z-ADDDSQTY1    T#QTY1           產品數量
+     C                     Z-ADDDMAMT4    T#AMT1           折讓單價
+     C                     Z-ADDDSAMT1    T#AMT2           折讓金額
+     C                     Z-ADDDSAMT2    T#TAX            折讓稅額
+     C                     MOVELDSTXNO    T#TXNO           折讓單號
+     C                     Z-ADDDSTXIT    T#TXIT           折讓項次
+     C                     Z-ADDTXACDT    T#TXDT           入帳日期
+     C*
+     C   69                WRITEAR050TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR050T1
+     C*
+     C                     ADD  T#QTY1    T#TQT1           訂單小計
+     C                     ADD  T#AMT2    T#TAM1           訂單小計
+     C                     ADD  T#TAX     T#TAX1           訂單小計
+     C*
+     C                     ADD  T#QTY1    T#TQT2           客戶小計
+     C                     ADD  T#AMT2    T#TAM2           客戶小計
+     C                     ADD  T#TAX     T#TAX2           客戶小計
+     C*
+     C                     ENDSR
+

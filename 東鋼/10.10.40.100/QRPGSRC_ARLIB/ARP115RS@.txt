@@ -1,0 +1,160 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP115RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LBU
+     H*            4.FUNCTION     非繳款代開傳票還原（畫面）
+     H*            5.DATE-WRITTEN  96/09/28
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARP115S CF  E                    WORKSTN
+     FRCVDTLL1IF  E           K        DISK
+     FARALOG  O   E           K        DISK
+     E*************************************************************
+     E                    T#ERR   1   6 70
+     I*************************************************************
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1  140W#SYST
+     I                                        1   60D#ST
+     I                                        7  100D#SY
+     I                                       11  140D#SMD
+     C**************************************************************
+     C*   程式參數接收區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1        結束旗標
+     C                     PARM           P#DATX  8        輸入日期
+     C                     PARM           P#AREA  1        還原廠區
+     C                     PARM           P#ENDD  2        輸入止日
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C                     MOVELP#DATX    W#DATX  80
+     C                     MOVELU#AREA    P#AREA
+     C                     MOVELU#AREA    S#AREA
+     C*
+     C           1         DOWEQ1
+     C                     WRITEAR115F1M
+     C                     EXFMTAR115F1
+     C*
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     EXSR SR1000                     檢核
+     C*
+     C           W#RTNV    IFEQ 'T'
+     C                     EXSR SR2000                     存登錄
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     SETON                     LR
+     C************************************
+     C*  核核
+     C************************************
+     CSR         SR1000    BEGSR
+     C*
+     C                     MOVEL'F'       W#RTNV  1
+     C                     MOVE *ALL'0'   P#DATE
+     C                     MOVE S#DATE    P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM           P#FLAG  1
+     C*
+     C           P#FLAG    IFNE '0'
+     C                     SETON                     4199
+     C                     MOVELT#ERR,1   S#MSG1           日期錯誤
+     C                     ENDIF
+     C*
+     C           S#DATE    IFGT UDATE
+     C                     SETON                     4199
+     C                     MOVELT#ERR,2   S#MSG1           大於系統日
+     C                     ENDIF
+     C*
+     C           S#CGCA    IFEQ *BLANK
+     C                     MOVELT#ERR,4   S#MSG1           輸入原因
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         W#CONT  30       筆數計算
+     C*
+     C                     MOVEA'00'      *IN,30
+     C           S#DATE    SETLLRVREC                30
+     C           *IN30     DOWEQ*OFF
+     C                     READ RVREC                    30
+     C*
+     C   30                LEAVE
+     C*
+     C           RVTYPE    IFNE '3'
+     C           U#AREA    ORNE RVTXAR
+     C           RVDATE    ORLT S#DATE
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           RVVNO2    IFNE *BLANK
+     C                     MOVELT#ERR,5   S#MSG1           票據傳票
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C           RVVNO1    IFNE *BLANK                     繳款代開
+     C                     ADD  1         W#CONT
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           W#CONT    IFLE 0
+     C                     MOVELT#ERR,6   S#MSG1           無符合資料
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C                     MOVEL'T'       W#RTNV
+     C*
+     CSR         ES1000    ENDSR
+     C************************************
+     C*  存檔登錄及設定傳回值
+     C************************************
+     CSR         SR2000    BEGSR
+     C*
+     C                     MOVE *ALL'0'   P#DATX
+     C                     MOVE S#DATE    P#DATX           傳回清日
+     C                     MOVEL'0'       P#IN03
+     C*
+     C           S#ENDD    IFEQ 0
+     C                     MOVE '31'      P#ENDD
+     C                     ELSE
+     C                     MOVE S#ENDD    P#ENDD
+     C                     ENDIF
+     C*
+     C                     CLEARRARALOG
+     C                     Z-ADDUDATE     AGDATE           日期
+     C                     TIME           W#SYST
+     C                     Z-ADDD#ST      AGTIME           時間
+     C                     MOVELU#USID    AGURID           使用者
+     C                     MOVEL'AIG'     AGTRID           異動代號
+     C                     MOVELS#DATE    AGRENO           相關號碼
+     C                     MOVELS#CGCA    AGCGCA           修改原因
+     C                     WRITERARALOG
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+** T#ERR
+０１日期錯誤．
+０２日期不可大於系統日期
+０３該日期會計帳尚未代開，無法還原
+０４異動原因必須輸入
+０５欲還原之非營業繳款日期中有票據已兌現，無法還原，請通知系工人員
+０６欲還原之非營業繳款日期中所有傳票皆已還原，無符合條件之資料
+

@@ -1,0 +1,303 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP063R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     客戶寄放品代開傳票（出貨）1B
+     H*            5.DATE-WRITTEN  87/11/25
+     H*
+     H* 說明：依日期訂單來分，每一日期一個傳票編號，
+     H*       每個不同的訂單或品名一個項次。
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FHSVOUR  IP  E           K        DISK
+     FACTRAN  O   E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FSAMAST  IF  E           K        DISK
+     FHSMAST  IF  E           K        DISK
+     FHIPROD  IF  E           K        DISK
+     FARP063T O   E             66     PRINTER
+     F*****************************************************************
+     E                    ARY1       50 23
+     E*****************************************************************
+     IRHSVOUR
+     I                                              S4ENTDL2
+     I                                              S4TFBTL1
+     I                                              S4NAMEL1
+     I*
+     IRHSMAST
+     I              S1SALE                          S0SALE
+     I              S1SND                           S0SND
+     I              S1RECV                          S0RECV
+     I*------------------------------------------------------
+     I              '應付保管品'        C         N#2322
+     I              '保管品'            C         N#1542
+     I              '公司往來'          C         N#3511
+     I*------------------------------------------------------
+     I           UDS
+     I                                        1   40U#YYMM
+     I                                        7   7 U#TXAR
+     I                                       31  34 U#ADDN
+     I                                     10011010 U#USID
+     I                                     10011003 U#DPID
+     I*------------------------------------------------------
+     I            DS
+     I                                        1   4 ACVRNO
+     I                                        1   1 D#VRTP
+     I            DS
+     I                                        1   4 W#VRN1
+     I                                        2   40D#WVR1
+     I            DS
+     I                                        1   9 S4ORNO
+     I                                        1   6 W#ORNO
+     I                                        1   1 S1OREA
+     I                                        2   60S1ORNO
+     I                                        7   90S1ORTM
+     I            DS
+     I                                        1  23 A1DATA
+     I                                        1   3 A1PDCD
+     I                                        4  120A1QTY
+     I                                       13  230A1AMT
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C*          ---------------------------------欄位關鍵定義
+     C           K#ORNO    KLIST
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C                     KFLD           S1ORTM
+     C*
+     C*          ---------------------------------獲得傳票號碼W#VRN1
+     C                     MOVEL'Y500'    W#VRN1           重新編號
+     C*
+     C*          ---------------------------------初始變數
+     C                     Z-ADD0         W#RCNT  40       入帳筆數
+     C                     MOVEL*ALL'9'   ARY1             初始陣列
+     C                     Z-ADD0         A1LEN   20
+     C                     SETON                     66    設定換頁
+     C*
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2清除函式     (換了日期，傳票號加一)
+     C*********************************
+     CSR         L2CLR     BEGSR
+     C                     ADD  1         D#WVR1           指向下一號
+     C                     Z-ADD0         W#ITEM  20       項次歸零
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式     (換了訂單或品名)
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     Z-ADD0         W#AM10 110       項次金額
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C           K#ORNO    CHAINRSAMAST              69
+     C   69      K#ORNO    CHAINRHSMAST              69
+     C   69                Z-ADD0         S1UPRC           無訂單設零
+     C*
+     C           S4TYPE    IFEQ '0'
+     C                     Z-ADDS4STDW    W#QTY   60
+     C                     ELSE
+     C                     Z-ADDS4NWGT    W#QTY
+     C                     ENDIF
+     C*
+     C           W#QTY     MULT S1UPRC    W#AM00 110       計算金額
+     C*
+     C                     EXSR SR1000                     累計品名
+     C*
+     C                     ADD  W#AM00    W#AM10           合計
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  換了訂單（寫明細）
+     C*********************************
+     CSR         L1SR      BEGSR
+     C                     EXSR SRWR01                     寫入並印出
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2 函式  換了日期
+     C*********************************
+     CSR         L2SR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  印核覆
+     C*********************************
+     CSR         LRSR      BEGSR
+     C                     EXSR PR1000                     品名合計
+     C*
+     C   66                WRITEAR063T1H
+     C   66                SETOF                     66
+     C                     Z-ADDW#RCNT    R#RCNT
+     C                     WRITEAR063T1T
+     C*
+     C   66                WRITEAR063T1H
+     C   66                SETOF                     66
+     C                     WRITEAR063T1X                   核覆
+     C*
+     C                     MOVELW#RCNT    U#ADDN
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     WRITEAR063T1H
+     C                     WRITEAR063T1M
+     C                     MOVEL'   0'    U#ADDN
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  子函式集
+     C*********************************
+     C*
+     C*-------------------------------
+     C* 明細寫入傳票檔(一貸一借)
+     C*-------------------------------
+     CSR         SRWR01    BEGSR
+     C           W#ITEM    IFGE 98                         項次已滿
+     C                     EXSR L2CLR                      編號加一
+     C                     ENDIF
+     C*
+     C           S4CUNO    CHAINCBCUST               69
+     C                     CLEARRACVOUR
+     C                     MOVEL'N'       ACVRTY
+     C                     MOVEL'A'       ACSEPT
+     C                     MOVEL'A'       ACKIND           一般傳票
+     C                     MOVELU#TXAR    ACDM03           開立廠區
+     C                     Z-ADDS4ENTD    ACYMD            入帳日期
+     C                     MOVELW#ORNO    ACRLNO           相關號碼
+     C                     MOVELCBCUNM    ACCSNM           客戶簡稱
+     C                     MOVEL'G'       ACTYCO           要件代號
+     C                     MOVELS4NAME    ACDSC1           品名代號
+     C                     Z-ADDW#AM10    ACAMT            金額
+     C                     MOVELU#TXAR    ACCARD           傳票廠區
+     C                     MOVELW#VRN1    ACVRNO           傳票號碼
+     C*
+     C                     ADD  1         W#ITEM
+     C                     Z-ADDW#ITEM    ACITEM           傳票項次
+     C                     MOVEL'D'       ACDC             借貸別
+     C                     MOVEL'2322'    ACNO             會計科目
+     C                     WRITERACVOUR
+     C                     EXSR SRPR01                     印出明細
+     C*
+     C                     ADD  1         W#ITEM
+     C                     Z-ADDW#ITEM    ACITEM           傳票項次
+     C                     MOVEL'C'       ACDC             借貸別
+     C                     MOVEL'1542'    ACNO             會計科目
+     C                     WRITERACVOUR
+     C                     EXSR SRPR01                     印出明細
+     C*
+     C                     ADD  2         W#RCNT           入帳筆數
+     CSR                   ENDSR
+     C*
+     C*-------------------------------
+     C* 印出明細記錄（一貸一借）
+     C*-------------------------------
+     CSR         SRPR01    BEGSR
+     C   66                WRITEAR063T1H
+     C   66                SETOF                     66
+     C*
+     C                     CLEARAR063T1D
+     C                     MOVELACDM03    R#FRAR           開立廠區
+     C                     Z-ADDACYMD     R#DATE           入帳日期
+     C                     MOVELACRLNO    R#ORNO           相關號碼
+     C                     MOVELACCSNM    R#CUNO           客戶簡稱
+     C                     MOVELACTYCO    R#TYCO           要件代號
+     C                     MOVELACITEM    R#VRIT           傳票項次
+     C                     MOVELS4NAME    R#PDNO           品名代號
+     C           S4NAME    CHAINHIPROD               69
+     C  N69                MOVELF4CHIN    R#PDNM           品名名稱
+     C                     MOVELACDC      R#ACDC           借貸別
+     C                     MOVELACCARD    R#TOAR           傳票廠區
+     C                     MOVELACVRNO    R#VRNO           傳票號碼
+     C                     MOVELACNO      R#ACNO           會計科目
+     C*
+     C           ACDC      IFEQ 'C'                        貸方
+     C                     MOVELN#1542    R#ACNM           會計科目名
+     C                     Z-ADD0         R#AMTD
+     C                     Z-ADDW#AM10    R#AMTC           貸方金額
+     C*
+     C                     ELSE                            借方
+     C                     MOVELN#2322    R#ACNM           會計科目名
+     C                     Z-ADDW#AM10    R#AMTD           借方金額
+     C                     Z-ADD0         R#AMTC
+     C                     ENDIF
+     C*
+     C                     WRITEAR063T1D
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+     C*         統計陣列子函式（將各品名之值累計至陣列中）
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C                     MOVEL'F'       W#FIND  1
+     C           1         DO   A1LEN     I       20
+     C                     MOVELARY1,I    A1DATA
+     C           S4NAME    IFEQ A1PDCD
+     C                     ADD  W#QTY     A1QTY
+     C                     ADD  W#AM00    A1AMT
+     C                     MOVELA1DATA    ARY1,I
+     C                     MOVEL'T'       W#FIND
+     C                     LEAVE
+     C                     ENDIF
+     C           A1PDCD    IFEQ '999'
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           W#FIND    IFEQ 'F'
+     C                     MOVEL*ALL'0'   A1DATA
+     C                     ADD  1         A1LEN
+     C                     Z-ADDA1LEN     I
+     C                     MOVELS4NAME    A1PDCD
+     C                     Z-ADDW#QTY     A1QTY
+     C                     Z-ADDW#AM00    A1AMT
+     C                     MOVELA1DATA    ARY1,I
+     C                     ENDIF
+     C           ES1000    ENDSR
+     C*
+     C*****************************************************************
+     C*         列印品名小計
+     C*****************************************************************
+     C           PR1000    BEGSR
+     C                     SORTAARY1
+     C                     SETOF                     45
+     C*
+     C           1         DO   A1LEN     I
+     C   66                WRITEAR063T1H                   *表頭
+     C   66                SETOF                     66
+     C                     MOVELARY1,I    A1DATA
+     C                     MOVE A1PDCD    R#PCD1
+     C                     Z-ADDA1QTY     R#QTY1
+     C                     Z-ADDA1AMT     R#AMT1
+     C                     WRITEAR063T1S
+     C  N45                SETON                     45
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+

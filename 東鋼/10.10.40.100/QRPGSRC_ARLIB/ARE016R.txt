@@ -1,0 +1,288 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE016R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S01LYH
+     H*            4.FUNCTION     票據資料挑選設定
+     H*            5.WRITE-DATE    90/12/07
+     H*            5.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FRCVDTL6 UF  E           K        DISK                      A
+     FARE016S CF  E                    WORKSTN
+     F                                        RRN   KSFILE AR016F1
+     E                    ERR     1  13 70               *錯誤訊息
+     I            DS
+     I                                        1  10 S#SRID
+     I                                        1   8 D#SID1
+     I                                        9  10 D#SID2
+     I           UDS
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVN
+     I                                     10211021 D#AREA
+     C*****************************************************************
+     C*                    KEY  LIST
+     C*****************************************************************
+     C*     FILE => AVTYPE
+     C           K#KEY1    KLIST
+     C                     KFLD           K#DUDT  80       *到期日期
+     C                     KFLD           K#NTNO 20        *票據號碼
+     C                     KFLD           K#NO    6        *繳款編號
+     C*                    KFLD           K#ITEM  20       *項次　　
+     C*
+     C*****************************************************************
+     C*Main Program
+     C*****************************************************************
+     C                     EXSR SR0000                     *初值設定
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           *前置處理
+     C           W#PRID    CASEQ'02'      SR2000           *畫面一
+     C           W#PRID    CASEQ'03'      SR3000           * READC
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*================================================================
+     C           SR0000    BEGSR
+     C*================================================================
+     C*初值設定
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVE *ALL'='   S#LIN3
+     C                     MOVE 'ARE016S-'D#SID1
+     C                     MOVEA'000'     *IN,51
+     C                     MOVEA'0000'    *IN,71
+     C                     MOVE '01'      W#PRID  2
+     C                     ENDSR
+     C*================================================================
+     C           SR1000    BEGSR
+     C*================================================================
+     C*W#PRID='01'
+     C*CLEAR SUBFILE
+     C                     MOVEA'0000'    *IN,71
+     C                     MOVE *ON       *IN74            *SFLCLR
+     C                     WRITEAR016F1C
+     C                     MOVE *OFF      *IN74
+     C                     Z-ADD0         W#CNT   20
+     C                     Z-ADD0         RRN     40
+     C                     Z-SUB11        S#NBR
+     C*
+     C*讀入SUBFILE AR016F1
+     C                     MOVE S#DUTK    K#DUDT
+     C                     MOVE S#NTNK    K#NTNO
+     C                     MOVE S#NOK     K#NO
+     C           K#KEY1    SETLLRVREC                65
+     C  N65                READ RVREC               N    65*END OF FILE
+     C  N65                EXSR SR1100                     *MOVE DATA
+     C                     MOVE '02'      W#PRID
+     C                     ENDSR
+     C*================================================================
+     C           SR1100    BEGSR
+     C*================================================================
+     C*MOVE DATA TO DISPLAY
+     C                     Z-ADD0         W#CNT   20
+     C                     Z-ADD0         S#OPT
+     C           W#CNT     DOWLT12
+     C                     Z-ADDRVDATE    S#DATE           *繳款日期
+     C                     MOVE RVNTNO    S#NTNO           *票據號碼
+     C                     MOVE RVNO      S#NO             *繳款編號
+     C                     Z-ADDRVITEM    S#ITEM           *項次　　
+     C                     Z-ADDRVDUDT    S#DUDT           *到期日　
+     C                     MOVE RVPLAC    S#PLAC           *付款地　
+     C                     Z-ADDRVRAMT    S#RAMT           *金額　　
+     C                     MOVE RVAREA    S#AREA           *出納廠區
+     C                     MOVE RVOLDT    S#DT             *寄送日
+     C                     ADD  1         RRN
+     C                     WRITEAR016F1
+     C                     ADD  1         W#CNT
+     C                     READ RVREC               N    65*EOF
+     C   65                LEAVE
+     C                     ENDDO
+     C*
+     C           W#CNT     IFGT 0                          *至少一筆
+     C                     ADD  12        S#NBR
+     C                     ENDIF
+     C                     ENDSR
+     C*================================================================
+     C           SR2000    BEGSR
+     C*================================================================
+     C*
+     C*顯示畫面一
+     C*
+     C           W#PRID    DOWEQ'02'
+     C                     MOVEA'0000'    *IN,71
+     C           RRN       IFEQ 0                          *NO DATA
+     C                     MOVE *ON       *IN72            *SFLDSP OFF
+     C                     ENDIF
+     C           W#CNT     IFGE 12
+     C                     MOVE *ON       *IN73            *SFLEND OFF
+     C                     ENDIF
+     C                     MOVE '1'       D#SID2
+     C                     MOVE *OFF      *IN30            *MODE
+     C*
+     C*  65                MOVE ERR,13    S#ERR
+     C*
+     C                     WRITEAR016H
+     C                     WRITEAR016F1M
+     C                     EXFMTAR016F1C
+     C                     MOVE *BLANK    S#ERR
+     C                     MOVEA'00'      *IN,51
+     C                     MOVE *OFF      *IN99
+     C*F3=EXIT
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*F12=EXIT
+     C           *IN12     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*翻下頁
+     C           *IN91     IFEQ *ON
+     C*  65                MOVE ERR,13    S#ERR
+     C  N65                EXSR SR1100
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE '03'      W#PRID
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*================================================================
+     C           SR3000    BEGSR
+     C*================================================================
+     C*READC逐筆檢核
+     C                     MOVEA'000'     *IN,50
+     C                     MOVE *OFF      *IN99
+     C                     MOVEA'0000'    *IN,71
+     C                     MOVE *BLANK    S#ERR
+     C                     Z-ADDRRN       W#TEMP  40
+     C                     Z-ADD1         RRN
+     C*
+     C           W#PRID    DOWEQ'03'
+     C                     READCAR016F1                9898*ER*EOF
+     C           *IN98     IFEQ *ON
+     C*
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           S#OPT     IFEQ 0
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*
+     C                     MOVE *ON       *IN70
+     C                     UPDATAR016F1
+     C                     MOVE *OFF      *IN70
+     C                     ENDDO
+     C*
+     C* READC資料存檔／刪除
+     C*
+     C           S#ERR     IFNE *BLANK
+     C                     MOVE '02'      W#PRID
+     C                     Z-ADDW#TEMP    RRN
+     C                     ELSE
+     C                     EXSR SR5310                     *CLR BUFFER
+     C*
+     C                     MOVEA'00'      *IN,97
+     C                     Z-ADD1         RRN
+     C           W#PRID    DOWEQ'03'
+     C                     READCAR016F1                9898*EOF
+     C           *IN98     IFEQ '1'
+     C*
+     C*          S#OPTK    IFEQ 1
+     C*                    EXSR SR5100                     *存檔
+     C*                    EXSR SR5600
+     C*                    ENDIF
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           S#OPT     IFEQ 0
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           S#OPT     IFEQ 2                          *修改
+     C                     EXSR SR5200                     *存檔
+     C  N97                EXSR SR5500                     *REPOSITION
+     C  N97                MOVE *ON       *IN97
+     C                     ENDIF
+     C*          S#OPT     IFEQ 4                          *刪除
+     C*                    EXSR SR5400                     *刪除
+     C* N97                EXSR SR5500                     *REPOSITION
+     C* N97                MOVE *ON       *IN97
+     C*                    ENDIF
+     C*
+     C                     ENDDO
+     C                     MOVE '01'      W#PRID
+     C                     ENDIF
+     C                     ENDSR
+     C*================================================================
+     C           SR5200    BEGSR
+     C*================================================================
+     C*SFL存檔作業
+     C*
+     C                     MOVE S#DUDT    K#DUDT
+     C                     MOVE S#NTNO    K#NTNO
+     C                     MOVE S#NO      K#NO
+     C                     CLEARRVREC
+     C           K#KEY1    CHAINRVREC                60
+     C                     Z-ADDS#DATE    RVDATE
+     C                     MOVE S#NTNO    RVNTNO
+     C                     MOVE S#NO      RVNO
+     C                     Z-ADDS#ITEM    RVITEM
+     C                     Z-ADDS#DUDT    RVDUDT
+     C                     MOVE S#PLAC    RVPLAC
+     C                     Z-ADDS#RAMT    RVRAMT
+     C                     MOVE S#AREA    RVAREA
+     C                     MOVE S#DT      RVOLDT
+     C  N60                UPDATRVREC
+     C   60                WRITERVREC
+     C                     MOVE *OFF      *IN60
+     C                     MOVE ERR,8     S#ERR
+     C*
+     C                     ENDSR
+     C*================================================================
+     C           SR5310    BEGSR
+     C*================================================================
+     C*CLEAR BUFFER
+     C                     Z-ADD0         W#OPT   10       *OP CODE
+     C                     MOVE *BLANK    W#DATE  8
+     C                     MOVE *BLANK    W#NTNO 20
+     C                     MOVE *BLANK    W#NO    6
+     C                     ENDSR
+     C*================================================================
+     C           SR5500    BEGSR
+     C*================================================================
+     C*
+     C                     Z-ADD0         S#OPTK           *OP CODE
+     C                     MOVE S#DATE    S#DATE
+     C*
+     C                     ENDSR
+     C*================================================================
+     C           SR5600    BEGSR
+     C*================================================================
+     C*
+     C                     Z-ADD0         S#OPTK
+     C                     MOVE *BLANK    S#DUTK
+     C                     MOVE *BLANK    S#NTNK
+     C                     MOVE *BLANK    S#NOK
+     C                     ENDSR
+     C*===============================================================
+**  ERR
+01-資料已存在！
+02-資料不得重複！
+03-欄位不可空白或零！
+04-此選項值只能為1
+05-廠區別錯誤!需為A,B,C,H!
+06-異動代號錯誤
+07-新增完成
+08-修改完成
+09-群組代號需為A~  E !
+10-資料不存在！
+11-此欄位不得為1 !
+12-工號尚未定義 !
+13-資料已到達檔底!
+

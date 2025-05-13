@@ -1,0 +1,121 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARP095R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     應收帳款承購發票自動結案　
+     H*          5.DATE-WRITTEN  91/10/16
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARINVML1IP  E           K        DISK
+     F            RARINVM                           KRENAMERINVM
+     FARCVDTL1IF  E           K        DISK
+     FARCVMS  IF  E           K        DISK
+     FARCVCK  IF  E           K        DISK
+     FARINVM  UF  E           K        DISK
+     I*****************************************************************
+     IRINVM       01
+     I              AMFLAG                          F#FLAG
+     I              AMINNO                          F#INNO
+     I              AMINDT                          F#INDT
+     I              AMDUDT                          F#DUDT
+     I              AMINTP                          F#INTP
+     I              AMDELT                          F#DELT
+     I              AMDELD                          F#DELD
+     I              AMCUNO                          F#CUNO
+     I              AMCUNM                          F#CUNM
+     I              AMAAMT                          F#AAMT
+     I              AMATAX                          F#ATAX
+     I              AMBAMT                          F#BAMT
+     I              AMBTAX                          F#BTAX
+     I              AMCAMT                          F#CAMT
+     I              AMDAMT                          F#DAMT
+     I              AMEAMT                          F#EAMT
+     I              AMFAMT                          F#FAMT
+     I              AMAPN1                          F#APN1
+     I              AMAPD1                          F#APD1
+     I              AMAPN2                          F#APN2
+     I              AMAPD2                          F#APD2
+     I              AMORNO                          F#ORNO
+     I              AMAREA                          F#AREA
+     I              AMACN1                          F#ACN1
+     I              AMDAT1                          F#DAT1
+     I              AMDLC1                          F#DLC1
+     I              AMBLCB                          F#BLCB
+     I              AMDLM1                          F#DLM1
+     I              AMDLD1                          F#DLD1
+     I              AMAPCD                          F#APCD
+     I              AMCHKC                          F#CHKC
+     I              AMCHKM                          F#CHKM
+     I              AMCHKD                          F#CHKD
+     I              AMDLC2                          F#DLC2
+     I              AMDLM2                          F#DLM2
+     I              AMDLD2                          F#DLD2
+     I              AMCLOC                          F#CLOC
+     I              AMCLOM                          F#CLOM
+     I              AMCLOD                          F#CLOD
+     I              AMUPDM                          F#UPDM
+     I              AMUPDD                          F#UPDD
+     I              AMUPDT                          F#UPDT
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AMT3 120       總繳款金額
+     C                     Z-ADD0         W#DAMT 120       總應繳金額
+     C*
+     C                     MOVELF#INNO    ATINNO           發票號碼
+     C           ATINNO    SETLLRARCVDT
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RARCVDT             N    40
+     C           ATINNO    IFNE F#INNO
+     C           *IN40     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*當發票相同時，判斷該筆沖銷金額是否已確認 　　　　　　　　
+     C*當已確認時才累加該筆發票沖銷金額
+     C*
+     C           ATRCNO    CHAINRARCVMS             N42
+     C  N42      ASFL01    IFEQ 'Y'                        營業確認碼
+     C           ASFL02    ANDEQ' '                        財會過入碼
+     C           ATRCNO    CHAINRARCVCK             N43
+     C           *IN43     IFEQ *OFF
+     C           AKDUDT    ANDLEUDATE
+     C           AKNTCD    ANDEQ'Y'
+     C                     ADD  ATAMT3    W#AMT3 120       總繳款金額
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C           W#AMT3    IFNE 0
+     C*計算該筆發票折讓部分金額
+     C*總繳款金額＋折退金額＋折退稅額＝發票金額
+     C           W#AMT3    SUB  F#BAMT    W#DAMT           折讓金額
+     C                     SUB  F#BTAX    W#DAMT           折讓稅額
+     C                     SUB  F#DAMT    W#DAMT           發票金額
+     C*
+     C*當總繳款金額=總應繳金額時,結案碼上Y
+     C           F#INNO    CHAINRARINVM              41
+     C           W#DAMT    IFGE 0
+     C                     MOVEL'Y'       AMCLOC
+     C                     MOVEL'SYSTEM'  AMCLOM
+     C                     MOVE UDATE     AMCLOD
+     C                     ENDIF
+     C*UPDATE已沖銷金額
+     C                     Z-ADDW#AMT3    AMFAMT           已沖銷金額
+     C  N41                UPDATRARINVM
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+

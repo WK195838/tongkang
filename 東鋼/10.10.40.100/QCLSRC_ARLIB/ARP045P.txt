@@ -1,0 +1,57 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP045P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     清除廠區之銷貨已傳旗標                 */
+     /*     5.DATE-WRITTEN  86/04/29                                */
+     /*                                                             */
+     /*  說明：                                                   */
+     /*      把廠區經過帳至應收後加上的も旗標清除                 */
+     /*      不要在白天執行，除非確定各廠當日過帳的資料未即時     */
+     /*      拉至台北                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             RTVJOBA    TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+ START:
+             SBMJOB     JOB(ARP045P) JOBD(ARJOBD) JOBQ(QCTL) +
+                          RQSDTA('CALL ARLIB/ARP045P')
+             GOTO       CMDLBL(ENDCLPGM)
+ BATCH:
+        /*  建立　DDMF          ............................ */
+             DLTF       FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMT)
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMK)
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMH)
+
+        /*  開始清檔  */
+             CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(*NONSTD +
+                          'DALIB/TRNDTL') LVLCHK(*NO)
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(*NONSTD +
+                          'DALIB/TRNDTL') LVLCHK(*NO)
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(*NONSTD +
+                          'DALIB/TRNDTL') LVLCHK(*NO)
+
+             OVRDBF     FILE(TRNDTLT) TOFILE(QTEMP/DDMT)
+             OVRDBF     FILE(TRNDTLH) TOFILE(QTEMP/DDMH)
+             OVRDBF     FILE(TRNDTLK) TOFILE(QTEMP/DDMK)
+             OVRDBF     FILE(TRNDTLP) TOFILE(DALIB/TRNDTL)
+             OVRDBF   FILE(TRNDTLL4) TOFILE(DALIB/TRNDTLL4) SHARE(*YES)
+             OVRDBF     FILE(ARP045F) TOFILE(ARLIB/ARP045F)
+             CALL       PGM(ARLIB/ARP045R)
+             DLTOVR     *ALL
+
+ ENDCLPGM:   ENDPGM
+

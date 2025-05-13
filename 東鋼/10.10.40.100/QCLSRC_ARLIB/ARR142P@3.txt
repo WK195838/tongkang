@@ -1,0 +1,148 @@
+    /****************************************************************/
+    /*                                                              */
+    /*          >>   PROGRAM INTRODUCTION  <<                       */
+    /*            1.PROGRAM-ID     ARR142P                          */
+    /*            2.PROGRAM-TYPE   CLP                              */
+    /*            3.AUTHOR         S00WCJ                           */
+    /*            4.FUNCTION      折讓開立分攤檢核表              */
+    /*            5.DATE-WRITTEN   104/08/27 2015AR951              */
+    /*            6.DATE-MODIFY    105/12/09 2016AR931 S00WCJ (0512A)*/
+    /*                             增加選項                       */
+    /*                             108/08/02 S00WCJ (0808A)         */
+    /*                              增加印表機設定為PPB0004H      */
+    /*                            113/02/29 2024AR00009 S00WCJ(1302A)*/
+    /*                              修改排序方式為客戶編號+發票 */
+    /*                              開立廠區+折讓單號，且若此程 */
+    /*                              式由ARP150P#呼叫，則報報須傳*/
+    /*                              送至B05CHM                    */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCLF       FILE(ARR142S)
+
+             DCL        VAR(&DSPID)   TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&INT)     TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&QDATE)   TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&S#TXN1)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&S#TXN2)  TYPE(*CHAR)  LEN(6)
+/*0808A*/    DCL        VAR(&PRINT)   TYPE(*CHAR)  LEN(10)
+/*1302A*/    DCL        VAR(&USER)    TYPE(*CHAR)  LEN(10)
+/*1302A*/    DCL        VAR(&CURUSER) TYPE(*CHAR)  LEN(10)
+
+/*1302A*/    RTVJOBA    JOB(&DSPID) OUTQ(&OUTQ) TYPE(&INT) +
+                        USER(&USER)  CURUSER(&CURUSER)
+
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+       /*           */
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+
+             RTVJOBA    CYMDDATE(&QDATE)
+             CHGVAR     VAR(&QDATE)   VALUE('0' *CAT &QDATE)
+
+  START:
+ /*0512A*/   CHGVAR     VAR(&S#CHSE)  VALUE('1')
+             SNDRCVF
+             IF         COND(&IN03 *EQ '1')   THEN(RETURN)
+             IF         COND(&IN12 *EQ '1')   THEN(RETURN)
+
+             CHGVAR     VAR(&IN30)    VALUE('0')
+             CHGVAR     VAR(&IN32)    VALUE('0')
+             CHGVAR     VAR(&S#ERR)   VALUE(' ')
+
+       /* 檢核折讓單號 */
+             IF         COND(&S#TXN1 *EQ ' ')   THEN(DO)
+             CHGVAR     (&IN30)       VALUE('1')
+             CHGVAR     (&S#ERR)      VALUE('折讓單號起不得為空白!')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             IF         COND(&S#TXN1 *GT &S#TXN2)   THEN(DO)
+             CHGVAR     (&IN32)       VALUE('1')
+             CHGVAR     (&IN30)       VALUE('1')
+             CHGVAR     (&S#ERR)      VALUE('折讓單號迄值不得大於起值!')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             IF         COND(&S#TXN2 *EQ ' ') THEN(DO)
+              CHGVAR    (&S#TXN2)     VALUE(&S#TXN1)
+             ENDDO
+
+       /* 紀錄輸入值 */
+             CHGDTAARA  DTAARA(*LDA (501 6))  VALUE(&S#TXN1) /*起始*/
+             CHGDTAARA  DTAARA(*LDA (507 6))  VALUE(&S#TXN2) /*終止*/
+             CHGDTAARA  DTAARA(*LDA (517 10)) VALUE(&DSPID)
+ /*0512A*/   CHGDTAARA  DTAARA(*LDA (531 1))  VALUE(&S#CHSE) /*選項*/
+
+             SBMJOB     CMD(CALL PGM(ARR142P)) JOB(ARR142P) +
+                        JOBD(ARJOBD)
+             SNDBRKMSG  MSG('<<折讓開立鋼種分攤未確認檢核表，+
+             開始處理，請稍待...>>') +
+                         TOMSGQ(&DSPID) MSGTYPE(*INFO)
+             RETURN     /* INTERACTIVE JOB   */
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (501 6))  RTNVAR(&S#TXN1)
+             RTVDTAARA  DTAARA(*LDA (507 6))  RTNVAR(&S#TXN2)
+             RTVDTAARA  DTAARA(*LDA (517 10)) RTNVAR(&DSPID)
+/*0512A*/    RTVDTAARA  DTAARA(*LDA (531 1))  RTNVAR(&S#CHSE)
+
+/*0512A*/    CLRPFM     FILE(ARR142F)
+/*1301A*/    CLRPFM     FILE(ARR142F1)
+
+/*0808A*/    CHGVAR     VAR(&PRINT)  VALUE('PPB0004H')
+
+/*0808A*/    OVRPRTF    FILE(ARR142T) TOFILE(ARR142T) +
+                        USRDTA('折分未確') HOLD(*YES) +
+                        SAVE(*YES) OUTQ(&PRINT) COPIES(1) +
+                        PAGESIZE(*N 158) CPI(12)
+             OVRDBF     FILE(TRNDTL)  TOFILE(TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) QRYSLT(' +
+                        (TXFLAG *NE "D" ) *AND +
+                         (TXCODE *EQ "AR06") *AND +
+                         (TXACDT *EQ 0) *AND +
+                         (TXNO  *GE "' || &S#TXN1 || '") *AND +
+                         (TXNO  *LE "' || &S#TXN2 || '")      +
+                                       ') +
+                        KEYFLD((TXNO) (TXIVNO))
+
+
+/*0512A*/  IF     COND(&S#CHSE *EQ '1')  THEN(DO)
+/*1301A*/        CALL      PGM(ARR142RB)
+/*1301A*/        OVRDBF     FILE(ARR142F1) TOFILE(ARR142F1) SHARE(*YES)
+/*1301A*/        OPNQRYF    FILE(ARR142F1)  KEYFLD( +
+                    (TXIVEA) (TXCUNO) (TXNO) (TXIVNO))
+/*13101A*/
+             CALL       PGM(ARR142R)
+/*0512A*/  ENDDO
+
+/*0512A*/  IF     COND(&S#CHSE *EQ '2')  THEN(DO)
+/*0512A*/        CALL      PGM(ARR142RA)
+
+/*0512A*/        OVRDBF     FILE(ARR142F)  TOFILE(ARR142F) SHARE(*YES)
+/*0512A*/        OPNQRYF    FILE(ARR142F)  KEYFLD( +
+                    (A4DXNO) (A4DXIT) (A4IVNO) (A4PDNM) (A4METL) +
+                    (A4SPE1) (A4SPE2))
+/*0512A*/        CALL      PGM(ARR142R1)
+/*0512A*/        CLOF       OPNID(ARR142F)
+/*0512A*/  ENDDO
+
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+/*0302A*/  IF     COND(&DSPID  *NE 'ARP150P#') THEN(DO)
+
+             SNDBRKMSG  MSG('<<折讓開立鋼種分攤未確認核查表+
+                處理完畢，請列印...>>'                               ) +
+                          TOMSGQ(&DSPID) MSGTYPE(*INFO)
+/*0302A*/  ENDDO
+
+/*0302A*/  IF     COND(&DSPID  *EQ 'ARP150P#') THEN(DO)
+/*0302A*/      CHGVAR     VAR(&CURUSER)   VALUE('B05CHM')
+/*0302A*/      CHGSPLFA   FILE(ARR142T) JOB(&CURUSER/QPRTJOB) +
+                          SPLNBR(*LAST) OUTQ(&PRINT)
+/*0302A*/  ENDDO
+
+             ENDPGM
+

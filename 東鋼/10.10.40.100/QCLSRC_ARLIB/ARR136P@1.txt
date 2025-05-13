@@ -1,0 +1,192 @@
+     /***************************************************************/
+     /*                                                             */
+     /*        *****   PROGRAM INTRODUCTION   *****                 */
+     /*                                                             */
+     /*        1.PROGRAM-ID    ARR136P                              */
+     /*        2.PROGRAM-TYPE  CLS                                  */
+     /*        3.AUTHOR        S00WCJ                               */
+     /*        4.FUNCTION     銷貨發票開立方式一覽表            */
+     /*        5.DATE-WRITTEN  98/12/18 2009OD64                    */
+     /*        6.UPDATE  DATE 113/01/05 2023AR00056 S00WCJ (1301A)  */
+     /*                       修正廠區，T改為U桃園；出貨業務  */
+     /*                       代號改為業務代號篩選接單、出貨、收  */
+     /*                       款；新增客戶代號篩選及增加訂單結案  */
+     /*                       選項                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&DEVNM) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&USER)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&COMP)   TYPE(*CHAR) LEN(35)
+             DCL        VAR(&DEVNM)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&S#AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#DATS) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#DATE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&S#ERR)  TYPE(*CHAR) LEN(70)
+             DCL        VAR(&W#ERR)  TYPE(*CHAR) LEN(1)
+             DCLF       FILE(ARR136S)
+
+             RTVJOBA   TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&DEVNM)
+             RTVDTAARA  DTAARA(*LDA (951 35)) RTNVAR(&COMP)
+
+ START:
+
+ /*1301A*/   CHGVAR     VAR(&S#CLOS)   VALUE('N')
+
+             SNDRCVF    RCDFMT(TITLE)
+
+             CHGVAR     VAR(&IN41)  VALUE('0')
+             CHGVAR     VAR(&IN42)  VALUE('0')
+             CHGVAR     VAR(&S#ERR)  VALUE(' ')
+
+             IF         COND(&IN03 *OR &IN12) THEN(RETURN)
+
+
+                 IF      COND(&S#DATS *EQ 0) THEN(DO)
+                      CHGVAR   VAR(&S#ERR)  VALUE('訊息-日期欄位+
+                             不可空白!')
+                      CHGVAR   VAR(&IN41)   VALUE('1')
+                      GOTO     CMDLBL(START)
+                 ENDDO
+
+             IF       COND(&S#DATS *NE 0) THEN(DO)
+                  CALL     PGM(C018) PARM(&S#DATS &W#ERR)
+               IF       COND(&W#ERR *EQ '1') THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-輸入日期錯誤!')
+                   CHGVAR  VAR(&IN41)  VALUE('1')
+                   GOTO     CMDLBL(START)
+               ENDDO
+             ENDDO
+
+             IF       COND(&S#DATE *NE 0) THEN(DO)
+                  CALL     PGM(C018) PARM(&S#DATE &W#ERR)
+               IF       COND(&W#ERR *EQ '1') THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-輸入日期錯誤!')
+                   CHGVAR  VAR(&IN42)  VALUE('1')
+                   GOTO     CMDLBL(START)
+               ENDDO
+             ENDDO
+
+             IF      COND(&S#DATS *NE 0  *AND &S#DATE *EQ 0) THEN(DO   )
+                   CHGVAR  VAR(&S#DATE)  VALUE(&S#DATS)
+             ENDDO
+
+
+             IF       COND(&S#DATS *GT &S#DATE) THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-日期區間錯誤!')
+                   CHGVAR  VAR(&IN41)  VALUE('1')
+                   CHGVAR  VAR(&IN42)  VALUE('1')
+                   GOTO     CMDLBL(START)
+             ENDDO
+
+             CHGVAR     VAR(&W#DATS)    VALUE(&S#DATS)
+             CHGVAR     VAR(&W#DATE)    VALUE(&S#DATE)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&W#DATS)
+             CHGDTAARA  DTAARA(*LDA (9 8)) VALUE(&W#DATE)
+             CHGDTAARA  DTAARA(*LDA (17 1)) VALUE(&S#AREA)
+             CHGDTAARA  DTAARA(*LDA (18 1)) VALUE(&S#SALS)
+             CHGDTAARA  DTAARA(*LDA (19  1)) VALUE(&S#INVS)
+/*1301A*/    CHGDTAARA  DTAARA(*LDA (20  6)) VALUE(&S#CUNS)
+/*1301A*/    CHGDTAARA  DTAARA(*LDA (26  1)) VALUE(&S#CLOS)
+
+
+
+INPUT:
+
+             SBMJOB     CMD(CALL PGM(ARR136P)) JOB(ARR136P) +
+                          JOBD(ARJOBD)
+             SNDBRKMSG  MSG('<<銷貨發票開立方式一覽表已開始處理+
+                         ,請稍待.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             RETURN
+
+
+BATCH:
+             RTVDTAARA  DTAARA(*LDA (1  8)) RTNVAR(&W#DATS)
+             RTVDTAARA  DTAARA(*LDA (9  8)) RTNVAR(&W#DATE)
+             RTVDTAARA  DTAARA(*LDA (17 1)) RTNVAR(&S#AREA)
+             RTVDTAARA  DTAARA(*LDA (18 1)) RTNVAR(&S#SALS)
+             RTVDTAARA  DTAARA(*LDA (19  1)) RTNVAR(&S#INVS)
+
+
+STEP1:       /* 複製暫存資料 */
+
+             DLTF       FILE(QTEMP/ARR136F)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(ARR136F) FROMLIB(ARLIB) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+             OVRDBF     FILE(ARR136F) TOFILE(QTEMP/ARR136F)
+             OVRDBF     FILE(SAMAST)  TOFILE(SAMAST) SHARE(*YES)
+
+/*1301A*/    OPNQRYF    FILE(SAMAST) +
+                        QRYSLT('S1DATE *GE ' || &W#DATS || ' *AND +
+                                S1DATE *LE ' || &W#DATE || ' *AND +
+                                %SST(S1PDNO 1 1) *EQ "2" *AND +
+                                S1KIND *NE "E"')
+
+             CALL       ARR136R1
+             CLOF       SAMAST
+             DLTOVR     *ALL
+
+STEP2:       /* 列印報表 */
+
+             OVRPRTF    FILE(ARR136T) TOFILE(ARR136T) PAGESIZE(*N +
+                          132) CPI(10) HOLD(*YES) USRDTA('開立方式')
+             OVRDBF     FILE(ARR136F) TOFILE(QTEMP/ARR136F) SHARE(*YES)
+
+   /*廠區空白，業務空白*/
+
+        IF   COND(&S#AREA *EQ ' ' *AND &S#SALS *EQ ' ') THEN(DO)
+/*1301A*/    OPNQRYF    FILE(ARR136F) +
+                        KEYFLD((ARSND) +
+                               (ARMTHD) (ARCUNO) (ARORN5))
+        ENDDO
+
+   /*廠區不空白，業務空白*/
+
+        IF   COND(&S#AREA *NE ' ' *AND &S#SALS *EQ ' ') THEN(DO)
+/*1301A*/    OPNQRYF    FILE(ARR136F) +
+                        QRYSLT('ARAREA *EQ "' || &S#AREA || '"') +
+                        KEYFLD((ARSND) +
+                               (ARMTHD) (ARCUNO) (ARORN5))
+        ENDDO
+
+   /*廠區空白，業務不空白*/
+
+        IF   COND(&S#AREA *EQ ' ' *AND &S#SALS *NE ' ') THEN(DO)
+/*1301A*/    OPNQRYF    FILE(ARR136F) +
+                        QRYSLT('ARSALE *EQ "' || &S#SALS || '" *OR +
+                                ARSND  *EQ "' || &S#SALS || '" *OR +
+                                ARRECV *EQ "' || &S#SALS || '"') +
+                        KEYFLD((ARSND) +
+                               (ARMTHD) (ARCUNO) (ARORN5))
+        ENDDO
+
+   /*廠區不空白，業務不空白*/
+
+        IF   COND(&S#AREA *NE ' ' *AND &S#SALS *NE ' ') THEN(DO)
+/*1301A*/    OPNQRYF    FILE(ARR136F) +
+                        QRYSLT('ARAREA *EQ "' || &S#AREA || '" *AND +
+                               (ARSALE *EQ "' || &S#SALS || '" *OR +
+                                ARSND  *EQ "' || &S#SALS || '" *OR +
+                                ARRECV *EQ "' || &S#SALS || '")') +
+                        KEYFLD((ARSND) +
+                               (ARMTHD) (ARCUNO) (ARORN5))
+        ENDDO
+
+  /*      CPYFRMQRYF    FROMOPNID(ARR136F) TOFILE(S00WCJ/AR136F) +
+              MBROPT(*REPLACE)  CRTFILE(*YES)   */
+
+             CALL       ARR136R
+             CLOF       ARR136F
+             DLTOVR     *ALL
+
+             SNDBRKMSG  MSG('<<銷貨發票開立方式一覽表已完成+
+                        ,請列印.........>>') +
+                      TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             ENDPGM
+

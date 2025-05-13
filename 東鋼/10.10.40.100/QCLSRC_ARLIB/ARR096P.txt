@@ -1,0 +1,78 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR096P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02YSH                                  */
+     /*     4.FUNCTION     訂單別記帳出貨明細表                   */
+     /*     5.DATE-WRITTEN  90/06/20                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCLF       FILE(ARR096S)
+             DCL        VAR(&DATS)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DATE)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&IN03)  TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN12)  TYPE(*LGL)  LEN(1)
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+ DISPLAY:    SNDRCVF
+             IF         COND(&IN03 *EQ '1')   THEN(RETURN)
+             IF         COND(&IN12 *EQ '1')   THEN(RETURN)
+
+             CHGVAR     VAR(&DATS) VALUE(&S#DATS)
+             CHGVAR     VAR(&DATE) VALUE(&S#DATE)
+
+             CHGDTAARA  DTAARA(*LDA (301 6)) VALUE(&S#CUNO)
+             CHGDTAARA  DTAARA(*LDA (307 6)) VALUE(&S#ORNO)
+             CHGDTAARA  DTAARA(*LDA (313 6)) VALUE(&DATS)
+             CHGDTAARA  DTAARA(*LDA (319 6)) VALUE(&DATE)
+
+             SBMJOB     JOB(ARR096P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                        RQSDTA('CALL ARR096P')
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (301 6)) RTNVAR(&S#CUNO)
+             RTVDTAARA  DTAARA(*LDA (307 6)) RTNVAR(&S#ORNO)
+             RTVDTAARA  DTAARA(*LDA (313 6)) RTNVAR(&DATS)
+             RTVDTAARA  DTAARA(*LDA (319 6)) RTNVAR(&DATE)
+
+             CLRPFM     FILE(ARR096F)
+       /*    MONMSG     MSGID(CPF0000)    */
+
+   STEP1:  /*依出貨日期找出1B磅單 */
+             OVRDBF     FILE(WTMASPJ1) TOFILE(DALIB/WTMASPJ1) SHARE(*YES)
+             OPNQRYF    FILE(WTMASPJ1) QRYSLT('+
+                        (W6CUNO *EQ "' || &S#CUNO || '") *AND +
+                        (ENTD *GE "' || &DATS || '") *AND +
+                        (ENTD *LE "' || &DATE || '") *AND +
+                        (W7SPLT *NE "S") *AND +
+                        (W6TRCD *EQ "1B")') +
+                        MAPFLD((CHAR1 W6ENTD *CHAR 8) +
+                               (ENTD '%SST(CHAR1 3 6)' *CHAR 6))
+             CALL       PGM(ARR096R1)
+             CLOF       OPNID(WTMASPJ1)
+             DLTOVR     FILE(*ALL)
+
+   STEP2:    /* 依規格別處理   */
+             CALL       PGM(ARR096R2)
+
+   STEP3:    /* 列印報表   */
+             OVRDBF     FILE(ARR096F) TOFILE(ARLIB/ARR096F) SHARE(*YES)
+             OVRPRTF    FILE(ARR096T) TOFILE(ARR096T) PAGESIZE(*N +
+                          198) CPI(15) HOLD(*YES) +
+                          USRDTA('記帳出發') IGCDTA(*YES)
+             OPNQRYF    FILE((ARR096F)) +
+                        KEYFLD((AXINNO))
+             CALL       PGM(ARR096R3)
+             CLOF       OPNID(ARR096F)
+             DLTOVR     FILE(*ALL)
+ ENDCLPGM:   ENDPGM
+

@@ -1,0 +1,139 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP077R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     電子商務介面檔-帳款明細(ARFNDS)
+     H*            5.DATE-WRITTEN  90/09/29
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARSTAT  IP  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FCAMBAL  IF  E           K        DISK
+     FCAMBALN IF  E           K        DISK
+     FARLCDSW IF  E           K        DISK
+     FHSINFO  IF  E           K        DISK
+     FAR2159F IF  E           K        DISK
+     F            ARREC                             KRENAMEAR2159
+     FARFNDS  O   E           K        DISK
+     IARREC       01
+     I              ARCUNO                          F#CUNO
+     I              ARRESV                          F#RESV
+     C*****************************************************************
+     C*         KEY  LIST
+     C*****************************************************************
+     C*AR2159F
+     C           K#2159    KLIST
+     C                     KFLD           ARCUNO
+     C                     KFLD           ARAREA
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     CLEARRARFNDS
+     C*
+     C           F#CUNO    CHAINCBREC               N41
+     C                     MOVELCBMUID    AFVTNO           統編
+     C                     MOVELCBCUNM    AFCUNM
+     C                     MOVELARORNO    AFORNO           訂單號碼
+     C*
+     C                     ADD  ARAAMT    AFTAMT           銷貨帳款
+     C*                    ADD  ARBAMT    AFTAMT
+     C*                    ADD  AREAMT    AFTAMT
+     C*                    ADD  ARGAMT    AFTAMT
+     C*                    ADD  ARHAMT    AFTAMT
+     C                     ADD  ARCAMT    AFTAMT
+     C                     ADD  ARDAMT    AFTAMT
+     C                     ADD  ARFAMT    AFTAMT
+     C                     ADD  ARATAX    AFTAMT
+     C                     ADD  ARCTAX    AFTAMT
+     C                     ADD  ARDTAX    AFTAMT
+     C*                    ADD  ARETAX    AFTAMT
+     C                     ADD  ARFTAX    AFTAMT
+     C*                    ADD  ARGTAX    AFTAMT
+     C*                    ADD  ARHTAX    AFTAMT
+     C                     ADD  ARKAMT    AFTAMT
+     C                     ADD  ARLAMT    AFTAMT
+     C*
+     C                     ADD  ARIAMT    AFPAMT           已沖貨款
+     C*                    ADD  ARJAMT    AFPAMT
+     C                     MULT -1        AFPAMT
+     C*
+     C                     Z-ADDARNBAL    AFDAMT           未沖貨款
+     C                     Z-ADDARPBAL    AFRAMT
+     C* 910415 START
+     C           F#CUNO    CHAINALREC               N40
+     C                     Z-ADDALNBAL    AFFAMT           信用狀
+     C                     Z-ADDALOAMT    AFGAMT           已押匯
+     C                     Z-ADDALCBAL    AFIAMT           授信餘額
+     C           UDATE     IFLE ALUSDT                      有效期間
+     C                     ADD  ALYAMT    AFIAMT           +核准金額
+     C                     END
+     C           F#CUNO    CHAINCNREC               N40
+     C                     ADD  CNAM1P    AFHAMT           開出單
+     C                     ADD  CNAM1M    AFHAMT
+     C                     ADD  CNAM1T    AFHAMT
+     C                     ADD  CNAM1H    AFHAMT
+     C                     ADD  CNAM1K    AFHAMT
+     C                     ADD  CNAM1L    AFHAMT
+     C                     ADD  CNAM1C    AFHAMT
+     C*
+     C                     MOVE UDATE     AFUPDD
+     C* 910415 END
+     C*計算暫收
+     C                     MOVE F#CUNO    ARCUNO
+     C                     MOVE *BLANK    ARAREA
+     C           K#2159    SETLLAR2159
+     C                     READ AR2159                   40
+     C           *IN40     DOWEQ*OFF
+     C           ARCUNO    IFNE F#CUNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ADD  ARAMT1    AFEAMT
+     C                     SUB  ARAMT2    AFEAMT
+     C                     ADD  ARAMT4    AFEAMT
+     C*
+     C                     READ AR2159                   40
+     C                     ENDDO
+     C*預防因折讓導致貨款未結案
+     C           AFDAMT    IFLT 0
+     C           AFPAMT    ORLT 0
+     C                     MOVE *ON       *IN43
+     C                     ELSE
+     C                     MOVE *OFF      *IN43
+     C                     ENDIF
+     C*訂單是否結案且已過60天
+     C           ARORNO    CHAINRARLCDSW             40
+     C           AFTAMT    IFNE 0
+     C   40      ARFL01    IFEQ ' '
+     C           AFVTNO    CHAINRHSINFO             N42
+     C  N41N42N43          WRITERARFNDS
+     C                     ENDIF
+     C           *IN40     IFEQ *OFF
+     C                     MOVE UDATE     W#CHDT  60
+     C           19110000  ADD  W#CHDT    W#USDT  80
+     C                     MOVE AWRCDT    P#DAT1  8
+     C                     MOVE W#USDT    P#DAT2  8
+     C                     CALL 'UTS103R'
+     C                     PARM           P#DAT1
+     C                     PARM           P#DAT2
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM 0         P#RTND  50
+     C                     PARM           P#ERR   1
+     C           P#RTND    IFLE 60
+     C           AFVTNO    CHAINRHSINFO             N42
+     C  N41N42N43          WRITERARFNDS
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDSR
+

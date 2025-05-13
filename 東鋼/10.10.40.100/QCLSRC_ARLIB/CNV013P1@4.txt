@@ -1,0 +1,203 @@
+             PGM
+             DCL        VAR(&YYA)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&MMA)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&YY)    TYPE(*DEC)  LEN(2 0)
+             DCL        VAR(&MM)    TYPE(*DEC)  LEN(2 0)
+             DCL        VAR(&BKDT)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&BYM)   TYPE(*CHAR) LEN(4)
+
+             CHGJOB     RUNPTY(15)
+
+             RTVDTAARA  DTAARA(ARLIB/ARBACKUP (1 6)) RTNVAR(&BKDT)
+             CLRPFM     FILE(CCLIB/ARSTAT)
+             CPYF       FROMFILE(CCLIB/ARSTATO) TOFILE(CCLIB/ARSTAT) +
+                        MBROPT(*ADD)
+
+ /* --------------------------------------------------------------- */
+          /* 参璸秨祇布*/
+             CHGVAR     VAR(&BYM)    VALUE(%SST(&BKDT 1 4))
+             OVRDBF     FILE(SAMAST) TOFILE(DALIB/SAMAST)
+             OVRDBF     FILE(SACUST) TOFILE(DALIB/SACUST)
+             OVRDBF     FILE(ARSTAT) TOFILE(CCLIB/ARSTAT)
+             OVRDBF     FILE(INVDTL) TOFILE(DALIB/INVDTL) SHARE(*YES)
+             OVRPRTF    FILE(CNV013T) TOFILE(ARLIB/CNV013T) +
+                        USRDTA('祇布岿粇')
+             OVRDBF     FILE(INVDTL01) TOFILE(DALIB/INVDTL01)
+             OPNQRYF    FILE(INVDTL)                             +
+                        QRYSLT('(ACDT *NE "999999" *AND          +
+                                 IVACDT *GE ' || &BKDT || ') *OR +
+                                (ACDT *EQ "999999" *AND          +
+                            %SST(IVRESV 1 4) *GE "' || &BYM || '")') +
+                        KEYFLD((IVACNO) (IVNO))                  +
+                        MAPFLD((IVACNO '%SST(IVORNO 1 6)') +
+                               (DATE IVACDT *CHAR 8) +
+                               (ACDT '%SST(DATE 3 6)' *CHAR 6))
+             CALL       PGM(CNV013R#X)
+             CLOF       OPNID(INVDTL)
+             DLTOVR     FILE(*ALL)
+
+          /* 参璸ゼ秨祇布*/
+             OVRDBF     FILE(ARSTAT) TOFILE(CCLIB/ARSTAT)
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL)                               +
+                        QRYSLT('TXFL02  *EQ " "    *AND            +
+                                TXACDT  *GE ' || &BKDT || ' *AND   +
+                                %SST(TXRESV 10 1) *NE "*" *AND     +
+                               %SST(TXORNO 1  6) *NE "K02607" *AND +
+                          (TXCODE = "SA04" *OR TXCODE = "AR05")')  +
+                        KEYFLD((TXVUNO) (TXNO) (TXACNT))           +
+                        MAPFLD((TXVUNO '%SST(TXORNO 1 6)'))
+             CALL       PGM(CNV013RA)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+          /* 参璸ゼ砯璹虫⌒⒃⑤⑧②〓⒀€⑨⒂*/
+             OVRDBF     FILE(ARSTAT) TOFILE(CCLIB/ARSTAT)
+             OVRDBF     FILE(LLCMSTL1) TOFILE(DALIB/LLCMSTL1)
+             CALL       PGM(CNV013RB)
+             DLTOVR     FILE(*ALL)
+
+          /*    AFTER COMPLETE   */
+ COM:        CPYF       FROMFILE(CCLIB/ARSTAT) TOFILE(DALIB/ARSTAT) +
+                          MBROPT(*REPLACE) FMTOPT(*MAP *DROP)
+ /* --------------------------------------------------------------- */
+
+ DDMF:
+             DLTF       FILE(QTEMP/TYDDM)
+             MONMSG     CPF0000
+             DLTF       FILE(QTEMP/MLDDM)
+             MONMSG     CPF0000
+             DLTF       FILE(QTEMP/KSDDM)
+             MONMSG     CPF0000
+
+             CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+
+
+ TYN:     /*    TRANSFER TO TOUYAN  */
+             CHGDDMF    FILE(QTEMP/TYDDM) RMTFILE(DALIB/ARSTATTM)
+             CPYF       FROMFILE(DALIB/ARSTAT) TOFILE(QTEMP/TYDDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+             SBMRMTCMD  CMD('CPYF FROMFILE(DALIB/ARSTATTM) +
+                        TOFILE(DALIB/ARSTAT) MBROPT(*REPLACE)') +
+                        DDMFILE(QTEMP/TYDDM)
+             MONMSG     MSGID(CPF0000)
+          /*    TRANSFER TO KOUSHUN */
+
+ KOR:        CHGDDMF    FILE(QTEMP/KSDDM) RMTFILE(DALIB/ARSTATTM)
+             CPYF       FROMFILE(DALIB/ARSTAT) TOFILE(QTEMP/KSDDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+             SBMRMTCMD  CMD('CPYF FROMFILE(DALIB/ARSTATTM) +
+                        TOFILE(DALIB/ARSTAT) MBROPT(*REPLACE)') +
+                        DDMFILE(QTEMP/KSDDM)
+             MONMSG     MSGID(CPF0000)
+          /*    TRANSFER TO KOUSHUN */
+
+ MIL:        CHGDDMF    FILE(QTEMP/MLDDM) RMTFILE(DALIB/ARSTATTM)
+             CPYF       FROMFILE(DALIB/ARSTAT) TOFILE(QTEMP/MLDDM) +
+                        MBROPT(*REPLACE) INCCHAR(*RCD 18 *EQ 'H') +
+                        FMTOPT(*NOCHK)
+             MONMSG     MSGID(CPF0000)
+             SBMRMTCMD  CMD('CPYF FROMFILE(DALIB/ARSTATTM) +
+                        TOFILE(DALIB/ARSTAT) MBROPT(*REPLACE)') +
+                        DDMFILE(QTEMP/MLDDM)
+             MONMSG     MSGID(CPF0000)
+
+
+ /* --------------------------------------------------------------- */
+
+             /*   矪瞶甭獺╰参  */
+ GUAD:       RTVSYSVAL  SYSVAL(QYEAR) RTNVAR(&YYA)
+             RTVSYSVAL  SYSVAL(QMONTH) RTNVAR(&MMA)
+             CHGVAR     VAR(&YY) VALUE(&YYA)
+             CHGVAR     VAR(&MM) VALUE(&MMA)
+             CHGDTAARA  DTAARA(*LDA (5 2)) VALUE('01')
+             CHGDTAARA  DTAARA(*LDA (11 2)) VALUE('31')
+             CHGDTAARA  DTAARA(*LDA (7 2)) VALUE(&YYA)
+             CHGDTAARA  DTAARA(*LDA (9 2)) VALUE(&MMA)
+             IF         COND(&MM *EQ 1) THEN(DO)
+                        CHGVAR  VAR(&MM)  VALUE(12)
+                        CHGVAR  VAR(&YY)  VALUE(&YY - 1)
+                        ENDDO
+             ELSE  DO
+                        CHGVAR  VAR(&MM)  VALUE(&MM - 1)
+                   ENDDO
+             CHGVAR     VAR(&YYA) VALUE(&YY)
+             CHGVAR     VAR(&MMA) VALUE(&MM)
+             CHGDTAARA  DTAARA(*LDA (1 2)) VALUE(&YYA)
+             CHGDTAARA  DTAARA(*LDA (3 2)) VALUE(&MMA)
+ /* --------------------------------------------------------------- */
+
+           /*  矪瞶玂靡⌒璹虫*/
+             CALL       PGM(CCLIB/CCP010P)
+             MONMSG     MSGID(CPF0000)
+
+              /* TRANSFER TO TOUYAN  */
+             CHGDDMF    FILE(QTEMP/TYDDM) RMTFILE(DALIB/CGDDTL)
+             CPYF       FROMFILE(DALIB/CGDDTL) TOFILE(QTEMP/TYDDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+
+              /* TRANSFER TO KOUSHUN */
+             CHGDDMF    FILE(QTEMP/KSDDM) RMTFILE(DALIB/CGDDTL)
+             CPYF       FROMFILE(DALIB/CGDDTL) TOFILE(QTEMP/KSDDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+
+              /* TRANSFER TO MIL     */
+             CHGDDMF    FILE(QTEMP/MLDDM) RMTFILE(DALIB/CGDDTL)
+             CPYF       FROMFILE(DALIB/CGDDTL) TOFILE(QTEMP/MLDDM) +
+                        MBROPT(*REPLACE) FMTOPT(*NOCHK)
+             MONMSG     MSGID(CPF0000)
+ /* --------------------------------------------------------------- */
+
+           /*  矪瞶箇Μ砯蹿緇肂⌒璹虫*/
+             CALL         PGM(CCLIB/CCP011P)
+             MONMSG     MSGID(CPF0000)
+
+              /* TRANSFER TO TOUYAN  */
+             CHGDDMF    FILE(QTEMP/TYDDM) RMTFILE(DALIB/CPRBAL)
+             CPYF       FROMFILE(DALIB/CPRBAL) TOFILE(QTEMP/TYDDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+             CHGDDMF    FILE(QTEMP/TYDDM) RMTFILE(DALIB/CPRDTL)
+             CPYF       FROMFILE(DALIB/CPRDTL) TOFILE(QTEMP/TYDDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+
+              /* TRANSFER TO KOUSHUN */
+             CHGDDMF    FILE(QTEMP/KSDDM) RMTFILE(DALIB/CPRBAL)
+             CPYF       FROMFILE(DALIB/CPRBAL) TOFILE(QTEMP/KSDDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+             CHGDDMF    FILE(QTEMP/KSDDM) RMTFILE(DALIB/CPRDTL)
+             CPYF       FROMFILE(DALIB/CPRDTL) TOFILE(QTEMP/KSDDM) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)
+
+              /* TRANSFER TO MIL     */
+             CHGDDMF    FILE(QTEMP/MLDDM) RMTFILE(DALIB/CPRBAL)
+             CPYF       FROMFILE(DALIB/CPRBAL) TOFILE(QTEMP/MLDDM) +
+                        MBROPT(*REPLACE) FMTOPT(*NOCHK)
+             MONMSG     MSGID(CPF0000)
+             CHGDDMF    FILE(QTEMP/MLDDM) RMTFILE(DALIB/CPRDTL)
+             CPYF       FROMFILE(DALIB/CPRDTL) TOFILE(QTEMP/MLDDM) +
+                        MBROPT(*REPLACE) FMTOPT(*NOCHK)
+             MONMSG     MSGID(CPF0000)
+
+ /* --------------------------------------------------------------- */
+
+           /*  矪瞶め砯猵*/
+             SBMJOB     CMD(CALL PGM(CCLIB/CCP001P)) JOB(CCP001P) +
+                        JOBD(CCJOBD) JOBQ(QCTL) LOG(4 0 *SECLVL) +
+                        LOGCLPGM(*YES) MSGQ(*USRPRF)
+             MONMSG     MSGID(CPF0000)
+
+             ENDPGM
+

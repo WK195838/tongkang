@@ -1,0 +1,97 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP106P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CSF                                  */
+     /*     4.FUNCTION     折讓代開傳票還原處理                   */
+     /*     5.DATE-WRITTEN  93/01/08                                */
+     /*     6.DATE-UPDATE                                           */
+     /*                                                             */
+     /* *原折讓代開傳票程式已包含還原功能,但因代開後營業若要透過*/
+     /*   ARE036R，已確認折讓單更改確認日期時,則須請財會還原    */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCLF       FILE(ARP106S)
+             DCL        VAR(&P#YYMM) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&P#CODE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)  /*執行狀態*/
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&USER)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&AREA)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&YYMM)   TYPE(*CHAR) LEN(4)
+             DCL        VAR(&YY)     TYPE(*CHAR) LEN(2)
+             DCL        VAR(&MM)     TYPE(*CHAR) LEN(2)
+             DCL        VAR(&FNAME)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MNAME)  TYPE(*CHAR) LEN(10)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&S#AREA) VALUE(&AREA)
+ DISPLAY:
+             SNDRCVF    RCDFMT(AR106F1)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+             CHGVAR     VAR(&YYMM) VALUE(&S#YYMM)
+             CHGVAR     VAR(&P#YYMM) VALUE(&S#YYMM)
+             CHGVAR     VAR(&YY) VALUE(%SST(&YYMM 1 2))
+             CHGVAR     VAR(&MM) VALUE(%SST(&YYMM 3 2))
+             CHGVAR     VAR(&FNAME) +
+                        VALUE('AC' || &AREA || 'R' || &YY )
+             CHGVAR     VAR(&MNAME) VALUE('VR' || &MM)
+             CHKOBJ     OBJ(&FNAME) OBJTYPE(*FILE) MBR(&MNAME)
+             MONMSG     CPF0000     EXEC(DO)
+             CHGVAR     VAR(&S#ERR) +
+                        VALUE('折讓代開傳票傳票作業，無法找到指定+
+                          的傳票檔：' || &FNAME || ', ' || &MNAME)
+                        GOTO DISPLAY
+             ENDDO
+
+             ADDLIBLE   ACLIB
+             MONMSG     CPF0000
+
+             CALL    PGM(ACP101R) PARM(&P#YYMM &P#CODE)
+             IF         COND(&P#CODE *EQ '1') THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('關帳日期已過')
+             GOTO       CMDLBL(DISPLAY)
+             ENDDO
+
+             CHGDTAARA  DTAARA(*LDA (301 4)) VALUE(&YYMM)
+             CHGDTAARA  DTAARA(*LDA (307 1)) VALUE(&S#AREA)
+
+             SBMJOB     JOB(ARP106P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARP106P')
+             RETURN
+
+BATCH:
+             RTVDTAARA  DTAARA(*LDA (301 4)) RTNVAR(&YYMM)
+             RTVDTAARA  DTAARA(*LDA (301 2)) RTNVAR(&YY)
+             RTVDTAARA  DTAARA(*LDA (303 2)) RTNVAR(&MM)
+             RTVDTAARA  DTAARA(*LDA (307 1)) RTNVAR(&AREA)
+
+             CHGVAR     VAR(&FNAME) +
+                        VALUE('AC' || &AREA || 'R' || &YY)
+             CHGVAR     VAR(&MNAME) VALUE('VR' || &MM)
+
+  /* 刪除已代開過的資料 */
+
+            /* 1.刪除輸入日期後的傳票檔資料*/
+             OVRDBF     FILE(ACTRAN) TOFILE(&FNAME) MBR(&MNAME)        +
+                        SHARE(*YES)
+             OPNQRYF    FILE(ACTRAN) OPTION(*ALL) QRYSLT(' +
+                        (ACVRNO *GE "E000")     *AND +
+                        (ACVRNO *LE "E999")')
+             CALL       PGM(ARP106R)
+             CLOF       OPNID(ACTRAN)
+             DLTOVR     FILE(*ALL)
+
+             SNDBRKMSG  MSG('<<折讓代開傳票處理完畢，請列印....>>') +
+                        TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+
+             ENDPGM
+

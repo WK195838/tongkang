@@ -1,0 +1,210 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR132R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     訂單別出貨及發票明細表（發票）
+     H*            5.DATE-WRITTEN  86/10/26
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FARR132F UF  E           K        DISK                      A
+     F*****************************************************************
+     ITXREC
+     I                                              TXNO  L2
+     I                                              TXIVNOL1
+     I*------------------------------------------------------
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I*
+     I            DS
+     I                                        1   8 TXNO
+     I                                        1   6 D#NO1
+     I                                        7   8 D#NO2
+     I            DS
+     I                                        1   8 W#ANO
+     I                                        1   1 D#ANO1
+     I                                        4   8 D#ANO2
+     I            DS
+     I                                        1   8 W#BNO
+     I                                        1   1 D#BNO1
+     I                                        2   6 D#BNO2
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L1清除函式
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     Z-ADD0         W#DATE  80
+     C                     MOVEL*BLANK    W#WTNO  8
+     C                     MOVEL*BLANK    W#PDNM  3
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L1 函式  存檔（同一張磅單下的不同發票）
+     C*********************************
+     CSR         L1SR      BEGSR
+     C           K#WF1     KLIST
+     C                     KFLD           W#ORNO
+     C                     KFLD           W#DATE
+     C                     KFLD           W#WTNO
+     C*
+     C           K#WF2     KLIST
+     C                     KFLD           W#ORNO
+     C                     KFLD           W#DATE
+     C                     KFLD           W#WTNO
+     C                     KFLD           W#PDNM
+     C*
+     C                     Z-ADDTXDATE    W#DATE
+     C           D#NO2     IFEQ '  '                       去磅單異動
+     C                     MOVELTXNO      W#WTNO           代碼
+     C                     ELSE
+9008 C                     MOVELTXORNO    W#ORNO  6
+     C                     MOVELTXNO      W#ANO
+     C                     MOVELD#ANO1    D#BNO1
+     C                     MOVELD#ANO2    D#BNO2
+     C                     MOVELW#BNO     W#WTNO
+     C                     ENDIF
+     C*
+     C                     MOVEL'F'       W#FIND  1
+     C           K#WF1     CHAINWFREC                69    找第一筆
+     C           *IN69     DOWEQ'0'                        發票未填
+     C           WFIVNO    IFEQ *BLANK
+     C                     EXSR SR1000                     找發票資料
+     C                     UPDATWFREC                      存檔離開
+     C                     MOVEL'T'       W#FIND
+     C                     LEAVE
+     C                     ENDIF
+     C           K#WF1     READEWFREC                    69
+     C                     ENDDO
+     C*
+     C           W#FIND    IFEQ 'F'                        找不到
+     C                     Z-ADD0         I       30       重寫銷貨
+     C                     DO   100                        一百筆
+     C                     ADD  1         I
+     C                     MOVE I         W#PDNM
+     C           K#WF2     CHAINWFREC                69
+     C           *IN69     IFEQ '1'
+     C                     CLEARWFREC
+     C                     MOVELTXRESV    WFORNO
+     C                     Z-ADDW#DATE    WFDATE
+     C                     MOVELW#WTNO    WFWTNO
+     C                     MOVE W#PDNM    WFPDNM
+     C                     EXSR SR1000
+     C                     WRITEWFREC
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  LR 函式  印核覆
+     C*********************************
+     CSR         LRSR      BEGSR
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  子函式集
+     C*********************************
+     C*---------------------------------------
+     C*  依發票號碼找出發票相關資料
+     C*---------------------------------------
+     CSR         SR1000    BEGSR
+     C           TXIVNO    CHAININVMST              N69
+     C           *IN69     IFEQ '1'                        找不到
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C           INFLAG    IFEQ 'D'                        已作廢
+     C           INDECD    OREQ 'D'
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         W#AAMT 110       出貨金額
+     C                     Z-ADD0         W#CAMT 110       折退金額
+     C                     Z-ADD0         W#BAMT 110       扣預收
+     C                     Z-ADD0         W#ATAX 110       稅額
+     C                     Z-ADD0         W#EAMT 110       繳款金額
+     C                     Z-ADD0         W#NBAL 110       未收餘額
+     C                     MOVEL*BLANK    W#APNO  6        繳款單號
+     C*
+     C           TXIVNO    CHAINIVREC               N69
+     C           *IN69     DOWEQ'0'
+     C           IVFLAG    IFNE 'D'                        刪除者不計
+     C           IVDECD    ANDNE'D'
+     C                     SELEC
+     C           IVACNT    WHEQ '1'                        出貨
+     C                     ADD  IVAMT     W#AAMT
+     C           IVACNT    WHEQ '2'                        退貨
+     C                     ADD  IVAMT     W#CAMT
+     C           IVACNT    WHEQ '3'                        折讓
+     C                     ADD  IVAMT     W#CAMT
+     C           IVACNT    WHEQ '4'                        扣預收
+     C                     ADD  IVAMT     W#BAMT
+     C           IVACNT    WHEQ '5'                        稅額
+     C                     ADD  IVAMT     W#ATAX
+     C           IVACNT    WHEQ '6'                        繳款
+     C                     MOVELIVAPNO    W#APNO           繳款單號
+     C                     ADD  IVAMT     W#EAMT
+     C           IVACNT    WHEQ '7'                        退票轉出
+     C                     ADD  IVAMT     W#EAMT
+     C           IVACNT    WHEQ '8'                        勞務
+     C                     ADD  IVAMT     W#AAMT
+     C           IVACNT    WHEQ '9'                        其他
+     C                     ADD  IVAMT     W#AAMT
+     C                     ENDSL
+     C                     ENDIF
+     C           TXIVNO    READEIVREC               N    69
+     C                     ENDDO
+     C*
+     C           W#AAMT    ADD  W#CAMT    W#NBAL           彙總餘額
+     C                     ADD  W#BAMT    W#NBAL
+     C                     ADD  W#ATAX    W#NBAL
+     C                     ADD  W#EAMT    W#NBAL
+     C*                                                    設值至檔案
+     C                     MOVELTXRESV    WFORNO
+     C                     MOVELTXIVNO    WFIVNO
+     C                     Z-ADDW#AAMT    WFIVAM
+     C                     Z-ADDW#CAMT    WFAR06
+     C                     Z-ADDW#BAMT    WFPRRV
+     C                     Z-ADDW#ATAX    WFIVTX
+     C                     Z-ADDW#NBAL    WFIVAR
+     C                     MOVELW#APNO    WFAPNO
+     C*
+     CSR         ES1000    ENDSR
+     C*****************************************************************
+

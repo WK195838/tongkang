@@ -1,0 +1,132 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR136R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     銷貨發票開立方式一覽表暫存檔整理
+     H*            5.DATE-WRITTEN  98/12/21
+     H*            6.UPDATE  DATE 113/01/05 2023AR00056 S00WCJ (1301A)
+     H*                            修正廠區，T改為U桃園；出貨業務
+     H*                            代號改為業務代號篩選接單、出貨、收
+     H*                            款；新增客戶代號篩選及增加訂單結案
+     H*                            選項
+     H*                           113/01/23 S00WCJ (1301B)
+     H*                            增加寫入訂單日期
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FSAMAST  IP  E           K        DISK
+     FARCUCT  IF  E           K        DISK
+     FARODCT  IF  E           K        DISK
+     FTRNDTLL1IF  E           K        DISK
+     FARR136F O   E           K        DISK
+     F*****************************************************************
+     I            DS
+     I                                        1   6 D#CUNO
+     I                                        1   1 S1KIND
+     I                                        2   2 S1CUN1
+     I                                        3   5 S1CUN2
+     I                                        6   6 S1CD01
+     I*
+     I            DS
+     I                                        1   9 D#ORNO
+     I                                        1   6 D#ORN5
+     I                                        1   1 S1OREA
+     I                                        2   60S1ORNO
+     I                                        7   90S1ORTM
+     I*
+     I*
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10011003 U#DPID
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C                     EXSR DTLSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C           K#A1      KLIST
+     C                     KFLD           A1CUNO
+     C                     KFLD           A1CTKD
+     C*
+     C           K#A2      KLIST
+     C                     KFLD           A2ORNO
+     C                     KFLD           A2CTKD
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           ARCUNO
+     C                     KFLD           ARORN5
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     MOVEL'00'      ARMTHD           初始為隨車
+     C*判斷是否存在客戶管制檔
+     C                     MOVELD#CUNO    A1CUNO
+     C                     MOVEL'04'      A1CTKD
+     C           K#A1      CHAINRARCUCT              69
+     C           *IN69     IFEQ '0'
+     C                     MOVELA1MTHD    ARMTHD           預設客戶
+     C           A1RFOR    IFEQ ' '                        採客戶
+     C                     GOTO L#SAVE
+     C                     ENDIF
+     C                     ENDIF
+     C*判斷是否存在訂單管制檔
+     C                     MOVELD#ORNO    A2ORNO           訂單編號
+     C                     MOVEL'04'      A2CTKD           管制發票
+     C           K#A2      CHAINRARODCT              69
+     C           *IN69     IFEQ '0'                        採訂單
+     C                     MOVELA2MTHD    ARMTHD
+     C                     ENDIF
+     C*
+     C*9607 針對整張訂單人工開立作修正 START ---------------------
+     C                     MOVELD#ORNO    W#ORN3  6
+     C                     MOVELW#ORN3    A2ORNO           訂單編號
+     C                     MOVE '000'     A2ORNO
+     C                     MOVEL'04'      A2CTKD           管制類別
+     C           K#A2      CHAINRARODCT              42
+     C           *IN42     IFEQ *OFF
+     C           A2MTHD    ANDEQ'04'
+     C                     MOVELA2MTHD    ARMTHD
+     C                     ENDIF
+     C*9607 針對整張訂單人工開立作修正 END  ----------------------
+     C*
+     C           L#SAVE    TAG                             存檔旗標
+     C*
+     C                     EXSR SR1000                     搬移資料
+     C                     WRITEARREC
+     CSR                   ENDSR
+     C*
+     C*-------------------------------
+     C* 搬移資料
+     C*-------------------------------
+     CSR         SR1000    BEGSR
+     C                     MOVELD#ORN5    ARORN5
+     C                     MOVELD#ORNO    ARORNO
+     C                     MOVELD#CUNO    ARCUNO
+     C                     MOVELS1CUNO    ARCUNM
+     C                     MOVELS1OREA    ARAREA
+1301AC                     MOVELS1SALE    ARSALE
+1301AC                     MOVELS1SND     ARSND
+1301AC                     MOVELS1RECV    ARRECV
+1301AC                     MOVELS1CLOS    ARCLOS
+     C                     MOVELS1CTNO    ARCTNO
+1301BC                     Z-ADDS1DATE    ARDATE
+     C*
+     C           KEY01     CHAINTRNDTLL1             61
+     C  N61                MOVEL'Y'       ARTRYN
+     C   61                MOVEL' '       ARTRYN
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+

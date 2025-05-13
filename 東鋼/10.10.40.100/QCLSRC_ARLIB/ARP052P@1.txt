@@ -1,0 +1,241 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP052P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     應收系統主要檔案備份移出作業           */
+     /*     5.DATE-WRITTEN  86/12/20                                */
+     /*                                                             */
+     /*    <說明>: 本作業會根據使用者所輸入的日期將應收系統中， */
+     /*            銷貨明細檔、發票主檔、發票明細檔等三檔的資料 */
+     /*              移出至BKLIB 的備份檔名上。並將CCLIB/       */
+     /*               ARSTATO應收帳款統計檔結論備份至BKLIB上    */
+     /*                                                             */
+     /*    <注意>: 根据營業及財會部門的要求，本程式之備份日期應 */
+     /*              至少保留二個年度以上的資料。也就是在換新的一 */
+     /*              年度時，將備份日期填入兩年度前的一月一日，如 */
+     /*              現在是87年元月，填入850101來進行處理。   */
+     /*              對於未結案的特定客戶，則輸入至ARP052F 檔內 */
+     /*              ，在該檔內的客戶其應收系統的相關資料皆不移出 */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)     TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&SYSNAME) TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&IN03)    TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&LSTBKD)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&YYMMDD)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&BYYMM)   TYPE(*CHAR)  LEN(4)
+             DCL        VAR(&EYYMM)   TYPE(*CHAR)  LEN(4)
+             DCL        VAR(&YMMDD)   TYPE(*CHAR)  LEN(5)
+             DCL        VAR(&TX_BKFN) TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&IV_BKFN) TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&IN_BKFN) TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&SO_BKFN) TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&SX_BKFN) TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&CR_BKFN) TYPE(*CHAR)  LEN(10)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             RTVNETA    SYSNAME(&SYSNAME)
+
+             IF         COND(&INT *EQ '1') THEN(DO)  /* 輸入日期 */
+                CALL       PGM(ARLIB/ARP052RS) PARM(&IN03 &YYMMDD)
+                IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+                RTVDTAARA  DTAARA(ARLIB/ARBACKUP (1 6)) RTNVAR(&LSTBKD)
+                CHGDTAARA  DTAARA(ARLIB/ARBACKUP (7 6)) VALUE(&LSTBKD)
+                CHGDTAARA  DTAARA(ARLIB/ARBACKUP (1 6)) VALUE(&YYMMDD)
+                SBMJOB     JOB(ARP052P) JOBD(ARJOBD) JOBQ(QCTL) +
+                           OUTQ(&OUTQ) RQSDTA('CALL ARP052P')
+                RETURN
+             ENDDO
+
+ BATCH:
+             CHGJOB  RUNPTY(25)  /* 調高處理權限 */
+             MONMSG  CPF0000
+
+                /* 上次備份之日期 */
+             RTVDTAARA  DTAARA(ARLIB/ARBACKUP (7 6))        +
+                        RTNVAR(&LSTBKD)
+
+                /* 本次備份之日期 */
+             RTVDTAARA  DTAARA(ARLIB/ARBACKUP (1 6))        +
+                        RTNVAR(&YYMMDD)
+
+                /* 備份檔名之尾字 */
+             CHGVAR     VAR(&YMMDD) VALUE(%SST(&YYMMDD 2 5))
+
+                /* 備份檔名之組合 */
+             CHGVAR     VAR(&TX_BKFN) VALUE('ARTX_' || &YMMDD)
+             CHGVAR     VAR(&IV_BKFN) VALUE('ARIV_' || &YMMDD)
+             CHGVAR     VAR(&IN_BKFN) VALUE('ARIN_' || &YMMDD)
+             CHGVAR     VAR(&SO_BKFN) VALUE('ARSO_' || &YMMDD)
+             CHGVAR     VAR(&SX_BKFN) VALUE('ARSX_' || &YMMDD)
+             CHGVAR     VAR(&CR_BKFN) VALUE('ARCC_' || &YMMDD)
+
+             CRTDUPOBJ  OBJ(TRNDTL) FROMLIB(DALIB) OBJTYPE(*FILE) +
+                        TOLIB(BKLIB) NEWOBJ(&TX_BKFN)
+             CHGOBJD    OBJ(BKLIB/&TX_BKFN) OBJTYPE(*FILE) +
+                        TEXT('銷貨明細檔備份' || &YYMMDD || +
+                             '前的資料')
+
+             CRTDUPOBJ  OBJ(INVDTL) FROMLIB(DALIB) OBJTYPE(*FILE) +
+                        TOLIB(BKLIB) NEWOBJ(&IV_BKFN)
+             CHGOBJD    OBJ(BKLIB/&IV_BKFN) OBJTYPE(*FILE) +
+                        TEXT('發票明細檔備份' || &YYMMDD || +
+                             '前的資料')
+
+             CRTDUPOBJ  OBJ(INVMST) FROMLIB(DALIB) OBJTYPE(*FILE) +
+                        TOLIB(BKLIB) NEWOBJ(&IN_BKFN)
+             CHGOBJD    OBJ(BKLIB/&IN_BKFN) OBJTYPE(*FILE) +
+                        TEXT('發票主檔的備份' || &YYMMDD || +
+                             '前的資料')
+
+             CRTDUPOBJ  OBJ(CRACCU) FROMLIB(DALIB) OBJTYPE(*FILE) +
+                        TOLIB(BKLIB) NEWOBJ(&CR_BKFN)
+             CHGOBJD    OBJ(BKLIB/&CR_BKFN) OBJTYPE(*FILE) +
+                        TEXT('授信異動的備份' || &YYMMDD || +
+                             '前的資料')
+
+
+             IF      COND(&SYSNAME *EQ 'P02') THEN(GOTO MAJOR)
+             ELSE    CMD(GOTO MINOR)
+
+/* ----------------------------------------------------------------- */
+/*     廠區的備份作業：依日期移出資料即可    */
+
+ MINOR:
+
+    /* 移出銷貨明細 */
+             OVRDBF     FILE(TRNDTL)   TOFILE(DALIB/TRNDTL)
+             OVRDBF     FILE(TRNDTLBK) TOFILE(BKLIB/&TX_BKFN)
+             OVRDBF     FILE(ARP052F)  TOFILE(ARLIB/ARP052F)
+             CALL       ARP052R1
+             DLTOVR     FILE(*ALL)
+
+    /* 移出發票主檔及明細檔 */
+             OVRDBF     FILE(INVMST)   TOFILE(DALIB/INVMST)
+             OVRDBF     FILE(INVDTL)   TOFILE(DALIB/INVDTL)
+             OVRDBF     FILE(INVMSTBK) TOFILE(BKLIB/&IN_BKFN)
+             OVRDBF     FILE(INVDTLBK) TOFILE(BKLIB/&IV_BKFN)
+             OVRDBF     FILE(ARP052F)  TOFILE(ARLIB/ARP052F)
+             CALL       ARP052R2
+             DLTOVR     FILE(*ALL)
+
+             RETURN
+
+/* ----------------------------------------------------------------- */
+/*     台北的備份作業：依日期移出資料，且必須先合計CCLIB/ARSTATO   */
+/*      CCLIB/ARSTATO內的資料為備份移出日期之各訂單結論，每日合計  */
+/*     應收帳款時，必須作為期初資料。                              */
+
+ MAJOR:
+
+             CRTDUPOBJ  OBJ(ARSTATO) FROMLIB(CCLIB) OBJTYPE(*FILE) +
+                        TOLIB(BKLIB) NEWOBJ(&SO_BKFN) DATA(*YES)
+             CHGOBJD    OBJ(CCLIB/ARSTATO) OBJTYPE(*FILE) +
+                        TEXT('應收帳款統計檔' || &YYMMDD || +
+                             '前的結論')
+
+             CRTDUPOBJ  OBJ(&SO_BKFN) FROMLIB(BKLIB) OBJTYPE(*FILE) +
+                        TOLIB(BKLIB)  NEWOBJ(&SX_BKFN)
+             CHGOBJD    OBJ(BKLIB/&SX_BKFN) OBJTYPE(*FILE) +
+                        TEXT('應收帳款統計檔' || &YYMMDD || +
+                             '前已結案訂單')
+
+/* ----------------------------------------------------------------- */
+    /* 合計至已移出資料之ARSTATO */
+
+             CLRPFM     FILE(CCLIB/ARSTAT)
+             CPYF       FROMFILE(CCLIB/ARSTATO) TOFILE(CCLIB/ARSTAT) +
+                        MBROPT(*ADD)
+
+          /* 統計已開發票*/
+             CHGVAR     VAR(&EYYMM)  VALUE(%SST(&YYMMDD 1 4))
+             CHGVAR     VAR(&BYYMM)  VALUE(%SST(&LSTBKD 1 4))
+             OVRDBF     FILE(SAMAST) TOFILE(DALIB/SAMAST)
+             OVRDBF     FILE(SACUST) TOFILE(DALIB/SACUST)
+             OVRDBF     FILE(ARSTAT) TOFILE(CCLIB/ARSTAT)
+             OVRDBF     FILE(INVDTL) TOFILE(DALIB/INVDTL) SHARE(*YES)
+             OVRPRTF    FILE(CNV013T) TOFILE(ARLIB/CNV013T) +
+                        USRDTA('發票錯誤')
+             OVRDBF     FILE(INVDTL01) TOFILE(DALIB/INVDTL01)
+             OPNQRYF    FILE(INVDTL)                                 +
+                        QRYSLT('(ACDT *NE "999999" *AND              +
+                                 IVACDT *LT ' || &YYMMDD || ' *AND   +
+                                 IVACDT *GE ' || &LSTBKD || ') *OR   +
+                                (ACDT *EQ "999999" *AND              +
+                        %SST(IVRESV 1 4) *LT "' || &EYYMM || '" *AND +
+                        %SST(IVRESV 1 4) *GE "' || &BYYMM || '")')   +
+                        KEYFLD((IVACNO) (IVNO)) +
+                        MAPFLD((IVACNO '%SST(IVORNO 1 6)') +
+                               (DATE IVACDT *CHAR 8) +
+                               (ACDT '%SST(DATE 3 6)' *CHAR 6))
+             CALL       PGM(CNV013R#X)
+             CLOF       OPNID(INVDTL)
+             DLTOVR     FILE(*ALL)
+
+          /* 統計未開發票*/
+             OVRDBF     FILE(ARSTAT) TOFILE(CCLIB/ARSTAT)
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL)                                 +
+                        QRYSLT('TXFL02  *EQ " " *AND                 +
+                                TXACDT  *LT ' || &YYMMDD || ' *AND   +
+                                TXACDT  *GE ' || &LSTBKD || ' *AND   +
+                          (TXCODE = "SA04" *OR TXCODE = "AR05")')    +
+                        KEYFLD((TXVUNO) (TXNO) (TXACNT))             +
+                        MAPFLD((TXVUNO '%SST(TXORNO 1 6)'))
+             CALL       PGM(CNV013RA)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+          /* 統計未出貨訂單－ＦＯＲ　Ｌ／Ｃ　ＵＳＥ*/
+             OVRDBF     FILE(ARSTAT) TOFILE(CCLIB/ARSTAT)
+             OVRDBF     FILE(LLCMSTL1) TOFILE(DALIB/LLCMSTL1)
+             CALL       PGM(CNV013RB)
+             DLTOVR     FILE(*ALL)
+
+          /*    AFTER COMPLETE   */
+             CLRPFM     FILE(CCLIB/ARSTATO)
+             CPYF       FROMFILE(CCLIB/ARSTAT) TOFILE(CCLIB/ARSTATO) +
+                        MBROPT(*ADD)
+/* ----------------------------------------------------------------- */
+
+
+    /* 移出應收結論檔之已結案訂單 */
+             OVRDBF     FILE(ARSTAT)   TOFILE(CCLIB/ARSTATO)
+             OVRDBF     FILE(ARSTATBK) TOFILE(BKLIB/&SX_BKFN)
+             OVRDBF     FILE(ARP052F)  TOFILE(ARLIB/ARP052F)
+             CALL       ARP052R3
+             DLTOVR     FILE(*ALL)
+
+
+    /* 移出銷貨明細 */
+             OVRDBF     FILE(TRNDTL)   TOFILE(DALIB/TRNDTL)
+             OVRDBF     FILE(TRNDTLBK) TOFILE(BKLIB/&TX_BKFN)
+             OVRDBF     FILE(ARP052F)  TOFILE(ARLIB/ARP052F)
+             CALL       ARP052R1
+             DLTOVR     FILE(*ALL)
+
+    /* 移出發票主檔及明細檔 */
+             OVRDBF     FILE(INVMST)   TOFILE(DALIB/INVMST)
+             OVRDBF     FILE(INVDTL)   TOFILE(DALIB/INVDTL)
+             OVRDBF     FILE(INVMSTBK) TOFILE(BKLIB/&IN_BKFN)
+             OVRDBF     FILE(INVDTLBK) TOFILE(BKLIB/&IV_BKFN)
+             OVRDBF     FILE(ARP052F)  TOFILE(ARLIB/ARP052F)
+             CALL       ARP052R2
+             DLTOVR     FILE(*ALL)
+
+    /* 移出客戶授信餘額每日統計檔 */
+             OVRDBF     FILE(CRACCU)   TOFILE(DALIB/CRACCU)
+             OVRDBF     FILE(CRACCUBK) TOFILE(BKLIB/&CR_BKFN)
+             OVRDBF     FILE(ARP052F)  TOFILE(ARLIB/ARP052F)
+             CALL       ARP052R4
+             DLTOVR     FILE(*ALL)
+
+             RETURN
+             ENDPGM
+

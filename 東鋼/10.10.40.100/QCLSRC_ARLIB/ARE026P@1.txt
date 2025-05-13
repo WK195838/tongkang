@@ -1,0 +1,86 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARE026P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     業務員基本資料輸入與查詢               */
+     /*     5.DATE-WRITTEN  86/12/12                                */
+     /*                                                             */
+     /*    <說明>: 本作業當業務員資料新增或修改完畢，會詢問是否 */
+     /*            傳輸至各廠，以維持全公司一致的資料。       */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)     TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&USER)    TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&IN03)    TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&FLAG1)   TYPE(*CHAR)  LEN(3) VALUE('XXX')
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+
+             IF         COND(&INT *EQ '1') THEN(DO)  /* 輸入日期 */
+                CALL       PGM(ARLIB/ARE026R)
+
+                CALL       PGM(ARLIB/ARE026RS) PARM(&IN03)
+                IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+                SBMJOB     JOB(ARE026P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                           RQSDTA('CALL ARE026P')
+                RETURN
+             ENDDO
+
+ BATCH:
+
+                   /*  建立　DDMF   */
+             DLTF       FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMT)
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMH)
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMK)
+
+ TY:    /*桃園廠*/
+             CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(DDLIB/ARSAID) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(DDLIB/ARSAID) TOFILE(QTEMP/DDMT) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO ML)
+             CHGVAR     VAR(%SST(&FLAG1 1 1)) VALUE(' ')
+
+ ML:    /*苗栗廠*/
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(DDLIB/ARSAID) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(DDLIB/ARSAID) TOFILE(QTEMP/DDMH) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO KS)
+             CHGVAR     VAR(%SST(&FLAG1 2 1)) VALUE(' ')
+
+ KS:    /*高雄廠*/
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(DDLIB/ARSAID) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(DDLIB/ARSAID) TOFILE(QTEMP/DDMK) +
+                          MBROPT(*REPLACE) FMTOPT(*MAP *DROP)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO ENDCLPGM)
+             CHGVAR     VAR(%SST(&FLAG1 3 1)) VALUE(' ')
+
+
+ ENDCLPGM:
+             IF         COND(&FLAG1 *NE '   ') THEN(+
+                        SNDMSG     TOUSR(&USER) MSG(+
+                        '業務員基本資料傳輸失敗"' || &FLAG1 || '"'))
+             ELSE       CMD(+
+                        SNDMSG     TOUSR(&USER) MSG(+
+                        '業務員基本資料傳輸成功'))
+
+             RETURN
+             ENDPGM
+

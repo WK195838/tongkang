@@ -1,0 +1,3852 @@
+     A*****************************************************************
+     A*
+     A*            *****   PROGRAM INTRODUCTION   *****
+     A*
+     A*            1.PROGRAM-ID    ARE105R
+     A*            2.PROGRAM-TYPE  RPG
+     A*            3.AUTHOR        S00WCJ
+     A*            4.FUNCTION     年度發票號碼維護作業
+     A*            5.DATE-WRITTEN  107/02/27 2017AR1112
+     A*            6.UPDATE  DATE  107/06/26 2018AR1162 S00WCJ (0706A)
+     A*                            電子發票介面檔增加處理代號
+     A*                            107/08/07 2018AR1163 S00WCJ (0708A)
+     A*                             增加寫入電子發票配號檔
+     A*                            107/12/20 2018AR00039 S00WCJ (0712A)
+     A*                             此程式由台北財會維護，其他人只可
+     A*                             查詢，程式維護完後，直接傳輸廠區
+     A*
+     A*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARE105S CF  E                    WORKSTN
+     FINESEQ  UF  E           K        DISK                      A
+     FGENSEQ  IF  E           K        DISK
+     FINENRB  UF  E           K        DISK                      A
+     FINENRBG O   E           K        DISK
+     F            RINENRB                           KRENAMEINENRG
+0708AFINEENB  UF  E           K        DISK                      A
+0708AFINEENBG O   E           K        DISK
+0708AF            RINEENB                           KRENAMEINEENG
+     E*************************************************************
+     E                    HD      1   3 10
+     E                    ERR     1  22 70
+     I*************************************************************
+     IAADS        DS
+     I                                        1   6 YYMM
+     I                                        1   40S#YY
+     I                                        5   60MM
+     I                                       11  20 GRP
+     I                                       11  11 GE1
+     I                                       12  17 GE2
+     I                                       18  20 GE3
+     I            DS
+     I                                        1   80U#SYSD
+     I                                        1   40D#UYY
+     I            DS
+     I                                        1   5 SQYYMM
+     I                                        1   30D#SQYY
+     I                                        4   5 D#SQMM
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10011010 D#USER
+0712AI                                     10011001 D#USE1
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C**************************************************************
+     C*
+     C           GEKEY     KLIST
+     C                     KFLD           GEKIND
+     C                     KFLD           GEPRIN
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           S#YY
+     C                     KFLD           SQYYMM
+     C                     KFLD           SQFACT
+     C*
+     C           KEY02     KLIST
+     C                     KFLD           SQYYMM
+     C                     KFLD           SQFACT
+     C**************************************************************
+     C           *DATE     SUB  19000000  U#SYSD  80
+     C                     Z-ADD1         MM
+     C                     Z-ADD0         S#YY
+0712AC                     SELEC
+0712AC           D#USE1    WHEQ 'F'
+0712AC           D#USE1    OREQ 'S'
+0712AC           D#USER    OREQ 'H173'
+0712AC                     MOVEL*ON       *IN95
+0712AC                     OTHER
+0712AC                     MOVEL*OFF      *IN95            僅有查詢權限
+0712AC                     ENDSL
+     C  N90                MOVE '1'       SCRN    1
+     C  N90                MOVE '1'       *IN,90
+     C**************************************************************
+     C           *IN03     DOUEQ'1'
+     C           SCRN      CASEQ'1'       SR#01
+     C           SCRN      CASEQ'2'       SR#02
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     CSR         SR#01     BEGSR
+     C                     EXFMTTITLE
+     C   KC                EXSR KC#01
+     C                     EXSR CK#01
+     C  N99                MOVE '2'       SCRN
+     C  N99                EXSR PR#02
+     C   99                MOVE '1'       SCRN
+     CSR         SR#01Z    ENDSR
+     C******
+     CSR         SR#02     BEGSR
+     C                     EXFMTDETAIL
+     C   KC                EXSR KC#01
+     C   KL                MOVE '1'       SCRN
+     C   KL                GOTO SR#02Z
+     C   KJ                EXSR KJ#02
+     C   KJ                GOTO SR#02Z
+     C           CODE      IFEQ '1'
+     C           CODE      OREQ '2'
+     C                     EXSR CK#02
+     C                     ELSE
+     C           CODE      IFEQ '4'
+     C                     MOVE '1'       SCRN
+     C                     ENDIF
+     C                     ENDIF
+     CSR         SR#02Z    ENDSR
+     C*****
+     CSR         KC#01     BEGSR
+     C                     SETON                     LR
+0712AC           TXAR      IFEQ 'P'
+0712AC           *IN95     ANDEQ*ON
+0712AC*                    CALL 'ARP145P@'
+0712AC*                    CALL 'ARP142P@'
+0712AC                     ENDIF
+     C                     RETRN
+     CSR                   ENDSR
+     C****
+     CSR         KJ#02     BEGSR
+     C           CODE      IFEQ '1'
+     C           CODE      OREQ '2'
+     C                     EXSR CK#02
+     C                     ENDIF
+     C  N99                EXSR FL#02
+     C  N99                MOVE '1'       SCRN
+     CSR         KJ#02Z    ENDSR
+     C****
+     CSR         CK#01     BEGSR
+     C                     SETOF                     414299
+     C                     MOVEA'00000000'*IN,70
+     C                     MOVEA'0000'    *IN,78
+     C                     Z-ADD0         STNO2P  80
+     C                     Z-ADD0         STNO3P  80
+     C                     Z-ADD0         CUNO2P  80
+     C                     Z-ADD0         CUNO3P  80
+     C                     Z-ADD0         STNO2M  80
+     C                     Z-ADD0         STNO3M  80
+     C                     Z-ADD0         CUNO2M  80
+     C                     Z-ADD0         CUNO3M  80
+     C                     MOVEL*BLANKS   ERRMSG
+     C                     MOVEL*BLANK    W#CK02
+     C                     SELEC
+     C           CODE      WHEQ ' '
+     C                     SETON                     4199
+     C                     MOVE ERR,1     ERRMSG
+     C           CODE      WHEQ '1'
+     C                     MOVE '新增'  MOD
+     C                     MOVE '0'       *IN70
+     C           CODE      WHEQ '2'
+     C                     MOVE '更正'  MOD
+     C                     MOVE '0'       *IN70
+     C           CODE      WHEQ '3'
+     C                     MOVE '刪除'  MOD
+     C                     MOVE '1'       *IN70
+     C           CODE      WHEQ '4'
+     C                     MOVE '查詢'  MOD
+     C                     MOVE '1'       *IN70
+     C                     OTHER
+     C                     SETON                     4199
+     C                     MOVE ERR,2     ERRMSG
+     C                     ENDSL
+     C******
+0712AC           *IN95     IFNE *ON
+0712AC           CODE      ANDNE'4'
+0712AC                     MOVE ERR,22    ERRMSG
+0712AC                     SETON                     4199
+0712AC                     GOTO CK#01Z
+0712AC                     ENDIF
+0712AC*
+     C           S#YY      IFEQ *ZERO
+     C                     SETON                     4299
+     C                     MOVE ERR,3     ERRMSG
+     C                     ENDIF
+     C**
+     C           *IN99     IFEQ *OFF
+     C           D#UYY     ADD  1         W#SYY   40
+     C           CODE      IFEQ '1'
+     C           S#YY      IFLT D#UYY
+     C           S#YY      ORGT W#SYY
+     C                     SETON                     4299
+     C                     MOVELERR,4     ERRMSG
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C**
+     C           *IN99     IFEQ '0'
+     C*
+     C*檢核P主機之發票號碼是否已使用，已使用則不可刪除
+     C*
+     C                     Z-ADD1         MM
+     C                     EXSR CK#GEN
+     C*
+     C           *IN99     IFEQ *OFF
+     C           TXAR      ANDEQ'P'
+     C                     MOVEL'M'       GE1
+     C                     MOVELGRP       GEPRIN
+     C           GEKEY     CHAINGENSEQ              N96
+     C  N96                Z-ADDGESTNO    STNO2M
+     C  N96                Z-ADDGECUNO    CUNO2M
+     C                     MOVEL'02'      GEKIND
+     C           GEKEY     CHAINGENSEQ              N96
+     C  N96                Z-ADDGESTNO    STNO3M
+     C  N96                Z-ADDGECUNO    CUNO3M
+     C                     ENDIF
+     C*檢核其他廠發票號碼
+     C           *IN96     IFEQ *OFF
+     C           TXAR      ANDEQ'P'
+     C           CODE      ANDEQ'3'
+     C                     MOVEL'U'       GE1
+     C                     MOVEL'U'       W#FACT  1
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C*
+     C           S#YY      CHAININESEQ              N97
+     C                     SELEC
+     C           CODE      WHEQ '1'
+     C           *IN97     ANDEQ'0'
+     C                     SETON                     4299
+     C                     MOVE ERR,6     ERRMSG
+     C           CODE      WHEQ '3'
+     C           *IN96     ANDEQ'0'
+     C           STNO2P    IFLE CUNO2P
+     C           STNO3P    ORLE CUNO3P
+     C           STNO2M    ORLE CUNO2M
+     C           STNO3M    ORLE CUNO3M
+     C           W#ERR     OREQ '1'
+     C                     SETON                     4299
+     C                     MOVE ERR,16    ERRMSG
+     C                     ENDIF
+     C           CODE      WHNE '1'
+     C           *IN97     ANDEQ'1'
+     C                     SETON                     4299
+     C                     MOVE ERR,7     ERRMSG
+     C                     ENDSL
+     C                     ENDIF
+     CSR         CK#01Z    ENDSR
+     C******
+     C           CK#GEN    BEGSR
+     C******
+     C                     MOVEL*OFF      *IN96
+     C                     Z-ADD0         STNO2P  80
+     C                     Z-ADD0         STNO3P  80
+     C                     Z-ADD0         CUNO2P  80
+     C                     Z-ADD0         CUNO3P  80
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     Z-ADD1         MM
+     C           W#TYPE    WHEQ '04'
+     C                     Z-ADD3         MM
+     C           W#TYPE    WHEQ '06'
+     C                     Z-ADD5         MM
+     C           W#TYPE    WHEQ '08'
+     C                     Z-ADD7         MM
+     C           W#TYPE    WHEQ '10'
+     C                     Z-ADD9         MM
+     C           W#TYPE    WHEQ '12'
+     C                     Z-ADD11        MM
+     C                     ENDSL
+     C                     MOVEL'01'      GEKIND
+     C                     MOVEL*BLANK    GEPRIN
+     C                     MOVEL*BLANK    GRP
+     C           W#FACT    IFNE TXAR
+     C                     MOVELW#FACT    GE1
+     C                     ELSE
+     C                     MOVELTXAR      GE1
+     C                     ENDIF
+     C                     MOVE YYMM      GE2
+     C                     MOVELGRP       GEPRIN
+     C*
+     C*
+     C           GEKEY     CHAINGENSEQ              N96
+     C  N96                Z-ADDGESTNO    STNO2P
+     C  N96                Z-ADDGECUNO    CUNO2P
+     C                     MOVEL'02'      GEKIND
+     C           GEKEY     CHAINGENSEQ              N96
+     C  N96                Z-ADDGESTNO    STNO3P
+     C  N96                Z-ADDGECUNO    CUNO3P
+     C           *IN96     IFEQ '0'
+     C           STNO2P    IFLE CUNO2P
+     C           STNO3P    ORLE CUNO3P
+     C                     MOVELERR,17    ERRMSG
+     C                     MOVEL*ON       *IN99
+     C                     ENDIF
+     C                     ENDIF
+     C           *IN99     IFEQ *ON
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     515763
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525864
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535965
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546066
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556167
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566268
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     ENDIF
+     C*
+     CSR         CK#GEZ    ENDSR
+     C******
+     CSR         PR#02     BEGSR
+     C                     MOVEA'000'     *IN,30
+     C                     MOVEA'00000000'*IN,43
+     C                     MOVEA'0000'    *IN,51
+     C                     MOVEA'000000'  *IN,55
+     C                     MOVEA'000000'  *IN,61
+     C                     MOVEA'000000'  *IN,67
+     C                     MOVEA'00000000'*IN,73
+     C                     MOVEA'0000000' *IN,81
+     C                     MOVEA'00'      *IN,88
+     C*
+     C   95                MOVELERR,21    ERRMSG
+     C*
+     C                     MOVE *BLANK    PRE2
+     C                     MOVE *BLANK    PRE4
+     C                     MOVEL*BLANK    PRE6
+     C                     MOVEL*BLANK    PRE8
+     C                     MOVEL*BLANK    PRE10
+     C                     MOVEL*BLANK    PRE12
+     C                     MOVE *BLANK    H#PRE2
+     C                     MOVE *BLANK    H#PRE4
+     C                     MOVEL*BLANK    H#PRE6
+     C                     MOVEL*BLANK    H#PRE8
+     C                     MOVEL*BLANK    H#PREA
+     C                     MOVEL*BLANK    H#PREB
+     C*
+     C                     Z-ADD0         SNO2
+     C                     Z-ADD0         ENO2
+     C                     Z-ADD0         H#SNO2
+     C                     Z-ADD0         H#ENO2
+     C*P廠起訖
+     C                     Z-ADD0         S#PS12
+     C                     Z-ADD0         S#PS34
+     C                     Z-ADD0         S#PS56
+     C                     Z-ADD0         S#PS78
+     C                     Z-ADD0         S#PS9A
+     C                     Z-ADD0         S#PSBC
+     C                     Z-ADD0         S#PE12
+     C                     Z-ADD0         S#PE34
+     C                     Z-ADD0         S#PE56
+     C                     Z-ADD0         S#PE78
+     C                     Z-ADD0         S#PE9A
+     C                     Z-ADD0         S#PEBC
+     C*
+     C                     Z-ADD0         H#PS12
+     C                     Z-ADD0         H#PS34
+     C                     Z-ADD0         H#PS56
+     C                     Z-ADD0         H#PS78
+     C                     Z-ADD0         H#PS9A
+     C                     Z-ADD0         H#PSBC
+     C                     Z-ADD0         H#PE12
+     C                     Z-ADD0         H#PE34
+     C                     Z-ADD0         H#PE56
+     C                     Z-ADD0         H#PE78
+     C                     Z-ADD0         H#PE9A
+     C                     Z-ADD0         H#PEBC
+     C*U廠起訖
+     C                     Z-ADD0         S#US12
+     C                     Z-ADD0         S#US34
+     C                     Z-ADD0         S#US56
+     C                     Z-ADD0         S#US78
+     C                     Z-ADD0         S#US9A
+     C                     Z-ADD0         S#USBC
+     C                     Z-ADD0         S#UE12
+     C                     Z-ADD0         S#UE34
+     C                     Z-ADD0         S#UE56
+     C                     Z-ADD0         S#UE78
+     C                     Z-ADD0         S#UE9A
+     C                     Z-ADD0         S#UEBC
+     C*
+     C                     Z-ADD0         H#US12
+     C                     Z-ADD0         H#US34
+     C                     Z-ADD0         H#US56
+     C                     Z-ADD0         H#US78
+     C                     Z-ADD0         H#US9A
+     C                     Z-ADD0         H#USBC
+     C                     Z-ADD0         H#UE12
+     C                     Z-ADD0         H#UE34
+     C                     Z-ADD0         H#UE56
+     C                     Z-ADD0         H#UE78
+     C                     Z-ADD0         H#UE9A
+     C                     Z-ADD0         H#UEBC
+     C*M廠起訖
+     C                     Z-ADD0         S#MS12
+     C                     Z-ADD0         S#MS34
+     C                     Z-ADD0         S#MS56
+     C                     Z-ADD0         S#MS78
+     C                     Z-ADD0         S#MS9A
+     C                     Z-ADD0         S#MSBC
+     C                     Z-ADD0         S#ME12
+     C                     Z-ADD0         S#ME34
+     C                     Z-ADD0         S#ME56
+     C                     Z-ADD0         S#ME78
+     C                     Z-ADD0         S#ME9A
+     C                     Z-ADD0         S#MEBC
+     C*
+     C                     Z-ADD0         H#MS12
+     C                     Z-ADD0         H#MS34
+     C                     Z-ADD0         H#MS56
+     C                     Z-ADD0         H#MS78
+     C                     Z-ADD0         H#MS9A
+     C                     Z-ADD0         H#MSBC
+     C                     Z-ADD0         H#ME12
+     C                     Z-ADD0         H#ME34
+     C                     Z-ADD0         H#ME56
+     C                     Z-ADD0         H#ME78
+     C                     Z-ADD0         H#ME9A
+     C                     Z-ADD0         H#MEBC
+     C*H廠起訖
+     C                     Z-ADD0         S#HS12
+     C                     Z-ADD0         S#HS34
+     C                     Z-ADD0         S#HS56
+     C                     Z-ADD0         S#HS78
+     C                     Z-ADD0         S#HS9A
+     C                     Z-ADD0         S#HSBC
+     C                     Z-ADD0         S#HE12
+     C                     Z-ADD0         S#HE34
+     C                     Z-ADD0         S#HE56
+     C                     Z-ADD0         S#HE78
+     C                     Z-ADD0         S#HE9A
+     C                     Z-ADD0         S#HEBC
+     C*
+     C                     Z-ADD0         H#HS12
+     C                     Z-ADD0         H#HS34
+     C                     Z-ADD0         H#HS56
+     C                     Z-ADD0         H#HS78
+     C                     Z-ADD0         H#HS9A
+     C                     Z-ADD0         H#HSBC
+     C                     Z-ADD0         H#HE12
+     C                     Z-ADD0         H#HE34
+     C                     Z-ADD0         H#HE56
+     C                     Z-ADD0         H#HE78
+     C                     Z-ADD0         H#HE9A
+     C                     Z-ADD0         H#HEBC
+     C*K廠起訖
+     C                     Z-ADD0         S#KS12
+     C                     Z-ADD0         S#KS34
+     C                     Z-ADD0         S#KS56
+     C                     Z-ADD0         S#KS78
+     C                     Z-ADD0         S#KS9A
+     C                     Z-ADD0         S#KSBC
+     C                     Z-ADD0         S#KE12
+     C                     Z-ADD0         S#KE34
+     C                     Z-ADD0         S#KE56
+     C                     Z-ADD0         S#KE78
+     C                     Z-ADD0         S#KE9A
+     C                     Z-ADD0         S#KEBC
+     C*
+     C                     Z-ADD0         H#KS12
+     C                     Z-ADD0         H#KS34
+     C                     Z-ADD0         H#KS56
+     C                     Z-ADD0         H#KS78
+     C                     Z-ADD0         H#KS9A
+     C                     Z-ADD0         H#KSBC
+     C                     Z-ADD0         H#KE12
+     C                     Z-ADD0         H#KE34
+     C                     Z-ADD0         H#KE56
+     C                     Z-ADD0         H#KE78
+     C                     Z-ADD0         H#KE9A
+     C                     Z-ADD0         H#KEBC
+     C*
+     C           CODE      CASNE'1'       PR#OTH
+     C                     ENDCS
+     ***
+     CSR         PR#02Z    ENDSR
+     C******
+     C******
+     CSR         PR#OTH    BEGSR
+     C*
+     C                     MOVEL*OFF      *IN97
+     C           S#YY      SETLLINESEQ
+     C           *IN97     DOWEQ*OFF
+     C           S#YY      READEINESEQ              N    97
+     C   97                LEAVE
+     C                     SELEC
+     C           D#SQMM    WHEQ '02'
+     C                     MOVELSQINTK    PRE2
+     C                     MOVELSQINTK    H#PRE2
+     C           D#SQMM    WHEQ '04'
+     C                     MOVELSQINTK    PRE4
+     C                     MOVELSQINTK    H#PRE4
+     C           D#SQMM    WHEQ '06'
+     C                     MOVELSQINTK    PRE6
+     C                     MOVELSQINTK    H#PRE6
+     C           D#SQMM    WHEQ '08'
+     C                     MOVELSQINTK    PRE8
+     C                     MOVELSQINTK    H#PRE8
+     C           D#SQMM    WHEQ '10'
+     C                     MOVELSQINTK    PRE10
+     C                     MOVELSQINTK    H#PREA
+     C           D#SQMM    WHEQ '12'
+     C                     MOVELSQINTK    PRE12
+     C                     MOVELSQINTK    H#PREB
+     C                     ENDSL
+     C                     MOVELSQINBN    SNO2
+     C                     MOVELSQINEN    ENO2
+     C                     MOVELSQINBN    H#SNO2
+     C                     MOVELSQINEN    H#ENO2
+     C                     SELEC
+     C           SQFACT    WHEQ 'P'
+     C           D#SQMM    ANDEQ'02'
+     C                     MOVELSQINB1    S#PS12
+     C                     MOVELSQINE1    S#PE12
+     C                     MOVELSQINB1    H#PS12
+     C                     MOVELSQINE1    H#PE12
+     C           SQFACT    WHEQ 'P'
+     C           D#SQMM    ANDEQ'04'
+     C                     MOVELSQINB1    S#PS34
+     C                     MOVELSQINE1    S#PE34
+     C                     MOVELSQINB1    H#PS34
+     C                     MOVELSQINE1    H#PE34
+     C           SQFACT    WHEQ 'P'
+     C           D#SQMM    ANDEQ'06'
+     C                     MOVELSQINB1    S#PS56
+     C                     MOVELSQINE1    S#PE56
+     C                     MOVELSQINB1    H#PS56
+     C                     MOVELSQINE1    H#PE56
+     C           SQFACT    WHEQ 'P'
+     C           D#SQMM    ANDEQ'08'
+     C                     MOVELSQINB1    S#PS78
+     C                     MOVELSQINE1    S#PE78
+     C                     MOVELSQINB1    H#PS78
+     C                     MOVELSQINE1    H#PE78
+     C           SQFACT    WHEQ 'P'
+     C           D#SQMM    ANDEQ'10'
+     C                     MOVELSQINB1    S#PS9A
+     C                     MOVELSQINE1    S#PE9A
+     C                     MOVELSQINB1    H#PS9A
+     C                     MOVELSQINE1    H#PE9A
+     C           SQFACT    WHEQ 'P'
+     C           D#SQMM    ANDEQ'12'
+     C                     MOVELSQINB1    S#PSBC
+     C                     MOVELSQINE1    S#PEBC
+     C                     MOVELSQINB1    H#PSBC
+     C                     MOVELSQINE1    H#PEBC
+     C           SQFACT    WHEQ 'U'
+     C           D#SQMM    ANDEQ'02'
+     C                     MOVELSQINB1    S#US12
+     C                     MOVELSQINE1    S#UE12
+     C                     MOVELSQINB1    H#US12
+     C                     MOVELSQINE1    H#UE12
+     C           SQFACT    WHEQ 'U'
+     C           D#SQMM    ANDEQ'04'
+     C                     MOVELSQINB1    S#US34
+     C                     MOVELSQINE1    S#UE34
+     C                     MOVELSQINB1    H#US34
+     C                     MOVELSQINE1    H#UE34
+     C           SQFACT    WHEQ 'U'
+     C           D#SQMM    ANDEQ'06'
+     C                     MOVELSQINB1    S#US56
+     C                     MOVELSQINE1    S#UE56
+     C                     MOVELSQINB1    H#US56
+     C                     MOVELSQINE1    H#UE56
+     C           SQFACT    WHEQ 'U'
+     C           D#SQMM    ANDEQ'08'
+     C                     MOVELSQINB1    S#US78
+     C                     MOVELSQINE1    S#UE78
+     C                     MOVELSQINB1    H#US78
+     C                     MOVELSQINE1    H#UE78
+     C           SQFACT    WHEQ 'U'
+     C           D#SQMM    ANDEQ'10'
+     C                     MOVELSQINB1    S#US9A
+     C                     MOVELSQINE1    S#UE9A
+     C                     MOVELSQINB1    H#US9A
+     C                     MOVELSQINE1    H#UE9A
+     C           SQFACT    WHEQ 'U'
+     C           D#SQMM    ANDEQ'12'
+     C                     MOVELSQINB1    S#USBC
+     C                     MOVELSQINE1    S#UEBC
+     C                     MOVELSQINB1    H#USBC
+     C                     MOVELSQINE1    H#UEBC
+     C           SQFACT    WHEQ 'M'
+     C           D#SQMM    ANDEQ'02'
+     C                     MOVELSQINB1    S#MS12
+     C                     MOVELSQINE1    S#ME12
+     C                     MOVELSQINB1    H#MS12
+     C                     MOVELSQINE1    H#ME12
+     C           SQFACT    WHEQ 'M'
+     C           D#SQMM    ANDEQ'04'
+     C                     MOVELSQINB1    S#MS34
+     C                     MOVELSQINE1    S#ME34
+     C                     MOVELSQINB1    H#MS34
+     C                     MOVELSQINE1    H#ME34
+     C           SQFACT    WHEQ 'M'
+     C           D#SQMM    ANDEQ'06'
+     C                     MOVELSQINB1    S#MS56
+     C                     MOVELSQINE1    S#ME56
+     C                     MOVELSQINB1    H#MS56
+     C                     MOVELSQINE1    H#ME56
+     C           SQFACT    WHEQ 'M'
+     C           D#SQMM    ANDEQ'08'
+     C                     MOVELSQINB1    S#MS78
+     C                     MOVELSQINE1    S#ME78
+     C                     MOVELSQINB1    H#MS78
+     C                     MOVELSQINE1    H#ME78
+     C           SQFACT    WHEQ 'M'
+     C           D#SQMM    ANDEQ'10'
+     C                     MOVELSQINB1    S#MS9A
+     C                     MOVELSQINE1    S#ME9A
+     C                     MOVELSQINB1    H#MS9A
+     C                     MOVELSQINE1    H#ME9A
+     C           SQFACT    WHEQ 'M'
+     C           D#SQMM    ANDEQ'12'
+     C                     MOVELSQINB1    S#MSBC
+     C                     MOVELSQINE1    S#MEBC
+     C                     MOVELSQINB1    H#MSBC
+     C                     MOVELSQINE1    H#MEBC
+     C           SQFACT    WHEQ 'H'
+     C           D#SQMM    ANDEQ'02'
+     C                     MOVELSQINB1    S#HS12
+     C                     MOVELSQINE1    S#HE12
+     C                     MOVELSQINB1    H#HS12
+     C                     MOVELSQINE1    H#HE12
+     C           SQFACT    WHEQ 'H'
+     C           D#SQMM    ANDEQ'04'
+     C                     MOVELSQINB1    S#HS34
+     C                     MOVELSQINE1    S#HE34
+     C                     MOVELSQINB1    H#HS34
+     C                     MOVELSQINE1    H#HE34
+     C           SQFACT    WHEQ 'H'
+     C           D#SQMM    ANDEQ'06'
+     C                     MOVELSQINB1    S#HS56
+     C                     MOVELSQINE1    S#HE56
+     C                     MOVELSQINB1    H#HS56
+     C                     MOVELSQINE1    H#HE56
+     C           SQFACT    WHEQ 'H'
+     C           D#SQMM    ANDEQ'08'
+     C                     MOVELSQINB1    S#HS78
+     C                     MOVELSQINE1    S#HE78
+     C                     MOVELSQINB1    H#HS78
+     C                     MOVELSQINE1    H#HE78
+     C           SQFACT    WHEQ 'H'
+     C           D#SQMM    ANDEQ'10'
+     C                     MOVELSQINB1    S#HS9A
+     C                     MOVELSQINE1    S#HE9A
+     C                     MOVELSQINB1    H#HS9A
+     C                     MOVELSQINE1    H#HE9A
+     C           SQFACT    WHEQ 'H'
+     C           D#SQMM    ANDEQ'12'
+     C                     MOVELSQINB1    S#HSBC
+     C                     MOVELSQINE1    S#HEBC
+     C                     MOVELSQINB1    H#HSBC
+     C                     MOVELSQINE1    H#HEBC
+     C           SQFACT    WHEQ 'K'
+     C           D#SQMM    ANDEQ'02'
+     C                     MOVELSQINB1    S#KS12
+     C                     MOVELSQINE1    S#KE12
+     C                     MOVELSQINB1    H#KS12
+     C                     MOVELSQINE1    H#KE12
+     C           SQFACT    WHEQ 'K'
+     C           D#SQMM    ANDEQ'04'
+     C                     MOVELSQINB1    S#KS34
+     C                     MOVELSQINE1    S#KE34
+     C                     MOVELSQINB1    H#KS34
+     C                     MOVELSQINE1    H#KE34
+     C           SQFACT    WHEQ 'K'
+     C           D#SQMM    ANDEQ'06'
+     C                     MOVELSQINB1    S#KS56
+     C                     MOVELSQINE1    S#KE56
+     C                     MOVELSQINB1    H#KS56
+     C                     MOVELSQINE1    H#KE56
+     C           SQFACT    WHEQ 'K'
+     C           D#SQMM    ANDEQ'08'
+     C                     MOVELSQINB1    S#KS78
+     C                     MOVELSQINE1    S#KE78
+     C                     MOVELSQINB1    H#KS78
+     C                     MOVELSQINE1    H#KE78
+     C           SQFACT    WHEQ 'K'
+     C           D#SQMM    ANDEQ'10'
+     C                     MOVELSQINB1    S#KS9A
+     C                     MOVELSQINE1    S#KE9A
+     C                     MOVELSQINB1    H#KS9A
+     C                     MOVELSQINE1    H#KE9A
+     C           SQFACT    WHEQ 'K'
+     C           D#SQMM    ANDEQ'12'
+     C                     MOVELSQINB1    S#KSBC
+     C                     MOVELSQINE1    S#KEBC
+     C                     MOVELSQINB1    H#KSBC
+     C                     MOVELSQINE1    H#KEBC
+     C                     ENDSL
+     C*
+     C                     ENDDO
+     C***
+     CSR         PR#OTZ    ENDSR
+     C******
+     CSR         CK#02     BEGSR
+     C******
+     C                     SETOF                     99
+     C                     MOVE *BLANK    ERRMSG
+     C***
+     C                     MOVEA'0000'    *IN,30
+     C                     MOVEA'00000000'*IN,43
+     C                     MOVEA'0000'    *IN,51
+     C                     MOVEA'000000'  *IN,55
+     C                     MOVEA'000000'  *IN,61
+     C                     MOVEA'000000'  *IN,67
+     C                     MOVEA'00000000'*IN,73
+     C                     MOVEA'0000000' *IN,81
+     C                     MOVEA'00'      *IN,88
+     C*
+     C                     MOVEL'Y'       W#CK02  1
+     C                     Z-ADDS#YY      D#SQYY
+     C***
+     C           PRE2      IFEQ *BLANK
+     C                     SETON                     9943
+     C                     MOVELERR,8     ERRMSG
+     C                     ENDIF
+     C*****
+     C           PRE4      IFEQ *BLANK
+     C                     SETON                     9944
+     C                     MOVELERR,8     ERRMSG
+     C                     ENDIF
+     C*****
+     C           PRE6      IFEQ *BLANK
+     C                     SETON                     9945
+     C                     MOVELERR,8     ERRMSG
+     C                     ENDIF
+     C*
+     C           PRE8      IFEQ *BLANK
+     C                     SETON                     9946
+     C                     MOVELERR,8     ERRMSG
+     C                     ENDIF
+     C*
+     C           PRE10     IFEQ *BLANK
+     C                     SETON                     9947
+     C                     MOVELERR,8     ERRMSG
+     C                     ENDIF
+     C*
+     C           PRE12     IFEQ *BLANK
+     C                     SETON                     9948
+     C                     MOVELERR,8     ERRMSG
+     C                     ENDIF
+     C*
+     C   99                GOTO CK#02Z
+     C                     SELEC
+     C           PRE2      WHEQ PRE4
+     C                     SETON                     994344
+     C                     MOVELERR,14    ERRMSG
+     C           PRE2      WHEQ PRE6
+     C                     SETON                     994345
+     C                     MOVELERR,14    ERRMSG
+     C           PRE2      WHEQ PRE8
+     C                     SETON                     994346
+     C                     MOVELERR,14    ERRMSG
+     C           PRE2      WHEQ PRE10
+     C                     SETON                     994347
+     C                     MOVELERR,14    ERRMSG
+     C           PRE2      WHEQ PRE12
+     C                     SETON                     994348
+     C                     MOVELERR,14    ERRMSG
+     C           PRE4      WHEQ PRE6
+     C                     SETON                     994445
+     C                     MOVELERR,14    ERRMSG
+     C           PRE4      WHEQ PRE8
+     C                     SETON                     994446
+     C                     MOVELERR,14    ERRMSG
+     C           PRE4      WHEQ PRE10
+     C                     SETON                     994447
+     C                     MOVELERR,14    ERRMSG
+     C           PRE4      WHEQ PRE12
+     C                     SETON                     994448
+     C                     MOVELERR,14    ERRMSG
+     C           PRE6      WHEQ PRE8
+     C                     SETON                     994546
+     C                     MOVELERR,14    ERRMSG
+     C           PRE6      WHEQ PRE10
+     C                     SETON                     994547
+     C                     MOVELERR,14    ERRMSG
+     C           PRE6      WHEQ PRE12
+     C                     SETON                     994548
+     C                     MOVELERR,14    ERRMSG
+     C           PRE8      WHEQ PRE10
+     C                     SETON                     994647
+     C                     MOVELERR,14    ERRMSG
+     C           PRE8      WHEQ PRE12
+     C                     SETON                     994648
+     C                     MOVELERR,14    ERRMSG
+     C           PRE10     WHEQ PRE12
+     C                     SETON                     994748
+     C                     MOVELERR,14    ERRMSG
+     C                     ENDSL
+     C*
+     C  N99      SNO2      IFEQ 0
+     C                     SETON                     9949
+     C                     MOVELERR,9     ERRMSG
+     C                     ENDIF
+     C*****
+     C  N99      ENO2      IFEQ 0
+     C                     SETON                     9933
+     C                     MOVELERR,9     ERRMSG
+     C                     ENDIF
+     C*
+     C*****
+     C  N99      SNO2      IFGT ENO2
+     C                     SETON                     994933
+     C                     MOVELERR,10    ERRMSG
+     C                     ENDIF
+     C*****
+     C*-----------------------------
+     C*檢核碼確認
+     C*-----------------------------
+     C  N99      S#CKS2    IFNE SNO2
+     C           H#SNO2    ANDNESNO2
+     C           *IN71     ANDEQ'0'
+     C                     MOVELERR,19    ERRMSG
+     C                     SETON                     9949
+     C                     GOTO CK#02Z
+     C                     ENDIF
+     C  N99      S#CKE2    IFNE ENO2
+     C           H#ENO2    ANDNEENO2
+     C           *IN71     ANDEQ'0'
+     C                     MOVELERR,20    ERRMSG
+     C                     SETON                     9933
+     C                     GOTO CK#02Z
+     C                     ENDIF
+     C*
+     C  N99      S#PS12    IFEQ 0
+     C           S#PE12    ANDEQ0
+     C           S#US12    ANDEQ0
+     C           S#UE12    ANDEQ0
+     C           S#MS12    ANDEQ0
+     C           S#ME12    ANDEQ0
+     C           S#HS12    ANDEQ0
+     C           S#HE12    ANDEQ0
+     C           S#KS12    ANDEQ0
+     C           S#KE12    ANDEQ0
+     C                     MOVELERR,5     ERRMSG
+     C                     SETON                     515763
+     C                     SETON                     698799
+     C                     GOTO CK#02Z
+     C                     ENDIF
+     C*
+     C*02期廠區配號檢核
+     C*
+     C                     MOVEL'02'      D#SQMM
+     C                     MOVEL'02'      W#TYPE  2
+     C  N99      H#PRE2    IFNE PRE2
+     C           H#SNO2    ORNE SNO2
+     C           H#ENO2    ORNE ENO2
+     C           H#PS12    ORNE S#PS12
+     C           H#PE12    ORNE S#PE12
+     C           H#US12    ORNE S#US12
+     C           H#UE12    ORNE S#UE12
+     C           H#MS12    ORNE S#MS12
+     C           H#ME12    ORNE S#ME12
+     C           H#HS12    ORNE S#HS12
+     C           H#HE12    ORNE S#HE12
+     C           H#KS12    ORNE S#KS12
+     C           H#KE12    ORNE S#KE12
+     C                     EXSR CK#NR
+     C  N99                EXSR CK#GEN
+     C                     MOVEL'M'       W#FACT
+     C  N99                EXSR CK#GEN
+     C           *IN99     IFEQ *OFF
+     C           TXAR      ANDEQ'P'
+     C                     MOVEL'U'       GE1
+     C                     MOVEL'U'       W#FACT  1
+     C                     Z-ADD1         MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      TXAR      IFEQ 'P'
+     C           H#HS12    IFNE S#HS12
+     C           H#HE12    ORNE S#HE12
+     C           H#PRE2    ORNE PRE2
+     C                     MOVEL'H'       GE1
+     C                     MOVEL'H'       W#FACT  1
+     C                     Z-ADD1         MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      TXAR      IFEQ 'P'
+     C           H#KS12    IFNE S#KS12
+     C           H#KE12    ORNE S#KE12
+     C           H#PRE2    ORNE PRE2
+     C                     MOVEL'K'       GE1
+     C                     MOVEL'K'       W#FACT  1
+     C                     Z-ADD1         MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     Z-ADD1         W#CONT  10
+     C           W#CONT    DOWLE5
+     C                     SELEC
+     C           W#CONT    WHEQ 1
+     C           S#PS12    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#PE12    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'P'       W#FACT  1
+     C           W#CONT    WHEQ 2
+     C           S#US12    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#UE12    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'U'       W#FACT
+     C           W#CONT    WHEQ 3
+     C           S#MS12    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#ME12    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'M'       W#FACT
+     C           W#CONT    WHEQ 4
+     C           S#HS12    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#HE12    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'H'       W#FACT
+     C           W#CONT    WHEQ 5
+     C           S#KS12    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#KE12    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'K'       W#FACT
+     C                     ENDSL
+     C                     Z-ADDS#PS12    W#PS12  80
+     C                     Z-ADDS#PE12    W#PE12  80
+     C                     Z-ADDS#US12    W#US12  80
+     C                     Z-ADDS#UE12    W#UE12  80
+     C                     Z-ADDS#MS12    W#MS12  80
+     C                     Z-ADDS#ME12    W#ME12  80
+     C                     Z-ADDS#HS12    W#HS12  80
+     C                     Z-ADDS#HE12    W#HE12  80
+     C                     Z-ADDS#KS12    W#KS12  80
+     C                     Z-ADDS#KE12    W#KE12  80
+     C                     EXSR CK#02W
+     C                     ADD  1         W#CONT
+     C                     ENDDO
+     C*
+     C*04期號碼預設
+     C*
+     C           *IN99     IFEQ *OFF
+     C*P
+     C           S#PS34    IFEQ 0
+     C           S#PE34    ANDEQ0
+     C                     Z-ADDS#PS12    S#PS34
+     C                     Z-ADDS#PE12    S#PE34
+     C                     ENDIF
+     C*U
+     C           S#US34    IFEQ 0
+     C           S#UE34    ANDEQ0
+     C                     Z-ADDS#US12    S#US34
+     C                     Z-ADDS#UE12    S#UE34
+     C                     ENDIF
+     C*M
+     C           S#MS34    IFEQ 0
+     C           S#ME34    ANDEQ0
+     C                     Z-ADDS#MS12    S#MS34
+     C                     Z-ADDS#ME12    S#ME34
+     C                     ENDIF
+     C*H
+     C           S#HS34    IFEQ 0
+     C           S#HE34    ANDEQ0
+     C                     Z-ADDS#HS12    S#HS34
+     C                     Z-ADDS#HE12    S#HE34
+     C                     ENDIF
+     C*K
+     C           S#KS34    IFEQ 0
+     C           S#KE34    ANDEQ0
+     C                     Z-ADDS#KS12    S#KS34
+     C                     Z-ADDS#KE12    S#KE34
+     C                     ENDIF
+     C*04期廠區配號檢核
+     C*
+     C                     MOVEL'04'      D#SQMM
+     C                     MOVEL'04'      W#TYPE  2
+     C           H#PRE4    IFNE PRE4
+     C           H#SNO2    ORNE SNO2
+     C           H#ENO2    ORNE ENO2
+     C           H#PS34    ORNE S#PS34
+     C           H#PE34    ORNE S#PE34
+     C           H#US34    ORNE S#US34
+     C           H#UE34    ORNE S#UE34
+     C           H#MS34    ORNE S#MS34
+     C           H#ME34    ORNE S#ME34
+     C           H#HS34    ORNE S#HS34
+     C           H#HE34    ORNE S#HE34
+     C           H#KS34    ORNE S#KS34
+     C           H#KE34    ORNE S#KE34
+     C                     EXSR CK#NR
+     C  N99                EXSR CK#GEN
+     C                     MOVEL'M'       W#FACT
+     C  N99                EXSR CK#GEN
+     C           *IN99     IFEQ *OFF
+     C           TXAR      ANDEQ'P'
+     C                     MOVEL'U'       GE1
+     C                     MOVEL'U'       W#FACT  1
+     C                     Z-ADD3         MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      TXAR      IFEQ 'P'
+     C           H#HS34    IFNE S#HS34
+     C           H#HE34    ORNE S#HE34
+     C           H#PRE4    ORNE PRE4
+     C                     MOVEL'H'       GE1
+     C                     MOVEL'H'       W#FACT  1
+     C                     Z-ADD3         MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      TXAR      IFEQ 'P'
+     C           H#KS34    IFNE S#KS34
+     C           H#KE34    ORNE S#KE34
+     C           H#PRE4    ORNE PRE4
+     C           TXAR      ANDEQ'P'
+     C                     MOVEL'K'       GE1
+     C                     MOVEL'K'       W#FACT  1
+     C                     Z-ADD3         MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     Z-ADD1         W#CONT  10
+     C           W#CONT    DOWLE5
+     C                     SELEC
+     C           W#CONT    WHEQ 1
+     C           S#PS34    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#PE34    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'P'       W#FACT  1
+     C           W#CONT    WHEQ 2
+     C           S#US34    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#UE34    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'U'       W#FACT
+     C           W#CONT    WHEQ 3
+     C           S#MS34    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#ME34    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'M'       W#FACT
+     C           W#CONT    WHEQ 4
+     C           S#HS34    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#HE34    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'H'       W#FACT
+     C           W#CONT    WHEQ 5
+     C           S#KS34    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#KE34    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'K'       W#FACT
+     C                     ENDSL
+     C                     Z-ADDS#PS34    W#PS12  80
+     C                     Z-ADDS#PE34    W#PE12  80
+     C                     Z-ADDS#US34    W#US12  80
+     C                     Z-ADDS#UE34    W#UE12  80
+     C                     Z-ADDS#MS34    W#MS12  80
+     C                     Z-ADDS#ME34    W#ME12  80
+     C                     Z-ADDS#HS34    W#HS12  80
+     C                     Z-ADDS#HE34    W#HE12  80
+     C                     Z-ADDS#KS34    W#KS12  80
+     C                     Z-ADDS#KE34    W#KE12  80
+     C                     EXSR CK#02W
+     C                     ADD  1         W#CONT
+     C                     ENDDO
+     C                     ENDIF
+     C*
+     C*06期號碼預設
+     C*
+     C           *IN99     IFEQ *OFF
+     C*P
+     C           S#PS56    IFEQ 0
+     C           S#PE56    ANDEQ0
+     C                     Z-ADDS#PS34    S#PS56
+     C                     Z-ADDS#PE34    S#PE56
+     C                     ENDIF
+     C*U
+     C           S#US56    IFEQ 0
+     C           S#UE56    ANDEQ0
+     C                     Z-ADDS#US34    S#US56
+     C                     Z-ADDS#UE34    S#UE56
+     C                     ENDIF
+     C*M
+     C           S#MS56    IFEQ 0
+     C           S#ME56    ANDEQ0
+     C                     Z-ADDS#MS34    S#MS56
+     C                     Z-ADDS#ME34    S#ME56
+     C                     ENDIF
+     C*H
+     C           S#HS56    IFEQ 0
+     C           S#HE56    ANDEQ0
+     C                     Z-ADDS#HS34    S#HS56
+     C                     Z-ADDS#HE34    S#HE56
+     C                     ENDIF
+     C*K
+     C           S#KS56    IFEQ 0
+     C           S#KE56    ANDEQ0
+     C                     Z-ADDS#KS34    S#KS56
+     C                     Z-ADDS#KE34    S#KE56
+     C                     ENDIF
+     C*06期廠區配號檢核
+     C*
+     C                     MOVEL'06'      D#SQMM
+     C                     MOVEL'06'      W#TYPE  2
+     C           H#PRE6    IFNE PRE6
+     C           H#SNO2    ORNE SNO2
+     C           H#ENO2    ORNE ENO2
+     C           H#PS56    ORNE S#PS56
+     C           H#PE56    ORNE S#PE56
+     C           H#US56    ORNE S#US56
+     C           H#UE56    ORNE S#UE56
+     C           H#MS56    ORNE S#MS56
+     C           H#ME56    ORNE S#ME56
+     C           H#HS56    ORNE S#HS56
+     C           H#HE56    ORNE S#HE56
+     C           H#KS56    ORNE S#KS56
+     C           H#KE56    ORNE S#KE56
+     C                     EXSR CK#NR
+     C  N99                EXSR CK#GEN
+     C                     MOVEL'M'       W#FACT
+     C  N99                EXSR CK#GEN
+     C           *IN99     IFEQ *OFF
+     C           TXAR      ANDEQ'P'
+     C                     MOVEL'U'       GE1
+     C                     MOVEL'U'       W#FACT  1
+     C                     Z-ADD5         MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      TXAR      IFEQ 'P'
+     C           H#HS56    IFNE S#HS56
+     C           H#HE56    ORNE S#HE56
+     C           H#PRE6    ORNE PRE6
+     C                     MOVEL'H'       GE1
+     C                     MOVEL'H'       W#FACT  1
+     C                     Z-ADD5         MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      TXAR      IFEQ 'P'
+     C           H#KS56    IFNE S#KS56
+     C           H#KE56    ORNE S#KE56
+     C           H#PRE6    ORNE PRE6
+     C                     MOVEL'K'       GE1
+     C                     MOVEL'K'       W#FACT  1
+     C                     Z-ADD5         MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     Z-ADD1         W#CONT  10
+     C           W#CONT    DOWLE5
+     C                     SELEC
+     C           W#CONT    WHEQ 1
+     C           S#PS56    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#PE56    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'P'       W#FACT  1
+     C           W#CONT    WHEQ 2
+     C           S#US56    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#UE56    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'U'       W#FACT
+     C           W#CONT    WHEQ 3
+     C           S#MS56    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#ME56    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'M'       W#FACT
+     C           W#CONT    WHEQ 4
+     C           S#HS56    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#HE56    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'H'       W#FACT
+     C           W#CONT    WHEQ 5
+     C           S#KS56    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#KE56    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'K'       W#FACT
+     C                     ENDSL
+     C                     Z-ADDS#PS56    W#PS12  80
+     C                     Z-ADDS#PE56    W#PE12  80
+     C                     Z-ADDS#US56    W#US12  80
+     C                     Z-ADDS#UE56    W#UE12  80
+     C                     Z-ADDS#MS56    W#MS12  80
+     C                     Z-ADDS#ME56    W#ME12  80
+     C                     Z-ADDS#HS56    W#HS12  80
+     C                     Z-ADDS#HE56    W#HE12  80
+     C                     Z-ADDS#KS56    W#KS12  80
+     C                     Z-ADDS#KE56    W#KE12  80
+     C                     EXSR CK#02W
+     C                     ADD  1         W#CONT
+     C                     ENDDO
+     C                     ENDIF
+     C*
+     C*08期號碼預設
+     C*
+     C           *IN99     IFEQ *OFF
+     C*P
+     C           S#PS78    IFEQ 0
+     C           S#PE78    ANDEQ0
+     C                     Z-ADDS#PS56    S#PS78
+     C                     Z-ADDS#PE56    S#PE78
+     C                     ENDIF
+     C*U
+     C           S#US78    IFEQ 0
+     C           S#UE78    ANDEQ0
+     C                     Z-ADDS#US56    S#US78
+     C                     Z-ADDS#UE56    S#UE78
+     C                     ENDIF
+     C*M
+     C           S#MS78    IFEQ 0
+     C           S#ME78    ANDEQ0
+     C                     Z-ADDS#MS56    S#MS78
+     C                     Z-ADDS#ME56    S#ME78
+     C                     ENDIF
+     C*H
+     C           S#HS78    IFEQ 0
+     C           S#HE78    ANDEQ0
+     C                     Z-ADDS#HS56    S#HS78
+     C                     Z-ADDS#HE56    S#HE78
+     C                     ENDIF
+     C*K
+     C           S#KS78    IFEQ 0
+     C           S#KE78    ANDEQ0
+     C                     Z-ADDS#KS56    S#KS78
+     C                     Z-ADDS#KE56    S#KE78
+     C                     ENDIF
+     C*
+     C*08期廠區配號檢核
+     C*
+     C                     MOVEL'08'      D#SQMM
+     C                     MOVEL'08'      W#TYPE  2
+     C           H#PRE8    IFNE PRE8
+     C           H#SNO2    ORNE SNO2
+     C           H#ENO2    ORNE ENO2
+     C           H#PS78    ORNE S#PS78
+     C           H#PE78    ORNE S#PE78
+     C           H#US78    ORNE S#US78
+     C           H#UE78    ORNE S#UE78
+     C           H#MS78    ORNE S#MS78
+     C           H#ME78    ORNE S#ME78
+     C           H#HS78    ORNE S#HS78
+     C           H#HE78    ORNE S#HE78
+     C           H#KS78    ORNE S#KS78
+     C           H#KE78    ORNE S#KE78
+     C                     EXSR CK#NR
+     C  N99                EXSR CK#GEN
+     C                     MOVEL'M'       W#FACT
+     C  N99                EXSR CK#GEN
+     C           *IN99     IFEQ *OFF
+     C           TXAR      ANDEQ'P'
+     C                     MOVEL'U'       GE1
+     C                     MOVEL'U'       W#FACT  1
+     C                     Z-ADD7         MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      TXAR      IFEQ 'P'
+     C           H#HS78    IFNE S#HS78
+     C           H#HE78    ORNE S#HE78
+     C           H#PRE8    ORNE PRE8
+     C                     MOVEL'H'       GE1
+     C                     MOVEL'H'       W#FACT  1
+     C                     Z-ADD7         MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      TXAR      IFEQ 'P'
+     C           H#KS78    IFNE S#KS78
+     C           H#KE78    ORNE S#KE78
+     C           H#PRE8    ORNE PRE8
+     C                     MOVEL'K'       GE1
+     C                     MOVEL'K'       W#FACT  1
+     C                     Z-ADD7         MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     Z-ADD1         W#CONT  10
+     C           W#CONT    DOWLE5
+     C                     SELEC
+     C           W#CONT    WHEQ 1
+     C           S#PS78    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#PE78    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'P'       W#FACT  1
+     C           W#CONT    WHEQ 2
+     C           S#US78    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#UE78    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'U'       W#FACT
+     C           W#CONT    WHEQ 3
+     C           S#MS78    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#ME78    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'M'       W#FACT
+     C           W#CONT    WHEQ 4
+     C           S#HS78    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#HE78    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'H'       W#FACT
+     C           W#CONT    WHEQ 5
+     C           S#KS78    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#KE78    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'K'       W#FACT
+     C                     ENDSL
+     C                     Z-ADDS#PS78    W#PS12  80
+     C                     Z-ADDS#PE78    W#PE12  80
+     C                     Z-ADDS#US78    W#US12  80
+     C                     Z-ADDS#UE78    W#UE12  80
+     C                     Z-ADDS#MS78    W#MS12  80
+     C                     Z-ADDS#ME78    W#ME12  80
+     C                     Z-ADDS#HS78    W#HS12  80
+     C                     Z-ADDS#HE78    W#HE12  80
+     C                     Z-ADDS#KS78    W#KS12  80
+     C                     Z-ADDS#KE78    W#KE12  80
+     C                     EXSR CK#02W
+     C                     ADD  1         W#CONT
+     C                     ENDDO
+     C                     ENDIF
+     C*
+     C*10期號碼預設
+     C*
+     C           *IN99     IFEQ *OFF
+     C*P
+     C           S#PS9A    IFEQ 0
+     C           S#PE9A    ANDEQ0
+     C                     Z-ADDS#PS78    S#PS9A
+     C                     Z-ADDS#PE78    S#PE9A
+     C                     ENDIF
+     C*U
+     C           S#US9A    IFEQ 0
+     C           S#UE9A    ANDEQ0
+     C                     Z-ADDS#US78    S#US9A
+     C                     Z-ADDS#UE78    S#UE9A
+     C                     ENDIF
+     C*M
+     C           S#MS9A    IFEQ 0
+     C           S#ME9A    ANDEQ0
+     C                     Z-ADDS#MS78    S#MS9A
+     C                     Z-ADDS#ME78    S#ME9A
+     C                     ENDIF
+     C*H
+     C           S#HS9A    IFEQ 0
+     C           S#HE9A    ANDEQ0
+     C                     Z-ADDS#HS78    S#HS9A
+     C                     Z-ADDS#HE78    S#HE9A
+     C                     ENDIF
+     C*K
+     C           S#KS9A    IFEQ 0
+     C           S#KE9A    ANDEQ0
+     C                     Z-ADDS#KS78    S#KS9A
+     C                     Z-ADDS#KE78    S#KE9A
+     C                     ENDIF
+     C*
+     C*10期廠區配號檢核
+     C*
+     C                     MOVEL'10'      D#SQMM
+     C                     MOVEL'10'      W#TYPE  2
+     C           H#PREA    IFNE PRE10
+     C           H#SNO2    ORNE SNO2
+     C           H#ENO2    ORNE ENO2
+     C           H#PS9A    ORNE S#PS9A
+     C           H#PE9A    ORNE S#PE9A
+     C           H#US9A    ORNE S#US9A
+     C           H#UE9A    ORNE S#UE9A
+     C           H#MS9A    ORNE S#MS9A
+     C           H#ME9A    ORNE S#ME9A
+     C           H#HS9A    ORNE S#HS9A
+     C           H#HE9A    ORNE S#HE9A
+     C           H#KS9A    ORNE S#KS9A
+     C           H#KE9A    ORNE S#KE9A
+     C                     EXSR CK#NR
+     C  N99                EXSR CK#GEN
+     C                     MOVEL'M'       W#FACT
+     C  N99                EXSR CK#GEN
+     C           *IN99     IFEQ *OFF
+     C           TXAR      ANDEQ'P'
+     C                     MOVEL'U'       GE1
+     C                     MOVEL'U'       W#FACT  1
+     C                     Z-ADD9         MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      TXAR      IFEQ 'P'
+     C           H#HS9A    IFNE S#HS9A
+     C           H#HE9A    ORNE S#HE9A
+     C           H#PREA    ORNE PRE10
+     C                     MOVEL'H'       GE1
+     C                     MOVEL'H'       W#FACT  1
+     C                     Z-ADD9         MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      TXAR      IFEQ 'P'
+     C           H#KS9A    IFNE S#KS9A
+     C           H#KE9A    ORNE S#KE9A
+     C           H#PREA    ORNE PRE10
+     C                     MOVEL'K'       GE1
+     C                     MOVEL'K'       W#FACT  1
+     C                     Z-ADD9         MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     Z-ADD1         W#CONT  10
+     C           W#CONT    DOWLE5
+     C                     SELEC
+     C           W#CONT    WHEQ 1
+     C           S#PS9A    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#PE9A    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'P'       W#FACT  1
+     C           W#CONT    WHEQ 2
+     C           S#US9A    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#UE9A    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'U'       W#FACT
+     C           W#CONT    WHEQ 3
+     C           S#MS9A    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#ME9A    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'M'       W#FACT
+     C           W#CONT    WHEQ 4
+     C           S#HS9A    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#HE9A    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'H'       W#FACT
+     C           W#CONT    WHEQ 5
+     C           S#KS9A    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#KE9A    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'K'       W#FACT
+     C                     ENDSL
+     C                     Z-ADDS#PS9A    W#PS12  80
+     C                     Z-ADDS#PE9A    W#PE12  80
+     C                     Z-ADDS#US9A    W#US12  80
+     C                     Z-ADDS#UE9A    W#UE12  80
+     C                     Z-ADDS#MS9A    W#MS12  80
+     C                     Z-ADDS#ME9A    W#ME12  80
+     C                     Z-ADDS#HS9A    W#HS12  80
+     C                     Z-ADDS#HE9A    W#HE12  80
+     C                     Z-ADDS#KS9A    W#KS12  80
+     C                     Z-ADDS#KE9A    W#KE12  80
+     C                     EXSR CK#02W
+     C                     ADD  1         W#CONT
+     C                     ENDDO
+     C                     ENDIF
+     C*
+     C*12期號碼預設
+     C*
+     C           *IN99     IFEQ *OFF
+     C*P
+     C           S#PSBC    IFEQ 0
+     C           S#PEBC    ANDEQ0
+     C                     Z-ADDS#PS9A    S#PSBC
+     C                     Z-ADDS#PE9A    S#PEBC
+     C                     ENDIF
+     C*U
+     C           S#USBC    IFEQ 0
+     C           S#UEBC    ANDEQ0
+     C                     Z-ADDS#US9A    S#USBC
+     C                     Z-ADDS#UE9A    S#UEBC
+     C                     ENDIF
+     C*M
+     C           S#MSBC    IFEQ 0
+     C           S#MEBC    ANDEQ0
+     C                     Z-ADDS#MS9A    S#MSBC
+     C                     Z-ADDS#ME9A    S#MEBC
+     C                     ENDIF
+     C*H
+     C           S#HSBC    IFEQ 0
+     C           S#HEBC    ANDEQ0
+     C                     Z-ADDS#HS9A    S#HSBC
+     C                     Z-ADDS#HE9A    S#HEBC
+     C                     ENDIF
+     C*K
+     C           S#KSBC    IFEQ 0
+     C           S#KEBC    ANDEQ0
+     C                     Z-ADDS#KS9A    S#KSBC
+     C                     Z-ADDS#KE9A    S#KEBC
+     C                     ENDIF
+     C*
+     C*12期廠區配號檢核
+     C*
+     C                     MOVEL'12'      D#SQMM
+     C                     MOVEL'12'      W#TYPE  2
+     C           H#PREB    IFNE PRE12
+     C           H#SNO2    ORNE SNO2
+     C           H#ENO2    ORNE ENO2
+     C           H#PSBC    ORNE S#PSBC
+     C           H#PEBC    ORNE S#PEBC
+     C           H#USBC    ORNE S#USBC
+     C           H#UEBC    ORNE S#UEBC
+     C           H#MSBC    ORNE S#MSBC
+     C           H#MEBC    ORNE S#MEBC
+     C           H#HSBC    ORNE S#HSBC
+     C           H#HEBC    ORNE S#HEBC
+     C           H#KSBC    ORNE S#KSBC
+     C           H#KEBC    ORNE S#KEBC
+     C                     EXSR CK#NR
+     C  N99                EXSR CK#GEN
+     C                     MOVEL'M'       W#FACT
+     C  N99                EXSR CK#GEN
+     C           *IN99     IFEQ *OFF
+     C           TXAR      ANDEQ'P'
+     C                     MOVEL'U'       GE1
+     C                     MOVEL'U'       W#FACT  1
+     C                     Z-ADD11        MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      TXAR      IFEQ 'P'
+     C           H#HSBC    IFNE S#HSBC
+     C           H#HEBC    ORNE S#HEBC
+     C           H#PREB    ORNE PRE12
+     C                     MOVEL'H'       GE1
+     C                     MOVEL'H'       W#FACT  1
+     C                     Z-ADD11        MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      TXAR      IFEQ 'P'
+     C           H#KSBC    IFNE S#KSBC
+     C           H#KEBC    ORNE S#KEBC
+     C           H#PREB    ORNE PRE12
+     C                     MOVEL'K'       GE1
+     C                     MOVEL'K'       W#FACT  1
+     C                     Z-ADD11        MM
+     C                     MOVELGRP       W#GRP  10
+     C                     MOVEL'0'       W#ERR   1
+     C                     EXSR CK#GE1
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     Z-ADD1         W#CONT  10
+     C           W#CONT    DOWLE5
+     C                     SELEC
+     C           W#CONT    WHEQ 1
+     C           S#PSBC    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#PEBC    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'P'       W#FACT  1
+     C           W#CONT    WHEQ 2
+     C           S#USBC    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#UEBC    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'U'       W#FACT
+     C           W#CONT    WHEQ 3
+     C           S#MSBC    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#MEBC    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'M'       W#FACT
+     C           W#CONT    WHEQ 4
+     C           S#HSBC    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#HEBC    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'H'       W#FACT
+     C           W#CONT    WHEQ 5
+     C           S#KSBC    ANDNE0
+     C           *IN99     ANDEQ*OFF
+     C           S#KEBC    ORNE 0
+     C           *IN99     ANDEQ*OFF
+     C                     MOVEL'K'       W#FACT
+     C                     ENDSL
+     C                     Z-ADDS#PSBC    W#PS12  80
+     C                     Z-ADDS#PEBC    W#PE12  80
+     C                     Z-ADDS#USBC    W#US12  80
+     C                     Z-ADDS#UEBC    W#UE12  80
+     C                     Z-ADDS#MSBC    W#MS12  80
+     C                     Z-ADDS#MEBC    W#ME12  80
+     C                     Z-ADDS#HSBC    W#HS12  80
+     C                     Z-ADDS#HEBC    W#HE12  80
+     C                     Z-ADDS#KSBC    W#KS12  80
+     C                     Z-ADDS#KEBC    W#KE12  80
+     C                     EXSR CK#02W
+     C                     ADD  1         W#CONT
+     C                     ENDDO
+     C                     ENDIF
+     C*
+     C*****
+     CSR         CK#02Z    ENDSR
+     C******
+     C           CK#GE1    BEGSR
+     C******
+     C                     CALL 'ARE105P1'
+     C                     PARM           W#FACT
+     C                     PARM           W#GRP
+     C                     PARM           W#ERR
+     C           W#ERR     IFEQ '1'
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     515763
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525864
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535965
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546066
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556167
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566268
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     SETON                     99
+     C                     MOVELERR,17    ERRMSG
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C******
+     C           CK#NR     BEGSR
+     C*
+     C           SQYYMM    SETLLINENRB
+     C                     MOVEL*OFF      *IN98
+     C           *IN98     DOWEQ*OFF
+     C           SQYYMM    READERINENRB                  98
+     C   98                LEAVE
+     C           NBTMDT    IFNE 0
+     C           NBSTCL    ORNE *BLANKS
+     C                     SELEC
+     C           D#SQMM    WHEQ '02'
+     C           H#PRE2    IFNE PRE2
+     C                     SETON                     43
+     C                     ENDIF
+     C                     SETON                     515763
+     C                     SETON                     698799
+     C           D#SQMM    WHEQ '04'
+     C           H#PRE4    IFNE PRE4
+     C                     SETON                     44
+     C                     ENDIF
+     C                     SETON                     525864
+     C                     SETON                     828899
+     C           D#SQMM    WHEQ '06'
+     C           H#PRE6    IFNE PRE6
+     C                     SETON                     45
+     C                     ENDIF
+     C                     SETON                     535965
+     C                     SETON                     838999
+     C           D#SQMM    WHEQ '08'
+     C           H#PRE8    IFNE PRE8
+     C                     SETON                     46
+     C                     ENDIF
+     C                     SETON                     546066
+     C                     SETON                     843099
+     C           D#SQMM    WHEQ '10'
+     C           H#PREA    IFNE PRE10
+     C                     SETON                     47
+     C                     ENDIF
+     C                     SETON                     556167
+     C                     SETON                     853199
+     C           D#SQMM    WHEQ '12'
+     C           H#PREB    IFNE PRE12
+     C                     SETON                     48
+     C                     ENDIF
+     C                     SETON                     566268
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C   99                MOVELERR,18    ERRMSG
+     C*
+     C           CK#NRZ    ENDSR
+     C*****
+     C           CK#02W    BEGSR
+     C******
+     C*
+     C                     SELEC
+     C           W#FACT    WHEQ 'P'
+     C*P廠單一區間
+     C           W#PS12    IFEQ SNO2
+     C           W#PE12    ANDEQENO2
+     C           W#US12    IFNE 0
+     C           W#UE12    ORNE 0
+     C           W#MS12    ORNE 0
+     C           W#ME12    ORNE 0
+     C           W#HS12    ORNE 0
+     C           W#HE12    ORNE 0
+     C           W#KS12    ORNE 0
+     C           W#KE12    ORNE 0
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     515763
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525864
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535965
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546066
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556167
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566268
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     MOVELERR,15    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*P訖值檢核
+     C                     MOVEL*BLANKS   W#TEYN  1
+     C           W#PE12    ADD  1         W#TE12  80
+     C                     SELEC
+     C           W#TE12    WHEQ W#US12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#TE12    WHEQ W#MS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#TE12    WHEQ W#HS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#TE12    WHEQ W#KS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#PE12    WHEQ ENO2
+     C                     MOVEL'Y'       W#TEYN
+     C                     ENDSL
+     C           W#TEYN    IFNE 'Y'
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     515763
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525864
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535965
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546066
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556167
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566268
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C           W#PS12    IFLT SNO2
+     C           W#PE12    ANDGTENO2
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     5199
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     5299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     5399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     5499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     5599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     5699
+     C                     ENDSL
+     C                     MOVELERR,12    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#PE12    IFLE W#PS12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     5199
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     5299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     5399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     5499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     5599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     5699
+     C                     ENDSL
+     C                     MOVELERR,11    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*P & U比對
+     C           W#US12    IFNE 0
+     C           W#PS12    IFGE W#US12
+     C           W#PS12    ANDLEW#UE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     515799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#PE12    IFGE W#US12
+     C           W#PE12    ANDLEW#UE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     515799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*P & M比對
+     C           W#MS12    IFNE 0
+     C           W#PS12    IFGE W#MS12
+     C           W#PS12    ANDLEW#ME12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     516399
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     526499
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     536599
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546699
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556799
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566899
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#PE12    IFGE W#MS12
+     C           W#PE12    ANDLEW#ME12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     516399
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     526499
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     536599
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546699
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556799
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566899
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*P & H比對
+     C           W#HS12    IFNE 0
+     C           W#PS12    IFGE W#HS12
+     C           W#PS12    ANDLEW#HE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     516999
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     528299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     538399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     548499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     558599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     568699
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#PE12    IFGE W#HS12
+     C           W#PE12    ANDLEW#HE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     516999
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     528299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     538399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     548499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     558599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     568699
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*P & K 比對
+     C           W#KS12    IFNE 0
+     C           W#PS12    IFGE W#KS12
+     C           W#PS12    ANDLEW#KE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     518799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     528899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     538999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     543099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     553199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     563299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#PE12    IFGE W#KS12
+     C           W#PE12    ANDLEW#KE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     518799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     528899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     538999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     543099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     553199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     563299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           W#FACT    WHEQ 'U'
+     C*U廠單一區間
+     C           W#US12    IFEQ SNO2
+     C           W#UE12    ANDEQENO2
+     C           W#PS12    IFNE 0
+     C           W#PE12    ORNE 0
+     C           W#MS12    ORNE 0
+     C           W#ME12    ORNE 0
+     C           W#HS12    ORNE 0
+     C           W#HE12    ORNE 0
+     C           W#KS12    ORNE 0
+     C           W#KE12    ORNE 0
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     515763
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525864
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535965
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546066
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556167
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566268
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     MOVELERR,15    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*U訖值檢核
+     C                     MOVEL*BLANKS   W#TEYN
+     C           W#UE12    ADD  1         W#TE12  80
+     C                     SELEC
+     C           W#TE12    WHEQ W#PS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#TE12    WHEQ W#MS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#TE12    WHEQ W#HS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#TE12    WHEQ W#KS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#UE12    WHEQ ENO2
+     C                     MOVEL'Y'       W#TEYN
+     C                     ENDSL
+     C           W#TEYN    IFNE 'Y'
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     515763
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525864
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535965
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546066
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556167
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566268
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#US12    IFLT SNO2
+     C           W#UE12    ANDGTENO2
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     5799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     5899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     5999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     6099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     6199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     6299
+     C                     ENDSL
+     C                     MOVELERR,12    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#UE12    IFLE W#US12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     5799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     5899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     5999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     6099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     6199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     6299
+     C                     ENDSL
+     C                     MOVELERR,11    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*U & P比對
+     C           W#PS12    IFNE 0
+     C           W#US12    IFGE W#PS12
+     C           W#US12    ANDLEW#PE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     516579
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#UE12    IFGE W#PS12
+     C           W#UE12    ANDLEW#PE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     516799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*U & M比對
+     C           W#MS12    IFNE 0
+     C           W#US12    IFGE W#MS12
+     C           W#US12    ANDLEW#ME12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     576399
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     586499
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     596599
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     606699
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     616799
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     626899
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#UE12    IFGE W#MS12
+     C           W#UE12    ANDLEW#ME12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     576399
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     586499
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     596599
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     606699
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     616799
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     626899
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*U & H比對
+     C           W#HS12    IFNE 0
+     C           W#US12    IFGE W#HS12
+     C           W#US12    ANDLEW#HE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     576999
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     588299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     598399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     608499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     618599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     628699
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#UE12    IFGE W#HS12
+     C           W#UE12    ANDLEW#HE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     576999
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     588299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     598399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     608499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     618599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     628699
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*U & K 比對
+     C           W#KS12    IFNE 0
+     C           W#US12    IFGE W#KS12
+     C           W#US12    ANDLEW#KE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     578799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     588899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     598999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     603099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     613199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     623299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#UE12    IFGE W#KS12
+     C           W#UE12    ANDLEW#KE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     578799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     588899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     598999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     603099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     613199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     623299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           W#FACT    WHEQ 'M'
+     C*M廠單一區間
+     C           W#MS12    IFEQ SNO2
+     C           W#ME12    ANDEQENO2
+     C           W#PS12    IFNE 0
+     C           W#PE12    ORNE 0
+     C           W#US12    ORNE 0
+     C           W#UE12    ORNE 0
+     C           W#HS12    ORNE 0
+     C           W#HE12    ORNE 0
+     C           W#KS12    ORNE 0
+     C           W#KE12    ORNE 0
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     515763
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525864
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535965
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546066
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556167
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566268
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     MOVELERR,15    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*M訖值檢核
+     C                     MOVEL*BLANKS   W#TEYN
+     C           W#ME12    ADD  1         W#TE12  80
+     C                     SELEC
+     C           W#TE12    WHEQ W#PS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#TE12    WHEQ W#US12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#TE12    WHEQ W#HS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#TE12    WHEQ W#KS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#ME12    WHEQ ENO2
+     C                     MOVEL'Y'       W#TEYN
+     C                     ENDSL
+     C           W#TEYN    IFNE 'Y'
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     515763
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525864
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535965
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546066
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556167
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566268
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#MS12    IFLT SNO2
+     C           W#ME12    ANDGTENO2
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     6399
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     6499
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     6599
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     6699
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     6799
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     6899
+     C                     ENDSL
+     C                     MOVELERR,12    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#ME12    IFLE W#MS12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     6399
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     6499
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     6599
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     6699
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     6799
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     6899
+     C                     ENDSL
+     C                     MOVELERR,11    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*M & P比對
+     C           W#PS12    IFNE 0
+     C           W#MS12    IFGE W#PS12
+     C           W#MS12    ANDLEW#PE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     516399
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     526499
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     536599
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546699
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556799
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566899
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#ME12    IFGE W#PS12
+     C           W#ME12    ANDLEW#PE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     516399
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     526499
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     536599
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546699
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556799
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566899
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*M & U比對
+     C           W#US12    IFNE 0
+     C           W#MS12    IFGE W#US12
+     C           W#MS12    ANDLEW#UE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     576399
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     586499
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     596599
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     606699
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     616799
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     626899
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#ME12    IFGE W#US12
+     C           W#ME12    ANDLEW#UE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     576399
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     586499
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     596599
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     606699
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     616799
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     626899
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*M & H比對
+     C           W#HS12    IFNE 0
+     C           W#MS12    IFGE W#HS12
+     C           W#MS12    ANDLEW#HE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     636999
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     648299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     658399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     668499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     678599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     688699
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#ME12    IFGE W#HS12
+     C           W#ME12    ANDLEW#HE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     636999
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     648299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     658399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     668499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     678599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     688699
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*M & K 比對
+     C           W#KS12    IFNE 0
+     C           W#MS12    IFGE W#KS12
+     C           W#MS12    ANDLEW#KE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     638799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     648899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     658999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     663099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     673199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     683299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#ME12    IFGE W#KS12
+     C           W#ME12    ANDLEW#KE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     638799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     648899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     658999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     663099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     673199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     683299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           W#FACT    WHEQ 'H'
+     C*H廠單一區間
+     C           W#HS12    IFEQ SNO2
+     C           W#HE12    ANDEQENO2
+     C           W#PS12    IFNE 0
+     C           W#PE12    ORNE 0
+     C           W#US12    ORNE 0
+     C           W#UE12    ORNE 0
+     C           W#MS12    ORNE 0
+     C           W#ME12    ORNE 0
+     C           W#KS12    ORNE 0
+     C           W#KE12    ORNE 0
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     515763
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525864
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535965
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546066
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556167
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566268
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     MOVELERR,15    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*H訖值檢核
+     C                     MOVEL*BLANKS   W#TEYN
+     C           W#HE12    ADD  1         W#TE12  80
+     C                     SELEC
+     C           W#TE12    WHEQ W#PS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#TE12    WHEQ W#US12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#TE12    WHEQ W#MS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#TE12    WHEQ W#KS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#HE12    WHEQ ENO2
+     C                     MOVEL'Y'       W#TEYN
+     C                     ENDSL
+     C           W#TEYN    IFNE 'Y'
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     515763
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525864
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535965
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546066
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556167
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566268
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#HS12    IFLT SNO2
+     C           W#HE12    ANDGTENO2
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     6999
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     8299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     8399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     8499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     8599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     8699
+     C                     ENDSL
+     C                     MOVELERR,12    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#HE12    IFLE W#HS12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     6999
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     8299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     8399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     8499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     8599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     8699
+     C                     ENDSL
+     C                     MOVELERR,11    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*H & P比對
+     C           W#PS12    IFNE 0
+     C           W#HS12    IFGE W#PS12
+     C           W#HS12    ANDLEW#PE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     516999
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     528299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     538399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     548499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     558599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     568699
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#HE12    IFGE W#PS12
+     C           W#HE12    ANDLEW#PE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     516999
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     528299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     538399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     548499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     558599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     568699
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*H & U比對
+     C           W#US12    IFNE 0
+     C           W#HS12    IFGE W#US12
+     C           W#HS12    ANDLEW#UE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     576999
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     588299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     598399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     608499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     618599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     628699
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#HE12    IFGE W#US12
+     C           W#HE12    ANDLEW#UE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     576999
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     588299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     598399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     608499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     618599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     628699
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*H & M比對
+     C           W#MS12    IFNE 0
+     C           W#HS12    IFGE W#MS12
+     C           W#HS12    ANDLEW#ME12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     636999
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     648299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     658399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     668499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     678599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     688699
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#HE12    IFGE W#MS12
+     C           W#HE12    ANDLEW#ME12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     636999
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     648299
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     658399
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     668499
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     678599
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     688699
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*H & K 比對
+     C           W#KS12    IFNE 0
+     C           W#HS12    IFGE W#KS12
+     C           W#HS12    ANDLEW#KE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#HE12    IFGE W#KS12
+     C           W#HE12    ANDLEW#KE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           W#FACT    WHEQ 'K'
+     C*K廠單一區間
+     C           W#KS12    IFEQ SNO2
+     C           W#KE12    ANDEQENO2
+     C           W#PS12    IFNE 0
+     C           W#PE12    ORNE 0
+     C           W#US12    ORNE 0
+     C           W#UE12    ORNE 0
+     C           W#MS12    ORNE 0
+     C           W#ME12    ORNE 0
+     C           W#HS12    ORNE 0
+     C           W#HE12    ORNE 0
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     515763
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525864
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535965
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546066
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556167
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566268
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     MOVELERR,15    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*K訖值檢核
+     C                     MOVEL*BLANKS   W#TEYN
+     C           W#KE12    ADD  1         W#TE12  80
+     C                     SELEC
+     C           W#TE12    WHEQ W#PS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#TE12    WHEQ W#US12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#TE12    WHEQ W#MS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#TE12    WHEQ W#KS12
+     C                     MOVEL'Y'       W#TEYN
+     C           W#KE12    WHEQ ENO2
+     C                     MOVEL'Y'       W#TEYN
+     C                     ENDSL
+     C           W#TEYN    IFNE 'Y'
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     515763
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     525864
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     535965
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     546066
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     556167
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     566268
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#KS12    IFLT SNO2
+     C           W#KE12    ANDGTENO2
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     8799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     8899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     8999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     3099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     3199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     3399
+     C                     ENDSL
+     C                     MOVELERR,12    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#KE12    IFLE W#KS12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     8799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     8899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     8999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     3099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     3199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     3399
+     C                     ENDSL
+     C                     MOVELERR,11    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*K & P比對
+     C           W#PS12    IFNE 0
+     C           W#KS12    IFGE W#PS12
+     C           W#KS12    ANDLEW#PE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     518799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     528899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     538999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     543099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     553199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     563299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#KE12    IFGE W#PS12
+     C           W#KE12    ANDLEW#PE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     518799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     528899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     538999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     543099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     553199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     563299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*K & U比對
+     C           W#US12    IFNE 0
+     C           W#KS12    IFGE W#US12
+     C           W#KS12    ANDLEW#UE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     578799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     588899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     598999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     603099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     613199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     623299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#KE12    IFGE W#US12
+     C           W#KE12    ANDLEW#UE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     578799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     588899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     598999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     603099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     613199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     623299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*K & M比對
+     C           W#MS12    IFNE 0
+     C           W#KS12    IFGE W#MS12
+     C           W#KS12    ANDLEW#ME12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     638799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     648899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     658999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     663099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     673199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     683299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#KE12    IFGE W#MS12
+     C           W#KE12    ANDLEW#ME12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     638799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     648899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     658999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     663099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     673199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     683299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*K & H 比對
+     C           W#HS12    IFNE 0
+     C           W#KS12    IFGE W#HS12
+     C           W#KS12    ANDLEW#HE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C*
+     C           W#KE12    IFGE W#HS12
+     C           W#KE12    ANDLEW#HE12
+     C                     SELEC
+     C           W#TYPE    WHEQ '02'
+     C                     SETON                     698799
+     C           W#TYPE    WHEQ '04'
+     C                     SETON                     828899
+     C           W#TYPE    WHEQ '06'
+     C                     SETON                     838999
+     C           W#TYPE    WHEQ '08'
+     C                     SETON                     843099
+     C           W#TYPE    WHEQ '10'
+     C                     SETON                     853199
+     C           W#TYPE    WHEQ '12'
+     C                     SETON                     863299
+     C                     ENDSL
+     C                     MOVELERR,13    ERRMSG
+     C                     GOTO CK#02X
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDSL
+     C*
+     C           CK#02X    ENDSR
+     C******
+     CSR         FL#02     BEGSR
+     C           CODE      CASEQ'3'       DL#02
+     C           CODE      CASEQ'1'       WR#02
+     C           CODE      CASEQ'2'       WR#02
+     C                     ENDCS
+     CSR         FL#02Z    ENDSR
+     C****
+     CSR         DL#02     BEGSR
+     C                     MOVEL*OFF      *IN97
+     C           S#YY      SETLLINESEQ
+     C           *IN97     DOWEQ*OFF
+     C           S#YY      READEINESEQ                   97
+     C   97                LEAVE
+     C                     MOVEL*OFF      *IN96
+     C           SQYYMM    SETLLRINENRB
+     C           *IN96     DOWEQ*OFF
+     C           SQYYMM    READERINENRB                  96
+     C   96                LEAVE
+0706AC                     MOVEL'D'       NBFLAG
+     C                     Z-ADDU#SYSD    NBXPDD           上送日期
+     C                     TIME           NBXPDT           上送時間
+     C                     MOVELD#USER    NBXUSR           上送人員
+0706AC                     UPDATRINENRB
+     C                     MOVEL'D'       NBMAR1
+     C                     WRITEINENRG
+     C                     ENDDO
+0706AC  N97                MOVEL'D'       SQFLAG
+0706AC  N97                UPDATRINESEQ
+0708AC           SQYYMM    SETLLRINEENB
+0708AC                     MOVEL*OFF      *IN96
+0708AC           *IN96     DOWEQ*OFF
+0708AC           SQYYMM    READERINEENB                  96
+0708AC   96                LEAVE
+0708AC                     MOVEL'D'       ENFLAG
+0708AC                     Z-ADDU#SYSD    ENXPDD           上送日期
+0708AC                     TIME           ENXPDT           上送時間
+0708AC                     MOVELD#USER    ENXUSR           上送人員
+0708AC                     MOVEL'D'       ENMAR1
+0708AC                     WRITEINEENG
+0708AC                     DELETRINEENB
+0708AC                     ENDDO
+     C                     ENDDO
+     C******
+     CSR                   ENDSR
+     *****
+     CSR         WR#02     BEGSR
+     C***
+     C                     Z-ADDS#YY      SQYY
+     C                     MOVELSNO2      SQINBN
+     C                     MOVELENO2      SQINEN
+     C                     Z-ADDS#YY      D#SQYY
+     C*02期
+     C                     MOVEL'02'      D#SQMM
+     C*P廠
+     C                     MOVEL'P'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE2      SQINTK
+     C                     MOVELS#PS12    SQINB1
+     C                     MOVELS#PE12    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*U廠
+     C                     MOVEL'U'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE2      SQINTK
+     C                     MOVELS#US12    SQINB1
+     C                     MOVELS#UE12    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*M廠
+     C                     MOVEL'M'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE2      SQINTK
+     C                     MOVELS#MS12    SQINB1
+     C                     MOVELS#ME12    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*H廠
+     C                     MOVEL'H'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE2      SQINTK
+     C                     MOVELS#HS12    SQINB1
+     C                     MOVELS#HE12    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*K廠
+     C                     MOVEL'K'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE2      SQINTK
+     C                     MOVELS#KS12    SQINB1
+     C                     MOVELS#KE12    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*04期
+     C                     MOVEL'04'      D#SQMM
+     C*P廠
+     C                     MOVEL'P'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE4      SQINTK
+     C                     MOVELS#PS34    SQINB1
+     C                     MOVELS#PE34    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*U廠
+     C                     MOVEL'U'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE4      SQINTK
+     C                     MOVELS#US34    SQINB1
+     C                     MOVELS#UE34    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*M廠
+     C                     MOVEL'M'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE4      SQINTK
+     C                     MOVELS#MS34    SQINB1
+     C                     MOVELS#ME34    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*H廠
+     C                     MOVEL'H'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE4      SQINTK
+     C                     MOVELS#HS34    SQINB1
+     C                     MOVELS#HE34    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*K廠
+     C                     MOVEL'K'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE4      SQINTK
+     C                     MOVELS#KS34    SQINB1
+     C                     MOVELS#KE34    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*06期
+     C                     MOVEL'06'      D#SQMM
+     C*P廠
+     C                     MOVEL'P'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE6      SQINTK
+     C                     MOVELS#PS56    SQINB1
+     C                     MOVELS#PE56    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*U廠
+     C                     MOVEL'U'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE6      SQINTK
+     C                     MOVELS#US56    SQINB1
+     C                     MOVELS#UE56    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*M廠
+     C                     MOVEL'M'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE6      SQINTK
+     C                     MOVELS#MS56    SQINB1
+     C                     MOVELS#ME56    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*H廠
+     C                     MOVEL'H'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE6      SQINTK
+     C                     MOVELS#HS56    SQINB1
+     C                     MOVELS#HE56    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*K廠
+     C                     MOVEL'K'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE6      SQINTK
+     C                     MOVELS#KS56    SQINB1
+     C                     MOVELS#KE56    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*08期
+     C                     MOVEL'08'      D#SQMM
+     C*P廠
+     C                     MOVEL'P'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE8      SQINTK
+     C                     MOVELS#PS78    SQINB1
+     C                     MOVELS#PE78    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*U廠
+     C                     MOVEL'U'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE8      SQINTK
+     C                     MOVELS#US78    SQINB1
+     C                     MOVELS#UE78    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*M廠
+     C                     MOVEL'M'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE8      SQINTK
+     C                     MOVELS#MS78    SQINB1
+     C                     MOVELS#ME78    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*H廠
+     C                     MOVEL'H'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE8      SQINTK
+     C                     MOVELS#HS78    SQINB1
+     C                     MOVELS#HE78    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*K廠
+     C                     MOVEL'K'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE8      SQINTK
+     C                     MOVELS#KS78    SQINB1
+     C                     MOVELS#KE78    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*10期
+     C                     MOVEL'10'      D#SQMM
+     C*P廠
+     C                     MOVEL'P'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE10     SQINTK
+     C                     MOVELS#PS9A    SQINB1
+     C                     MOVELS#PE9A    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*U廠
+     C                     MOVEL'U'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE10     SQINTK
+     C                     MOVELS#US9A    SQINB1
+     C                     MOVELS#UE9A    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*M廠
+     C                     MOVEL'M'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE10     SQINTK
+     C                     MOVELS#MS9A    SQINB1
+     C                     MOVELS#ME9A    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*H廠
+     C                     MOVEL'H'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE10     SQINTK
+     C                     MOVELS#HS9A    SQINB1
+     C                     MOVELS#HE9A    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*K廠
+     C                     MOVEL'K'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE10     SQINTK
+     C                     MOVELS#KS9A    SQINB1
+     C                     MOVELS#KE9A    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*12期
+     C                     MOVEL'12'      D#SQMM
+     C*P廠
+     C                     MOVEL'P'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE12     SQINTK
+     C                     MOVELS#PSBC    SQINB1
+     C                     MOVELS#PEBC    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*U廠
+     C                     MOVEL'U'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE12     SQINTK
+     C                     MOVELS#USBC    SQINB1
+     C                     MOVELS#UEBC    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*M廠
+     C                     MOVEL'M'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE12     SQINTK
+     C                     MOVELS#MSBC    SQINB1
+     C                     MOVELS#MEBC    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*H廠
+     C                     MOVEL'H'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE12     SQINTK
+     C                     MOVELS#HSBC    SQINB1
+     C                     MOVELS#HEBC    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*K廠
+     C                     MOVEL'K'       SQFACT
+     C           KEY01     CHAINRINESEQ              97
+     C   97                MOVEL'A'       SQFLAG
+     C  N97                MOVEL'C'       SQFLAG
+     C                     MOVELPRE12     SQINTK
+     C                     MOVELS#KSBC    SQINB1
+     C                     MOVELS#KEBC    SQINE1
+     C   97                MOVELD#USER    SQENTM
+     C   97                Z-ADDU#SYSD    SQENTD
+     C   97                TIME           SQENTT
+     C                     MOVELD#USER    SQUPDM
+     C                     Z-ADDU#SYSD    SQUPDD
+     C                     TIME           SQUPDT
+     C   97                WRITERINESEQ
+     C  N97                UPDATRINESEQ
+     C*寫入介面檔
+     C                     EXSR WR#03
+     C****
+     C****
+     CSR         WR#02Z    ENDSR
+     *****
+     *****
+     CSR         WR#03     BEGSR
+     C****
+     C                     MOVEL*OFF      *IN98
+     C           S#YY      SETLLINESEQ
+     C           *IN98     DOWEQ*OFF
+     C           S#YY      READEINESEQ                   98
+     C   98                LEAVE
+     C           SQINB1    IFEQ '00000000'
+     C           SQINE1    OREQ '00000000'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           KEY02     CHAINRINENRB              96
+     C   96                CLEARRINENRB
+     C  N96      NBTMDT    IFNE 0
+     C           NBSTCL    ORNE *BLANK
+     C                     ITER
+     C                     ENDIF
+     C*
+0706AC   96                MOVEL'A'       NBFLAG
+0706AC  N96                MOVEL'C'       NBFLAG
+     C                     MOVEL'E0401'   NBMSTE           訊息代碼
+     C                     SELEC
+     C           SQFACT    WHEQ 'P'
+     C           SQFACT    OREQ 'U'
+     C           SQFACT    OREQ 'M'
+     C                     MOVELHD,1      NBHEBN           總公司統編
+     C                     MOVELHD,1      NBBRBN           分支機構統編
+     C           SQFACT    WHEQ 'H'
+     C                     MOVELHD,1      NBHEBN
+     C                     MOVELHD,2      NBBRBN
+     C           SQFACT    WHEQ 'K'
+     C                     MOVELHD,1      NBHEBN
+     C                     MOVELHD,3      NBBRBN
+     C                     ENDSL
+     C                     MOVEL'07'      NBINTE           發票類別
+     C                     MOVELSQYYMM    NBYEMH           發票期別
+     C                     MOVELSQINTK    NBINTK           發票字軌
+     C                     MOVELSQINBN    NBINBN           發票起號
+     C                     MOVELSQINEN    NBINEN           發票迄號
+     C                     MOVELSQINB1    NBINB1           發票起號
+     C                     MOVELSQINE1    NBINE1           發票迄號
+     C*計算本組數
+     C*
+     C                     MOVELSQINB1    W#INB1  80
+     C                     MOVELSQINE1    W#INB2  80
+     C           W#INB2    SUB  W#INB1    W#INBS  80
+     C                     ADD  1         W#INBS
+     C           W#INBS    DIV  50        NBINBT           本組數
+     C*
+     C                     MOVELSQFACT    NBFACT           廠區
+     C*
+     C                     Z-ADDU#SYSD    NBXPDD           上送日期
+     C                     TIME           NBXPDT           上送時間
+     C                     MOVELD#USER    NBXUSR           上送人員
+     C   96                WRITERINENRB
+     C   96                MOVEL'A'       NBMAR1
+     C   96                WRITEINENRG
+     C  N96                UPDATRINENRB
+     C  N96                MOVEL'C'       NBMAR1
+     C  N96                WRITEINENRG
+     C*
+0708AC           SQFACT    IFEQ 'P'
+0708AC           KEY02     CHAINRINEENB              96
+0708AC   96                CLEARRINEENB
+0708AC   96                MOVEL'A'       ENFLAG
+0708AC  N96                MOVEL'C'       ENFLAG
+0708AC                     MOVELSQFACT    ENFACT           廠區
+0708AC                     MOVEL'E0501'   ENMSTE           訊息代碼
+0708AC                     SELEC
+0708AC           SQFACT    WHEQ 'P'
+0708AC                     MOVELHD,1      ENHEBN           總公司統編
+0708AC                     ENDSL
+0708AC                     MOVEL'07'      ENINTE           發票類別
+0708AC                     MOVELSQYYMM    ENYEMH           發票期別
+0708AC                     MOVELSQINTK    ENINTK           發票字軌
+0708AC                     MOVELSQINBN    ENINBN           發票起號
+0708AC                     MOVELSQINEN    ENINEN           發票迄號
+0708AC*
+0708AC*計算本組數
+0708AC*
+0708AC                     MOVELSQINBN    W#INBN  80
+0708AC                     MOVELSQINEN    W#INEN  80
+0708AC           W#INEN    SUB  W#INBN    W#INBS
+0708AC                     ADD  1         W#INBS
+0708AC           W#INBS    DIV  50        ENINBT           本組數
+0708AC*
+0708AC                     Z-ADDU#SYSD    ENXPDD           上送日期
+0708AC                     TIME           ENXPDT           上送時間
+0708AC                     MOVELD#USER    ENXUSR           上送人員
+0708AC   96                WRITERINEENB
+0708AC   96                MOVEL'A'       ENMAR1
+0708AC   96                WRITEINEENG
+0708AC  N96                UPDATRINEENB
+0708AC  N96                MOVEL'C'       ENMAR1
+0708AC  N96                WRITEINEENG
+0708AC                     ENDIF
+     C                     ENDDO
+     CSR         WR#03Z    ENDSR
+     C***
+** HD
+75280209
+84707108
+07989206
+** ERR
+01-功能代碼必須輸入．
+02-功能代碼必須為１，２，３，４
+03-需輸入年度
+04-年度錯誤
+05-廠區配號不可全部空白
+06-此年度已輸入發票號碼，不可再新增
+07-此年度未輸入發票號碼．
+08-字軌不可空白
+09-發票號碼不可空白
+10-起始號碼不可大於截止號碼
+11-廠區配號訖號不可小於等於起號
+12-廠區配號不在發票區間範圍內，請檢核
+13-廠區配號錯誤
+14-字軌重覆
+15-廠區配號區間與發票區間不符
+16-此年度之發票號碼已開立發票，不可再刪除
+17-此期之發票號碼已開立發票，不可修改
+18-發票號碼已上送電子發票平台，不可修改
+19-發票起始號碼輸入與檢核不符
+20-發票截止號碼輸入與檢核不符
+21-廠區配號若各月份相同，則僅輸入1~2月份(欄位空白同前一月份)
+22-此帳號只有查詢權限
+

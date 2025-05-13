@@ -1,0 +1,311 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP109R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     電子商務--發票資料下載處理
+     H*            5.DATE-WRITTEN  93/08/09
+     H*            6.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FINVMST  IP  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FINMLOG  UF  E           K        DISK                      A
+     FINDLOG  UF  E           K        DISK                      A
+     FARCBDW  UF  E           K        DISK
+     FARINDW  UF  E           K        DISK                      A
+     FARIVDW  UF  E           K        DISK                      A
+     IINREC
+     I                                              INCUNOL1
+     C*****************************************************************
+     C*          KEY   LIST
+     C*****************************************************************
+     C*FILE==>INVDTL(發票明細檔)
+     C           K#INVD    KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*
+     C*FILE==>ARINDW(發票主檔下載)
+     C           K#INDW    KLIST
+     C                     KFLD           ANVNNO           客戶統編
+     C                     KFLD           ANFILE           檔案序號
+     C                     KFLD           ANSEQN           資料處理序號
+     C*
+     C*FILE==>ARINDW(發票明細檔下載)
+     C           K#IVDW    KLIST
+     C                     KFLD           AVVNNO           客戶統編
+     C                     KFLD           AVFILE           檔案序號
+     C                     KFLD           AVSEQN           資料處理序號
+     C*FILE==>INDLOG(發票明細檔下載ｌｏｇ)
+     C           K#INDG    KLIST
+     C                     KFLD           IDNO             發票號碼
+     C                     KFLD           IDACNT           類別
+     C                     KFLD           IDITEM           項次
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#INSQ  50
+     C                     Z-ADD0         W#IVSQ  50
+     C                     Z-ADD0         W#SEQ3  60
+     C                     Z-ADD0         W#SEQ4  60
+     C                     MOVEL*BLANK    W#MUID 10
+     C*
+     C*先判斷該客戶是否要做資料交換
+     C*
+     C           INCUNO    CHAINCBREC                40
+     C           *IN40     IFEQ *OFF
+     C                     MOVELCBMUID    W#MUID
+     C           W#MUID    CHAINRARCBDW              41
+     C  N41      ADFLE3    IFEQ 'Y'
+     C           ADSEQ3    ADD  1         W#SEQ3
+     C                     ENDIF
+     C*
+     C           W#MUID    CHAINRARCBDW              41
+     C  N41      ADFLE4    IFEQ 'Y'
+     C           ADSEQ4    ADD  1         W#SEQ4
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C* 1.先判斷該張發票是否為新增發票
+     C* 2.再判斷此張發票是否已下載（已存於INMLOG檔）
+     C* 3.若該張發票未下載，將該筆資料寫入ＬＯＧ檔，並且也寫入下載檔
+     C* 4.用*IN50來判斷資料是否需下載
+     C*
+     C  N41      ADFLE3    IFEQ 'Y'                        主檔下載
+     C           INNO      CHAINRINMLOG              42
+     C   42                EXSR CHKSR
+     C   42N50             EXSR INMSR                      寫入下載檔
+     C   42N50             EXSR LOGSR                      寫入ＬＯＧ檔
+     C                     ENDIF
+     C*發票主檔下載
+     C  N41      ADFLE4    IFEQ 'Y'                        明細檔下載
+     C   42N50             EXSR INVSR
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           W#INSQ    IFNE 0
+     C*
+     C           INCUNO    CHAINCBREC                48
+     C           *IN48     IFEQ *OFF
+     C                     MOVELCBMUID    W#MUID
+     C           W#MUID    CHAINRARCBDW              49
+     C  N49      ADFLE3    IFEQ 'Y'
+     C                     ADD  1         ADSEQ3
+     C                     UPDATRARCBDW
+     C                     ENDIF
+     C*
+     C           W#MUID    CHAINRARCBDW              49
+     C  N49      ADFLE4    IFEQ 'Y'
+     C                     ADD  1         ADSEQ4
+     C                     UPDATRARCBDW
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           CHKSR     BEGSR
+     C*****************************************************************
+     C* 1.先判斷此張發票是否屬於新增發票
+     C*==> 用*IN50來判斷資料是否需下載
+     C*
+     C                     MOVE *OFF      *IN50
+     C                     MOVELINNO      IVNO
+     C                     MOVEL'1'       IVACNT
+     C                     Z-ADD1         IVITEM
+     C           K#INVD    CHAINIVREC                43
+     C  N43      IVFLAG    IFNE 'A'
+     C*                    MOVE *ON       *IN50
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           INMSR     BEGSR
+     C*****************************************************************
+     C*寫入下載檔
+     C                     ADD  1         W#INSQ
+     C                     MOVELW#MUID    ANVNNO
+     C                     Z-ADDW#SEQ3    ANFILE
+     C                     Z-ADDW#INSQ    ANSEQN
+     C           K#INDW    CHAINRARINDW              44
+     C                     CLEARRARINDW
+     C                     MOVEL'A'       ANFLAG           處理代號
+     C                     MOVELINTYPE    ANTYPE           發票類別
+     C                     MOVELINDECD    ANDECD           作廢碼
+     C           INDEDT    IFEQ 0
+     C                     Z-ADDINDEDT    ANDEDT           作廢日期
+     C                     ELSE
+     C           19110000  ADD  INDEDT    ANDEDT
+     C                     ENDIF
+     C                     MOVELINNO      ANNO             發票號碼
+     C                     MOVELW#MUID    ANVNNO           客戶統編
+     C                     MOVELINCUNO    ANCUNO           客戶代號
+     C                     MOVELINCUNM    ANCUNM           客戶名稱
+     C                     MOVELINORNO    ANORNO           訂單編號
+     C           19110000  ADD  ININDT    ANINDT           發票日期
+     C                     MOVELINKIND    ANKIND           發票聯式
+     C                     MOVELINRVID    ANRVID           收款業務
+     C                     MOVELINSALE    ANSALE           出貨業務
+     C                     MOVELINAREA    ANAREA           開立廠區
+     C                     MOVELINTXTP    ANTXTP           課稅別
+     C                     Z-ADDINAAMT    ANAAMT           出貨金額
+     C                     Z-ADDINATAX    ANATAX           出貨稅額
+     C                     Z-ADDINBAMT    ANBAMT           扣預收額
+     C                     Z-ADDINCAMT    ANCAMT           折讓／銷退金額
+     C                     Z-ADDINCTAX    ANCTAX           折讓／銷退稅額
+     C                     Z-ADDINNBAL    ANNBAL           未收餘額
+     C                     MOVELINAPNO    ANAPNO           請款單號
+     C           INAPDT    IFEQ 0
+     C                     Z-ADDINAPDT    ANAPDT           請款日期
+     C                     ELSE
+     C           19110000  ADD  INAPDT    ANAPDT
+     C                     ENDIF
+     C                     Z-ADDW#INSQ    ANSEQN           資料處理序號
+     C                     Z-ADDW#SEQ3    ANFILE           檔案序號
+     C   44                WRITERARINDW
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LOGSR     BEGSR
+     C*****************************************************************
+     C*寫入ＬＯＧ檔
+     C           INNO      CHAINRINMLOG              45
+     C                     CLEARRINMLOG
+     C                     MOVEL'A'       IMFLAG           處理代碼
+     C                     MOVELINTYPE    IMTYPE           發票類別
+     C                     MOVELINDECD    IMDECD           作廢碼
+     C           INDEDT    IFEQ 0
+     C                     Z-ADDINDEDT    IMDEDT           作廢日期
+     C                     ELSE
+     C           19110000  ADD  INDEDT    IMDEDT
+     C                     ENDIF
+     C                     MOVELINNO      IMNO             發票號碼
+     C                     MOVELINCUNO    IMCUNO           客戶代號
+     C                     MOVELINCUNM    IMCUNM           客戶名稱
+     C                     MOVELINORNO    IMORNO           訂單編號
+     C           19110000  ADD  ININDT    IMINDT           發票日期
+     C                     MOVELINKIND    IMKIND           發票聯式
+     C                     MOVELINRVID    IMRVID           收款業務
+     C                     MOVELINSALE    IMSALE           出貨業務
+     C                     MOVELINAREA    IMAREA           開立廠區
+     C                     MOVELINTXTP    IMTXTP           課稅別
+     C                     Z-ADDINAAMT    IMAAMT           出貨金額
+     C                     Z-ADDINATAX    IMATAX           出貨稅額
+     C                     Z-ADDINBAMT    IMBAMT           扣預收額
+     C                     Z-ADDINCAMT    IMCAMT           折讓／銷退金額
+     C                     Z-ADDINCTAX    IMCTAX           折讓／銷退稅額
+     C                     Z-ADDINNBAL    IMNBAL           未收餘額
+     C                     MOVELINAPNO    IMAPNO           請款單號
+     C           INAPDT    IFEQ 0
+     C                     Z-ADDINAPDT    IMAPDT           請款日期
+     C                     ELSE
+     C           19110000  ADD  INAPDT    IMAPDT
+     C                     ENDIF
+     C                     MOVELW#MUID    IMVNNO           客戶統編
+     C                     Z-ADDW#INSQ    IMSEQN           資料處理序號
+     C                     Z-ADDW#SEQ3    IMFILE           檔案序號
+     C   45                WRITERINMLOG
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           INVSR     BEGSR
+     C*****************************************************************
+     C                     MOVELINNO      IVNO
+     C                     MOVE *BLANK    IVACNT
+     C                     Z-ADD0         IVITEM
+     C           K#INVD    SETLLIVREC
+     C                     MOVE *OFF      *IN46
+     C           *IN46     DOWEQ*OFF
+     C                     READ IVREC                    46
+     C   46                LEAVE
+     C*
+     C           IVNO      IFNE INNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           IVACNT    IFEQ '6'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     ADD  1         W#IVSQ
+     C                     MOVELW#MUID    AVVNNO
+     C                     Z-ADDW#SEQ4    AVFILE
+     C                     Z-ADDW#IVSQ    AVSEQN
+     C           K#IVDW    CHAINRARIVDW              47
+     C                     CLEARRARIVDW
+     C                     MOVEL'A'       AVFLAG           處理代碼
+     C                     MOVELIVNO      AVNO             發票號碼
+     C                     MOVELIVACNT    AVACNT           類別
+     C                     Z-ADDIVITEM    AVITEM           項次
+     C           19110000  ADD  IVACDT    AVACDT           入帳日期
+     C                     MOVELIVORNO    AVORNO           訂單編號
+     C                     MOVELIVPDCD    AVPDCD           品名
+     C                     Z-ADDIVQTY     AVQTY            數量
+     C                     Z-ADDIVUPRC    AVUPRC           單價
+     C                     Z-ADDIVAMT     AVAMT            金額
+     C                     MOVELIVDECD    AVDECD           作廢碼
+     C                     Z-ADDIVDEDT    AVDEDT           作廢日期
+     C                     Z-ADDW#SEQ4    AVFILE           檔案序號
+     C                     Z-ADDW#IVSQ    AVSEQN           資料處理序號
+     C                     MOVELW#MUID    AVVNNO           客戶統編
+     C   47                WRITERARIVDW
+     C*
+     C                     EXSR INDGSR
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           INDGSR    BEGSR
+     C*****************************************************************
+     C                     MOVELIVNO      IDNO
+     C                     MOVELIVACNT    IDACNT
+     C                     Z-ADDIVITEM    IDITEM
+     C           K#INDG    CHAINRINDLOG              51
+     C                     MOVEL'A'       IDFLAG           處理代碼
+     C                     MOVELIVNO      IDNO             發票號碼
+     C                     MOVELIVACNT    IDACNT           類別
+     C                     Z-ADDIVITEM    IDITEM           項次
+     C           19110000  ADD  IVACDT    IDACDT           入帳日期
+     C                     MOVELIVORNO    IDORNO           訂單編號
+     C                     MOVELIVPDCD    IDPDCD           品名
+     C                     Z-ADDIVQTY     IDQTY            數量
+     C                     Z-ADDIVUPRC    IDUPRC           單價
+     C                     Z-ADDIVAMT     IDAMT            金額
+     C                     MOVELIVDECD    IDDECD           作廢碼
+     C                     Z-ADDIVDEDT    IDDEDT           作廢日期
+     C                     Z-ADDW#SEQ4    IDFILE           檔案序號
+     C                     Z-ADDW#IVSQ    IDSEQN           資料處理序號
+     C                     MOVELW#MUID    IDVNNO           客戶統編
+     C   51                WRITERINDLOG
+     C  N51                UPDATRINDLOG
+     C*
+     C                     ENDSR
+

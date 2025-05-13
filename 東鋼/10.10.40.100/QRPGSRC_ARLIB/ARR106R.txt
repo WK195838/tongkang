@@ -1,0 +1,213 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR106R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     應收帳款承購客戶其他應收明細表
+     H*          5.DATE-WRITTEN  92/02/10
+     H*          6.DATE-UPDATE   92/08/27
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARINVM  IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FARCVMSL2IF  E           K        DISK
+     FARCVDT  IF  E           K        DISK
+     FARCUDT  IF  E           K        DISK
+     FARR106T O   E             66     PRINTER
+     E*****************************************************************
+     IRARINVM
+     I                                              AMCUNOL1
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10111020 S#DEVN
+     I                                      310 314 S#CUNO
+     I                                      315 320 S#INDT
+     C*****************************************************************
+     C*          KET  LIST
+     C*****************************************************************
+     C*FILE==>ARCVMSL2
+     C           W#CVMS    KLIST
+     C                     KFLD           ASCUNO
+     C                     KFLD           ASRCNO
+     C*FILE==>ATCVDT
+     C           W#CVDT    KLIST
+     C                     KFLD           ATRCNO
+     C                     KFLD           ATITEM
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN66
+     C*
+     C                     MOVEL*ALL'='   T#LIN1
+     C                     MOVEL*ALL'='   T#LIN2
+     C                     MOVEL*ALL'-'   T#LIN3
+     C*
+     C           S#CUNO    IFEQ *BLANK
+     C                     MOVEL'全部'  T#CUN1           表頭
+     C                     ELSE
+     C                     MOVELS#CUNO    W#CUN1  6
+     C           W#CUN1    CHAINRARCUDT              49
+     C  N49                MOVELACCUNM    T#CUN1
+     C                     ENDIF
+     C*
+     C                     MOVELS#INDT    T#INDT
+     C                     MOVE S#INDT    W#INDT  80
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR106T1S
+     C                     MOVEL*BLANK    W#CUNO
+     C                     MOVEL*BLANK    W#ORNO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR106T1D
+     C*ARINVM未結案且未繳款之資料
+     C           AMINNO    CHAININREC                40
+     C  N40      INDECD    IFNE *BLANK                     已作廢
+     C           INDEDT    ANDLEW#INDT
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C*
+     C  N40      INNBAL    IFNE 0
+     C           INRCDT    ORGT W#INDT
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C*
+     C                     MOVELAMCUNO    T#CUNO           客戶代號
+     C                     MOVELINCUNM    T#CUNM           客戶名稱
+     C                     MOVELINORNO    T#ORNO           訂單編號
+     C                     MOVELINNO      T#IVNO           發票號碼
+     C                     Z-ADDINAAMT    T#AAMT           出貨金額
+     C                     Z-ADDINATAX    T#ATAX           銷項稅額
+     C                     Z-ADDINBAMT    T#BAMT           扣預收
+     C           INAAMT    ADD  INATAX    W#CAMT 120
+     C           W#CAMT    ADD  INBAMT    W#CAMT
+     C           W#CAMT    SUB  AMFAMT    T#CAMT           應收金額
+     C*
+     C*客戶代號相同則省略不印
+     C           T#CUNO    IFEQ W#CUNO
+     C                     MOVE *ON       *IN50
+     C                     ELSE
+     C                     MOVELT#CUNO    W#CUNO
+     C                     MOVE *OFF      *IN50
+     C                     ENDIF
+     C*
+     C*訂單編號相同則省略不印
+     C           T#ORNO    IFEQ W#ORNO
+     C                     MOVE *ON       *IN51
+     C                     ELSE
+     C                     MOVELT#ORNO    W#ORNO  6
+     C                     MOVE *OFF      *IN51
+     C                     ENDIF
+     C*
+     C   66                WRITEAR106T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR106T1D
+     C*
+     C                     ADD  T#AAMT    T#AAMS           出貨金額小計
+     C                     ADD  T#ATAX    T#ATAS           銷項稅額小計
+     C                     ADD  T#BAMT    T#BAMS           扣預收金額小計
+     C                     ADD  T#CAMT    T#CAMS           應收帳款小計
+     C*
+     C           DTLEND    ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*ARCVMS裡已繳款之資料
+     C                     MOVELS#CUNO    ASCUNO
+     C                     MOVE *BLANK    ASRCNO
+     C           W#CVMS    SETLLRARCVMS
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ RARCVMS                  41
+     C   41                LEAVE
+     C*
+     C                     MOVELASCUNO    W#CUNO  5
+     C           W#CUNO    IFNE S#CUNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           ASACDT    IFLT W#INDT
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     EXSR SR1000
+     C                     ENDDO
+     C*
+     C   66                WRITEAR106T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR106T1S
+     C                     WRITEAR106T1L
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C                     EXSR L1SR
+     C*
+     C           T#AAMS    IFEQ 0
+     C   66                WRITEAR106T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR106T1M
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C                     MOVELASRCNO    ATRCNO
+     C                     Z-ADD0         ATITEM
+     C           W#CVDT    SETLLRARCVDT
+     C                     MOVE *OFF      *IN42
+     C           *IN42     DOWEQ*OFF
+     C                     READ RARCVDT                  42
+     C   42                LEAVE
+     C*
+     C           ATRCNO    IFNE ASRCNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           ATINNO    CHAININREC                43
+     C           *IN43     IFEQ *OFF
+     C                     Z-ADDINAAMT    T#AAMT           出貨金額
+     C                     Z-ADDINATAX    T#ATAX           銷項稅額
+     C                     Z-ADDINBAMT    T#BAMT           扣預收
+     C                     MOVELS#CUNO    T#CUNO           客戶代號
+     C                     MOVELINCUNM    T#CUNM           客戶名稱
+     C                     MOVELINORNO    T#ORNO           訂單編號
+     C                     MOVELINNO      T#IVNO           發票號碼
+     C           INAAMT    ADD  INATAX    W#CAMT 120
+     C           W#CAMT    SUB  INBAMT    T#CAMT           應收帳款
+     C*
+     C   66                WRITEAR106T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR106T1D
+     C*
+     C                     ADD  T#AAMT    T#AAMS
+     C                     ADD  T#ATAX    T#ATAS
+     C                     ADD  T#BAMT    T#BAMS
+     C                     ADD  T#CAMT    T#CAMS
+     C*
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDSR
+

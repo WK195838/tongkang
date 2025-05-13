@@ -1,0 +1,790 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARE095R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     營業外銷報關資料維護
+     H*          5.DATE-WRITTEN  98/01/21
+     H*          6.DATE-MODIFY   98/03/10 S00LCL 2008HS135 (9803A)
+     H*                          98/05/11 2009AR309 S00WCJ (9805A)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARE095S CF  E                    WORKSTN
+     F                                        RRN   KSFILE SF1
+     FARCINV  UF  E           K        DISK                      A
+     FARCINVL1IF  E           K        DISK
+     F            RARCINV                           KRENAMERARCINV1
+9803AFARCINVL2IF  E           K        DISK
+9803AF            RARCINV                           KRENAMERARCINV2
+     FSAMAST  IF  E           K        DISK
+     FHSMAST  IF  E           K        DISK
+     FTRNDTLL4IF  E           K        DISK
+     E*****************************************************************
+     E                    ERR     1  30 70
+     I*****************************************************************
+     IRARCINV1
+     I              R1AREA                          F#AREA
+     I              R1ORNO                          F#ORNO
+     I              R1SEQ                           F#SEQ
+     I              R1OCUS                          F#OCUS
+     I              R1OCNM                          F#OCNM
+     I              R1YYMM                          F#YYMM
+     I              R1CDTE                          F#CDTE
+     I              R1SACD                          F#SACD
+     I              R1EACD                          F#EACD
+     I              R1TRAT                          F#TRAT
+     I              R1FCUR                          F#FCUR
+     I              R1AMT                           F#AMT
+     I              R1APNO                          F#APNO
+     I              R1QTY                           F#QTY
+     IRARCINV2
+     I              R1AREA                          F2AREA
+     I              R1ORNO                          F2ORNO
+     I              R1SEQ                           F2SEQ
+     I              R1OCUS                          F2OCUS
+     I              R1OCNM                          F2OCNM
+     I              R1YYMM                          F2YYMM
+     I              R1CDTE                          F2CDTE
+     I              R1SACD                          F2SACD
+     I              R1EACD                          F2EACD
+     I              R1TRAT                          F2TRAT
+     I              R1FCUR                          F2FCUR
+     I              R1AMT                           F2AMT
+     I              R1APNO                          F2APNO
+     I              R1QTY                           F2QTY
+     I*
+     IRHSMAST
+     I              S1SALE                          F#SALE
+     I              S1SND                           F#SND
+     I              S1RECV                          F#RECV
+     I*
+9803AI           IDS
+     I                                        1   6 S#ORNO
+     I                                        1   1 D#AREA
+     I                                        2   60D#ORNO
+     I            DS
+     I                                        1   6 D#CUNO
+     I                                        1   1 D#KIND
+     I                                        2   2 D#CUN1
+     I                                        3   5 D#CUN2
+     I                                        6   6 D#CUN3
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10011010 U#USID
+     I                                     10111020 S#DEVN
+     I                                     10211021 TXAR
+     C*****************************************************************
+     C*          KEY       LIST
+     C*****************************************************************
+     C           K#MAST    KLIST
+     C                     KFLD           K#OREA  1        地區別
+     C                     KFLD           K#ORN1  50       訂單號碼
+     C*
+     C           K#CINV    KLIST
+     C                     KFLD           K#AREA  1        報關廠區
+     C                     KFLD           K#ORNO  6        訂單編號
+     C                     KFLD           K#YYMM  60       報關年月
+     C                     KFLD           K#SEQ   30       流水號
+     C*
+     C           K#CIN1    KLIST
+     C                     KFLD           K#AREA           報關廠區
+     C                     KFLD           K#ORNO           訂單編號
+     C                     KFLD           K#YYMM           報關年月
+     C*
+     C**************************************************************
+     C*          MAIN      PROGRAM
+     C**************************************************************
+     C  N90                MOVE '1'       SCRN    1
+     C  N90                MOVE '1'       *IN,90
+     C*
+     C           *IN03     DOUEQ'1'
+     C           SCRN      CASEQ'1'       SR#01
+     C           SCRN      CASEQ'2'       SR#02
+     C           SCRN      CASEQ'3'       SR#03
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C*****************************************************************
+     CSR         SR#01     BEGSR
+     C*****************************************************************
+9803AC                     MOVEL*BLANKS   S#ORNO
+9805AC                     MOVEL*BLANK    W#CODE
+     C                     EXFMTTITLE
+     C                     MOVE *BLANK    S#ERR
+9805AC                     MOVEL*OFF      *IN42
+9805AC                     MOVEL*OFF      *IN43
+     C*
+     C   KC                EXSR KC#01
+9803AC           S#CODE    IFEQ '1'                        *新增
+9803AC                     CLEARDETAIL
+9803AC                     MOVE '新增'  S#MOD            功能模式
+9803AC                     SETON                     06    新增
+9803AC                     MOVE '3'       SCRN             畫面三
+9805AC                     MOVEL'1'       W#CODE
+9803AC                     ELSE
+     C                     EXSR CK#01                       CHK畫面一
+     C*
+9803AC* N99                MOVEL*BLANK    S#CODE
+9803AC           S#ORNO    IFNE ' '
+  |  C                     SETON                     44    *訂單排序
+  |  C                     ELSE
+  |  C                     SETOF                     44    *報關日排
+9803AC                     ENDIF
+9803AC* N99                EXSR PR#021
+9803AC  N99 44             EXSR PR#021
+9803AC  N99N44             EXSR PR#023                     *報關日
+     C   99                MOVE '1'       SCRN
+9803AC                     ENDIF
+     C*
+9803AC           S#CODE    IFEQ '2'
+  |  C                     SETON                     45    *SHOW 刪除
+  |  C                     ELSE
+  |  C                     SETOF                     45
+9803AC                     ENDIF
+     C*
+     CSR         SR#01Z    ENDSR
+     C*****************************************************************
+     CSR         SR#02     BEGSR
+     C*****************************************************************
+     C           RRN       IFEQ 0
+     C                     MOVEL*ON       *IN72            SFLDSP OFF
+     C                     MOVELERR,27    S#ERR
+     C                     ELSE
+     C                     MOVEL*OFF      *IN72
+     C                     ENDIF
+     C*
+     C                     WRITEUND01
+     C                     EXFMTSFCTL1                     畫面二
+     C                     MOVEL*BLANK    S#ERR
+     C*
+     C   KC                EXSR KC#01
+     C   KF                EXSR PR#022
+     C   KF                GOTO SR#02Z
+     C   KL                EXSR KL#01
+     C   KL                GOTO SR#02Z
+     C*
+     C                     Z-ADD0         RRN
+     C                     MOVEL*OFF      *IN32
+     C*
+     C           1         DOWEQ1
+     C                     ADD  1         RRN
+     C           RRN       CHAINSF1                  32
+     C   32                LEAVE
+     C*
+     C           S#OPT     IFNE ' '
+     C           S#OPT     ANDNE'Y'
+     C                     MOVELERR,15    S#ERR
+9803AC*                    SETON                     57
+9803AC                     SETON                     40
+     C                     UPDATSF1
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           S#OPT     IFEQ ' '
+     C                     ITER
+     C                     ELSE
+     C                     EXSR PR#022
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     CSR         SR#02Z    ENDSR
+     C*****************************************************************
+     CSR         SR#03     BEGSR
+     C*****************************************************************
+     C                     EXFMTDETAIL                     畫面三
+     C*
+     C                     MOVEA'0000'    *IN,51
+     C                     MOVEA'0000'    *IN,55
+     C                     MOVEA'0'       *IN,59
+     C                     MOVEL*BLANK    S#ERR
+     C*
+     C   KC                EXSR KC#01
+     C   KL                EXSR KL#01
+     C   KL                GOTO SR#03Z
+     C   KJ                EXSR KJ#02
+     C   KJ                GOTO SR#03Z
+9803AC   23                SETON                     28
+     C*
+     C                     SELEC
+     C           W#CODE    WHEQ '1'
+9805AC*          W#CODE    WHEQ '2'
+9805AC           W#CODE    OREQ '2'
+     C                     EXSR CK#02
+     C           W#CODE    WHEQ '4'
+     C                     MOVE '1'       SCRN
+     C                     MOVE *BLANK    S#ORNO
+     C                     ENDSL
+     C*
+     CSR         SR#03Z    ENDSR
+     C*****************************************************************
+     CSR         KC#01     BEGSR
+     C*****************************************************************
+     C* PF03 =離開
+     C                     SETON                     LR
+     C                     RETRN
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         KL#01     BEGSR
+     C*****************************************************************
+     C* PF12 =回前畫面
+     C*
+     C   06                MOVEL'2'       W#CODE
+     C                     MOVEL'0'       *IN06
+     C*
+     C           SCRN      IFEQ '3'
+9803AC           S#CODE    ANDNE'1'
+9803AC*首頁->新增畫面->返回首頁
+9803AC   44                EXSR PR#021
+9803AC  N44                EXSR PR#023
+     C                     MOVE *BLANK    S#ERR
+     C                     ELSE
+     C                     MOVE '1'       SCRN
+     C                     MOVE *BLANK    S#ERR
+     C                     MOVE *BLANK    S#ORNO           訂單號碼
+9803AC                     Z-ADD0         SYMD             報關起日
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         KJ#02     BEGSR
+     C*****************************************************************
+     C           W#CODE    IFEQ '1'
+     C           W#CODE    OREQ '2'
+     C                     EXSR CK#02
+     C                     ENDIF
+     C*
+     C  N99                EXSR FL#02
+     C  N99                MOVE '1'       SCRN
+     C  N99                MOVE *BLANK    S#ORNO           信用狀號碼
+     C*
+     CSR         KJ#02Z    ENDSR
+     C*****************************************************************
+     CSR         CK#01     BEGSR
+     C*****************************************************************
+     C* CHECK畫面一
+     C                     SETOF                     414299
+9803AC                     SETOF                     43
+     C                     MOVEL*BLANK    S#ERR
+     C                     MOVEL*BLANK    W#ORNO  6
+     C                     MOVEL*BLANK    W#CODE  1
+     C                     MOVELS#CODE    W#CODE
+     C                     MOVELS#ORNO    W#ORNO
+     C*
+     C                     SELEC
+     C           W#CODE    WHEQ ' '
+     C                     SETON                     4199
+     C                     MOVELERR,1     S#ERR
+     C*
+     C           W#CODE    WHEQ '2'
+     C                     MOVE '更正'  S#MOD
+     C                     MOVE '0'       *IN50
+     C*
+     C           W#CODE    WHEQ '4'
+     C                     MOVE '查詢'  S#MOD
+     C                     MOVE '1'       *IN50
+     C*
+     C                     OTHER
+     C                     SETON                     4199
+     C                     MOVELERR,2     S#ERR
+     C                     ENDSL
+     C*
+     C           *IN99     IFEQ *ON
+     C                     GOTO CK#01Z
+     C                     ENDIF
+     C*****
+     C*
+     C           S#ORNO    IFEQ *BLANK
+9803AC           SYMD      ANDEQ0
+9803AC                     SETON                     424399
+9803AC                     MOVELERR,28    S#ERR
+9803AC*                    SETON                     4299
+9803AC*                    MOVELERR,3     S#ERR
+     C                     GOTO CK#01Z
+     C                     ENDIF
+     C*給定ＫＥＹ值
+9803AC           S#ORNO    IFNE *BLANKS
+     C                     MOVELD#AREA    K#OREA           地區別
+     C                     Z-ADDD#ORNO    K#ORN1           訂單流水號
+     C*
+     C                     MOVEL*OFF      *IN97
+     C                     MOVEL*BLANK    D#CUNO           客戶編號
+     C                     MOVEL*BLANK    W#CUNM 10        客戶名稱
+     C           D#AREA    IFEQ 'H'
+     C           K#MAST    CHAINHSMAST              N97
+     C  N97                MOVELS1CUN3    D#CUN3           公司碼
+     C                     ELSE
+     C           K#MAST    CHAINSAMAST              N97
+     C  N97                MOVELS1CD01    D#CUN3           公司碼
+     C                     ENDIF
+     C*
+     C           *IN97     IFEQ *ON
+     C                     SETON                     4299
+     C                     MOVELERR,4     S#ERR
+     C                     ELSE
+     C                     MOVELS1KIND    D#KIND           內外銷
+     C                     MOVELS1CUN1    D#CUN1           地區
+     C                     MOVELS1CUN2    D#CUN2           流水號
+     C                     ENDIF
+9803AC                     ENDIF
+     C*
+     CSR         CK#01Z    ENDSR
+     C*****************************************************************
+     CSR         PR#021    BEGSR
+     C*****************************************************************
+     C                     SETON                     71     SFL CLEAR
+     C                     WRITESFCTL1
+     C                     SETOF                     71
+     C*
+     C                     Z-ADD0         RRN     20
+     C                     Z-SUB12        S#NBR
+     C*
+     C                     MOVEL*OFF      *IN97
+     C           S#ORNO    SETLLRARCINV1
+     C           *IN97     DOWEQ*OFF
+     C           S#ORNO    READERARCINV1            N    97
+     C*
+     C   97                LEAVE
+     C*
+     C                     CLEARSF1
+     C                     ADD  1         RRN
+     C                     MOVEL*BLANK    S#OPT            挑選碼
+9803AC                     MOVELF#ORNO    S@ORNO           訂單號碼
+     C                     MOVELF#APNO    S#NTNO           報單號碼
+     C                     MOVELD#CUNO    S#CUNO           客戶代號
+     C                     MOVELF#AREA    S#AREA           報關廠區
+     C                     Z-ADDF#FCUR    S#AAMT           外幣報關額
+     C                     Z-ADDF#CDTE    S#CDTE           報關日期
+     C                     Z-ADDF#SEQ     H#SEQ            流水號　
+     C                     Z-ADDF#YYMM    H#YYMM           報關年月
+     C                     WRITESF1
+     C                     ENDDO
+     C*
+     C           RRN       IFGT 0
+     C                     ADD  13        S#NBR
+     C                     ENDIF
+     C*
+     C                     SETON                     74
+     C                     MOVE '2'       SCRN             畫面二
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+9803ACSR         PR#023    BEGSR
+  |  C*****************************************************************
+     C                     SETON                     71     SFL CLEAR
+     C                     WRITESFCTL1
+     C                     SETOF                     71
+     C*
+     C                     Z-ADD0         RRN     20
+     C                     Z-SUB12        S#NBR
+     C*
+     C                     MOVEL*OFF      *IN98
+     C           SYMD      SETLLRARCINV2
+     C           *IN98     DOWEQ*OFF
+     C           SYMD      READERARCINV2            N    98
+     C*
+     C   98                LEAVE
+     C**
+     C                     CLEARSF1
+     C                     ADD  1         RRN
+     C                     MOVEL*BLANK    S#OPT            挑選碼
+9803AC                     MOVELF2ORNO    S@ORNO           訂單號碼
+     C                     MOVELF2APNO    S#NTNO           報單號碼
+9803AC*                    MOVELD#CUNO    S#CUNO           客戶代號
+9803AC                     MOVELF2OCUS    S#CUNO           客戶代號
+     C                     MOVELF2AREA    S#AREA           報關廠區
+     C                     Z-ADDF2FCUR    S#AAMT           外幣報關額
+     C                     Z-ADDF2CDTE    S#CDTE           報關日期
+     C                     Z-ADDF2SEQ     H#SEQ            流水號　
+     C                     Z-ADDF2YYMM    H#YYMM           報關年月
+     C                     WRITESF1
+     C                     ENDDO
+     C*
+     C           RRN       IFGT 0
+     C                     ADD  13        S#NBR
+     C                     ENDIF
+     C*
+     C                     SETON                     74
+     C                     MOVE '2'       SCRN             畫面二
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         PR#022    BEGSR
+     C*****************************************************************
+     C*查詢功能中不可新增資料
+     C*-----------------------
+     C*
+     C           W#CODE    IFEQ '4'
+     C           *IN06     ANDEQ'1'
+     C                     MOVELERR,18    S#ERR
+     C                     GOTO PR#22Z
+     C                     ENDIF
+     C*
+     C*-----------------------
+     C*依功能選項顯示相關資料
+     C*-----------------------
+     C*
+     C           *IN06     IFEQ '1'                        新增
+     C                     CLEARDETAIL
+9803AC*                    MOVELW#ORNO    S#ORND           訂單編號
+9803AC                     MOVELS@ORNO    S#ORND           訂單編號
+     C                     ELSE                            修改或查詢
+     C*
+     C                     MOVELS#AREA    K#AREA           報關廠區
+9803AC*                    MOVELW#ORNO    K#ORNO           訂單號碼
+9803AC                     MOVELS@ORNO    K#ORNO           訂單號碼
+     C                     Z-ADDH#YYMM    K#YYMM           報關年月
+     C                     Z-ADDH#SEQ     K#SEQ            流水號
+     C           K#CINV    CHAINRARCINV             N97
+     C*
+     C                     MOVELR1ORNO    S#ORND           訂單編號
+     C                     MOVELR1APNO    S#APNO           報單號碼
+     C                     MOVELR1AREA    S#ARED           報關廠區
+     C                     Z-ADDR1CDTE    S#CDTD           報關日期
+     C                     Z-ADDR1SACD    S#DATS           起出貨日期
+     C                     Z-ADDR1EACD    S#DATE           訖出貨日期
+     C                     Z-ADDR1TRAT    S#TRAT           報關匯率
+     C                     Z-ADDR1FCUR    S#FCUR           外幣報關額
+     C                     Z-ADDR1AMT     S#AMT            台幣報關額
+     C                     Z-ADDR1QTY     S#QTY            報關數量
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           *IN06     WHEQ '1'
+     C           W#CODE    ANDEQ'2'
+     C                     MOVE '新增'  S#MOD            功能模式
+     C                     MOVEL'1'       W#CODE           新增
+     C*
+     C           W#CODE    WHEQ '2'
+     C           *IN06     ANDEQ'0'
+     C                     MOVE '更正'  S#MOD
+     C                     MOVEL'2'       W#CODE
+     C                     SETON                     60
+     C*
+     C           W#CODE    WHEQ '4'
+     C           *IN06     ANDEQ'0'
+     C                     MOVE '查詢'  S#MOD
+     C                     MOVEL'4'       W#CODE
+     C                     SETON                     5060
+     C                     ENDSL
+     C*
+     C                     MOVE '3'       SCRN             畫面三
+     C*
+     CSR         PR#22Z    ENDSR
+     C*****************************************************************
+     CSR         CK#02     BEGSR
+     C*****************************************************************
+     C*檢核畫面三資料正確性
+     C*
+     C                     SETOF                     9799
+     C                     MOVEA'0000'    *IN,51
+     C                     MOVEA'0000'    *IN,55
+     C                     MOVEA'0'       *IN,59
+     C                     MOVEL*BLANK    S#ERR
+     C*
+     C*-----------------------
+     C*檢核修改資料是否不存在
+     C*-----------------------
+     C*
+     C                     MOVELS#AREA    K#AREA           報關廠區
+9803AC*                    MOVELW#ORNO    K#ORNO           訂單號碼
+9803AC                     MOVELS@ORNO    K#ORNO           訂單號碼
+     C                     Z-ADDH#YYMM    K#YYMM           報關年月
+     C                     Z-ADDH#SEQ     K#SEQ            流水號
+     C*
+     C           W#CODE    IFEQ '2'
+     C           K#CINV    CHAINRARCINV              97
+     C           *IN97     IFEQ *ON
+     C                     SETON                     9951
+     C                     MOVELERR,20    S#ERR
+     C                     GOTO CK#02Z
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C*-------------
+     C*檢核報單號碼
+     C*-------------
+     C*
+     C           S#APNO    IFEQ *BLANK
+     C                     SETON                     5199
+     C                     MOVELERR,5     S#ERR
+     C                     GOTO CK#02Z
+     C                     ENDIF
+     C*
+     C*-------------
+     C*檢核報關廠區
+     C*-------------
+     C*
+     C           S#ARED    IFNE 'H'
+     C           S#ARED    ANDNE'K'
+     C                     SETON                     5299
+     C                     MOVELERR,6     S#ERR
+     C                     GOTO CK#02Z
+     C                     ENDIF
+     C*
+     C*-------------
+     C*檢核報關日期
+     C*-------------
+     C*
+     C                     MOVEL*ALL'0'   P#DATE
+     C                     MOVE S#CDTD    P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM           FLAGC   1
+     C*
+     C           FLAGC     IFNE '0'
+     C                     SETON                     5399
+     C                     MOVELERR,7     S#ERR
+     C                     GOTO CK#02Z
+     C                     ENDIF
+     C*
+     C           S#CDTD    IFGT UDATE
+     C                     SETON                     5399
+     C                     MOVELERR,8     S#ERR
+     C                     GOTO CK#02Z
+     C                     ENDIF
+     C*
+     C*-----------------
+     C*檢核起始出貨日期
+     C*-----------------
+     C*
+     C           S#DATS    IFNE 0
+     C                     MOVEL*ALL'0'   P#DATE
+     C                     MOVE S#DATS    P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE
+     C                     PARM '1'       P#MODE
+     C                     PARM           P#MTL
+     C                     PARM           P#LY
+     C                     PARM           FLAGC
+     C*
+     C           FLAGC     IFNE '0'
+     C                     SETON                     5499
+     C                     MOVELERR,9     S#ERR
+     C                     GOTO CK#02Z
+     C                     ENDIF
+     C*
+     C           S#DATS    IFGT UDATE
+     C                     SETON                     5499
+     C                     MOVELERR,10    S#ERR
+     C                     GOTO CK#02Z
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C*-----------------
+     C*檢核終止出貨日期
+     C*-----------------
+     C*
+     C           S#DATE    IFNE 0
+     C                     MOVEL*ALL'0'   P#DATE
+     C                     MOVE S#DATE    P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE
+     C                     PARM '1'       P#MODE
+     C                     PARM           P#MTL
+     C                     PARM           P#LY
+     C                     PARM           FLAGC
+     C*
+     C           FLAGC     IFNE '0'
+     C*                    SETON                     5599
+     C*                    MOVELERR,21    S#ERR
+     C*                    GOTO CK#02Z
+     C                     ENDIF
+     C*
+     C           S#DATE    IFGT UDATE
+     C*                    SETON                     5599
+     C*                    MOVELERR,22    S#ERR
+     C*                    GOTO CK#02Z
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           S#DATS    IFGT S#DATE
+     C*                    SETON                     545599
+     C*                    MOVELERR,23    S#ERR
+     C*                    GOTO CK#02Z
+     C                     ENDIF
+     C*
+     C*-------------
+     C*檢核報關匯率
+     C*-------------
+     C*
+     C           S#TRAT    IFEQ 0
+     C                     SETON                     5699
+     C                     MOVELERR,11    S#ERR
+     C                     GOTO CK#02Z
+     C                     ENDIF
+     C*
+     C*-----------------
+     C*檢核外幣報關金額
+     C*-----------------
+     C*
+     C           S#FCUR    IFEQ 0
+     C                     SETON                     5799
+     C                     MOVELERR,24    S#ERR
+     C                     GOTO CK#02Z
+     C                     ENDIF
+     C*
+     C*-----------------
+     C*檢核台幣報關金額
+     C*-----------------
+     C*
+     C           S#AMT     IFEQ 0
+     C                     SETON                     5899
+     C                     MOVELERR,25    S#ERR
+     C                     GOTO CK#02Z
+     C                     ENDIF
+     C*
+     C*-------------
+     C*檢核報關數量
+     C*-------------
+     C*
+     C           S#QTY     IFEQ 0
+     C                     SETON                     5999
+     C                     MOVELERR,26    S#ERR
+     C                     GOTO CK#02Z
+     C                     ENDIF
+9805AC*
+9805AC           *IN23     IFEQ *ON
+9805AC                     MOVELERR,30    S#ERR
+9805AC                     ENDIF
+9805AC*
+     C*
+     CSR         CK#02Z    ENDSR
+     C*****************************************************************
+     CSR         FL#02     BEGSR
+     C*****************************************************************
+     C           W#CODE    CASEQ'1'       WR#02            新增報單
+     C           W#CODE    CASEQ'2'       UP#02            修改報單
+     C                     ENDCS
+     C*
+     CSR         FL#02Z    ENDSR
+     C*****************************************************************
+     CSR         WR#02     BEGSR
+     C*****************************************************************
+     C                     MOVE *OFF      *IN97
+     C                     MOVELS#ARED    K#AREA           報關廠區
+9803AC*                    MOVELW#ORNO    K#ORNO           訂單編號
+9803AC                     MOVELS#ORND    K#ORNO           訂單編號
+     C                     MOVELS#CDTD    K#YYMM           報關年月
+     C                     Z-ADD999       K#SEQ            流水號
+     C*
+     C                     MOVEL*OFF      *IN97
+     C           K#CINV    SETGTRARCINV
+     C           *IN97     DOWEQ*OFF
+     C                     READPRARCINV                  97
+     C*
+     C           *IN97     IFEQ *ON
+     C           R1ORNO    ORNE S#ORND
+     C                     Z-ADD0         R1SEQ
+     C                     ENDIF
+     C*
+     C                     MOVEL'A'       R1FLAG           處理代碼
+     C                     MOVELS#ARED    R1AREA           報關廠區
+     C                     MOVELS#ORND    R1ORNO           訂單編號
+     C                     ADD  1         R1SEQ            流水號
+     C                     MOVELS#CDTD    R1YYMM           報關年月
+     C                     Z-ADDS#CDTD    R1CDTE           報關日期
+     C                     Z-ADDS#DATS    R1SACD           起出貨日
+     C                     Z-ADDS#DATE    R1EACD           訖出貨日
+     C                     Z-ADDS#TRAT    R1TRAT           報關匯率
+     C                     Z-ADDS#FCUR    R1FCUR           外幣報關額
+     C                     Z-ADDS#AMT     R1AMT            台幣報關額
+     C                     MOVELS#APNO    R1APNO           報單編號
+     C                     MOVEL*BLANK    R1IVNO           發票號碼
+     C                     Z-ADDS#QTY     R1QTY            報關數量
+     C                     MOVE UDATE     R1ENTD           建檔日期
+     C                     MOVELU#USID    R1ENTM           建檔人員
+     C                     MOVE UDATE     R1UPDD           異動日期
+     C                     MOVELU#USID    R1UPDM           異動人員
+     C                     TIME           R1UPDT           異動時間
+     C*
+     C                     MOVEL*OFF      *IN30
+     C           S#ORND    CHAINTXREC                30
+     C  N30                MOVELTXCUNO    R1OCUS           客戶編號
+     C  N30                MOVELTXCUNM    R1OCNM           客戶名稱
+     C   30                MOVEL*BLANK    R1OCUS           客戶編號
+     C   30                MOVEL*BLANK    R1OCNM           客戶名稱
+     C*
+     C                     WRITERARCINV
+     C                     MOVELERR,19    S#ERR
+     C                     LEAVE
+     C                     ENDDO
+     C*
+     CSR         WR#02Z    ENDSR
+     C*****************************************************************
+     CSR         UP#02     BEGSR
+     C*****************************************************************
+     C                     MOVE *OFF      *IN97
+     C                     MOVELS#AREA    K#AREA           報關廠區
+9803AC*                    MOVELW#ORNO    K#ORNO           訂單編號
+9803AC                     MOVELS@ORNO    K#ORNO           訂單號碼
+     C                     MOVELS#CDTE    K#YYMM           報關年月
+     C                     Z-ADDH#SEQ     K#SEQ            流水號
+     C*
+     C           K#CINV    CHAINRARCINV              97
+     C   97                GOTO UP#02Z
+     C*
+     C                     MOVEL'C'       R1FLAG           處理代碼
+9803AC   28                MOVEL'D'       R1FLAG
+     C                     MOVELS#APNO    R1APNO           報單號碼
+     C                     MOVELS#ARED    R1AREA           報關廠區
+     C                     Z-ADDS#CDTD    R1CDTE           報關日期
+     C                     MOVELS#CDTD    R1YYMM           報關年月
+     C                     Z-ADDS#DATS    R1SACD           起出貨日
+     C                     Z-ADDS#DATE    R1EACD           訖出貨日
+     C                     Z-ADDS#TRAT    R1TRAT           報關匯率
+     C                     Z-ADDS#FCUR    R1FCUR           外幣報關額
+     C                     Z-ADDS#AMT     R1AMT            台幣報關額
+     C                     Z-ADDS#QTY     R1QTY            報關數量
+     C                     MOVE UDATE     R1UPDD           異動日期
+     C                     MOVELU#USID    R1UPDM           異動人員
+     C                     TIME           R1UPDT           異動時間
+     C*
+     C                     UPDATRARCINV
+9803AC*                    MOVELERR,17    S#ERR
+9803AC  N28                MOVELERR,17    S#ERR
+9803AC   28                MOVELERR,29    S#ERR
+9803AC   28                SETOF                     28
+     C*
+     CSR         UP#02Z    ENDSR
+     C*****************************************************************
+** ERR
+01-功能代碼必須輸入．
+02-功能代碼必須為２，４
+03-訂單號碼必須輸入
+04-此訂單號碼不存在
+05-報單號碼不可為空白
+06-報關廠區輸入錯誤
+07-報關日期輸入錯誤
+08-報關日期不可大於系統日期
+09-起始出貨日期輸入錯誤
+10-起始出貨日期不可大於系統日期
+11-報關匯率必需輸入
+12-新增時押匯日期不可輸入
+13-修改或查詢時，押匯日期必須輸入
+14-資料已存在，不可新增
+15-如欲修改或查詢該資料，請於欲挑選資料前上”Ｙ”碼
+16-此筆資料已存在，不允許新增
+17-報關資料已修改存檔
+18-於查詢功能下，不可新增資料
+19-報單資料已新增存檔
+20-於修改功能下，找不到欲修改之資料內容
+21-終止出貨日期輸入錯誤
+22-終止出貨日期不可大於系統日期
+23-起始出貨日期不可大於終止出貨日期
+24-外幣報關金額必需輸入
+25-台幣報關金額必需輸入
+26-報關數量必需輸入
+27-資料不存在
+28-請擇一輸入
+29-報關資料已刪除
+30-請按F10確認刪除
+

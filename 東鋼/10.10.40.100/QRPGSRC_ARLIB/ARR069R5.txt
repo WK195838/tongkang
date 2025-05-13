@@ -1,0 +1,230 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR069R5
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     訂單別出貨及發票明細表挑磅單
+     H*            5.WRITER-DATE   104/07/01 2015AR938 S00WCJ
+     H*            5.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARR069F UF  E           K        DISK
+     FARR069S1CF  E                    WORKSTN
+     F                                        RRN   KSFILE AR069F2
+     E                    ERR     1  26 70               *錯誤訊息
+     I            DS
+     I                                        1  10 S#SRID
+     I                                        1   8 D#SID1
+     I                                        9  10 D#SID2
+     I           UDS
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVN
+     I                                     10211021 D#AREA
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*
+0407AC           *ENTRY    PLIST
+0407AC                     PARM           P#IN03  1
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           S#ORNO
+     C                     KFLD           S#DATE
+     C                     KFLD           S#WTNO
+     C*
+     C*****************************************************************
+     C*Main Program
+     C*****************************************************************
+     C                     EXSR SR0000                     *初值設定
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           *前置處理
+     C           W#PRID    CASEQ'02'      SR2000           *畫面一
+     C           W#PRID    CASEQ'03'      SR3000           * READC
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*初值設定
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVE *ALL'='   S#LIN3
+     C                     MOVEL'ARR069S1'D#SID1
+     C                     MOVEL'-1'      D#SID2
+     C                     MOVE *ON       *IN31            * CURSOR
+     C                     MOVEA'00000'   *IN,50
+     C                     MOVEA'0000'    *IN,71
+     C                     MOVEL'Y'       UPDSCR  1
+     C                     MOVE '01'      W#PRID  2
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->ARE100S-1畫面
+     C* Clear subfile
+     C                     Z-ADD*ZEROS    W#LRRN  50
+     C                     MOVEA'111'     *IN,71
+     C                     WRITEAR069F2C
+     C                     MOVEA'000'     *IN,71           *SFLCLR
+     C*                    Z-ADD*ZEROS    W#CNT   20
+     C*                    Z-SUB31        S#NBR
+     C                     Z-ADD1         S#NBR
+     C                     Z-ADD*ZEROS    RRN     40
+     C*
+     C           UPDSCR    IFEQ 'Y'
+     C                     EXSR SR1100
+     C                     ENDIF
+     C*
+     C*讀入SUBFILE AR100F2
+     C                     MOVE '02'      W#PRID
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C* MOVE DARA TO DISPLAY
+     C                     Z-ADD0         W#CNT   20
+     C                     MOVEL*OFF      *IN65
+     C                     MOVEL*BLANKS   UPDSCR
+     C           *LOVAL    SETLLWFREC                      *1->NR
+     C           *IN65     DOWEQ*OFF
+     C                     READ WFREC               N    65*EOF
+     C   65                LEAVE
+     C   65                MOVEL*ON       *IN89
+     C*
+     C           WFWTNO    IFEQ S#WTNO
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVEL*BLANKS   S#OPTX
+     C                     MOVELWFORNO    S#ORNO           *訂單
+     C                     Z-ADDWFDATE    S#DATE           *日期
+     C                     MOVELWFWTNO    S#WTNO           *磅單編號
+     C                     ADD  1         RRN
+     C                     WRITEAR069F2
+     C                     ADD  1         W#CNT
+     C                     ENDDO
+     C*
+     C*          W#CNT     IFGT *ZERO                      *至少一筆
+     C*                    ADD  24        S#NBR
+     C*                    ENDIF
+     C                     Z-ADDRRN       W#LRRN
+     C*
+     C           S#NBR     IFGT RRN
+     C           RRN       ANDNE*ZEROS
+     C                     Z-ADDRRN       S#NBR
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*
+     C*顯示畫面一
+     C*
+     C           W#PRID    DOWEQ'02'
+     C*
+     C           RRN       COMP *ZEROS                   72
+     C   72      S#ERR     IFEQ *BLANKS
+     C                     MOVE ERR,5     S#ERR
+     C                     ENDIF
+     C**
+     C                     WRITEAR069H
+     C                     WRITEAR069F2M
+     C                     EXFMTAR069F2C
+     C                     MOVEL*BLANKS   S#ERR            * CURSOR
+     C                     Z-ADDS#CSR     S#NBR          50
+     C   50                Z-ADDW#LRRN    S#NBR
+     C   50                Z-ADD1         S#NBR
+     C*
+     C*PF3=Exit
+     C           *IN03     IFEQ *ON
+     C           *IN09     OREQ *ON
+     C                     MOVE '00'      W#PRID
+0407AC   03                MOVEL'1'       P#IN03
+     C                     LEAVE
+     C                     ENDIF
+     C*F12=Exit
+     C           *IN12     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+0407AC                     MOVEL'1'       P#IN03
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*PA1=翻下頁
+     C*          *IN91     IFEQ *ON
+     C*  65                MOVEAERR,5     S#ERR
+     C* N65                EXSR SR1100
+     C*                    ITER
+     C*                    ENDIF
+     C*
+     C                     MOVE '03'      W#PRID
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*READC逐筆撿核
+     C                     MOVEA'00000'   *IN,50
+     C                     MOVE *OFF      *IN99
+     C                     MOVEA'0000'    *IN,71
+     C                     MOVE *BLANK    S#ERR
+     C                     Z-ADDRRN       W#TEMP  40
+     C                     Z-ADD1         RRN
+     C*
+     C           W#PRID    DOWEQ'03'
+     C                     READCAR069F2                9898*ER*EOF
+     C   98                MOVEL'02'      W#PRID
+     C   98                LEAVE
+     C*
+     C           S#OPTX    IFNE *BLANKS
+     C                     EXSR SR3100
+     C                     ENDIF
+     C*
+     C           S#OPTX    IFEQ *BLANKS
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*                    MOVE *ON       *IN70
+     C                     UPDATAR069F2
+     C                     MOVE *OFF      *IN70
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3100    BEGSR
+     C*****************************************************************
+     C*
+     C           KEY01     SETLLWFREC
+     C                     MOVEL*OFF      *IN55
+     C           *IN55     DOWEQ*OFF
+     C           KEY01     READEWFREC                    55
+     C   55                LEAVE
+     C           S#OPTX    IFNE ' '
+     C                     MOVELS#OPTX    WFOPT
+     C                     UPDATWFREC
+     C                     ENDIF
+     C                     ENDDO
+     C           EN3100    ENDSR
+     C**************************************************************
+**  ERR
+01-資料已存在！
+03-欄位不可為或空白！
+05-資料不存在!!
+06-
+07-
+08-
+09-
+10-
+11-
+12-
+13-
+14-
+15-新增完成
+16-修改完成
+17-
+

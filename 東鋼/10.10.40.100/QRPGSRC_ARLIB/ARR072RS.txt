@@ -1,0 +1,177 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR072RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     客戶別各廠成品出貨數量表（畫面）
+     H*            5.DATE-WRITTEN  88/03/13
+     H*            6.DATE-MODIFY   92/06/25
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR072S CF  E                    WORKSTN
+     E*************************************************************
+     E                    T#MSG   1   5 70
+     I*************************************************************
+     I           UDS
+     I                                        1   2 U#TYPE
+     I                                       11  16 U#FRYM
+     I                                       21  26 U#TOYM
+     I                                       27  27 U#COD1
+     I                                       28  33 U#CUN1
+     I                                       34  39 U#CUN2
+     I                                       40  40 U#FLAG
+     I*
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 S#USID
+     I                                     10211021 S#AREA
+     C**************************************************************
+     C*   程式參數接收區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1        結束旗標
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C*   副程式開始
+     C**************************************************************
+     C*----------------------------------------
+     C*  宣告及初始變數
+     C*----------------------------------------
+     CSR         SR0000    BEGSR
+     C                     MOVEL'01'      W#PRID  2
+     C                     EXSR SR1100                     初始畫面一
+     CSR                   ENDSR
+     C*
+     C************************************
+     C*  畫面一:輸入日期區間及號碼區間
+     C************************************
+     CSR         SR1000    BEGSR
+     C                     EXFMTAR072F1
+     C                     MOVEL*BLANK    S#MSG1
+     C*
+     C                     SELEC
+     C           *IN03     WHEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03
+     C                     MOVEL'00'      W#PRID
+     C*
+     C                     OTHER
+     C                     EXSR SR1200                     存檔
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  初始畫面一
+     C*----------------------------------------
+     CSR         SR1100    BEGSR
+     C                     MOVEL'3'       S#TYPE
+     C                     MOVEL'3'       S#COD1
+     C                     Z-ADD0         S#FRYM
+     C                     Z-ADD0         S#TOYM
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一：存檔執行
+     C*----------------------------------------
+     CSR         SR1200    BEGSR
+     C*檢核年月起日
+     C                     MOVELS#FRYM    P#DATE
+     C                     MOVE '01'      P#DATE
+     C                     CALL 'UTS104R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM '2'       P#MOD2  1
+     C                     PARM '0000'    P#DAYS  4
+     C                     PARM *BLANK    P#RTND  8
+     C                     PARM *BLANK    P#ERRC  1
+     C           P#ERRC    IFNE '0'
+     C                     MOVELT#MSG,1   S#MSG1           起日錯誤
+     C                     SETON                     51
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*檢核年月迄日
+     C           S#TOYM    IFEQ 0
+     C                     Z-ADDS#FRYM    S#TOYM
+     C                     ELSE
+     C                     MOVELS#TOYM    P#DATE
+     C                     MOVE '01'      P#DATE
+     C                     CALL 'UTS104R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM '2'       P#MOD2  1
+     C                     PARM '0000'    P#DAYS  4
+     C                     PARM *BLANK    P#RTND  8
+     C                     PARM *BLANK    P#ERRC  1
+     C           P#ERRC    IFNE '0'
+     C                     MOVELT#MSG,2   S#MSG1           止日錯誤
+     C                     SETON                     52
+     C                     GOTO ES1200
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           S#FRYM    IFGT S#TOYM                     起大於止
+     C                     MOVELT#MSG,3   S#MSG1
+     C                     SETON                     5152
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*檢核內外銷別
+     C           S#COD1    IFNE '1'
+     C           S#COD1    ANDNE'2'
+     C           S#COD1    ANDNE'3'
+     C                     MOVELT#MSG,4   S#MSG1
+     C                     SETON                     55
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*檢核客戶別
+     C           S#CUN1    IFEQ *BLANK
+     C           S#CUN2    ANDNE*BLANK
+     C                     MOVELT#MSG,5   S#MSG1
+     C                     SETON                     54
+     C                     GOTO ES1200
+     C                     ENDIF
+     C*
+     C                     MOVELS#TYPE    U#TYPE           成品代碼
+     C                     MOVE S#FRYM    U#FRYM           年月起日
+     C                     MOVE S#TOYM    U#TOYM           年月止日
+     C                     MOVE S#COD1    U#COD1           內外銷
+     C                     SELEC
+     C           S#CUN1    WHEQ *BLANK                     客戶代號
+     C           S#CUN2    ANDEQ*BLANK
+     C                     MOVEL*BLANK    U#CUN1
+     C                     MOVEL'999999'  U#CUN2
+     C                     MOVEL*BLANK    U#FLAG
+     C           S#CUN1    WHNE *BLANK
+     C           S#CUN2    ANDEQ*BLANK
+     C                     MOVELS#CUN1    U#CUN1
+     C                     MOVELS#CUN1    U#CUN2
+     C                     MOVEL'X'       U#FLAG
+     C           S#CUN1    WHNE *BLANK
+     C           S#CUN2    ANDNE*BLANK
+     C                     MOVELS#CUN1    U#CUN1
+     C                     MOVELS#CUN2    U#CUN2
+     C                     MOVEL*BLANK    U#FLAG
+     C                     ENDSL
+     C                     MOVEL'0'       P#IN03
+     C                     MOVEL'00'      W#PRID
+     CSR         ES1200    ENDSR
+     C*
+     C**************************************************************
+** T#MSG
+０１起始年月錯誤！
+０２終止年月錯誤！
+０３起始年月大於終止年月！
+０４內外銷別輸入錯誤！
+０４客戶別輸入錯誤！
+

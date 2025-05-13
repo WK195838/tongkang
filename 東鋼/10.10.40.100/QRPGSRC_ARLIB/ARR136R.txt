@@ -1,0 +1,192 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARR136R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     銷貨發票開立方式一覽表
+     H*            5.DATE-WRITTEN  98/12/18  2009OD64
+     H*            6.UPDATE-DATE  113/01/08 2023AR00056 S00WCJ (1301A)
+     H*                            修正廠區，T改為U桃園；出貨業務
+     H*                            代號改為業務代號篩選接單、出貨、收
+     H*                            款；新增客戶代號篩選及增加訂單結案
+     H*                            選項
+     H*                           113/01/22 S00WCJ (1301B)
+     H*                            發票開立方式增加4每日隨訂選項；
+     H*                            取消銷貨未開欄位，改為訂單日期，增
+     H*                            加接單業務欄位
+     H*
+     H*****************************************************************
+     FARR136F IP  E           K        DISK
+     FARR136T O   E             60     PRINTER
+1301BE                    TAB1    4   4  2   TAB2    6   *開立方式
+     IARREC
+1301BI                                              ARSALEL3
+1301AI                                              ARSND L3
+     I                                              ARMTHDL2
+     I                                              ARCUNOL1
+     I           UDS
+     I                                        1   80R#DATS
+     I                                        9  160R#DATE
+1301AI                                       17  17 R#AREA
+1301AI                                       18  18 R#SALS
+     I                                       19  19 S#INVS
+1301AI                                       20  25 R#CUNS
+1301AI                                       26  26 R#CLOS
+     I                                      951 985 COMP
+     I                                     10011010 U#USID
+     I                                     10111020 DEVNM
+     C*
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C  N10                MOVEL*BLANKS   W#ORN5  6
+     C*
+     C           W#DATA    IFEQ 'Y'
+     C   L3 10             WRITEAR136T1M
+     C   L3                MOVEL*BLANKS   W#DATA
+     C                     ENDIF
+     C  N10                EXSR SR0000
+     C   L1                MOVEL*ON       *IN53
+     C   L2                MOVEL*ON       *IN52
+     C   L3                MOVEL*ON       *IN51
+     C                     EXSR SR1000
+     C   60                EXSR SR2000
+     CLR                   EXSR SR3000
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C* 印表頭
+     C                     MOVEL'N'       W#DATA
+1301AC                     SELEC
+1301AC           R#AREA    WHEQ 'U'
+1301AC                     MOVEL'桃園'  R#ARNM
+1301AC           R#AREA    WHEQ 'M'
+1301AC                     MOVEL'台中'  R#ARNM
+1301AC           R#AREA    WHEQ 'K'
+1301AC                     MOVEL'高雄'  R#ARNM
+1301AC           R#AREA    WHEQ 'P'
+1301AC                     MOVEL'台北'  R#ARNM
+1301AC           R#AREA    WHEQ 'N'
+1301AC                     MOVEL'大業'  R#ARNM
+1301AC           R#AREA    WHEQ ' '
+1301AC                     MOVEL'全部'  R#ARNM
+1301AC                     ENDSL
+     C*
+1301AC                     MOVELS#INVS    R#INVS
+1301AC                     SELEC
+1301AC           R#INVS    WHEQ *BLANKS
+1301AC                     MOVEL'全部'  R#INVM
+1301AC           R#INVS    WHEQ '1'
+1301AC                     MOVEL'隨車'  R#INVM
+1301AC           R#INVS    WHEQ '2'
+1301AC                     MOVEL'區間'  R#INVM
+1301AC           R#INVS    WHEQ '3'
+1301AC                     MOVEL'指定'  R#INVM
+1301BC           R#INVS    WHEQ '4'
+1301BC                     MOVEL'隨訂'  R#INVM
+1301AC                     ENDSL
+     C*
+     C                     MOVEL*ON       *IN10
+     C                     WRITEAR136T1H
+     C                     MOVEL*OFF      *IN60
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C           S#INVS    IFEQ '1'                        *隨車
+     C           ARMTHD    ANDNE'00'
+     C                     GOTO END100
+     C                     ENDIF
+     C*
+     C           S#INVS    IFEQ '2'                        *區間
+     C           ARMTHD    ANDNE'03'
+     C                     GOTO END100
+     C                     ENDIF
+     C*
+     C           S#INVS    IFEQ '3'                        *指定
+     C           ARMTHD    ANDNE'04'
+     C                     GOTO END100
+     C                     ENDIF
+     C*
+1301AC           S#INVS    IFEQ '4'
+1301AC           ARMTHD    ANDNE'01'                       *每日隨訂
+1301AC                     GOTO END100
+1301AC                     ENDIF
+     C*
+1301BC*          S#INVS    IFEQ *BLANKS
+1301BC*          ARMTHD    ANDEQ'01'                       *每日隨訂
+1301BC           S#INVS    IFEQ *BLANKS
+     C           ARMTHD    ANDEQ'02'                       *每月隨訂
+     C           S#INVS    OREQ *BLANKS
+     C           ARMTHD    ANDEQ'05'                       *人工開立
+     C                     GOTO END100
+     C                     ENDIF
+     C*
+     C*
+1301AC           R#CUNS    IFNE *BLANKS
+1301AC           ARCUNO    ANDNER#CUNS
+1301AC                     GOTO END100
+1301AC                     ENDIF
+1301AC*
+1301AC           R#CLOS    IFEQ 'N'
+1301AC           ARCLOS    ANDNE' '
+1301AC                     GOTO END100
+1301AC                     ENDIF
+1301AC*
+1301AC           R#CLOS    IFEQ 'Y'
+1301AC           ARCLOS    ANDEQ' '
+1301AC                     GOTO END100
+1301AC                     ENDIF
+     C*
+     C           ARORN5    IFEQ W#ORN5
+     C                     GOTO END100
+     C                     ENDIF
+     C*
+     C           ARMTHD    LOKUPTAB1      TAB2           50*EQ
+     C   50                MOVELTAB2      R#MTHD
+     C  N50                MOVEL*ALL'*'   R#MTHD
+1301BC                     MOVELARSALE    R#SALE
+1301AC                     MOVELARSND     R#SND
+     C                     MOVELARCUNO    R#CUNO
+     C                     MOVELARCUNM    R#CUNM
+     C                     MOVELARORN5    R#ORNO
+     C                     MOVELARCTNO    R#CTNO
+     C                     MOVELARAREA    R#VREA
+1301BC*                    MOVELARTRYN    R#TRYN
+1301BC                     Z-ADDARDATE    R#DATE
+1301BC           ARCLOS    IFNE *BLANKS
+1301BC                     MOVEL'Y'       R1CLOS
+1301BC                     ELSE
+1301BC                     MOVEL*BLANKS   R1CLOS
+1301BC                     ENDIF
+     C                     WRITEAR136T1D
+     C                     MOVELARORN5    W#ORN5  6
+     C                     MOVEL*OFF      *IN51
+     C                     MOVEL*OFF      *IN52
+     C                     MOVEL*OFF      *IN53
+     C                     MOVEL'Y'       W#DATA  1
+     C           END100    ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*
+     C                     WRITEAR136T1X
+     C                     WRITEAR136T1H
+     C                     SETOF                     60
+     C                     MOVEL*ON       *IN51
+     C                     MOVEL*ON       *IN52
+     C                     MOVEL*ON       *IN53
+     C                     ENDSR
+     C*
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*
+     C                     WRITEAR136T1T
+     C                     ENDSR
+**  TAB1 TAB2
+00隨車03區間04指定01隨訂
+

@@ -1,0 +1,117 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR075R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     新版發票列印作業（依號碼分類）
+     H*            5.DATE-WRITTEN  88/03/13
+     H*            6.UPDATE DATE  104/10/05  2015AR953  S00WCJ (0409A)
+     H*                            產品代碼3碼擴5碼
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  IF  E           K        DISK
+     FINVCUT  IF  E           K        DISK                      A
+     FARSAID  IF  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     F*****************************************************************
+     I            DS
+0409AI                                        1   5 IVPDCD
+     I                                        1   1 D#IVPD
+0409AI                                        1   2 D#PDN2
+0409AI                                        4   4 D#PDN4
+     I           UDS
+     I                                       21  30 U#FRNO
+     I                                       31  40 U#TONO
+     I                                     10011010 U#USID
+     I                                     10011003 U#DPID
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*        搜尋關鍵
+     C*****************************************************************
+     C           K#IV      KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C           U#FRNO    SETLLINREC                69
+     C           *IN69     DOWEQ'0'
+     C                     READ INREC                    69
+     C*
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C           INNO      IFGT U#TONO                     號碼之外
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           INDECD    WHEQ 'D'                        已作廢
+     C                     ITER
+     C           INPRTC    WHNE *BLANK                     已印出
+     C                     ITER
+     C           INAREA    WHNE U#AREA                     非本廠區
+     C                     ITER
+     C                     ENDSL
+     C*
+     C                     EXSR SR1000                     寫入分類
+     C                     ENDDO
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+     C*
+     C*********************************
+     C* 寫入發票分類檔
+     C*********************************
+     CSR         SR1000    BEGSR
+     C           INNO      CHAINRINVCUT              69
+     C  N69                GOTO ES1000                     已有不再寫
+     C*
+     C           INRVID    CHAINRARSAID              69    收款業務
+     C  N69                MOVELSALOCA    W#AREA  1
+     C   69                MOVEL'*'       W#AREA
+     C*
+     C           INTYPE    IFEQ '9'                        其他類
+     C                     MOVELINAREA    W#AREA
+     C                     ENDIF
+     C*
+     C           INTYPE    IFEQ '1'                        出貨類
+     C                     MOVELINNO      IVNO
+     C                     MOVEL'1'       IVACNT
+     C           K#IV      CHAINIVREC                69
+     C           *IN69     IFEQ '0'
+     C           D#IVPD    IFEQ '3'                        型鋼
+0409AC           D#PDN4    ANDEQ' '
+     C           D#IVPD    OREQ '4'                        鋼板
+0409AC           D#PDN4    ANDEQ' '
+     C           D#IVPD    OREQ '5'                        鋼板
+0409AC           D#PDN4    ANDEQ' '
+0409AC           D#PDN2    OREQ '33'
+0409AC           D#PDN4    ANDNE' '
+0409AC           D#PDN2    OREQ '34'
+0409AC           D#PDN4    ANDNE' '
+0409AC           D#PDN2    OREQ '35'
+0409AC           D#PDN4    ANDNE' '
+     C                     MOVEL'H'       W#AREA           一律採苗栗
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVEL'A'       CUFLAG
+     C                     MOVELW#AREA    CUAREA
+     C                     MOVELINNO      CUNO
+     C                     MOVELINTYPE    CUTYPE
+     C                     MOVELINKIND    CUKIND
+     C                     MOVELINAREA    CUINEA
+     C                     Z-ADDININDT    CUINDT
+     C                     MOVELINORNO    CUORNO
+     C                     MOVELINCUNO    CUCUNO
+     C                     MOVELINCUNM    CUCUNM
+     C                     MOVELINRVID    CURVID
+     C                     WRITERINVCUT
+     CSR         ES1000    ENDSR
+     C*
+

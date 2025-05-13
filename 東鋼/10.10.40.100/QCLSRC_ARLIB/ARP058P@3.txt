@@ -1,0 +1,123 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP058P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     營業繳款過入財會處理作業               */
+     /*     5.DATE-WRITTEN  87/05/28                                */
+     /*     6.UPDATE  DATE  99/08/16  2010AR517  S00WCJ (9908A)     */
+     /*                    100/01/03  2011ARXXX  S00WCJ (0001A)     */
+     /*                    103/08/25  S00WCJ (0308A)                */
+     /*                     SAVE報表                              */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)     TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&P#PDAT) TYPE(*CHAR) LEN(8)  /*輸入日期*/
+             DCL        VAR(&P#MODE) TYPE(*CHAR) LEN(1)  /*年份別*/
+             DCL        VAR(&P#MTL)  TYPE(*CHAR) LEN(24) /*月日數*/
+             DCL        VAR(&P#LEAP) TYPE(*CHAR) LEN(1)  /*閏年碼*/
+             DCL        VAR(&W#FLAG)  TYPE(*CHAR)  LEN(1)
+    /*0001A  DCL        VAR(&W#DATE)  TYPE(*DEC)   LEN(6 0)  */
+             DCL        VAR(&W#DATE)  TYPE(*DEC)   LEN(8 0) /*0001A*/
+             DCL        VAR(&W#RVDT)  TYPE(*CHAR)  LEN(8)
+    /*9908A  DCL        VAR(&W#UDATE) TYPE(*CHAR)  LEN(6)   */
+    /*9908A*/DCL        VAR(&W#UDATE) TYPE(*CHAR)  LEN(8)
+             DCLF       FILE(ARLIB/ARP058S)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+             RTVDTAARA  DTAARA(*LDA (1021  1)) RTNVAR(&S#RVDP)
+ INPUT:
+             SNDRCVF    RCDFMT(AR058F1)
+             IF         COND(&IN03 *EQ '1' *OR &IN12 *EQ '1') +
+                        THEN(RETURN)
+
+             CHGVAR     VAR(&IN52) VALUE('0')
+
+        /*   CHGVAR     VAR(&W#DATE) VALUE(&S#RVDT)     */
+        /*   CALL       PGM(C01) PARM(&W#DATE &W#FLAG)  */
+             CHGVAR     VAR(&P#PDAT) VALUE(&S#RVDT)
+             CHGVAR     VAR(&P#MODE) VALUE('1')
+             CALL       PGM(UTS102R) PARM(&P#PDAT &P#MODE +
+                                          &P#MTL &P#LEAP &W#FLAG)
+             IF         COND(&W#FLAG *NE '0') THEN(DO)
+                CHGVAR  VAR(&IN52) VALUE('1')
+                CHGVAR  VAR(&S#MSG1) VALUE('日期格式錯誤！')
+                GOTO    INPUT
+             ENDDO
+
+    /*9908A  START */
+         /*  RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&W#UDATE)  */
+
+             RTVJOBA    CYMDDATE(&W#UDATE)
+             CHGVAR     VAR(&W#UDATE)    VALUE('0' *CAT &W#UDATE)
+    /*9908A   END */
+             CHGVAR     VAR(&W#DATE)  VALUE(&W#UDATE)
+             IF         COND(&S#RVDT *GT &W#DATE) THEN(DO)
+                CHGVAR  VAR(&IN52) VALUE('1')
+                CHGVAR  VAR(&S#MSG1) VALUE('日期不可超過系統日期')
+                GOTO    INPUT
+             ENDDO
+
+             CHGDTAARA  DTAARA(*LDA (1 1)) VALUE(&S#RVDP)
+             CHGVAR     VAR(&W#RVDT)       VALUE(&S#RVDT)
+             CHGDTAARA  DTAARA(*LDA (2 8)) VALUE(&W#RVDT)
+             SBMJOB     JOB(ARP058P) JOBD(ARJOBD) JOBQ(QCTL) +
+                        OUTQ(&OUTQ) RQSDTA('CALL ARP058P')
+             RETURN
+
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 1)) RTNVAR(&S#RVDP)
+             RTVDTAARA  DTAARA(*LDA (2 8)) RTNVAR(&W#RVDT)
+
+ /*0308A*/   OVRPRTF    FILE(ARP058T) TOFILE(ARLIB/ARP058T) +
+                          PAGESIZE(66 158) LPI(6) CPI(12) +
+                          OVRFLW(57) HOLD(*YES) SAVE(*YES) +
+                          USRDTA('營業繳款')
+             OVRDBF     FILE(RCVDTL) TOFILE(DALIB/RCVDTL)
+             OVRDBF     FILE(INVMST) TOFILE(DALIB/INVMST)
+             OVRDBF     FILE(INVDTL) TOFILE(DALIB/INVDTL)
+             OVRDBF     FILE(SARVIN) TOFILE(DALIB/SARVIN)
+             OVRDBF     FILE(SARCVF) TOFILE(DALIB/SARCVF)
+             OVRDBF     FILE(SARCVFL1) TOFILE(DALIB/SARCVFL1) +
+                        SHARE(*YES)
+
+             IF         COND(&S#RVDP *EQ 'P') THEN(DO)
+             OPNQRYF    FILE(SARCVFL1) +
+                        QRYSLT( +
+                         'SRFL02 *EQ " " *AND +
+                          SRFL03 *EQ "Y" *AND +
+                          SRFL01 *EQ "Y" *AND +
+                     %SST(SRRVNO 1 1) *EQ %VALUES("P" "H" "M") *AND +
+                          SRRVDT *LE ' || &W#RVDT ) +
+                        KEYFLD((SRRVID) (SRRVDT) (SRRVNO))
+             ENDDO
+
+             ELSE       CMD(DO)
+             OPNQRYF    FILE(SARCVFL1) +
+                        QRYSLT( +
+                         'SRFL02 *EQ " " *AND +
+                          SRFL03 *EQ "Y" *AND +
+                          SRFL01 *EQ "Y" *AND +
+                     %SST(SRRVNO 1 1) *EQ "' || &S#RVDP || '" *AND +
+                          SRRVDT *LE ' || &W#RVDT ) +
+                        KEYFLD((SRRVID) (SRRVDT) (SRRVNO))
+             ENDDO
+
+             CALL       ARP058R
+             CLOF       OPNID(SARCVFL1)
+             DLTOVR     FILE(*ALL)
+
+             RETURN
+             ENDPGM
+

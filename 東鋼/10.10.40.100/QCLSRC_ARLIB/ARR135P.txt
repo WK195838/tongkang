@@ -1,0 +1,89 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR135P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02LBU                                  */
+     /*     4.FUNCTION     新桃工程自用發票開立明細表           */
+     /*     5.DATE-WRITTEN  98/02/25                                */
+     /*                                                             */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN12)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&YM1)    TYPE(*DEC)  LEN(6 0)
+             DCL        VAR(&YM2)    TYPE(*DEC)  LEN(6 0)
+             DCL        VAR(&YMA)    TYPE(*CHAR) LEN(6)
+             DCL        VAR(&YMB)    TYPE(*CHAR) LEN(6)
+             DCL        VAR(&PJNO)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&PJNS)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&PJNE)   TYPE(*CHAR) LEN(10)
+
+
+             RTVJOBA    TYPE(&INT) OUTQ(&OUTQ)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+ RDSP:
+             CHGVAR     VAR(&IN03)    VALUE('0')
+             CHGVAR     VAR(&IN12)    VALUE('0')
+             CALL       PGM(ARR135RS) PARM(&IN03 &YM1 &YM2 &PJNO)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGVAR     VAR(&YMA)         VALUE(&YM1)
+             CHGVAR     VAR(&YMB)         VALUE(&YM2)
+             CHGDTAARA  DTAARA(*LDA (301  6)) VALUE(&YMA)
+             CHGDTAARA  DTAARA(*LDA (307  6)) VALUE(&YMB)
+             CHGDTAARA  DTAARA(*LDA (313 10)) VALUE(&PJNO)
+
+             SBMJOB     JOB(ARR135P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARR135P')
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (301  6)) RTNVAR(&YMA)
+             RTVDTAARA  DTAARA(*LDA (307  6)) RTNVAR(&YMB)
+             RTVDTAARA  DTAARA(*LDA (313 10)) RTNVAR(&PJNO)
+
+             IF         COND((&PJNO *EQ '          ')) THEN(DO)
+             CHGVAR     VAR(&PJNS)        VALUE('          ')
+             CHGVAR     VAR(&PJNE)        VALUE('9999999999')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&PJNS)        VALUE(&PJNO)
+             CHGVAR     VAR(&PJNE)        VALUE(&PJNO)
+             ENDDO
+
+             CLRPFM     FILE(ARR135F)
+             OVRDBF     FILE(UENDTL) TOFILE(UENDTL) SHARE(*YES)
+             OPNQRYF    FILE(UENDTL) QRYSLT(' +
+                               (YYMM   *GE "' || &YMA  || '")   *AND  +
+                               (YYMM   *LE "' || &YMB  || '")   *AND  +
+                               (UVPJNO *GE "' || &PJNS || '")   *AND  +
+                               (UVPJNO *LE "' || &PJNE || '")   *AND  +
+                               (UVNO   *NE "          ")        *AND  +
+                               (UVFLAG *NE "D")')                     +
+                        MAPFLD((YYMM  UVYM    *CHAR 6))               +
+                        KEYFLD((UVNO)(UVPDNM))
+             CALL       PGM(ARR135R1)
+             CLOF       OPNID(UENDTL)
+             DLTOVR     FILE(*ALL)
+
+             OVRPRTF    FILE(ARR135T) TOFILE(ARR135T) PAGESIZE(*N 158) +
+                        CPI(12) HOLD(*YES) USRDTA('工程發票')
+             OVRDBF     FILE(ARR135F) TOFILE(ARR135F) SHARE(*YES)
+             OPNQRYF    FILE(ARR135F) +
+                        KEYFLD((W1NO))
+             CALL       ARR135R
+             DLTOVR     FILE(*ALL)
+             CLOF       OPNID(ARR135F)
+
+             SNDBRKMSG  MSG('<<工程自用發票開立清單已完成+
+                        ,請列印.........>>') +
+                      TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+
+             ENDPGM
+

@@ -1,0 +1,154 @@
+     H****************************************************************
+     H*
+     H*       UPDATE  DATE  111/04/07 S00WCJ (1104A)
+     H*                      配合發票開立運費折扣，修改抓折扣方式
+     H*
+     H****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  IP  E           K        DISK
+     FARWF02  O   E           K        DISK                      A
+     FINVDTL  IF  E           K        DISK
+     FINVDTY  IF  E           K        DISK
+     F            IVREC                             KRENAMEIVRECY
+     F*---------------------------------------------------------------
+     IIVRECY
+     I              IVFLAG                          F#FLAG
+     I              IVNO                            F#IVNO
+     I              IVACNT                          F#ACNT
+     I              IVITEM                          F#ITEM
+     I              IVACDT                          F#ACDT
+     I              IVORNO                          F#ORNO
+     I              IVPDCD                          F#PDCD
+     I              IVQTY                           F#QTY
+     I              IVUPRC                          F#UPRC
+     I              IVAMT                           F#AMT
+     I              IVDECD                          F#DECD
+     I              IVDEDT                          F#DEDT
+     I              IVAPNO                          F#APNO
+     I              IVACNO                          F#ACNO
+     I              IVFL01                          F#FL01
+     I              IVFL02                          F#FL02
+     I              IVFL03                          F#FL03
+     I              IVTXAR                          F#TXAR
+     I              IVRESV                          F#RESV
+1104AI              IVMAK1                          F#MAK1
+1104AI*
+1104AI            DS
+1104AI                                        1  30 F#MAK1
+1104AI                                        1   1 D#MAK1
+1104AI                                        2   3 D#MAK2
+     F*---------------------------------------------------------------
+     C           W#INVD    KLIST
+     C                     KFLD           F#IVNO
+     C                     KFLD           F#ACNT
+1104AC*                    KFLD           F#ITEM
+     C**-------------------------------------------**
+     C**  MAIN LOGIC                               **
+     C**-------------------------------------------**
+     C                     EXSR DP#01
+     C                     EXSR DP#02
+     C**-------------------------------------------**
+     C**  FIRST PROCESS                            **
+     C**-------------------------------------------**
+     CSR         DP#01     BEGSR
+     C                     SETOF                     21
+     C           INKIND    IFEQ '2'
+     C           INTXTP    IFEQ '1'
+     C                     Z-ADDINAAMT    TOT1   110H
+     C           TOT1      DIV  21        INATAX    H
+     C           TOT1      SUB  INATAX    TOT1      H
+     C                     Z-ADDTOT1      INAAMT    H
+     C                     ELSE
+     C                     Z-ADD0         INATAX
+     C                     SETON                     21
+     C                     ENDIF
+     C                     ENDIF
+     CSR                   ENDSR
+     C**--------------------------------------**
+     C**   DEATIL TIME PROCESS                **
+     C**--------------------------------------**
+     CSR         DP#02     BEGSR
+     C*
+     C                     MOVE INNO      W#INNO  8
+     C           W#INNO    IFEQ '52764995'
+     C                     Z-ADD0         W#TMP   10
+     C                     ENDIF
+     C*
+     C           INNO      SETLLINVDTL               97
+     C           *IN97     DOWEQ'0'
+     C           INNO      READEINVDTL                   97
+     C   97                LEAVE
+     C***
+     C           IVACNT    IFNE '1'
+     C           IVACNT    ANDNE'9'
+     C                     ITER
+     C                     ENDIF
+     C**
+     C*抓折扣
+     C           IVACNT    IFEQ '1'
+     C                     MOVELIVNO      F#IVNO
+     C                     MOVEL'3'       F#ACNT
+1104AC*                    Z-ADDIVITEM    F#ITEM
+1104AC*
+1104AC           W#INVD    SETLLIVRECY
+1104AC                     MOVEL*OFF      *IN50
+1104AC           *IN50     DOWEQ*OFF
+1104AC*          W#INVD    CHAINIVRECY               50
+1104AC           W#INVD    READEIVRECY              N    50
+1104AC   50                LEAVE
+     C  N50      F#FL03    IFEQ 'K'
+     C           F#ACDT    ANDEQIVACDT
+1104AC           D#MAK2    IFNE ' '
+1104AC                     MOVELD#MAK2    W#ITEM  20
+1104AC           IVITEM    IFNE W#ITEM
+1104AC                     ITER
+1104AC                     ENDIF
+1104AC                     ELSE
+1104AC           IVITEM    IFNE F#ITEM
+1104AC                     ITER
+1104AC                     ENDIF
+1104AC                     ENDIF
+     C           IVAMT     ADD  F#AMT     IVAMT
+     C                     ENDIF
+1104AC                     ENDDO
+     C                     ENDIF
+      *
+     C  N21      INKIND    IFEQ '2'
+     C           IVAMT     DIV  1.05      IVAMT     H
+     C           TOT1      SUB  IVAMT     TOT1
+     C           TOT1      IFLT 2
+     C                     ADD  TOT1      IVAMT
+     C                     ENDIF
+     C                     ENDIF
+      *
+     C                     CLEARRARWF02
+     C                     MOVELIVFLAG    W2FLAG
+     C                     MOVELIVNO      W2NO
+     C                     MOVELIVACNT    W2ACNT
+     C                     MOVELIVITEM    W2ITEM
+     C                     MOVELIVACDT    W2ACDT
+     C                     MOVELIVORNO    W2ORNO
+     C                     MOVELIVPDCD    W2PDCD
+     C                     MOVELIVQTY     W2QTY
+     C                     MOVELIVUPRC    W2UPRC
+     C                     MOVELIVAMT     W2AMT
+     C                     MOVELIVDECD    W2DECD
+     C                     MOVELIVDEDT    W2DEDT
+     C                     MOVELIVAPNO    W2APNO
+     C                     MOVELIVACNO    W2ACNO
+     C                     MOVELIVFL01    W2FL01
+     C                     MOVELIVFL02    W2FL02
+     C                     MOVELIVFL03    W2FL03
+     C                     MOVELIVTXAR    W2TXAR
+     C                     MOVELIVTXDT    W2TXDT
+     C                     MOVELIVRESV    W2RESV
+     C                     MOVELINKIND    W2KIND
+     C                     MOVELINAREA    W2AREA
+     C                     MOVELINCUNO    W2CUNO
+     C                     MOVELINCUNM    W2CUNM
+9010 C           IVDECD    IFNE 'D'
+     C                     WRITERARWF02
+9010 C                     ENDIF
+     C                     ENDDO
+     CSR         DP#02Z    ENDSR
+

@@ -1,0 +1,398 @@
+     H************************************************************
+     H*                                                          *
+     H*         PROGRAM   ID        :   ARR032R                  *
+     H*         PROGRAM   FUNCTION  :  銷項統一發票明細表列印  *
+     H*         AUTHER              :   ANNCY                    *
+     H*         CREATE    DATE      :   81/09/23                 *
+     H*         MAINTAIN  DATE      :                            *
+     H*         RELATION  PROGRAM   :   ARR032P,ARR032R          *
+     H*         NOTE                :                            *
+     H*                                                          *
+     H        1   Y                                     1                 BR003
+     FAR1WF1  IP  E           K        DISK
+     FGENSEQ  IF  E           K        DISK
+     FQPRINT  O   F     132     OF     PRINTER
+     F*---------------------------------------------------------------
+     E                    HD      1  11 80
+     E*------------------------------------------------------------
+     IRAR1WF1
+     I                                              A1INVOL1
+     I                                              A1SEQ L1
+     IAADS        DS
+     I                                        1  10 GP
+     I                                        1   1 GP1
+     I                                        2   5 GP2
+     I                                       11  20 NOHD
+     I                                       11  16 NOHD1
+     I                                       17  20 NOHD2
+     I           UDS
+     I                                        1   1 KIND
+     I                                        2   7 YMA
+     I                                        2   5 YA
+     I                                        6   7 MA
+     I                                        8   8 AREA
+     I*
+     C*----------------------------------------------------------------
+     C           GEKEY     KLIST
+     C                     KFLD           GEKIND
+     C                     KFLD           GEPRIN
+     C  N90                EXSR IN#01
+     C   L1 90             EXSR DL#L1
+     C                     EXSR DP#01
+     CL1 90                EXSR TL#L1
+     CLR 90                EXSR TL#LR
+     CLRN90                EXSR TL#LR1
+     C**--------------------------------------------**
+     C**  INITIALIZE ROUTINE                        **
+     C**--------------------------------------------**
+     CSR         IN#01     BEGSR
+     C                     SETON                     90
+     C                     Z-ADD80        LCNT    20
+     C                     Z-ADD55        TCNT    20
+     C                     Z-ADD0         PAG     30
+     C                     Z-ADD0         STNO    40
+     C                     Z-ADD0         ENNO    40
+     C                     Z-ADD0         NOA     40
+     C                     Z-ADD0         NOB     40
+     C                     Z-ADD0         NOC     40
+     C                     Z-ADD0         NOD     40
+     C                     SETOF                       12
+     C                     SELEC
+     C           AREA      WHEQ 'P'
+     C                     MOVEL'台　北'AREAC   8
+     C                     MOVELHD,3      SANO   18
+     C                     MOVELHD,6      NAME   50
+     C                     MOVELHD,9      TXNO   20
+     C                     SETON                       12
+     C           AREA      WHEQ 'M'
+     C                     MOVEL'台　中'AREAC
+CLJ  C           YMA       IFGE '008711'
+     C                     MOVELHD,3      SANO
+     C                     MOVELHD,6      NAME
+     C                     MOVELHD,9      TXNO
+---  C                     ELSE
+     C                     MOVELHD,5      SANO
+     C                     MOVELHD,8      NAME
+     C                     MOVELHD,11     TXNO
+     C                     ENDIF
+     C           AREA      WHEQ 'K'
+     C                     MOVEL'高　雄'AREAC
+     C                     MOVELHD,4      SANO
+     C                     MOVELHD,7      NAME
+     C                     MOVELHD,10     TXNO
+     C                     OTHER
+     C                     MOVE *BLANK    AREAC
+     C                     MOVE *BLANK    SANO
+     C                     MOVE *BLANK    NAME
+     C                     MOVE *BLANK    TXNO
+     C                     ENDSL
+     C***
+     C                     SELEC
+     C           KIND      WHEQ '3'
+     C                     MOVELHD,1      KINDC  32
+     C                     SETOF                     11
+     C                     MOVEL'02'      GEKIND
+     C                     OTHER
+     C                     MOVELHD,2      KINDC
+     C                     SETON                     11
+     C                     MOVEL'01'      GEKIND
+     C                     ENDSL
+     C***
+     C                     MOVEL*BLANK    GP
+     C                     MOVELAREA      GP1
+     C                     MOVE YMA       GP2
+     C                     MOVELGP        GEPRIN
+     C           GEKEY     CHAINGENSEQ               80
+     C                     MOVE GESTNO    STNO
+     C                     MOVE GEENNO    ENNO
+     C           ENNO      SUB  STNO      LASNO   40
+     C                     ADD  1         LASNO
+     CSR                   ENDSR
+     C**********
+     C* L1RTN  *
+     C**********
+     CSR         DL#L1     BEGSR
+     C                     Z-ADD0         CNT     30
+     C                     Z-ADD0         BLANK   40
+     C                     Z-ADD0         VOID    40
+     C                     Z-ADD0         TXN     40
+     C                     Z-ADD0         NON     40
+     C                     Z-ADD0         TOT1   130
+     C                     Z-ADD0         TOT2   130
+     C                     Z-ADD0         TOT3   130
+     CSR                   ENDSR
+     C**********
+     C* RTN01  *
+     C**********
+     CSR         DP#01     BEGSR
+     C           A1INVO    IFEQ 'JG878717'
+     C           A1ITEM    ANDEQ14
+     C                     Z-ADD0         W#TEST  10
+     C                     ENDIF
+     C                     MOVE ' '       TXF
+CLJ  C                     MOVE ' '       ZOF
+---  C                     MOVE ' '       NOF
+     C           A1QUIT    IFLT STNO
+     C                     Z-ADDA1QUIT    NOA
+     C                     ENDIF
+     C                     ADD  1         CNT
+     C           A1TXNO    IFEQ '1'
+     C                     MOVE 'V'       TXF     1
+     C                     END
+CLJ  C           A1TXNO    IFEQ '2'
+     C                     MOVE 'V'       ZOF     1
+     C                     END
+     C           A1TXNO    IFEQ '3'
+     C                     MOVE 'V'       NOF     1
+---  C                     END
+     C           A1DECD    IFEQ 'D'
+     C                     MOVE '作廢'  MARK    8
+     C                     MOVE ' '       TXF
+     C                     MOVE *BLANK    A1IDNO
+     C                     Z-ADD0         A1AMT
+     C                     Z-ADD0         A1TAX
+     C                     ADD  1         VOID
+     C                     ELSE
+     C                     MOVE *BLANK    MARK
+     C           A1TXNO    IFEQ '1'
+     C                     ADD  1         TXN
+     C                     END
+     C           A1TXNO    IFEQ '2'
+     C                     ADD  1         NON
+     C                     END
+     C                     END
+     C   11      A1AMT     ADD  A1TAX     AMT    110
+     C  N11                Z-ADDA1AMT     AMT
+     C           A1TXNO    IFEQ '1'
+     C                     ADD  AMT       TOT1
+     C                     ADD  A1TAX     TOT2
+     C                     ELSE
+     C                     ADD  AMT       TOT3
+     C                     ENDIF
+     C           LCNT      COMP TCNT                 75
+     C   75                ADD  1         PAG
+     C   75                Z-ADD0         LCNT
+     C   75                EXCPTEH#01
+     C                     EXCPTED#01
+     CSR                   ENDSR
+     C**********
+     C* TL#L1  *
+     C**********
+     CSR         TL#L1     BEGSR
+     C           TOT3      IFNE 0
+     C                     SETON                     25
+     C                     ELSE
+     C                     SETOF                     25
+     C                     ENDIF
+     C           50        SUB  CNT       BLANK
+     C                     ADD  BLANK     BLK1    40
+     C           BLANK     IFGT 0
+     C                     SETON                     17
+     C                     ELSE
+     C                     SETOF                     17
+     C                     END
+     C                     ADD  VOID      VOIDT   40
+     C                     ADD  TXN       TXNT    40
+     C                     ADD  NON       NONT    40
+     C                     ADD  TOT2      TOT21  130
+     C                     ADD  TOT1      TOT11  130
+     C                     ADD  TOT3      TOT31  130
+     C                     EXCPTET#01
+     C                     Z-ADD80        LCNT
+     CSR                   ENDSR
+     C**********
+     C* RTNLR  *
+     C**********
+     CSR         TL#LR     BEGSR
+     C           TOT31     IFNE 0
+     C                     SETON                     26
+     C                     ELSE
+     C                     SETOF                     26
+     C                     ENDIF
+     C                     MOVELA1INVO    NOHD1
+     C           TOT11     SUB  TOT21     TOT13  130
+     C                     ADD  TOT31     TOT11
+     C                     Z-ADD0         NX1     40
+     C                     Z-ADD0         NX2     40
+     C                     Z-ADD0         BLKA    40
+     C                     Z-ADD0         BLKB    40
+     C                     Z-ADD0         BLK     40
+     C                     Z-ADD0         BLK2    40
+     C*  12      STNO      SUB  NOA       NX1
+     C*  12      NX1       SUB  1         BLKA
+     C*  12                ADD  1         NOA
+     C*  12                SUB  1         STNO
+     C*  12                MOVELNOA       NOHD2
+     C*  12                MOVELNOHD      NA     10
+     C*  12                MOVELSTNO      NOHD2
+     C*  12                MOVELNOHD      NB     10
+     C***
+     C           ENNO      SUB  A1QUIT    NX2
+     C           NX2       ADD  0         BLKB
+     C                     ADD  1         A1QUIT
+     C                     MOVELA1QUIT    NOHD2
+     C                     MOVELNOHD      NC     10
+     C                     MOVELENNO      NOHD2
+     C                     MOVELNOHD      ND     10
+CLJ  C                     MOVE GEENNO    ND
+     C           GEENNO    SUB  GECUNO    BLK2
+     C           BLK2      IFEQ 0                          已無空白
+     C                     SETOF                     38    不印起迄
+     C                     ELSE
+     C                     SETON                     38
+---  C                     ENDIF
+     C                     EXCPTET#LR
+     CSR                   ENDSR
+     C**********
+     C* RTNLR1 * 查無記錄時，必須重設超迄號（IN#01未被執行)
+     C**********
+     CSR         TL#LR1    BEGSR
+     C                     EXSR IN#01
+     C                     Z-ADD1         PAG
+     C                     MOVELGEPRE     W#TMPN 10
+     C                     MOVE GESTNO    W#TMPN
+     C                     MOVELW#TMPN    A1INVO
+     C                     MOVELGEPRE     NC
+     C                     MOVE GESTNO    NC
+     C                     MOVELGEPRE     ND
+     C                     MOVE GEENNO    ND
+     C*
+     C                     EXCPTEH#01
+     C                     EXCPTET#LR1
+     CSR                   ENDSR
+     C*---------------------------------------------------------------
+     OQPRINT  E  103           EH#01
+     O                                   16 '報表編號:AR032'
+     O                         KINDC     56
+     O                                   70 '印表日期：'
+     O                         UDATE Y   79
+     O        E  1             EH#01
+     O                                   36 '中華民國'
+     O                                   44 '年'
+     O                         YA        40
+     O                                   50 '月'
+     O                         MA        46
+     O                                   70 '頁數：'
+     O                         PAG   Z   74
+     O        E  1             EH#01
+     O                                   14 '報稅地區：'
+     O                         AREAC     22
+     O        E  1             EH#01
+     O                                   14 '統一編號：'
+     O                         SANO      32
+     O        E  1             EH#01
+     O                                   14 '營業人名稱：'
+     O                         NAME      64
+     O                                   75 '發票號碼'
+     O        E  1             EH#01
+     O                                   14 '稅籍編號：'
+     O                         TXNO      34
+     O                         A1INVO    74
+     O        E  1             EH#01
+     O                                   11 '發票號碼'
+     O                N11                21 '買受人'
+     O                                   43 '應'
+     O                                   48 '零'
+     O                                   53 '免'
+     O        E  1             EH#01
+     O                                   11 '末二位'
+     O                N11                23 '統一編號'
+     O                N11                37 '銷　售　額'
+     O                 11                37 '發票總計金額'
+     O                                   53 '稅　稅率　稅'
+     O                                   65 '稅　額'
+     O                                   75 '備　註'
+     O        E 1              ED#01
+     O                         A1ITEM    10
+     O                N11      A1IDNO    24
+     O                         AMT   L   37
+     O                         TXF       42
+CLJ  O                         ZOF       47
+---  O                         NOF       52
+...  O                N11      A1TAX L   65
+     O                         MARK      75
+     O        E 1      17      ET#01
+     O                                   46 '以　　下　　空　　白'
+     O        E 1              ET#01
+     O                                   10 '應稅:'
+     O                         TXN   L   15
+     O                                   19 '張'
+     O                N11                32 '銷售額:'
+     O                N11      TOT1  L   46
+     O                 11                32 '發票總金額:'
+     O                 11      TOT1  L   46
+     O                                   53 '稅額:'
+     O                         TOT2  L   69
+     O        E 1      25      ET#01
+     O                                   10 '零稅率:'
+     O                         NON   L   15
+     O                                   19 '張'
+     O                N11                32 '銷售額:'
+     O                N11      TOT3  L   46
+     O                 11                32 '發票總金額:'
+     O                 11      TOT3  L   46
+     O        E 1              ET#01
+     O                                   10 '作廢:'
+     O                         VOID  L   15
+     O                                   19 '張'
+     O        E 1              ET#01
+     O                                   10 '空白:'
+     O                         BLANK L   15
+     O                                   19 '張'
+     O        E 2              ET#LR
+CLJ  O                 38N11             16 '三聯式：'
+     O                 38 11             16 '二聯式：'
+     O                 38      NC        28
+     O                 38                34 '至'
+     O                 38      ND        46
+---  O                 38                64 '均　為　空　白'
+     O        E 2              ET#LR
+     O                                   12 '本月合計：'
+     O        E 1              ET#LR
+     O                                   10 '應稅:'
+     O                         TXNT  L   15
+     O                                   19 '張'
+     O                                   32 '銷售額:'
+     O                N11      TOT11 L   46
+     O                 11      TOT13 L   46
+     O                                   53 '稅額:'
+     O                         TOT21 L   69
+     O        E 1      26      ET#LR
+     O                                   10 '零稅率:'
+     O                         NONT  L   15
+     O                                   19 '張'
+     O                                   32 '銷售額:'
+     O                         TOT31 L   46
+     O        E 1              ET#LR
+     O                                   10 '作廢:'
+     O                         VOIDT L   15
+     O                                   19 '張'
+     O        E 1              ET#LR
+     O                                   10 '空白:'
+     O                         BLK2  L   15
+     O                                   19 '張'
+     O                 11                53 '發票總金額:'
+     O                 11      TOT11 L   69
+     O        E 2              ET#LR1
+     O                                   16 '二聯式：'
+     O                         NC        28
+     O                                   34 '至'
+     O                         ND        46
+     O                                   64 '均　為　空　白'
+     O        E 2              ET#LR1
+     O                                   10 '空白:'
+     O                         LASNO L   15
+     O                                   19 '張'
+** HD
+營業人使用三聯式統一發票明細表
+營業人使用二聯式統一發票明細表
+７５２８０２０９
+０７９８９２０６
+７７６０９１１７
+東和鋼鐵企業股份有限公司
+東和鋼鐵企業（股）公司高雄廠
+東和鋼鐵企業（股）公司台中營業所
+１５０１００１４６
+１１０１０４８０３
+４８１５０８５１３
+

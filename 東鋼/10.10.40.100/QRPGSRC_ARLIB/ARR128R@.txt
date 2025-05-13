@@ -1,0 +1,136 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR128R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     銷貨折讓發票資料明細表
+     H*          5.DATE-WRITTEN  96/07/18
+     H*          6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTLL3IP  E           K        DISK
+     FARR128F IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FARR128T O   E             66     PRINTER
+     E*****************************************************************
+     ITXREC
+     I                                              TXNO  L1
+     I                                              TXAMT L1
+     I*
+     I            DS
+     I                                        1   4 ACVRNO
+     I                                        1   1 D#VRN1
+     I*
+     I            DS
+     I                                        1  32 ACDM04
+     I                                        1   8 D#NO
+     I*
+     I           UDS
+     I                                      301 306 D#YMS
+     I                                      307 312 D#YME
+     I                                      313 322 D#IVNO
+     C*****************************************************************
+     C*          KEY       LIST
+     C*****************************************************************
+     C           K#TRAN    KLIST
+     C                     KFLD           K#VRNO  4        傳票號碼
+     C                     KFLD           K#ITEM  20       項次
+     C*
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C  N90                EXSR INZ#01
+     C  N90                SETON                     90
+     C   L1                EXSR DL#L1
+     C                     EXSR DP#01
+     CL1 90                EXSR TL#L1
+     CLR 90                EXSR TL#LR
+     CLRN90                EXSR MSGSR
+     C*
+     C*****************************************************************
+     CSR         INZ#01    BEGSR
+     C*****************************************************************
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C*
+     C                     MOVELD#YMS     T#YMS            起報關年月
+     C                     MOVELD#YME     T#YME            訖報關年月
+     C                     MOVEL'H'       T#AREA           廠別
+     C*
+     C                     MOVE *ON       *IN66
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         DL#L1     BEGSR
+     C*****************************************************************
+     C                     CLEARAR128T1D
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         DP#01     BEGSR
+     C*****************************************************************
+     C*
+     CSR         ENDPSR    ENDSR
+     C*****************************************************************
+     CSR         TL#L1     BEGSR
+     C*****************************************************************
+     C                     Z-ADDTXAMT     T#AMT            折讓金額
+     C                     Z-ADDTXTAX     T#TAX            折讓稅額
+     C                     MOVELTXIVNO    T#IVNO           發票號碼
+     C                     MOVELTXNO      T#NO             折讓單號
+     C                     MOVELTXORNO    T#ORNO           訂單號碼
+     C                     MOVELTXCUNM    T#CUNM           客戶簡稱
+     C*
+     C           TXCUNO    CHAINCBCUST               30
+     C  N30                MOVELCBMUID    T#MUID           統一編號
+     C*
+     C           TXIVNO    IFEQ W#IVNO
+     C                     MOVEL*BLANK    T#IVNO
+     C                     ELSE
+     C                     MOVELTXIVNO    W#IVNO 10
+     C                     ENDIF
+     C*
+     C                     MOVEL*OFF      *IN31
+     C                     MOVEL'P000'    K#VRNO           傳票號碼
+     C                     Z-ADD0         K#ITEM           項次
+     C*
+     C           K#TRAN    SETLLARR128F
+     C           *IN30     DOWEQ*OFF
+     C                     READ RAR128F                  31
+     C*
+     C   31                LEAVE
+     C*
+     C           D#VRN1    IFNE 'P'
+     C           D#NO      ORNE TXNO
+     C                     ITER
+     C                     ELSE
+     C                     MOVELACVRNO    T#VRNO           傳票號碼
+     C                     Z-ADDACYMD     T#YMD            傳票入帳日
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C   66                WRITEAR128T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR128T1D
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         TL#LR     BEGSR
+     C*****************************************************************
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INZ#01
+     C*
+     C   66                WRITEAR128T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR128T1M
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+

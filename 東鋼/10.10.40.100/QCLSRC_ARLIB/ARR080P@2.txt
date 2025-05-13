@@ -1,0 +1,89 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR080P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     發票與銷貨金額差異表                   */
+     /*     5.DATE-WRITTEN  88/07/27                                */
+     /*                                                             */
+     /*  <說明:>                                                  */
+     /*            由於銷貨收入及銷貨調整代開傳票作業採銷貨明細   */
+     /*            作為來源，但銷貨明細過入發票後營業的應收帳款   */
+     /*            採發票作為來源；發票合計時可能造成金額上的差   */
+     /*            異。本表可供財會作為尾差調整的參考。           */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&USER)   TYPE(*CHAR) LEN(10)
+
+             DCL        VAR(&W#YYMM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&W#STRD) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#ENDD) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#SQLS) TYPE(*CHAR) LEN(40)
+
+             DCLF       FILE(ARR080S)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+             RTVDTAARA  DTAARA(*LDA (1021  1)) RTNVAR(&S#AREA)
+ INPUT:
+             SNDRCVF
+             IF         COND(&IN03 *EQ '1' *OR &IN12 *EQ '1') +
+                        THEN(RETURN)
+
+             CHGDTAARA  DTAARA(*LDA (1 1)) VALUE(&S#AREA)
+             CHGVAR     VAR(&W#YYMM) VALUE(&S#YYMM)
+             CHGDTAARA  DTAARA(*LDA (2 6)) VALUE(&W#YYMM)
+
+             SBMJOB     JOB(ARR080P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARR080P')
+             CHGDTAARA  DTAARA(*LDA (801 70)) +
+             VALUE('發票與銷貨金額差異表已匯入佇列中。')
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 1)) RTNVAR(&S#AREA)
+             RTVDTAARA  DTAARA(*LDA (2 6)) RTNVAR(&W#YYMM)
+
+             CHGVAR     VAR(&W#STRD) VALUE(&W#YYMM || '01')
+             CHGVAR     VAR(&W#ENDD) VALUE(&W#YYMM || '31')
+
+             CHGVAR     VAR(&W#SQLS) VALUE(' ')
+             IF         COND(&S#AREA *NE ' ') THEN(DO)
+             CHGVAR     VAR(&W#SQLS) VALUE(+
+                        '%SST(TXNO 1 1) *EQ "' || &S#AREA || '" *AND')
+             ENDDO
+
+             OVRPRTF    FILE(ARR080T) USRDTA('發銷差異') HOLD(*YES)
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT(&W#SQLS *BCAT +
+                              'TXCODE *NE "AR06" *AND +
+                               TXACDT *GE ' || &W#STRD || ' *AND +
+                               TXACDT *LE ' || &W#ENDD || ' *AND +
+                               TXIVNO *NE "0000000000"  *AND +
+                               TXIVNO *NE "*"  *AND +
+                               TXIVNO *NE "#" *AND +
+                               TXIVNO *NE " "  *AND +
+                               CHAR1  *NE "000000" *AND +
+                               TXFLAG *NE "D"') +
+                        MAPFLD((TXRESV '%SST(TXORNO 1 6)') +
+                               (CHAR1 '%SST(TXIVNO 1 6)' *CHAR 6)) +
+                        KEYFLD((TXRESV) (TXIVNO) (TXPDNM))
+
+             CALL       PGM(ARR080R)
+
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     *ALL
+
+             ENDPGM
+

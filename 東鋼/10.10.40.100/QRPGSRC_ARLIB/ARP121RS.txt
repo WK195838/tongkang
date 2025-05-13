@@ -1,0 +1,303 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*
+     H*          1.PROGRAM-ID    ARP121RS
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S00WCJ
+     H*          4.FUNCTION     獎勵金製票代開
+     H*          5.DATE-WRITTEN  101/02/20 2011AR641
+     H*          6.UPDATE DATE
+     H*
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARP121S CF  E                    WORKSTN
+     FARRDTLL1UF  E           K        DISK
+     FACCTRL  IF  E           K        DISK
+     FGLTRAN  UF  E           K        DISK
+     E*************************************************************
+     E                    ERR     1   9 70
+     I*************************************************************
+     IAADS        DS
+     I                                       21  260DATE
+     I                                       21  240DATE1
+     I                                       21  220DATE2
+     I            DS
+     I                                        1   8 D#YMD
+     I                                        1   60S#DATE
+     I                                        1   40S#YY
+     I            DS
+     I                                        1  10 W#GLNO
+     I                                        6   80D#NO
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 DEVNM
+     I                                     10211021 S#AREA
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C                     PARM           YMA     6
+     C                     PARM           ACYM    6
+     C*
+     C****************************************************************
+     C*          KEY       KLIST
+     C*****************************************************************
+     C           KEY01     KLIST
+     C                     KFLD           K#AREA  1
+     C                     KFLD           S#DATE
+     C                     KFLD           K#FSYS  3
+     C*
+     C           KEY02     KLIST
+     C                     KFLD           S#DATE
+     C                     KFLD           S#AREA
+     C*
+     C           KEY03     KLIST
+     C                     KFLD           S#AREA
+     C                     KFLD           S#YY
+     C                     KFLD           TLGLNO
+     C*
+     C           KEY04     KLIST
+     C                     KFLD           S#AREA
+     C                     KFLD           S#YY
+     C                     KFLD           W#GLNO 10
+     C*
+     C           KEY05     KLIST
+     C                     KFLD           S#DATE
+     C                     KFLD           S#AREA
+     C                     KFLD           W#KIND  1
+     C**************************************************************
+     C           *DATE     SUB  19000000  U#SYSD  80
+     C                     MOVE U#SYSD    D#YMD
+     C**************************************************************
+     C           *IN03     DOUEQ'1'
+     C                     EXFMTAR121F1
+     C   KC                EXSR KC#01
+     C                     EXSR CK#01
+     C   13N99             EXSR UP#01
+     C  N99                SETON                     LR
+     C  N99                RETRN
+     C                     ENDDO
+     C******
+     CSR         KC#01     BEGSR
+     C                     MOVE '1'       *IN03
+     C                     SETON                     LR
+     C                     RETRN
+     CSR                   ENDSR
+     C**************************
+     C***                    ***
+     C***  SCREEN 01 CHECK   ***
+     C***                    ***
+     C**************************
+     CSR         CK#01     BEGSR
+     C                     SETOF                     414299
+     C                     MOVE *BLANK    S#ERR
+     C                     MOVELS#DATE    APDT    80
+     C                     MOVE 01        APDT
+     C                     MOVE *ALL'0'   P#DATE
+     C                     MOVE APDT      P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM '0'       FLAG    1
+     C           FLAG      IFNE '0'
+     C                     SETON                     9941
+     C                     MOVELERR,1     S#ERR
+     C                     ENDIF
+      *
+     C  N45      *IN13     IFEQ *OFF
+     C                     MOVEL'H'       K#AREA
+     C                     MOVEL'AC'      K#FSYS
+     C           KEY01     CHAINRACCTRL              60
+     C           AAESFG    IFEQ 'Y'
+     C                     MOVELERR,2     S#ERR
+     C                     SETON                     9941
+     C   99                GOTO CK#01Z
+     C                     ENDIF
+     C*
+     C           KEY02     CHAINARRDTLL1             40
+     C           *IN40     IFEQ *ON
+     C                     MOVELERR,5     S#ERR
+     C                     SETON                     9941
+     C   99                GOTO CK#01Z
+     C                     ENDIF
+     C*
+     C           KEY02     CHAINARRDTLL1             40
+     C           *IN40     IFEQ *OFF
+     C           TLYN      ANDNE'Y'
+     C                     MOVELERR,3     S#ERR
+     C                     SETON                     9941
+     C   99                GOTO CK#01Z
+     C                     ENDIF
+     C*
+     C           KEY02     CHAINARRDTLL1             40
+     C           *IN40     IFEQ *OFF
+     C           TLGLNO    ANDNE*BLANKS
+     C                     MOVELERR,4     S#ERR
+     C                     SETON                     9941
+     C   99                GOTO CK#01Z
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N45      *IN13     IFEQ *ON
+     C           KEY02     CHAINARRDTLL1             40
+     C           *IN40     IFEQ *OFF
+     C           TLGLNO    ANDEQ*BLANKS
+     C                     MOVELERR,6     S#ERR
+     C                     SETON                     9941
+     C   99                SETOF                     13
+     C   99                GOTO CK#01Z
+     C                     ENDIF
+     C*
+     C                     MOVEL'1'       W#KIND
+     C           KEY05     CHAINARRDTLL1             40
+     C  N40      KEY03     CHAINGLTRAN               55
+     C           *IN55     IFEQ *OFF
+     C           GLPOST    ANDNE*BLANKS
+     C                     MOVELERR,7     S#ERR
+     C                     SETON                     9941
+     C   99                SETOF                     13
+     C   99                GOTO CK#01Z
+     C                     ENDIF
+     C*
+     C                     MOVEL'2'       W#KIND
+     C           KEY05     CHAINARRDTLL1             40
+     C  N40      KEY03     CHAINGLTRAN               55
+     C           *IN55     IFEQ *OFF
+     C           GLPOST    ANDNE*BLANKS
+     C                     MOVELERR,7     S#ERR
+     C                     SETON                     9941
+     C   99                SETOF                     13
+     C   99                GOTO CK#01Z
+     C                     ENDIF
+     C*
+     C                     MOVEL'3'       W#KIND
+     C           KEY05     CHAINARRDTLL1             40
+     C  N40      KEY03     CHAINGLTRAN               55
+     C           *IN55     IFEQ *OFF
+     C           GLPOST    ANDNE*BLANKS
+     C                     MOVELERR,7     S#ERR
+     C                     SETON                     9941
+     C   99                SETOF                     13
+     C   99                GOTO CK#01Z
+     C                     ENDIF
+     C                     MOVELERR,8     S#ERR
+     C                     SETON                     9945
+     C*
+     C                     ENDIF
+     C                     MOVELS#DATE    YMA
+      *
+     CSR         CK#01Z    ENDSR
+     C****************************************************************
+     C           UP#01     BEGSR
+     C****************************************************************
+     C*
+     C                     MOVEL'1'       W#KIND
+     C           KEY05     CHAINARRDTLL1             40
+     C                     MOVELTLGLNO    W#GLNO
+     C           KEY04     SETLLGLTRAN
+     C                     MOVEL*OFF      *IN56
+     C           *IN56     DOWEQ*OFF
+     C           KEY04     READEGLTRAN                   56
+     C   56                LEAVE
+     C                     DELETGLTRAN
+     C                     ENDDO
+     C*
+     C                     ADD  1         D#NO
+     C           KEY04     SETLLGLTRAN
+     C                     MOVEL*OFF      *IN56
+     C           *IN56     DOWEQ*OFF
+     C           KEY04     READEGLTRAN                   56
+     C   56                LEAVE
+     C                     DELETGLTRAN
+     C                     ENDDO
+     C*
+     C                     MOVEL'2'       W#KIND
+     C           KEY05     CHAINARRDTLL1             40
+     C                     MOVELTLGLNO    W#GLNO
+     C           KEY04     SETLLGLTRAN
+     C                     MOVEL*OFF      *IN56
+     C           *IN56     DOWEQ*OFF
+     C           KEY04     READEGLTRAN                   56
+     C   56                LEAVE
+     C                     DELETGLTRAN
+     C                     ENDDO
+     C*
+     C                     ADD  1         D#NO
+     C           KEY04     SETLLGLTRAN
+     C                     MOVEL*OFF      *IN56
+     C           *IN56     DOWEQ*OFF
+     C           KEY04     READEGLTRAN                   56
+     C   56                LEAVE
+     C                     DELETGLTRAN
+     C                     ENDDO
+     C*
+     C                     MOVEL'3'       W#KIND
+     C           KEY05     CHAINARRDTLL1             40
+     C                     MOVELTLGLNO    W#GLNO
+     C           KEY04     SETLLGLTRAN
+     C                     MOVEL*OFF      *IN56
+     C           *IN56     DOWEQ*OFF
+     C           KEY04     READEGLTRAN                   56
+     C   56                LEAVE
+     C                     DELETGLTRAN
+     C                     ENDDO
+     C*
+     C                     ADD  1         D#NO
+     C           KEY04     SETLLGLTRAN
+     C                     MOVEL*OFF      *IN56
+     C           *IN56     DOWEQ*OFF
+     C           KEY04     READEGLTRAN                   56
+     C   56                LEAVE
+     C                     DELETGLTRAN
+     C                     ENDDO
+     C*
+     C                     MOVEL'1'       W#KIND
+     C           KEY05     SETLLARRDTLL1
+     C                     MOVEL*OFF      *IN56
+     C           *IN56     DOWEQ*OFF
+     C           KEY05     READEARRDTLL1                 56
+     C   56                LEAVE
+     C                     MOVEL*BLANKS   TLGLNO
+     C                     UPDATRARRDTL
+     C                     ENDDO
+     C*
+     C                     MOVEL'2'       W#KIND
+     C           KEY05     SETLLARRDTLL1
+     C                     MOVEL*OFF      *IN56
+     C           *IN56     DOWEQ*OFF
+     C           KEY05     READEARRDTLL1                 56
+     C   56                LEAVE
+     C                     MOVEL*BLANKS   TLGLNO
+     C                     UPDATRARRDTL
+     C                     ENDDO
+     C*
+     C                     MOVEL'3'       W#KIND
+     C           KEY05     SETLLARRDTLL1
+     C                     MOVEL*OFF      *IN56
+     C           *IN56     DOWEQ*OFF
+     C           KEY05     READEARRDTLL1                 56
+     C   56                LEAVE
+     C                     MOVEL*BLANKS   TLGLNO
+     C                     UPDATRARRDTL
+     C                     ENDDO
+     C*
+     C                     MOVELERR,9     S#ERR
+     C                     SETON                     9941
+     C                     SETOF                     45
+     C                     ENDSR
+     C****************************************************************
+** ERR
+ 01-年月不合邏輯．
+ 02-該年月會計帳已關帳請查核．
+ 03-此年月代開資料尚未確認，無法代開!!
+ 04-此年月資料已代開過，無法重覆代開!!
+ 05-此年月代開資料尚未產生!!
+ 06-此年月尚未代開，無法還原!!
+ 07-此年月製票已入帳，無法還原!!
+ 08-請按F13 確認還原!!
+ 09-還原作業已完成!!
+

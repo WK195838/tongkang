@@ -1,0 +1,119 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARP011P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02LBU                                    */
+        /*        4.FUNCTION      銷貨收入代開傳票                         */
+        /*        5.DATE-WRITTEN   97/07/04                                  */
+        /*        6.DATE-MODIFY   100/11/25 2011AR634 S00WCJ (0011A)         */
+        /*                         配合IFRS修改                          */
+        /*                        101/12/13 2012AR704 S00WCJ (0112A)         */
+        /*                         配合IFRS正式轉換修改                  */
+        /*                                                                   */
+        /*       說明：配合新總帳上線擴檔欄位長度變更 97/07/14             */
+        /*                                                                   */
+        /*********************************************************************/
+             PGM
+             DCL        VAR(&P#YYMM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&P#DATE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&P#CODE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)  TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DATE)  TYPE(*DEC)  LEN(8)
+             DCL        VAR(&DATEA) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATEB) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATEC) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATEX) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREA)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&Y)     TYPE(*CHAR) LEN(4)
+             DCL        VAR(&M)     TYPE(*CHAR) LEN(2)
+             DCL        VAR(&YM)    TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DTARA) TYPE(*CHAR) LEN(11)
+             DCL        VAR(&WSID)  TYPE(*CHAR) LEN(10)
+ /*0011A*/   DCL        VAR(&D#VNO1) TYPE(*CHAR) LEN(6)
+ /*0011A*/   DCL        VAR(&D#VNO2) TYPE(*CHAR) LEN(6)
+ /*0112A*/   DCL        VAR(&IFRSD)  TYPE(*CHAR) LEN(8)
+
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&DTARA) VALUE('ACCTLDTA' *CAT &AREA)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             RTVDTAARA  DTAARA(DALIB/&DTARA (9 8)) RTNVAR(&DATEB)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&WSID)
+
+ DISPLY:     CALL       PGM(ARP011RS) PARM(&IN03 &DATE &AREA &DATEB)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&DATEA) VALUE(&DATE)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&DATEA)
+             CHGDTAARA  DTAARA(*LDA (9 1)) VALUE(&AREA)
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&P#YYMM)
+             RTVDTAARA  DTAARA(*LDA (1 8)) RTNVAR(&P#DATE)
+             RTVDTAARA  DTAARA(*LDA (1 8)) RTNVAR(&DATEC)
+
+             CALL    PGM(ACP101R) PARM(&P#YYMM &P#CODE)
+             IF         COND(&P#CODE *EQ '1') THEN(DO)
+             SNDBRKMSG  MSG('關帳日期已過，請與相關人員聯絡！') +
+                          TOMSGQ(&WSID)
+             GOTO       CMDLBL(DISPLY)
+             ENDDO
+
+             SBMJOB     JOB(ARP011P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARP011P')
+             RETURN
+             ENDDO
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 8)) RTNVAR(&DATEA)
+             RTVDTAARA  DTAARA(*LDA (1 4)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (5 2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&YM)
+             RTVDTAARA  DTAARA(*LDA (9 1)) RTNVAR(&AREA)
+             RTVDTAARA  DTAARA(*LDA (1 8)) RTNVAR(&DATEC)
+ /*0112A*/   RTVDTAARA  DTAARA(ARIFRSCTL (1  8))  RTNVAR(&IFRSD)
+
+             CHGVAR     VAR(&DATEX) VALUE(&YM *CAT '01')
+  /*         CPYF       FROMFILE(TRNDTL) TOFILE(QTEMP/TXTEMP) +
+                          MBROPT(*ADD) CRTFILE(*YES) INCCHAR(*RCD 6 +
+                          *EQ &AREA) INCREL((*IF TXVUNO *EQ '       +
+                          ') (*AND TXCODE *EQ 'SA04') (*AND TXACNT +
+                          *LE '3') (*AND TXFLAG *NE 'D') (*AND +
+                          TXACDT *EQ &DATEA))  */
+
+             CPYF       FROMFILE(TRNDTL) TOFILE(QTEMP/TXTEMP) +
+                          MBROPT(*ADD) CRTFILE(*YES) INCREL((*IF +
+                          TXVUNO *EQ '       ') (*AND TXCODE *EQ +
+                          'SA04') (*AND TXACNT *LE '3') (*AND +
+                          TXFLAG *NE 'D') (*AND TXACDT *LE &DATEA) +
+                          (*AND TXACDT *GE &DATEX) +
+                          (*AND TXTXAR *EQ &AREA))
+
+             OVRDBF     FILE(TRNDTLUP) TOFILE(TRNDTL)
+             OVRDBF     FILE(TRNDTL) TOFILE(QTEMP/TXTEMP) SHARE(*YES)
+             OPNQRYF    FILE((TRNDTL)) KEYFLD((TXACDT) (TXIVNO) +
+                             (TXCUNO) (TXUPRC) (TXPDNM)) +
+                          MAPFLD((TXIVNO '%SST(TXORNO 1 6)'))
+
+             OVRDBF     FILE(ACTRAN) TOFILE(DALIB/('AC' || &AREA || +
+                          'R')) LVLCHK(*NO)
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 176) +
+                          CPI(13.3) COPIES(1)
+
+             CALL       PGM(ARP011R)
+
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+             DLTF       FILE(QTEMP/TXTEMP)
+             CHGDTAARA  DTAARA(DALIB/&DTARA (9 8)) VALUE(&DATEC)
+
+  /*0112A*/  IF    COND(&DATEA  *LT &IFRSD)  THEN(DO)
+  /*0011A START*/
+             RTVDTAARA  DTAARA(*LDA (201 6)) RTNVAR(&D#VNO1)
+             RTVDTAARA  DTAARA(*LDA (211 6)) RTNVAR(&D#VNO2)
+
+             CALL       PGM(ARS888P) PARM(&AREA &YM &D#VNO1 &D#VNO2)
+  /*0011A  END */
+  /*0112A*/  ENDDO
+             ENDPGM
+

@@ -1,0 +1,184 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR113P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CSF                                  */
+     /*     4.FUNCTION     發票折扣核對清單                       */
+     /*     5.DATE-WRITTEN  92/05/31                                */
+     /*     6.DATE-MODIFY                                           */
+     /*                                                             */
+     /*                                                             */
+     /***************************************************************/
+       PGM
+       DCL        VAR(&TYPE)   TYPE(*CHAR) LEN(1)
+       DCL        VAR(&P#IN03) TYPE(*CHAR) LEN(1)
+       DCL        VAR(&CUNO)   TYPE(*CHAR) LEN(6)  /*客戶代號暫存*/
+       DCL        VAR(&CUN1)   TYPE(*CHAR) LEN(6)  /*客戶代號起值*/
+       DCL        VAR(&CUN2)   TYPE(*CHAR) LEN(6)  /*客戶代號止值*/
+       DCL        VAR(&SALE)   TYPE(*CHAR) LEN(1)  /*業務員別暫存*/
+       DCL        VAR(&SAL1)   TYPE(*CHAR) LEN(1)  /*業務員別起值*/
+       DCL        VAR(&SAL2)   TYPE(*CHAR) LEN(1)  /*業務員別止值*/
+       DCL        VAR(&IND1)   TYPE(*CHAR) LEN(8)  /*發票日期暫存*/
+       DCL        VAR(&IND2)   TYPE(*CHAR) LEN(8)  /*發票日期暫存*/
+       DCL        VAR(&AREA)   TYPE(*CHAR) LEN(1)  /*發票廠區暫存*/
+       DCL        VAR(&ARE1)   TYPE(*CHAR) LEN(1)  /*發票廠區暫存*/
+       DCL        VAR(&ARE2)   TYPE(*CHAR) LEN(1)  /*發票廠區暫存*/
+       DCL        VAR(&COD1)   TYPE(*CHAR) LEN(1)  /*報表內容暫存*/
+       DCL        VAR(&TYPE)   TYPE(*CHAR) LEN(1)  /*報表型態暫存*/
+       DCL        VAR(&CHIC)   TYPE(*CHAR) LEN(1)  /*訂單挑選暫存*/
+       DCL        VAR(&S#DEVN) TYPE(*CHAR) LEN(10)
+       DCL        VAR(&S#USER) TYPE(*CHAR) LEN(10)
+
+       RTVJOBA    JOB(&S#DEVN) USER(&S#USER) TYPE(&TYPE)
+       IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+       CALL     PGM(ARR113RS) PARM(&P#IN03)
+       IF       COND(&P#IN03 *EQ '1') THEN(RETURN)
+
+ /*    SBMJOB     CMD(CALL PGM(ARR113P)) JOB(ARR113P) +
+                     JOBD(ARJOBD)   */
+       SNDBRKMSG  MSG('<<發票折扣核對清單已開始處理 +
+                   ,請稍待.........>>') +
+                  TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+ /*    RETURN   */
+
+ BATCH:
+       RTVDTAARA  DTAARA(*LDA (300 6)) RTNVAR(&CUNO)
+       RTVDTAARA  DTAARA(*LDA (306 1)) RTNVAR(&SALE)
+       RTVDTAARA  DTAARA(*LDA (307 8)) RTNVAR(&IND1)
+       RTVDTAARA  DTAARA(*LDA (315 8)) RTNVAR(&IND2)
+       RTVDTAARA  DTAARA(*LDA (323 1)) RTNVAR(&AREA)
+       RTVDTAARA  DTAARA(*LDA (324 1)) RTNVAR(&COD1)
+       RTVDTAARA  DTAARA(*LDA (325 1)) RTNVAR(&TYPE)
+       RTVDTAARA  DTAARA(*LDA (326 1)) RTNVAR(&CHIC)
+
+   /*  客戶代號值　　*/
+       IF         COND(&CUNO   *EQ ' ') THEN(DO)
+       CHGVAR     VAR(&CUN1)     VALUE('      ')
+       CHGVAR     VAR(&CUN2)     VALUE('999999')
+       ENDDO
+       ELSE (DO)
+       CHGVAR     VAR(&CUN1)     VALUE(&CUNO)
+       CHGVAR     VAR(&CUN2)     VALUE(&CUNO)
+       ENDDO
+   /*  業務員別值　　*/
+       IF         COND(&SALE   *EQ ' ') THEN(DO)
+       CHGVAR     VAR(&SAL1)     VALUE(' ')
+       CHGVAR     VAR(&SAL2)     VALUE('9')
+       ENDDO
+       ELSE (DO)
+       CHGVAR     VAR(&SAL1)     VALUE(&SALE)
+       CHGVAR     VAR(&SAL2)     VALUE(&SALE)
+       ENDDO
+   /*  發票廠區值　　*/
+       IF         COND(&AREA   *EQ ' ') THEN(DO)
+       CHGVAR     VAR(&ARE1)     VALUE(' ')
+       CHGVAR     VAR(&ARE2)     VALUE('9')
+       ENDDO
+       ELSE (DO)
+       CHGVAR     VAR(&ARE1)     VALUE(&AREA)
+       CHGVAR     VAR(&ARE2)     VALUE(&AREA)
+       ENDDO
+
+ /*  折扣清單 */
+       IF         COND(&COD1    *EQ '1') THEN(DO)
+      /*明細表*/
+       IF         COND(&TYPE    *EQ '1') THEN(DO)
+       OVRPRTF    FILE(ARR113T) TOFILE(ARR113T) +
+                  PAGESIZE(*N 198) +
+                  CPI(15) HOLD(*YES)  USRDTA('折扣明細')
+       OVRDBF     FILE(ARDSLG)  TOFILE(ARDSLG) SHARE(*YES)
+       OPNQRYF    FILE(ARDSLG)  QRYSLT(' +
+                      (INDT    *GE "' || &IND1 || '") *AND +
+                      (INDT    *LE "' || &IND2 || '") *AND +
+                      (ADCUNO  *GE "' || &CUN1 || '") *AND +
+                      (ADCUNO  *LE "' || &CUN2 || '") *AND +
+                      (ADSALE  *GE "' || &SAL1 || '") *AND +
+                      (ADSALE  *LE "' || &SAL2 || '") *AND +
+                      (ADAREA  *GE "' || &ARE1 || '") *AND +
+                      (ADAREA  *LE "' || &ARE2 || '")')   +
+                  KEYFLD((ADINNO) (ADINDT) ) +
+                  MAPFLD((INDT    ADINDT  *CHAR 8))
+       CALL       PGM(ARR113R)
+       CLOF       OPNID(ARDSLG)
+       DLTOVR     FILE(*ALL)
+       ENDDO
+       ELSE (DO)
+       OVRPRTF    FILE(ARR113T1) TOFILE(ARR113T1) +
+                  PAGESIZE(*N 132) +
+                  CPI(15) HOLD(*YES)  USRDTA('折扣彙總')
+       OVRDBF     FILE(ARDSLG)  TOFILE(ARDSLG) SHARE(*YES)
+       OPNQRYF    FILE(ARDSLG)  QRYSLT(' +
+                      (INDT    *GE "' || &IND1 || '") *AND +
+                      (INDT    *LE "' || &IND2 || '") *AND +
+                      (ADCUNO  *GE "' || &CUN1 || '") *AND +
+                      (ADCUNO  *LE "' || &CUN2 || '") *AND +
+                      (ADSALE  *GE "' || &SAL1 || '") *AND +
+                      (ADSALE  *LE "' || &SAL2 || '") *AND +
+                      (ADAREA  *GE "' || &ARE1 || '") *AND +
+                      (ADAREA  *LE "' || &ARE2 || '")')   +
+                  KEYFLD((ADCUNO) (ADORNO) (ADINNO)) +
+                  MAPFLD((INDT    ADINDT  *CHAR 8))
+       CALL       PGM(ARR113R2)
+       CLOF       OPNID(ARDSLG)
+       DLTOVR     FILE(*ALL)
+       ENDDO
+
+       ENDDO
+       ELSE (DO)
+
+ /*  未扣清單 */
+      /*明細表*/
+       IF         COND(&TYPE    *EQ '1') THEN(DO)
+       OVRPRTF    FILE(ARR113T) TOFILE(ARR113T) +
+                  PAGESIZE(*N 198) +
+                  CPI(15) HOLD(*YES)  USRDTA('未扣明細')
+       OVRDBF     FILE(INVMST)  TOFILE(INVMST) SHARE(*YES)
+       OVRDBF     FILE(INVDTY)  TOFILE(INVDTL)
+       OPNQRYF    FILE(INVMST)  QRYSLT(' +
+                      (INDT    *GE "' || &IND1 || '") *AND +
+                      (INDT    *LE "' || &IND2 || '") *AND +
+                      (INCUNO  *GE "' || &CUN1 || '") *AND +
+                      (INCUNO  *LE "' || &CUN2 || '") *AND +
+                      (INSALE  *GE "' || &SAL1 || '") *AND +
+                      (INSALE  *LE "' || &SAL2 || '") *AND +
+                      (INAREA  *GE "' || &ARE1 || '") *AND +
+                      (INAREA  *LE "' || &ARE2 || '")')   +
+                  KEYFLD((ININDT) (INNO) ) +
+                  MAPFLD((INDT    ININDT  *CHAR 8))
+       CALL       PGM(ARR113R1)
+       CLOF       OPNID(INVMST)
+       DLTOVR     FILE(*ALL)
+       ENDDO
+       ELSE (DO)
+       OVRPRTF    FILE(ARR113T1) TOFILE(ARR113T1) +
+                  PAGESIZE(*N 132) +
+                  CPI(15) HOLD(*YES)  USRDTA('未扣彙總')
+       OVRDBF     FILE(INVMST)  TOFILE(INVMST) SHARE(*YES)
+       OVRDBF     FILE(INVDTY)  TOFILE(INVDTL)
+       OPNQRYF    FILE(INVMST)  QRYSLT(' +
+                      (INDT    *GE "' || &IND1 || '") *AND +
+                      (INDT    *LE "' || &IND2 || '") *AND +
+                      (INCUNO  *GE "' || &CUN1 || '") *AND +
+                      (INCUNO  *LE "' || &CUN2 || '") *AND +
+                      (INSALE  *GE "' || &SAL1 || '") *AND +
+                      (INSALE  *LE "' || &SAL2 || '") *AND +
+                      (INAREA  *GE "' || &ARE1 || '") *AND +
+                      (INAREA  *LE "' || &ARE2 || '")')   +
+                  KEYFLD((INCUNO) (INORNO) (INNO)) +
+                  MAPFLD((INDT    ININDT  *CHAR 8))
+       CALL       PGM(ARR113R3)
+       CLOF       OPNID(INVMST)
+       DLTOVR     FILE(*ALL)
+       ENDDO
+       ENDDO
+
+       CLRPFM     ARR113F
+
+       SNDBRKMSG  MSG('<<發票折扣核對清單已處理完成+
+                   ,請列印.........>>') +
+                    TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+       ENDPGM
+

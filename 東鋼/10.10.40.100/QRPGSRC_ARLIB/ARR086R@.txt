@@ -1,0 +1,212 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR086R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     現金流量預估明細表
+     H*            5.DATE-WRITTEN  89/04/19
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARSTTX  IP  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FRCVDTL  IF  E           K        DISK
+     FARR086T O   E             69     PRINTER
+     IAXREC       01
+     I                                              AXCUNOL1
+     I           UDS
+     I                                      500 5050T#DATE
+     I                                      506 506 D#KIND
+     I                                     10011010 T#USID
+     C           *IN99     IFEQ *OFF
+     C                     EXSR INISR
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR                   EXSR LRSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C           K#VDTL    KLIST
+     C                     KFLD           RVNO
+     C                     KFLD           RVITEM
+     C*
+     C                     MOVE *ALL'-'   T#LIN1
+     C                     MOVE *ALL'-'   T#LIN2
+     C*
+     C           D#KIND    IFEQ '1'
+     C                     MOVE '明細'  T#KIND
+     C                     ELSE
+     C                     MOVE '彙總'  T#KIND
+     C                     ENDIF
+     C*
+     C                     MOVE *ON       *IN69
+     C*列印控制
+     C                     MOVE *BLANK    W#CUNO  6
+     C                     MOVE *BLANK    W#APNO  6
+     C                     MOVE *BLANK    W#RVNO  6
+     C                     MOVE *BLANK    W#ORNO  5
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C*清除客戶小計
+     C                     Z-ADD0         W#INA1
+     C                     Z-ADD0         W#INA2
+     C                     Z-ADD0         W#INA3
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR086T1
+     C                     Z-ADD0         W#RAMT 120
+     C           AXAPNO    IFEQ *BLANK                     未請款
+     C                     MOVE AXTXNO    T#TXNO           磅單編號
+     C                     ENDIF
+     C*------------------------------------
+     C           AXRVNO    IFNE *BLANK                     已繳款
+TEST C           AXRVNO    IFEQ 'H51620'
+  .  C                     Z-ADD0         W#XX    10
+  .  C                     ENDIF
+     C           AXSTCD    IFEQ '*'                        多筆繳款
+     C*
+     C                     MOVE AXRVNO    RVNO             繳款單號
+     C                     Z-ADD0         RVITEM           繳款項次
+     C           K#VDTL    SETLLRVREC
+     C                     READ RVREC                    41
+     C           *IN41     DOWEQ*OFF
+     C           RVNO      IFNE AXRVNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           RVACTP    IFEQ 'D'                        借方
+     C           RVACNO    IFEQ '1112'                     現金繳款
+     C           RVDATE    ANDEQT#DATE                     繳款日期
+     C                     ADD  RVRAMT    W#RAMT
+     C                     ENDIF
+     C*
+     C           RVACNO    IFEQ '1131'                     支票繳款
+     C           RVDUDT    ANDEQT#DATE                     到期日
+     C                     ADD  RVRAMT    W#RAMT
+     C                     ENDIF
+     C*
+     C                     ENDIF                            RVACTP
+     C                     READ RVREC                    41
+     C                     ENDDO                            IN41
+     C*
+     C                     ELSE                            單筆繳款
+     C*
+     C           AXRVLD    IFEQ T#DATE
+     C                     Z-ADDAXINAM    W#RAMT           應收金額
+     C                     ENDIF
+     C*
+     C                     ENDIF                            AXSTCD
+     C*
+     C                     ELSE                            未繳款
+     C*
+     C           AXORLD    IFEQ T#DATE
+     C                     Z-ADDAXINAM    W#RAMT           應收金額
+     C                     ENDIF
+     C*
+     C                     ENDIF                            AXRVNO
+     C*---------------------------------
+     C                     SELEC
+     C           AXSTCD    WHEQ '1'                        未開發票
+     C           AXSTCD    OREQ '2'                        未請款
+     C                     Z-ADDW#RAMT    T#INA3           已出貨
+     C           AXSTCD    WHEQ '3'                        未繳款
+     C                     Z-ADDW#RAMT    T#INA2           已請款
+     C                     OTHER
+     C                     Z-ADDW#RAMT    T#INA1           以繳款
+     C                     ENDSL
+     C*列印
+     C           T#INA1    IFNE 0
+     C           T#INA2    ORNE 0
+     C           T#INA3    ORNE 0
+     C*
+     C           W#CUNO    IFNE AXCUNO
+     C                     MOVE AXCUNO    T#CUNO           客戶編號
+     C           AXCUNO    CHAINCBREC                40
+     C  N40                MOVE CBCUNM    T#CUNM           客戶名稱
+     C                     MOVE AXCUNO    W#CUNO
+     C                     ELSE
+     C                     MOVE *BLANK    T#CUNO
+     C                     MOVE *BLANK    T#CUNM
+     C                     ENDIF
+     C*
+     C           W#ORNO    IFNE AXORNO
+     C                     MOVE AXORNO    T#ORNO           訂單編號
+     C                     MOVE AXORNO    W#ORNO
+     C                     ELSE
+     C                     MOVE *BLANK    T#ORNO
+     C                     ENDIF
+     C*
+     C           W#RVNO    IFNE AXRVNO
+     C                     MOVE AXRVNO    T#RVNO           繳款單號
+     C                     MOVE AXRVNO    W#RVNO
+     C                     ELSE
+     C                     MOVE *BLANK    T#RVNO
+     C                     ENDIF
+     C*
+     C           W#APNO    IFNE AXAPNO
+     C                     MOVE AXAPNO    T#APNO           請款單號
+     C                     MOVE AXAPNO    W#APNO
+     C                     ELSE
+     C                     MOVE *BLANK    T#APNO
+     C                     ENDIF
+     C*
+     C                     MOVE AXINNO    T#IVNO           發票號碼
+     C*
+     C   69                WRITEAR086TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR086T1
+     C*暫存
+     C                     ADD  T#INA1    W#INA1 100
+     C                     ADD  T#INA2    W#INA2 100
+     C                     ADD  T#INA3    W#INA3 100
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*暫存值
+     C                     CLEARAR086T2
+     C*
+     C                     ADD  W#INA1    T#TOT1
+     C                     ADD  W#INA2    T#TOT2
+     C                     ADD  W#INA3    T#TOT3
+     C*
+     C                     Z-ADDW#INA1    T#INT1
+     C                     Z-ADDW#INA2    T#INT2
+     C                     Z-ADDW#INA3    T#INT3
+     C*列印
+     C           T#INT1    IFNE 0
+     C           T#INT2    ORNE 0
+     C           T#INT3    ORNE 0
+     C   69                WRITEAR086TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR086T2
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C*
+     C   69                WRITEAR086TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR086T3
+     C*
+     C   69                WRITEAR086TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR086TM
+     C*
+     C                     ENDSR
+

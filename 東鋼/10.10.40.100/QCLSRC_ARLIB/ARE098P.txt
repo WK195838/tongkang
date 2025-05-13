@@ -1,0 +1,58 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARE098P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCJ                                  */
+     /*     4.FUNCTION     區間發票開立試算表                     */
+     /*     5.DATE-WRITTEN  99/05/27 2010AR421                      */
+     /*     6.UPDATE  DATE  99/08/02  2010AR511 S00WCJ (9908A)      */
+     /*                    101/11/12  2012AR699 S00WCJ (0111A)      */
+     /*                    101/12/25  2012AR709 S00WCJ (0112A)      */
+     /*                    105/01/15  2016AR973 S00WCJ (0501A)      */
+     /*                     指定印表機PPB0001H                    */
+     /*                    108/09/11  S00WCJ (0809A)                */
+     /*                     配合磅單過至項次修改                  */
+     /*                                                             */
+     /***************************************************************/
+             PGM        PARM(&W#ITNO)
+
+             DCL        VAR(&W#ITNO)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+ /*0112A*/   DCL        VAR(&D#DEL) TYPE(*CHAR) LEN(1)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+             SBMJOB     JOB(ARE098P) JOBD(ARJOBD) JOBQ(ARJOBQ) +
+                           RQSDTA('CALL PGM(ARE098P) +
+                          PARM(''' || &W#ITNO || ''')')
+
+             RETURN
+
+ BATCH:
+ /*0809A*/   OVRPRTF    FILE(ARE098T) PAGESIZE(*N 158) CPI(12) +
+                          OUTQ(PPB0001H) HOLD(*YES) SAVE(*YES) +
+                          USRDTA('發票試算')
+ /*0809A*/   OVRPRTF    FILE(ARE098T1) PAGESIZE(*N 158) CPI(12) +
+                          OUTQ(PPB0001H) HOLD(*YES) SAVE(*YES) +
+                          USRDTA('發票差異')
+             OVRDBF     FILE(INVTRL) TOFILE(INVTRL) SHARE(*YES)
+                 OPNQRYF    FILE((INVTRL)) OPTION(*ALL) QRYSLT('  +
+                          ITNO *EQ "' || &W#ITNO || '" ') +
+                          KEYFLD((ITTXDE) (ITTXNO) (ITITEM))
+
+             CALL       PGM(ARE098R1)
+             CLOF       OPNID(INVTRL)
+             DLTOVR     FILE(*ALL)
+
+ /*0112A*/  RTVDTAARA    DTAARA(*LDA (201 1))  RTNVAR(&D#DEL)
+ /*0112A*/  IF     COND(&D#DEL *NE '1')  THEN(DO)
+ /*0112A*/        DLTSPLF        FILE(ARE098T1)    SPLNBR(*LAST)
+ /*0112A*/  ENDDO
+
+ ENDCLPGM:   ENDPGM
+

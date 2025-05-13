@@ -1,0 +1,60 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP050P2                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02YSH                                  */
+     /*     4.FUNCTION     進倉履約折讓自動處理作業-開立處理    */
+     /*     5.DATE-WRITTEN  91/02/22                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM        PARM(&P#CUNO &P#YYMM &P#CONT)
+
+             DCL        VAR(&P#CUNO)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&P#YYMM)  TYPE(*CHAR)  LEN(4)
+             DCL        VAR(&P#CONT)  TYPE(*CHAR)  LEN(3)
+             DCL        VAR(&C#CUNS)  TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&C#CUNE)  TYPE(*CHAR)  LEN(6)
+
+             CHGDTAARA  DTAARA(*LDA (401 6)) VALUE(&P#CUNO)
+             CHGDTAARA  DTAARA(*LDA (407 4)) VALUE(&P#YYMM)
+             CHGDTAARA  DTAARA(*LDA (411 3)) VALUE(&P#CONT)
+
+             IF         COND(&P#CUNO *EQ '      ') THEN(DO)
+             CHGVAR     VAR(&C#CUNS) VALUE('      ')
+             CHGVAR     VAR(&C#CUNE) VALUE('999999')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&C#CUNS) VALUE(&P#CUNO)
+             CHGVAR     VAR(&C#CUNE) VALUE(&P#CUNO)
+             ENDDO
+
+             OVRDBF     FILE(DISMST)  TOFILE(DALIB/DISMST)  SHARE(*YES)
+        /*   ADDLIBLE   S02YSH                                           */
+        /*   MONMSG     MSGID(CPF0000)                                   */
+        /*   OVRDBF     FILE(DISMST)  TOFILE(S02YSH/DISMSTX) SHARE(*YES) */
+        /*   OVRDBF     FILE(DISDTL)  TOFILE(S02YSH/DISDTLX)             */
+        /*   OVRDBF     FILE(INVMST)  TOFILE(S02YSH/INVMST9103)          */
+        /*   OVRDBF     FILE(INVDTL)  TOFILE(S02YSH/INVDTL9103)          */
+        /*   OVRDBF     FILE(TRNDTL)  TOFILE(S02YSH/TRNDTL9103)          */
+        /*   OVRDBF     FILE(GENSEQ)  TOFILE(S02YSH/GENSEQ9103)          */
+             OVRPRTF    FILE(ARE050T) TOFILE(ARE050T) PAGESIZE(*N +
+                          132) CPI(10) HOLD(*YES) USRDTA('折讓開立')
+             OPNQRYF    FILE(DISMST)  OPTION(*ALL) QRYSLT('+
+                        (DMCUNO *GE "' || &C#CUNS || '") *AND +
+                        (DMCUNO *LE "' || &C#CUNE || '") *AND +
+                        (YYMM *EQ "' || &P#YYMM || '") *AND +
+                        (CONT *EQ "' || &P#CONT || '") *AND +
+                        (DMCOD2 *NE " ") *AND +
+                        (DMCOD3 *EQ " ")') +
+                        MAPFLD((CHAR1 DMYYMM *CHAR 6) +
+                               (YYMM '%SST(CHAR1 3 4)' *CHAR 4) +
+                               (CONT DMCONT  *CHAR 3)) +
+                        KEYFLD((DMCUNO) (DMORNO))
+             CALL       PGM(ARE050R2)
+             CLOF       OPNID(DISMST)
+             DLTOVR     FILE(*ALL)
+
+ ENDCLPGM:   ENDPGM
+

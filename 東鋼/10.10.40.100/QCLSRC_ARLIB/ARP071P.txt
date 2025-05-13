@@ -1,0 +1,123 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP071P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     客戶暫收統計檔期初設定作業           */
+     /*     5.DATE-WRITTEN  88/11/30                                */
+     /*                                                             */
+     /*  <說明> 本程式用於處理全部的繳款明細檔，以獲得暫收款的  */
+     /*           使用情形，並將結論寫入客戶暫收統計檔內。        */
+     /*           廠區分別執行期初設定後；將所有暫收統計資料上傳  */
+     /*           台北，再來執行寫入授信擴充檔的現金欄上。        */
+     /*        !! 在台北重新執行時，請先CLRPFM AR2159F    !!      */
+     /*        !! 再執行P, M, H （此三廠皆在台北繳款）  !!      */
+     /*                                                             */
+     /*  <參數> "?" --> 廠區期初設定   "X" ---> 寫入授信      */
+     /*                   (P,M,T,H,K)                               */
+     /*                                                             */
+     /***************************************************************/
+             PGM        PARM(&P#TYPE)
+
+             DCL        VAR(&P#TYPE)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&USER)    TYPE(*CHAR) LEN(10)
+             DCL        VAR(&SYSN)    TYPE(*CHAR) LEN(8)
+             DCL        VAR(&INT)     TYPE(*CHAR) LEN(1)
+
+
+             RTVJOBA    TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+             SBMJOB     JOB(ARP071P) JOBD(ARJOBD) JOBQ(QSYS/QCTL) +
+                        RQSDTA('CALL ARLIB/ARP071P ' || &P#TYPE)
+             RETURN
+
+ BATCH:
+             RTVNETA    SYSNAME(&SYSN)
+             IF         COND(&P#TYPE *EQ 'P' *OR +
+                             &P#TYPE *EQ 'M' *OR +
+                             &P#TYPE *EQ 'T' *OR +
+                             &P#TYPE *EQ 'H' *OR +
+                             &P#TYPE *EQ 'K')      THEN(GOTO SETUPRV)
+
+             IF         COND(&P#TYPE *EQ 'X' *AND +
+                             &SYSN *EQ 'P02') THEN(GOTO SETUPCC)
+
+             SNDMSG     MSG('對不起，暫收款彙總程式的參數有問題！') +
+                        TOUSR(&USER)
+             RETURN
+
+  /* ---------------------------------------------------------- */
+
+  SETUPRV:        /*  期初設定；所有繳款明細匯總暫收款   */
+
+    STEP0:
+             CHGDTAARA  DTAARA(*LDA (1 1)) VALUE(&P#TYPE)
+
+    STEP1:        /*  寫入暫收貸減借之金額 */
+             OVRDBF     FILE(AR2159F) TOFILE(DALIB/AR2159F)
+             OVRDBF     FILE(RCVDTL) TOFILE(DALIB/RCVDTL) SHARE(*YES)
+             OPNQRYF    FILE(RCVDTL) +
+                        QRYSLT('RVACNO *EQ "2159" *AND +
+                                RVTYPE *NE "3" *AND    +
+                                %SST(RVNO 1 1) *EQ "'  +
+                                || &P#TYPE || '" *AND  +
+                                RVDECD *NE "D"') +
+                        KEYFLD((RVCUNO))
+             CALL       PGM(ARLIB/ARP071R1)
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+
+    STEP2:        /*  合計未兌現票據應轉暫收金額  */
+             OVRDBF     FILE(AR2159F) TOFILE(DALIB/AR2159F)
+             OVRDBF     FILE(RCVDTL) TOFILE(DALIB/RCVDTL) SHARE(*YES)
+             OPNQRYF    FILE(RCVDTL) +
+                        OPTION(*ALL) +
+                        QRYSLT('RVACNO *EQ "1131" *AND +
+                                RVTYPE *NE "3" *AND    +
+                                RVNTCD *EQ " " *AND    +
+                                %SST(RVNO 1 1) *EQ "'  +
+                                || &P#TYPE || '" *AND  +
+                                RVDECD *NE "D"') +
+                        KEYFLD((RVCUNO))
+             CALL       PGM(ARLIB/ARP071R2)
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+
+    STEP3:        /*  彙總暫收統計檔相關位的金額  */
+             OVRDBF     FILE(AR2159F) TOFILE(DALIB/AR2159F) SHARE(*YES)
+             OPNQRYF    FILE(AR2159F) +
+                        OPTION(*ALL)  +
+                        QRYSLT('ARAREA *EQ "' || &P#TYPE || '"') +
+                        KEYFLD((ARCUNO))
+             CALL       PGM(ARLIB/ARP071R3)
+             CLOF       OPNID(AR2159F)
+             DLTOVR     FILE(*ALL)
+
+             SNDMSG     MSG('暫收款彙總作業成功：' || &P#TYPE ) +
+                        TOUSR(&USER)
+             RETURN
+
+  /* ---------------------------------------------------------- */
+
+  SETUPCC:        /*  寫入授信；將統計結論寫入授信擴充檔   */
+
+             OVRDBF     FILE(CAMBALN) TOFILE(DALIB/CAMBALN)
+             CALL       PGM(ARLIB/ARP071R4)  /* 清除現金買貨欄 */
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(CAMBALN) TOFILE(DALIB/CAMBALN)
+             OVRDBF     FILE(AR2159F) TOFILE(DALIB/AR2159F)
+             OPNQRYF    FILE(AR2159F) +
+                        KEYFLD((ARCUNO))
+             CALL       PGM(ARLIB/ARP071R5)  /* 寫入現金買貨欄 */
+             CLOF       OPNID(AR2159F)
+             DLTOVR     FILE(*ALL)
+
+             SNDMSG     MSG('暫收款統計結論寫入授信成功！') +
+                        TOUSR(&USER)
+             RETURN
+
+             ENDPGM
+

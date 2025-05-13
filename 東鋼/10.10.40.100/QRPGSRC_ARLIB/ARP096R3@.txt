@@ -1,0 +1,378 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP096R3
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            5.DATE-WRITTEN  91/11/07
+     H*            P.S.1.由於銷貨明細具有將磅單同品名匯總為一筆之特性
+     H*                  故此支程式在恢復磅單,銷貨與發票之關係,但
+     H*                  因無遞迴之處理故寫為四層
+     H*****************************************************************
+     H        1   Y                                     1
+     FWTSBMP  IP  E           K        DISK
+     FWTMASPL2IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FARP096F2UF  E           K        DISK
+     FARP096F3O   E           K        DISK
+     IRWTSBMP     01
+     I            DS
+     I                                        1   9 D#ORNO
+     I                                        1   6 W6ORNO
+     I                                        7   90W7ODIT
+     I            DS
+     I                                        1  10 D#IVNO
+     I                                        1   2 D#IVN1
+     I                                        3  10 D#IVN2
+     I            DS
+     I                                        1   8 D#WTNO
+     I                                        1   1 W7AREA
+     I                                        2   3 W7VNO1
+     I                                        4   80W7VNO2
+     I           UDS
+     I                                      401 4100D#DH43
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*FILE => WTMASPL2 磅單主檔
+     C           K#MASP    KLIST
+     C                     KFLD           W6AREA           廠區別
+     C                     KFLD           W6VNO1           進出別
+     C                     KFLD           W6VNO2           單據序號
+     C*FILE => HBWTTX 磅單,發票與類別對照檔
+     C           K#ARF2    KLIST
+     C                     KFLD           A2TXNO           磅單號碼
+     C                     KFLD           A2ORNO           項次
+     C                     KFLD           A2PDNM           磅單類別
+     C                     KFLD           A2IVNO           發票號碼
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*判斷是否為銷貨
+     C                     MOVE W7AREA    W6AREA
+     C                     MOVE W7VNO1    W6VNO1
+     C                     Z-ADDW7VNO2    W6VNO2
+     C           K#MASP    CHAINRWTMASP              40
+     C           *IN40     IFEQ *ON
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C*
+     C           W6TRCD    IFNE '11'                       銷貨
+     C           W6TRCD    ANDNE'1E'                       友廠出
+     C           W6TRCD    ANDNE'1K'                       轉寄放
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C*排除外銷客戶
+     C                     MOVELW6CUNO    W#CUN1  1
+     C           W#CUN1    IFEQ 'E'
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C*先比對數量是否相符
+     C                     MOVE D#WTNO    A2TXNO           磅單號碼
+     C                     MOVE *BLANK    A2ORNO           項次
+     C                     MOVE *BLANK    A2PDNM           磅單類別
+     C                     MOVE *BLANK    A2IVNO           發票號碼
+     C           K#ARF2    SETLLAR096F2
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ AR096F2                  40
+     C           D#WTNO    IFNE A2TXNO
+     C           *IN40     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           W7NAME    IFNE A2PDNM
+     C           W7STDW    ORNE A2LAQT
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     Z-ADDW7STDW    W#QTY1  90
+     C                     EXSR WTRSR
+     C* UPDATE ARP096F2
+     C                     Z-ADD0         A2LAQT
+     C                     UPDATAR096F2
+     C*異常處理(慈濟未開磅單之三張銷貨)
+     C* H1130205啟阜營造
+     C*          W7AREA    IFEQ 'H'
+     C*          W7VNO1    ANDEQ'11'
+     C*          W7VNO2    ANDEQ30205
+     C*                    MOVE 'H1135773'D#WTNO
+     C*                    Z-ADD16761     W#QTY1
+     C*                    MOVE 'DN'      D#IVN1
+     C*                    MOVE '03494404'D#IVN2
+     C*                    MOVE D#IVNO    W1IVNO
+     C*                    MOVEL'H02280'  W1ORNO
+     C*                    MOVE '009'     W1ORNO
+     C*                    Z-ADD10.6      W1UPRC
+     C*                    EXSR WTRSR
+     C*                    ENDIF
+     C* K1117677永達營造
+     C*          W7AREA    IFEQ 'K'
+     C*          W7VNO1    ANDEQ'11'
+     C*          W7VNO2    ANDEQ17677
+     C*          W7SQIT    ANDEQ9
+     C*                    MOVE 'K1123087'D#WTNO
+     C*                    MOVE '325'     W7NAME
+     C*                    Z-ADD492       W#QTY1
+     C*                    MOVE 'DP'      D#IVN1
+     C*                    MOVE '97019566'D#IVN2
+     C*                    MOVE D#IVNO    W1IVNO
+     C*                    MOVEL'H02277'  W1ORNO
+     C*                    MOVE '007'     W1ORNO
+     C*                    Z-ADD10.6      W1UPRC
+     C*                    EXSR WTRSR
+     C*                    ENDIF
+     C*
+     C*                    GOTO DTLEND
+     C                     ENDDO
+     C*數量不相符
+     C                     MOVE D#WTNO    A2TXNO           磅單號碼
+     C                     MOVE *BLANK    A2ORNO           項次
+     C                     MOVE *BLANK    A2PDNM           磅單類別
+     C                     MOVE *BLANK    A2IVNO           發票號碼
+     C           K#ARF2    SETLLAR096F2
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ AR096F2                  40
+     C           D#WTNO    IFNE A2TXNO
+     C           *IN40     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           W7NAME    IFNE A2PDNM
+     C           A2CODE    OREQ '*'
+     C           A2LAQT    OREQ 0
+     C                     ITER
+     C                     ENDIF
+     C*判斷主邏輯開始
+     C*第一層START
+     C           A2LAQT    SUB  W7STDW    W#XQTY  90
+     C           W#XQTY    IFGE 0
+     C                     Z-ADDW7STDW    W#QTY1  90
+     C                     EXSR WTRSR
+     C* UPDATE ARP096F2
+     C                     Z-ADDW#XQTY    A2LAQT
+     C                     UPDATAR096F2
+     C                     LEAVE
+     C*
+     C                     ELSE
+     C*
+     C                     Z-ADDA2LAQT    W#QTY1
+     C                     EXSR WTRSR
+     C* UPDATE HBWTTX
+     C                     Z-ADD0         A2LAQT
+     C                     UPDATAR096F2
+     C*第二層START
+     C                     MOVE D#WTNO    A2TXNO           磅單號碼
+     C                     MOVE *BLANK    A2ORNO           項次
+     C                     MOVE *BLANK    A2PDNM           磅單類別
+     C                     MOVE *BLANK    A2IVNO           發票號碼
+     C           K#ARF2    SETLLAR096F2
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ AR096F2                  40
+     C           D#WTNO    IFNE A2TXNO
+     C           *IN40     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           W7NAME    IFNE A2PDNM
+     C           A2CODE    OREQ '*'
+     C           A2LAQT    OREQ 0
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MULT -1        W#XQTY
+     C           A2LAQT    SUB  W#XQTY    W#YQTY  90
+     C           W#YQTY    IFGE 0
+     C                     Z-ADDW#XQTY    W#QTY1
+     C                     EXSR WTRSR
+     C* UPDATE HBWTTX
+     C                     Z-ADDW#YQTY    A2LAQT
+     C                     UPDATAR096F2
+     C                     LEAVE
+     C*
+     C                     ELSE
+     C                     Z-ADDA2LAQT    W#QTY1
+     C                     EXSR WTRSR
+     C* UPDATE HBWTTX
+     C                     Z-ADD0         A2LAQT
+     C                     UPDATAR096F2
+     C*第三層START
+     C                     MOVE D#WTNO    A2TXNO           磅單號碼
+     C                     MOVE *BLANK    A2ORNO           項次
+     C                     MOVE *BLANK    A2PDNM           磅單類別
+     C                     MOVE *BLANK    A2IVNO           發票號碼
+     C           K#ARF2    SETLLAR096F2
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ AR096F2                  40
+     C           D#WTNO    IFNE A2TXNO
+     C           *IN40     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           W7NAME    IFNE A2PDNM
+     C           A2CODE    OREQ '*'
+     C           A2LAQT    OREQ 0
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MULT -1        W#YQTY
+     C           A2LAQT    SUB  W#YQTY    W#ZQTY  90
+     C           W#ZQTY    IFGE 0
+     C                     Z-ADDW7STDW    W#QTY1  90
+     C                     EXSR WTRSR
+     C* UPDATE HBWTTX
+     C                     Z-ADDW#ZQTY    A2LAQT
+     C                     UPDATAR096F2
+     C*
+     C                     ELSE
+     C*
+     C                     Z-ADDA2LAQT    W#QTY1
+     C                     EXSR WTRSR
+     C* UPDATE HBWTTX
+     C                     Z-ADD0         A2LAQT
+     C                     UPDATAR096F2
+     C*第四層START
+     C                     MOVE D#WTNO    A2TXNO           磅單號碼
+     C                     MOVE *BLANK    A2ORNO           項次
+     C                     MOVE *BLANK    A2PDNM           磅單類別
+     C                     MOVE *BLANK    A2IVNO           發票號碼
+     C           K#ARF2    SETLLAR096F2
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ AR096F2                  40
+     C           D#WTNO    IFNE A2TXNO
+     C           *IN40     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           W7NAME    IFNE A2PDNM
+     C           A2CODE    OREQ '*'
+     C           A2LAQT    OREQ 0
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MULT -1        W#ZQTY
+     C                     Z-ADDA2LAQT    W#QTY1
+     C                     EXSR WTRSR
+     C* UPDATE HBWTTX
+     C                     Z-ADDW#ZQTY    A2LAQT
+     C                     UPDATAR096F2
+     C                     LEAVE
+     C                     ENDDO
+     C*第四層結束
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*第三層結束
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*第二層結束
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*第一層結束
+     C*異常處理(慈濟未開磅單之三張銷貨)
+     C* H1135773北昌營造
+     C*          W7AREA    IFEQ 'H'
+     C*          W7VNO1    ANDEQ'11'
+     C*          W7VNO2    ANDEQ33371
+     C*          W7SQIT    ANDEQ5
+     C*                    MOVE 'H1138106'D#WTNO
+     C*                    Z-ADD18939     W#QTY1
+     C*                    MOVE 'EL'      D#IVN1
+     C*                    MOVE '02662597'D#IVN2
+     C*                    MOVE D#IVNO    W1IVNO
+     C*                    MOVEL'H02355'  W1ORNO
+     C*                    MOVE '022'     W1ORNO
+     C*                    Z-ADD10.6      W1UPRC
+     C*                    EXSR WTRSR
+     C*                    ENDIF
+     C           DTLEND    ENDSR
+     C*****************************************************************
+     C           WTRSR     BEGSR
+     C*****************************************************************
+     C*開始寫入
+     C                     CLEARAR096F3
+     C*
+     C           A2IVNO    CHAININREC                41
+     C*
+     C                     MOVE D#WTNO    A3WTNO           磅單號碼
+     C                     MOVE W6TRCD    A3TRCD
+     C                     Z-ADDW7SQIT    A3WTIT           磅單項次
+     C                     Z-ADDW7ENTD    A3ENTD           填單日期
+     C                     MOVE W7NAME    A3NAME           品名
+     C                     MOVE W7QULT    A3QULT           鋼種
+     C                     MOVE W7SPE1    A3SPE1            H/T/D
+     C                     MOVE W7SPE2    A3SPE2            B/W
+     C                     MOVELW7SPE5    A3LENG           長度
+     C                     MOVE W7SPE5    A3UNIT           長度單位
+     C                     MOVE W7QCCD    A3QCCD           品級
+     C                     Z-ADDW#QTY1    A3STDW           理論重
+     C                     MOVE INCUNO    A3CUNO           客戶代號
+     C                     MOVELINORNO    A3ORNO           訂單號碼
+     C                     MOVE 'N'       A3COD2
+     C*以下為特殊標記處理,國內廠商銷往第三國用
+     C*如有此類情形發生,須由營業部提供訂單號碼
+     C*          B1ORNO    IFEQ 'H01946'                    第三國
+     C*          B1ORNO    OREQ 'H02400'                       .
+     C*          B1ORNO    OREQ 'H02037'                       .
+     C*                    MOVE 'Y'       A1COD2
+     C*                    ENDIF
+     C*
+     C*          B1ORNO    IFEQ 'H02313'                    第三國
+     C*          W7ODIT    IFGE 45                            .
+     C*          W7ODIT    ANDLE47                            .
+     C*                    MOVE 'Y'       A1COD2              .
+     C*                    ENDIF                              .
+     C*                    ENDIF                              .
+     C*
+     C                     MOVE A2ORNO    A3ORIT           訂單項次
+     C                     MOVE *BLANK    A3COD1           一張發票
+     C                     Z-ADDA2UPRC    A3UPRC           單價
+     C*取得發票相關資訊
+     C                     MOVE A2IVNO    A3IVNO           發票號碼
+     C                     Z-ADDININDT    A3IVDT           入帳日期
+     C*計算開立帳齡
+     C                     MOVE A3ENTD    P#PDAT  8        出貨日
+     C                     MOVE A3IVDT    P#EDAT  8        收款日
+     C                     MOVE '1'       P#MODE  1        西元年
+     C                     Z-ADD0         P#DIF   50       相距天數
+     C                     MOVE *BLANK    P#ERR   1        錯誤碼
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT
+     C                     PARM           P#EDAT
+     C                     PARM           P#MODE
+     C                     PARM           P#DIF
+     C                     PARM           P#ERR
+     C           P#ERR     IFNE '0'
+     C                     Z-ADD0         P#DIF
+     C                     ENDIF
+     C*
+     C                     Z-ADDP#DIF     A3DAYS
+     C*取得出單號碼
+     C                     MOVE W7AREA    W6AREA
+     C                     MOVE W7VNO1    W6VNO1
+     C                     Z-ADDW7VNO2    W6VNO2
+     C           K#MASP    CHAINRWTMASP              40
+     C                     MOVELW6OTNO    A3ODNO           出單號碼
+     C*
+     C*          B1WTNO    IFEQ 'K1123087'
+     C*                    MOVE '04'      A3ODNO
+     C*                    ELSE
+     C                     MOVE W7OTTM    A3ODNO           出單號碼
+     C*                    ENDIF
+     C*
+     C                     WRITEAR096F3
+     C*
+     C                     ENDSR
+

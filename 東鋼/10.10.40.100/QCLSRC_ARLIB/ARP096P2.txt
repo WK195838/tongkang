@@ -1,0 +1,94 @@
+     /****************************************************************/
+     /*                                                              */
+     /*               >>   PROGRAM INTRODUCTION   <<                 */
+     /*                                                              */
+     /*            1.PROGRAM-ID    ARP096P1                          */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S02YSH                            */
+     /*            4.FUNCTION     反傾銷預警處理-內銷            */
+     /*            5.DATE-WRITTEN  92/02/10                          */
+     /*                                                              */
+     /****************************************************************/
+             PGM
+             DCL        VAR(&C#YYMM)  TYPE(*CHAR) LEN(4) /*年月暫存*/
+             DCL        VAR(&C#SYMD)  TYPE(*CHAR) LEN(6) /*起始日期*/
+             DCL        VAR(&C#EYMD)  TYPE(*CHAR) LEN(6) /*終止日期*/
+             DCL        VAR(&D#DCML)  TYPE(*DEC)  LEN(7 0) /*數字暫存*/
+             DCL        VAR(&C#DCML)  TYPE(*CHAR) LEN(7) /*數字暫存*/
+
+       /*取出記錄值*/
+             RTVDTAARA  DTAARA(*LDA (301 4)) RTNVAR(&C#YYMM)
+             CHGVAR     VAR(&C#SYMD)   VALUE(C#YYMM || '01') /*起始日*/
+             RTVDTAARA  DTAARA(*LDA (305 4)) RTNVAR(&C#YYMM)
+             CHGVAR     VAR(&C#EYMD)   VALUE(C#YYMM || '31') /*終止日*/
+
+       /* STEP 1.0 清空暫存檔 */
+             CLRPFM     FILE(ARLIB/ARP096F1)  /*磅單銷貨對照檔*/
+             CLRPFM     FILE(ARLIB/ARP096F2)  /*發票繳款對照*/
+             CLRPFM     FILE(ARLIB/ARP096F3)  /*發票折讓*/
+             CLRPFM     FILE(ARLIB/ARP096F5)  /*外銷工作檔案*/
+
+       /* STEP 2.0 處理磅單對照   */
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) QRYSLT('+
+                        (TXCODE *EQ "SA04") *AND +
+                        (DATE *GE "' || C#SYMD || '") *AND +
+                        (DATE *LE "' || C#EYMD || '") *AND +
+                        (IVNO *NE "#") *AND +
+                        (IVNO *NE "*") *AND +
+                        (IVNO *NE "0") *AND +
+                        (CUNO *EQ "E") *AND +
+                        (CHAR1 *EQ "3")') +
+                        KEYFLD((TXNO) (TXPDNM) (TXORNO) (TXIVNO)) +
+                        MAPFLD((CHAR1 '%SST(TXPDNM 1 1)' *CHAR 1) +
+                               (CUNO  '%SST(TXCUNO 1 1)' *CHAR 1) +
+                               (DATX  TXDATE *CHAR 8) +
+                               (DATE  '%SST(DATX 3 6)' *CHAR 6) +
+                               (IVNO  '%SST(TXIVNO 1 1)' *CHAR 1))
+             CALL       PGM(ARP096RA)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+       /* STEP 3.0 算發票繳款*/
+          /*此處以出貨日為準,有可能會以發票開立日為準*/
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) QRYSLT('+
+                        (TXCODE *EQ "SA04") *AND +
+                        (DATE *GE "' || C#SYMD || '") *AND +
+                        (DATE *LE "' || C#EYMD || '") *AND +
+                        (IVNO *NE "#") *AND +
+                        (IVNO *NE "*") *AND +
+                        (IVNO *NE "0") *AND +
+                        (CUNO *EQ "E") *AND +
+                        (CHAR1 *EQ "3")') +
+                        KEYFLD((TXNO) (TXPDNM) (TXORNO) (TXIVNO)) +
+                        MAPFLD((CHAR1 '%SST(TXPDNM 1 1)' *CHAR 1) +
+                               (CUNO  '%SST(TXCUNO 1 1)' *CHAR 1) +
+                               (DATX  TXDATE *CHAR 8) +
+                               (DATE  '%SST(DATX 3 6)' *CHAR 6) +
+                               (IVNO  '%SST(TXIVNO 1 1)' *CHAR 1))
+             CALL       PGM(ARP096RC)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+       /* STEP 4.0 處理外銷WORKFILE */
+             OVRDBF     FILE(WTSBMP)   TOFILE(DALIB/WTSBMP) SHARE(*YES)
+             OVRDBF     FILE(WTMASPL2) TOFILE(DALIB/WTMASPL2)
+             OVRDBF     FILE(INVDTL)   TOFILE(DALIB/INVDTL)
+             OVRDBF     FILE(TRNDTL)   TOFILE(DALIB/TRNDTL)
+             OPNQRYF    FILE(WTSBMP) QRYSLT('+
+                        (ENTD *GE "' || C#SYMD || '") *AND +
+                        (ENTD *LE "' || C#EYMD || '") *AND +
+                        (W7NAME *GE "300") *AND +
+                        (W7NAME *LE "399") *AND +
+                        (W7DELT *NE "D") *AND +
+                        (W7SPE1 *NE "     ") *AND +
+                        (W7SPE2 *NE "     ")') +
+                        KEYFLD((W7AREA) (W7VNO1) (W7VNO2) (W7NAME) (W7SQIT)) +
+                        MAPFLD((DATX  W7ENTD *CHAR 8) +
+                               (ENTD  '%SST(DATX 3 6)' *CHAR 6))
+             CALL       PGM(ARP096RE)
+             CLOF       OPNID(WTSBMP)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

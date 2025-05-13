@@ -1,0 +1,67 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE  99/08/16  2010AR517 S00WCJ (9908A) */
+    /*                          101/09/21  2012AR682 S00WCJ (0109A) */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+    /*9908A  DCL        VAR(&DATEX) TYPE(*CHAR) LEN(6)  */
+    /*9908A*/DCL        VAR(&DATEX) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATEY) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATE) TYPE(*DEC) LEN(8)
+             DCL        VAR(&DATEZ) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+
+             ADDLIBLE   DALIB
+             MONMSG     MSGID(CPF0000)
+
+    /*9908A  START */
+        /*   RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)  */
+        /*   RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&DATEX) */
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)  CYMDDATE(&DATEX)
+             CHGVAR   VAR(&DATEX)   VALUE('0' *CAT &DATEX)
+    /*9908A  END  */
+             RTVDTAARA  DTAARA(*LDA (1021 1))   RTNVAR(&AREA)
+
+             CHGVAR     VAR(&AREA)  VALUE('P')
+             CHGVAR     VAR(&DATE)  VALUE(&DATEX)
+             CHGVAR     VAR(&DATEZ) VALUE(&DATE)
+             CHGVAR     VAR(&DATEY) VALUE('00840326')
+             OVRDBF     FILE(RCVDTL) TOFILE(RCVDTL) SHARE(*YES)
+ /*0109A*/   OPNQRYF    FILE((RCVDTL)) OPTION(*ALL) QRYSLT('(DUDT +
+                          *LE "' || &DATEZ || '" *AND DUDT *GT "' +
+                          || &DATEY || '" *AND RVFLAG *NE "D" *AND +
+                          (RVACNO *EQ "1131" *OR RVACNO *EQ "111001") +
+                           *AND RVNTCD *EQ " " +
+                          *AND   RVAREA *EQ "' || &AREA || '"   +
+                          *AND RVVNO2 *EQ "       " *AND RVNTNO *NE +
+                          "          " )') KEYFLD((RVSBID) (RVSANO) +
+                          (RVPBID)) MAPFLD((DUDT RVDUDT *CHAR 8))
+             OVRPRTF    FILE(QPRINT1) TOFILE(QPRINT) PAGESIZE(*N +
+                          198) CPI(15) OVRFLW(55) +
+                          USRDTA('兌現明細') IGCDTA(*YES)
+             OVRPRTF    FILE(QPRINT2) TOFILE(QPRINT) PAGESIZE(*N +
+                          198) CPI(15) OVRFLW(55) +
+                          USRDTA('未兌現表') IGCDTA(*YES)
+             CALL       PGM(ARP034R)
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+
+            /*        繳款兌現　　　　　　　　　*/
+
+             OVRDBF     FILE(RCVDTZ) TOFILE(RCVDTL)
+             OVRDBF     FILE(RCVDTL) TOFILE(RCVDTL) SHARE(*YES)
+             OPNQRYF    FILE(RCVDTL) +
+                        OPTION(*ALL) +
+                        QRYSLT('%SST(RVRESV 12 1) *EQ "#" *AND +
+                                RVNTCD *EQ "1"') +
+                        KEYFLD(RVCUNO)
+             CALL       PGM(ARP034R1)
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

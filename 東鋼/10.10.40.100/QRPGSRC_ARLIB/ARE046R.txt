@@ -1,0 +1,407 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE046R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02HYS
+     H*            4.FUNCTION     承購銀行資料輸入
+     H*            5.DATE-WRITTEN  90/10/18
+     H*            6.DATE-MODIFY   91/12/19 BY S02CSF
+     H*                            99/08/24  2010AR517  S00WCJ (9908A)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FCBCUST  IF  E           K        DISK
+     FARCUDT  UF  E           K        DISK                      A
+     FARE046S CF  E                    WORKSTN
+     F                                        RECNUMKSFILE ZM003F2
+     E                    TAB1    5   5  1 0 TAB2    6   *維護名稱
+     E                    ERR     1   8 70               *錯誤訊息
+     I            DS
+     I                                        1  10 S#SRID
+     I                                        1   8 D#SID1
+     I                                        9  10 D#SID2
+     I           UDS
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVN
+     I                                     10211021 D#AREA
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C                     EXSR SR0000                     *初值設定
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           *畫面一
+     C           W#PRID    CASEQ'02'      SR2000           * READC
+     C           W#PRID    CASEQ'03'      SR3000           *畫面二
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*初值設定
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVE *ALL'='   S#LIN3
+     C                     MOVE 'ARE046S-'D#SID1
+     C                     MOVE *BLANK    S#KEY1           * REPOSITION
+     C                     MOVE *ON       *IN31            * CURSOR
+     C                     MOVE '01'      W#PRID  2
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->ZME003S-1畫面
+     C* Clear subfile
+     C                     MOVE *ON       *IN74            *SFLCLR
+     C                     WRITEZM003F2C
+     C                     MOVE *OFF      *IN74            *SFLCLR
+     C                     Z-ADD*ZEROS    RECNUM  40
+     C                     Z-SUB10        POINT
+     C*
+     C           S#KEY1    SETLLCBREC                78    *1->NR
+     C  N78                READ CBREC               N    78*EOF
+     C  N78                EXSR SR1100                     *讀入SFL
+     C                     MOVEA'0000'    *IN,71
+     C                     MOVE *BLANK    S#ERR
+     C           RECNUM    IFEQ *ZEROS
+     C                     MOVE ERR,2     S#ERR
+     C                     MOVE *ON       *IN72            *SFLDSP OFF
+     C                     ENDIF
+     C*=======
+     C           W#PRID    DOWEQ'01'
+     C           W#CNT     IFGE 11
+     C                     MOVE *ON       *IN73            *SFLEND OFF
+     C                     ELSE
+     C                     MOVE *OFF      *IN73            *SFLEND ON
+     C                     ENDIF
+     C                     MOVE '1 '      D#SID2           *SCREEN ID
+     C                     MOVE *OFF      *IN30            *MODE
+     C                     WRITEZM003F1
+     C                     WRITEZM003FM
+     C                     EXFMTZM003F2C
+     C                     MOVE *OFF      *IN31            * CURSOR
+     C*PF3=Exit
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*F12=Exit
+     C           *IN12     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*PA1=翻下頁
+     C           *IN91     IFEQ *ON
+     C  N78                EXSR SR1100
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE '02'      W#PRID
+     C                     ENDDO
+     C*=======
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*讀入SUBFILE ZM003F2
+     C                     Z-ADD*ZERO     W#CNT   20
+     C           W#CNT     DOWLT11
+     C*
+0725 C           CBCUNO    CHAINRARCUDT             N57    * 1->NF
+     C                     CLEARZM003F2
+     C           *IN57     IFEQ *OFF
+     C                     MOVELACBKNM    S#BKN1           *廠商代號
+     C                     Z-ADDACAAMT    S#AAM1
+     C                     Z-ADDACCAMT    S#CAM1
+     C                     ELSE
+     C                     MOVEL*BLANK    S#BKN1           *廠商代號
+     C                     Z-ADD0         S#AAM1
+     C                     ENDIF
+     C                     MOVELCBCUNO    S#CUNO           *客戶編號
+     C                     MOVELCBCUNM    S#CNUM           *客戶編號
+     C                     ADD  1         RECNUM
+     C                     WRITEZM003F2
+     C                     ADD  1         W#CNT
+     C*
+     C                     READ CBREC               N    78*EOF
+     C   78                LEAVE
+     C                     ENDDO
+     C*
+     C           W#CNT     IFGT *ZERO                      *至少一筆
+     C                     ADD  11        POINT
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*W#PRID='02'--->ZME003S-1畫面逐筆處理
+     C*
+     C                     MOVE *OFF      *IN30            *MODE
+     C                     Z-ADD1         RECNUM
+     C           W#PRID    DOWEQ'02'
+     C                     READCZM003F2                9898*ER*EOF
+     C   98                MOVE '01'      W#PRID
+     C   98                LEAVE
+     C*
+     C           S#OPT     IFEQ *ZEROS
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE S#CUNO    S#KEY1
+     C                     MOVE S#OPT     W#OPT   10
+     C                     MOVE *ZEROS    S#OPT
+     C                     UPDATZM003F2
+     C                     EXSR SR2100                     *READ DATA
+     C                     MOVE '03'      W#PRID
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+0725 C           S#CUNO    CHAINRARCUDT             N60    * 1->NF
+     C           *IN60     IFEQ *OFF
+     C                     EXSR SR2200
+     C                     ELSE
+     C                     MOVEL*BLANK    S#BKID           *承購銀帶
+     C                     MOVEL*BLANK    S#BKNM           *廠商代號
+     C                     MOVEL*BLANK    S#COD1           *承購代號
+     C                     MOVEL*BLANK    S#COD2           *代號簡稱
+     C                     Z-ADD0         S#DAT1           *承購起日
+     C                     Z-ADD0         S#DAT2           *承購止日
+ 9112C                     MOVEL*BLANK    S#CODE           *承購單合併碼
+     C                     Z-ADD0         S#AAMT
+     C                     Z-ADD0         S#BAMT
+     C                     Z-ADD0         S#BRAT
+     C                     MOVEL*BLANK    S#UPDM
+     C                     Z-ADD0         S#UPDD
+     C                     Z-ADD0         S#UPDT
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2200    BEGSR
+     C*****************************************************************
+     C                     MOVELACBKID    S#BKID           *承購銀帶
+     C                     MOVELACBKNM    S#BKNM           *廠商代號
+     C                     MOVELACCODE    S#COD1           *承購代號
+     C                     MOVELACCDNM    S#COD2           *代號簡稱
+     C                     Z-ADDACDAT1    S#DAT1           *承購起日
+     C                     Z-ADDACDAT2    S#DAT2           *承購止日
+ 9112C                     MOVELACCOD1    S#CODE           *承購單合併碼
+     C                     Z-ADDACAAMT    S#AAMT
+     C                     Z-ADDACBAMT    S#BAMT
+     C                     Z-ADDACCAMT    S#CAMT
+     C           ACBAMT    DIV  ACAAMT    S#BRAT
+     C                     MOVELACUPDM    S#UPDM
+     C                     Z-ADDACUPDD    S#UPDD
+     C                     Z-ADDACUPDT    S#UPDT
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*
+     C           W#OPT     LOKUPTAB1      TAB2           69*EQ
+     C  N69                MOVE *BLANK    S#MODE
+     C   69                MOVE TAB2      S#MODE
+     C                     MOVE *ON       *IN30            *MODE
+     C                     MOVEA'00'      *IN,80
+     C                     MOVEA'0'       *IN,99
+     C                     MOVE '2 '      D#SID2           *SCREEN ID
+     C                     SELEC
+     C           W#OPT     WHEQ 2                          *修改
+     C                     MOVE *ON       *IN80
+ 9112C                     MOVE *OFF      *IN85            NO PROTECT
+     C           W#OPT     WHEQ 4                          *刪除
+     C                     MOVE *ON       *IN81
+     C                     MOVE *ON       *IN85            PROTECT
+     C           W#OPT     WHEQ 5                          *查詢
+     C                     MOVE *ON       *IN85
+     C                     ENDSL
+     C*
+     C           *IN60     IFEQ *ON
+     C                     MOVE ERR,2     S#ERR            *沒有資料
+     C                     ELSE
+     C                     MOVE *BLANK    S#ERR            *沒有資料
+     C                     ENDIF
+     C*
+     C           W#PRID    DOWEQ'03'
+     C                     WRITEZM003F1
+     C                     EXFMTZM003F4
+     C                     MOVEA'0'       *IN,99
+     C                     MOVEA'00000000'*IN,32
+     C* F3=結束作業
+     C           *IN03     IFEQ *ON
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C* F12=回前畫面
+     C           *IN12     IFEQ *ON
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*----------------
+     C*新增／修改作業
+     C*----------------
+     C           W#OPT     IFEQ 2
+     C*資料編審
+     C                     MOVE *OFF      *IN99
+     C                     EXSR SR4100                     * CHK SR
+     C           S#ERR     IFNE *BLANK
+     C                     ITER
+     C                     ENDIF
+     C                     ENDIF
+     C           W#OPT     IFEQ 5                          *查詢
+     C                     MOVE '02'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*----------------
+     C* F10=存檔
+     C           *IN10     IFEQ *ON
+     C           *IN99     ANDEQ*OFF
+     C                     EXSR SR4200                     *存檔
+     C                     MOVE '02'      W#PRID
+     C                     ENDIF
+     C*
+     C*----------------
+     C*刪除作業
+     C*----------------
+     C* F11=刪除
+     C           W#OPT     IFEQ 4                          *刪除
+     C           *IN11     IFEQ *ON
+     C           S#CUNO    CHAINRARCUDT              60    * NO REC
+     C           ACCAMT    IFNE 0
+     C  N60                DELETRARCUDT
+     C                     MOVE '02'      W#PRID
+     C                     ELSE
+     C                     MOVE ERR,8     S#ERR            * SHOW F11
+     C                     ENDIF
+     C                     ELSE
+     C                     MOVE ERR,4     S#ERR            * SHOW F11
+     C                     ENDIF
+     C                     ENDIF
+     C*----------------
+     C*查詢作業
+     C*----------------
+     C*
+     C                     ENDDO
+     C*=========
+     C*
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4100    BEGSR
+     C*****************************************************************
+     C*資料編審
+     C                     MOVE *OFF      *IN99
+     C                     MOVE *BLANK    S#ERR
+     C           S#BKID    IFEQ *BLANK
+     C                     MOVEAERR,03    S#ERR
+     C                     MOVE *ON       *IN32
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C  N99      S#BKNM    IFEQ *BLANK
+     C                     MOVEAERR,03    S#ERR
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN33
+     C                     ENDIF
+     C  N99      S#COD1    IFEQ *BLANK
+     C                     MOVEAERR,03    S#ERR
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN34
+     C                     ENDIF
+     C  N99      S#COD2    IFEQ *BLANK
+     C                     MOVEAERR,03    S#ERR
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN35
+     C                     ENDIF
+     C  N99      S#DAT1    IFEQ 0
+     C                     MOVEAERR,03    S#ERR
+     C                     MOVE *ON       *IN36
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C* N99      S#DAT2    IFEQ 0
+     C*                    MOVEAERR,03    S#ERR
+     C*                    MOVE *ON       *IN37
+     C*                    MOVE *ON       *IN99
+     C*                    ENDIF
+     C  N99      S#DAT1    IFGT S#DAT2
+     C           S#DAT2    ANDNE0
+     C                     MOVEAERR,05    S#ERR
+     C                     MOVE *ON       *IN36
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C  N99      S#AAMT    IFEQ 0
+     C                     MOVEAERR,03    S#ERR
+     C                     MOVE *ON       *IN38
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C  N99      S#BAMT    IFEQ 0
+     C                     MOVEAERR,03    S#ERR
+     C                     MOVE *ON       *IN39
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C  N99      S#BAMT    IFGT S#AAMT
+     C                     MOVEAERR,04    S#ERR
+     C                     MOVE *ON       *IN39
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4200    BEGSR
+     C*****************************************************************
+     C*存檔作業
+     C           S#CUNO    CHAINRARCUDT              61    * NO REC
+     C*
+     C                     EXSR SR4250                     * MOVE DATA
+     C   61                WRITERARCUDT
+     C  N61                UPDATRARCUDT
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4250    BEGSR
+     C*****************************************************************
+     C                     CLEARRARCUDT
+     C                     SELEC
+     C           W#OPT     WHEQ 1                          *新增
+     C                     MOVE 'A'       ACFLAG           *處理代號
+     C           W#OPT     WHEQ 2                          *修改
+     C                     MOVE 'C'       ACFLAG           *處理代號
+     C                     ENDSL
+     C*
+     C                     MOVE S#CUNO    ACCUNO           *客戶代號
+     C                     MOVE S#CNUM    ACCUNM           *客戶簡稱
+     C                     MOVE S#BKID    ACBKID           *承購銀帶
+     C                     MOVE S#BKNM    ACBKNM           *承購銀簡
+     C                     MOVE S#COD1    ACCODE           *承購代號
+     C                     MOVE S#COD2    ACCDNM           *承購簡稱
+     C                     MOVE S#AAMT    ACAAMT           *承購額度
+     C                     MOVE S#BAMT    ACBAMT           *預支額度
+     C           S#BAMT    DIV  S#AAMT    ACBRAT
+     C*                    MOVE S#BRAT    ACBRAT           *預支比例
+     C                     MOVE S#DAT1    ACDAT1           *承購起日
+     C                     MOVE S#DAT2    ACDAT2           *承購止日
+ 9112C                     MOVE S#CODE    ACCOD1           *承購單合併碼
+9908AC*                    Z-ADDUDATE     ACUPDD           *異動日期
+9908AC           *DATE     SUB  19000000  ACUPDD           *異動日期
+     C                     TIME           ACUPDT           *異動時間
+     C                     MOVELS#USER    ACUPDM           *異動人員
+     C                     ENDSR
+     C*
+     C*=========
+     C*
+**  TAB1 TAB2
+1新增2修改3複製4刪除5查詢
+**  ERR
+01-資料已存在！
+02-資料不存在！
+03-欄位不可空白或零！
+04-預支額度不得大於承購額度！
+05-承購起日不得大於迄日！
+06-已到檔頭！
+07-已到檔尾！
+08-尚有預支金額，不允許刪除！
+

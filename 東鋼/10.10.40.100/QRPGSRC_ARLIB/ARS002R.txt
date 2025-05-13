@@ -1,0 +1,287 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARS002R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     折讓單確認還原處理發票轉出入副程式
+     H*            5.DATE-WRITTEN  107/12/25 2018AR00042
+     H*
+     H*****************************************************************
+     H            Y
+     FINVTFRL1UF  E           K        DISK
+     FINVDTLL5UF  E           K        DISK
+     FINVMST  UF  E           K        DISK
+     FINVD99L1UF  E           K        DISK
+     F            IVREC                             KRENAMEINVD9
+     FARTRLG  O   E           K        DISK
+     I*
+     IIVREC
+     I              IVFLAG                          I#FLAG
+     I              IVNO                            I#IVNO
+     I              IVACNT                          I#ACNT
+     I              IVITEM                          I#ITEM
+     I              IVACDT                          I#ACDT
+     I              IVAMT                           I#AMT
+     I              IVTXAR                          I#TXAR
+     I              IVTXDT                          I#TXDT
+     I              IVTRNO                          I#TRNO
+     IINVD9
+     I              IVFLAG                          D#FLAG
+     I              IVNO                            D#IVNO
+     I              IVACNT                          D#ACNT
+     I              IVITEM                          D#ITEM
+     I              IVACDT                          D#ACDT
+     I              IVORNO                          D#ORNO
+     I              IVTXAR                          D#TXAR
+     I              IVTXDT                          D#TXDT
+     I              IVTRNO                          D#TRNO
+     I*
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10011010 D#USER
+     I                                     10111020 S#DEVN
+     I                                     10211021 U#LOC
+     C*****************************************************************
+     C*          Parameter List
+     C*****************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#TXNO  8        *折讓單號
+     C                     PARM           P#IVNO 10        *發票號碼
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*FILE =>
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           W#TXNO
+     C                     KFLD           W#IVNO
+     C*
+     C           KEY02     KLIST
+     C                     KFLD           W#ACNT  1
+     C                     KFLD           W#TXNO
+     C                     KFLD           ITINNO
+     C*
+     C           KEY02A    KLIST
+     C                     KFLD           W#ACNT
+     C                     KFLD           W#TXNO
+     C                     KFLD           W#IVNO
+     C*
+     C           KEY03     KLIST
+     C                     KFLD           W#ACNT
+     C                     KFLD           W#TXNO
+     C                     KFLD           ITOTNO
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C           *DATE     SUB  19000000  U#SYSD  80
+     C*
+     C                     MOVELP#TXNO    W#TXNO  8
+     C                     MOVELP#IVNO    W#IVNO 10
+     C*
+     C*有做INVTFR，處理INVTFR
+     C*
+     C           KEY01     SETLLITREC
+     C                     MOVE *OFF      *IN52
+     C           *IN52     DOWEQ*OFF
+     C           KEY01     READEITREC                    52*EOF
+     C   52                LEAVE
+     C*
+     C           ITFLAG    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*處理發票明細
+     C*
+     C                     EXSR SR1000
+     C*
+     C*處理發票明細項次超過99項
+     C*
+     C                     EXSR SR2000
+     C*
+     C                     MOVEL'D'       ITFLAG
+     C                     MOVELU#LOC     ITAREA
+     C                     MOVELD#USER    ITUSER
+     C                     Z-ADDU#SYSD    ITTXDT
+     C                     TIME           ITTXTM
+     C                     UPDATITREC
+     C                     ENDDO
+     C*
+     C*沒做INVTFR，直接轉出者
+     C*
+     C   52                EXSR SR1000
+     C*
+     C                     MOVE *ON       *INLR
+     C***************************************************************
+     C           SR1000    BEGSR
+     C***************************************************************
+     C*
+     C*處理發票轉出明細
+     C                     MOVEL'7'       W#ACNT
+     C*
+     C                     MOVEL*OFF      *IN53
+     C  N52      KEY02     SETLLIVREC
+     C   52      KEY02A    SETLLIVREC
+     C           *IN53     DOWEQ*OFF
+     C  N52      KEY02     READEIVREC                    53
+     C   52      KEY02A    READEIVREC                    53
+     C   53                LEAVE
+     C*
+     C           I#FLAG    IFEQ 'D'
+     C           I#ITEM    OREQ 99
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVEL'D'       I#FLAG
+     C                     MOVELU#LOC     I#TXAR
+     C                     Z-ADDU#SYSD    I#TXDT
+     C                     UPDATIVREC
+     C*
+     C                     MOVEL'D'       IVFLAG
+     C                     MOVELI#TRNO    IVTRNO
+     C                     MOVELI#IVNO    IVNO
+     C                     Z-ADDI#ACDT    IVACDT
+     C                     Z-ADDI#AMT     IVAMT
+     C                     Z-ADD0         IVTRTM
+     C                     MOVEL'3'       IVTRPE
+     C                     Z-ADD0         IVTRDT
+     C                     Z-ADD0         IVTRCT
+     C                     MOVELU#LOC     IVTXAR
+     C                     Z-ADDU#SYSD    IVTXDT
+     C                     TIME           IVTXTM
+     C                     MOVELD#USER    IVTXUR
+     C                     WRITERARTRLG
+     C*
+     C*處理發票主檔
+     C*
+     C  N52      ITINNO    CHAININREC                55
+     C   52      W#IVNO    CHAININREC                55
+     C           *IN55     IFEQ *OFF
+     C                     MOVEL'C'       INFLAG
+     C                     SUB  I#AMT     INFAMT
+     C                     SUB  I#AMT     INNBAL
+     C                     MOVELU#LOC     INTXAR
+     C                     Z-ADDU#SYSD    INTXDT
+     C                     UPDATINREC
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*處理發票轉入明細
+     C                     MOVEL'6'       W#ACNT
+     C*
+     C                     MOVEL*OFF      *IN53
+     C           KEY03     SETLLIVREC
+     C           *IN53     DOWEQ*OFF
+     C           KEY03     READEIVREC                    53
+     C   53                LEAVE
+     C*
+     C           I#FLAG    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVEL'D'       I#FLAG
+     C                     MOVELU#LOC     I#TXAR
+     C                     Z-ADDU#SYSD    I#TXDT
+     C                     UPDATIVREC
+     C*
+     C                     MOVEL'D'       IVFLAG
+     C                     MOVELI#TRNO    IVTRNO
+     C                     MOVELI#IVNO    IVNO
+     C                     Z-ADDI#ACDT    IVACDT
+     C                     Z-ADDI#AMT     IVAMT
+     C                     Z-ADD0         IVTRTM
+     C                     MOVEL'3'       IVTRPE
+     C                     Z-ADD0         IVTRDT
+     C                     Z-ADD0         IVTRCT
+     C                     MOVELU#LOC     IVTXAR
+     C                     Z-ADDU#SYSD    IVTXDT
+     C                     TIME           IVTXTM
+     C                     MOVELD#USER    IVTXUR
+     C                     WRITERARTRLG
+     C*
+     C*處理發票主檔
+     C*
+     C           ITOTNO    CHAININREC                55
+     C           *IN55     IFEQ *OFF
+     C                     MOVEL'C'       INFLAG
+     C                     SUB  I#AMT     INEAMT
+     C                     SUB  I#AMT     INNBAL
+     C                     MOVELU#LOC     INTXAR
+     C                     Z-ADDU#SYSD    INTXDT
+     C                     UPDATINREC
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C***************************************************************
+     C           SR2000    BEGSR
+     C***************************************************************
+     C*
+     C*處理發票轉出明細超過99筆
+     C*
+     C                     MOVEL'7'       W#ACNT
+     C                     Z-ADD0         W#AMT  110
+     C*
+     C                     MOVEL*OFF      *IN53
+     C           KEY02     SETLLIVREC
+     C           *IN53     DOWEQ*OFF
+     C           KEY02     READEIVREC                    53
+     C   53                LEAVE
+     C           I#ITEM    IFEQ 99
+     C                     MOVEL*OFF      *IN54
+     C           KEY02     SETLLINVD9
+     C           *IN54     DOWEQ*OFF
+     C           KEY02     READEINVD9                    54
+     C   54                LEAVE
+     C*
+     C           D#FLAG    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVEL'D'       D#FLAG
+     C                     MOVELU#LOC     D#TXAR
+     C                     Z-ADDU#SYSD    D#TXDT
+     C                     ADD  I#VAMT    W#AMT
+     C                     UPDATINVD9
+     C*
+     C                     MOVELD#TRNO    IVTRNO
+     C                     MOVELD#IVNO    IVNO
+     C                     MOVELD#ACDT    IVACDT
+     C                     MOVELI#VAMT    IVAMT
+     C                     MOVEL'D'       IVFLAG
+     C                     Z-ADD0         IVTRTM
+     C                     MOVEL'3'       IVTRPE
+     C                     Z-ADD0         IVTRDT
+     C                     Z-ADD0         IVTRCT
+     C                     MOVELU#LOC     IVTXAR
+     C                     Z-ADDU#SYSD    IVTXDT
+     C                     MOVELD#USER    IVTXUR
+     C                     TIME           IVTXTM
+     C*
+     C                     WRITERARTRLG
+     C                     ENDDO
+     C                     MOVEL'C'       I#FLAG
+     C                     SUB  W#AMT     I#AMT
+     C                     MOVELU#LOC     I#TXAR
+     C                     Z-ADDU#SYSD    I#TXDT
+     C                     UPDATIVREC
+     C                     ENDIF
+     C*
+     C*處理發票主檔
+     C*
+     C           ITINNO    CHAININREC                55
+     C           *IN55     IFEQ *OFF
+     C                     MOVEL'C'       INFLAG
+     C                     SUB  W#AMT     INFAMT
+     C                     SUB  W#AMT     INNBAL
+     C                     MOVELU#LOC     INTXAR
+     C                     Z-ADDU#SYSD    INTXDT
+     C                     UPDATINREC
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+

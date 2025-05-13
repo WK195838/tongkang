@@ -1,0 +1,213 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP108R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     應收帳款承購折讓金額確認處理
+     H*            5.DATE-WRITTEN  93/05/7
+     H*            6.DATE-MODIFY
+     H*                            99/08/31  2010AR517  S00WCJ (9908A)
+     H*                           104/09/24  2015AR953  S00WCJ (0409A)
+     H*                            產品代碼3碼擴5碼
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTLL3IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FARINVM  UF  E           K        DISK
+     FARINVD  UF  E           K        DISK                      A
+     ITXREC       01
+     I            DS
+0409AI                                        1  30 TXRESV
+     I                                        1   6 D#ACYM
+     I           UDS
+     I                                     10011010 U#USER
+     I                                     10211021 U#AREA
+     C**************************************************************
+     C*          KEY   LIST
+     C**************************************************************
+     C*FILE==>ARINVD(承購發票明細檔)
+     C           K#AMIV    KLIST
+     C                     KFLD           AVINNO
+     C                     KFLD           AVACNT
+     C                     KFLD           AVITEM
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+9908AC           *DATE     SUB  19000000  U#SYSD  80
+     C  N99                EXSR INISR
+     C                     EXSR DTLSR
+     CLR 99                EXSR LRSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C           TXIVNO    CHAINRARINVM              50
+     C           *IN50     IFEQ *OFF
+     C           AMCLOC    ANDEQ' '                        未結案
+     C*寫入承購發票明細檔
+     C                     EXSR SR1000                     寫折讓金額
+     C                     EXSR SR2000                     寫折讓稅額
+     C*合計承購發票主檔
+     C                     EXSR SR3000
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*寫入ARINVD發票折讓金額
+     C                     MOVELTXIVNO    AVINNO
+     C                     MOVELTXACNT    AVACNT
+     C                     MOVE *HIVAL    AVITEM
+     C           K#AMIV    SETGTRARINVD              40
+     C                     READPRARINVD             N    40
+     C*取得項次
+     C           *IN40     IFEQ *ON
+     C                     Z-ADD1         W#ITEM  20
+     C                     ELSE
+     C           AVINNO    IFEQ TXIVNO
+     C           AVACNT    ANDEQTXACNT
+     C                     Z-ADDAVITEM    W#ITEM
+     C                     ADD  1         W#ITEM
+     C                     ELSE
+     C                     Z-ADD1         W#ITEM
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     CLEARRARINVD
+     C                     MOVEL'A'       AVFLAG           處理代碼
+     C                     MOVELTXIVNO    AVINNO           發票號碼
+     C                     MOVELTXACNT    AVACNT           類別
+     C                     Z-ADDW#ITEM    AVITEM           項次
+     C                     Z-ADDTXACDT    AVACDT           入帳日期
+     C                     MOVELTXORNO    AVORNO           訂單編號
+     C                     MOVELTXPDNM    AVPDCD           品名
+     C                     Z-SUBTXQTY     AVQTY            數量
+     C                     Z-ADDTXUPRC    AVUPRC           單價
+     C                     Z-SUBTXAMT     AVAMT            金額
+     C                     MOVELTXNO      AVAPNO           憑證編號
+     C*
+     C                     SELEC
+     C           TXACNT    WHEQ '2'
+     C                     MOVEL'C'       AVFL03           類別碼
+     C           TXACNT    WHEQ '3'
+     C                     MOVEL'D'       AVFL03
+     C           TXACNT    WHEQ '4'
+     C           TXAMT     IFLT 0
+     C                     MOVE 'H'       AVFL03
+     C                     ELSE
+     C                     MOVE 'G'       AVFL03
+     C                     ENDIF
+     C                     ENDSL
+     C*
+     C                     MOVEL'Y'       AVFL02           過發票碼
+9908AC                     Z-ADDU#SYSD    AVTXDT           異動日期
+     C                     MOVELTXTXAR    AVTXAR           異動廠區
+     C                     MOVE D#ACYM    AVRESV           保留碼
+     C                     WRITERARINVD
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*寫入ARINVD發票折讓稅額
+     C           TXIVNO    CHAININREC               N41
+     C           INTXTP    IFEQ '1'                        應稅
+     C                     MOVELTXIVNO    AVINNO
+     C                     MOVEL'5'       AVACNT
+     C                     MOVE *HIVAL    AVITEM
+     C           K#AMIV    SETGTRARINVD              41
+     C                     READPRARINVD             N    41
+     C*取得項次
+     C           *IN41     IFEQ *ON
+     C                     Z-ADD1         W#ITEM  20
+     C                     ELSE
+     C           AVINNO    IFEQ TXIVNO
+     C           AVACNT    ANDEQ'5'
+     C                     Z-ADDAVITEM    W#ITEM
+     C                     ADD  1         W#ITEM
+     C                     ELSE
+     C                     Z-ADD1         W#ITEM
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     CLEARRARINVD
+     C                     MOVEL'A'       AVFLAG           處理代碼
+     C                     MOVELTXIVNO    AVINNO           發票號碼
+     C                     MOVEL'5'       AVACNT           類別
+     C                     Z-ADDW#ITEM    AVITEM           項次
+     C                     Z-ADDTXACDT    AVACDT           入帳日期
+     C                     MOVELTXORNO    AVORNO           訂單編號
+     C                     Z-ADD0         AVQTY            品名
+     C                     Z-ADD0         AVUPRC           數量
+     C           TXTAX     MULT -1        AVAMT            單價
+     C                     MOVELTXNO      AVAPNO           金額
+     C*
+     C                     SELEC
+     C           TXACNT    WHEQ '2'
+     C                     MOVEL'B'       AVPDCD
+     C                     MOVEL'C'       AVFL03
+     C           TXACNT    WHEQ '3'
+     C                     MOVEL'C'       AVPDCD
+     C                     MOVEL'D'       AVFL03
+     C           TXACNT    WHEQ '4'
+     C           TXTAX     IFLT 0
+     C                     MOVEL'A'       AVPDCD
+     C                     MOVE 'H'       AVFL03
+     C                     ELSE
+     C                     MOVEL'C'       AVPDCD
+     C                     MOVE 'G'       AVFL03
+     C                     ENDIF
+     C                     ENDSL
+     C*
+     C                     MOVEL'Y'       AVFL02           過發票碼
+9908AC                     Z-ADDU#SYSD    AVTXDT           異動日期
+     C                     MOVELTXTXAR    AVTXAR           異動廠區
+     C                     MOVE D#ACYM    AVRESV           保留碼
+     C                     WRITERARINVD
+     C                     ELSE
+     C                     Z-ADD0         TXTAX
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*更新ARINVM
+     C*
+     C           TXIVNO    CHAINRARINVM              42
+     C           *IN42     IFEQ '0'
+     C                     SELEC
+     C           TXACNT    WHEQ '2'
+     C           TXAMT     MULT -1        W#AMT  110
+     C           TXTAX     MULT -1        W#TAX  110
+     C                     ADD  W#AMT     AMBAMT           折讓金額
+     C                     ADD  W#TAX     AMBTAX           折讓稅額
+     C           TXACNT    WHEQ '3'
+     C           TXAMT     MULT -1        W#AMT
+     C           TXTAX     MULT -1        W#TAX
+     C                     ADD  W#AMT     AMBAMT
+     C                     ADD  W#TAX     AMBTAX
+     C                     ENDSL
+     C*
+     C                     MOVE 'C'       AMFLAG
+     C                     Z-ADDTXTXDT    AMUPDD
+     C                     UPDATRARINVM
+     C                     ENDIF
+     C*
+     C                     ENDSR
+

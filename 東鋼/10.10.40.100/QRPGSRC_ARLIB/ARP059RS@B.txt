@@ -1,0 +1,646 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP059RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     營業繳款過入財會還原作業
+     H*            5.DATE-WRITTEN  87/05/29
+     H*            6.DATE-UPDATED  89/07/20
+     H*                            99/08/30  2010AR517  S00WCJ (9908A)
+     H*              還原時將ARR001N中相對應之繳款書編號塗掉
+     H*
+     H*            96/11/16修正外銷沖銷還原，新增會計科目1138
+     H*                            98/05/19 2009AR311 S00WCJ(9805A)
+     H*                            修正外銷沖銷還原，新增會計科目1111
+     H*                            98/11/24 2009AR382 S00WCJ(9811A)
+     H*                            99/02/09 2010AR434 S00WCJ(9902A)
+     H*                           101/09/21  2012AR682  S00WCJ (0109A)
+     H*                           102/10/01 S00WCJ (0209A)
+     H*                            配合ARQ015R修改，避免AR2159D繳
+     H*                            款金額虛增
+     H*                           113/10/04 2024AR00033 S00WCJ (1310A)
+     H*                            還原時處理型鋼外銷繳款金額明細工
+     H*                            作檔
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARP059S CF  E                    WORKSTN
+     FRCVDTL  UF  E           K        DISK
+     FSARCVF  UF  E           K        DISK
+     FSARVIN  UF  E           K        DISK
+     FINVMST  UF  E           K        DISK
+     FINVDTL  UF  E           K        DISK
+     FLLCMST  UF  E           K        DISK
+     FAR2159F UF  E           K        DISK
+     FAR2159D UF  E           K        DISK
+     FSARVOR  UF  E           K        DISK
+     FCAMBALT O   E           K        DISK
+     FARALOG  O   E           K        DISK
+8907 FARR001N UF  E           K        DISK
+1310AFARP155FAUF  E           K        DISK
+1310AFARP155FGO   E           K        DISK
+1310AF            RAR155FA                          KRENAMEARP15G
+     F*****************************************************************
+9902AE*                   ARY1      100 19
+9902AE                    ARY1      100 32
+     E*************************************************************
+     E                    T#MSG   1  13 70
+     I*************************************************************
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1  140W#SYST
+     I                                        1   60D#ST
+     I                                        7  100D#SY
+     I                                       11  140D#SMD
+     I            DS
+     I                                        1  12 RVRESV
+     I                                       12  12 D#RESV
+     I            DS
+     I                                        1  32 D#ARY1
+     I                                        1   20D#ITEM
+     I                                        3   8 D#ORNO
+     I                                        9  190D#RAMT
+9902AI                                       20  322D#CAMT
+     I            DS
+     I                                        1  10 SIINNO
+     I                                        7  10 D#BLK
+     C**************************************************************
+     C*   檔案搜尋欄位組合
+     C**************************************************************
+     C           K#IV      KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C*
+     C           K#AR      KLIST
+     C                     KFLD           ARCUNO
+     C                     KFLD           ARAREA
+     C*
+8907 C           K#AN      KLIST
+ .   C                     KFLD           ANAPNO
+ .   C                     KFLD           ANAPIT
+     C*
+     C           K#2159    KLIST
+     C                     KFLD           ADCUNO
+     C                     KFLD           ADAREA
+     C                     KFLD           ADORNO
+     C           K#RCVD    KLIST
+     C                     KFLD           RVNO
+     C                     KFLD           RVITEM
+     C*
+1310AC           KEY01     KLIST
+1310AC                     KFLD           SRCUNO
+1310AC                     KFLD           SRRVNO
+1310AC                     KFLD           W#ORNO  6
+1310AC                     KFLD           SRCURY
+     C*
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+9908AC           *DATE     SUB  19000000  U#SYSD  80
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C*   副程式開始
+     C**************************************************************
+     C*----------------------------------------
+     C*  宣告及初始變數
+     C*----------------------------------------
+     CSR         SR0000    BEGSR
+     C                     MOVEL'01'      W#PRID  2
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------------------------------
+     C*  畫面一:輸入原因
+     C*----------------------------------------------------------------
+     CSR         SR1000    BEGSR
+     C                     EXFMTAR059F1
+     C*
+     C                     SELEC
+     C           *IN03     WHEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'00'      W#PRID           結束畫面
+     C*
+     C                     OTHER                           執行鍵
+     C                     SETON                     50    LOCK  畫面
+     C                     EXSR SR1100
+     C                     SETOF                     50    UNLOCK畫面
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------------------------------
+     C*  畫面一:執行檢核
+     C*----------------------------------------------------------------
+     CSR         SR1100    BEGSR
+     C                     SETOF                     515253
+     C*
+     C           S#RVNO    IFEQ *BLANK
+     C                     SETON                     51
+     C                     MOVELT#MSG,1   S#MSG1           未輸繳款單
+     C                     GOTO ES1100
+     C                     ENDIF
+     C*
+     C           S#RVNO    SETLLRVREC                60
+     C  N60      S#RVNO    READERVREC                    60
+     C           *IN60     DOWEQ*OFF
+     C           RVVNO2    IFNE *BLANK
+     C                     SETON                     53
+     C                     MOVELT#MSG,13  S#MSG1
+     C                     GOTO ES1100
+     C                     ENDIF
+     C           S#RVNO    READERVREC                    60*OFF->FND
+     C                     ENDDO
+     C*
+     C           S#PASS    IFEQ *BLANK
+     C           S#RVNO    SETLLRVREC                60
+     C  N60      S#RVNO    READERVREC                    60
+     C           *IN60     DOWEQ*OFF
+     C           RVTANO    IFNE *BLANK
+     C                     SETON                     53
+     C                     MOVELT#MSG,11  S#MSG1
+     C                     GOTO ES1100
+     C                     ENDIF
+     C           S#RVNO    READERVREC                    60*OFF->FND
+     C                     ENDDO
+     C                     ENDIF
+     C*
+     C           S#PASS    IFNE *BLANK
+     C           S#PASS    ANDNE'CHLPASS'
+     C                     SETON                     53
+     C                     MOVELT#MSG,12  S#MSG1
+     C                     GOTO ES1100
+     C                     ENDIF
+     C*
+     C           S#CGCA    IFEQ *BLANK
+     C                     SETON                     52
+     C                     MOVELT#MSG,2   S#MSG1           未輸異動
+     C                     GOTO ES1100
+     C                     ENDIF
+     C*
+     C           S#RVNO    CHAINRVREC                69    繳款檔不在
+     C           *IN69     IFEQ '1'
+     C                     SETON                     51
+     C                     MOVELT#MSG,3   S#MSG1
+     C                     GOTO ES1100
+     C                     ENDIF
+     C*
+     C           RVVNO1    IFNE *BLANK                     已代開傳票
+     C                     SETON                     51
+     C                     MOVELT#MSG,4   S#MSG1
+     C                     GOTO ES1100
+     C                     ENDIF
+     C*
+     C           RVFLAG    IFEQ 'D'                        已作廢
+     C           RVDECD    OREQ 'D'
+     C                     SETON                     51
+     C                     MOVELT#MSG,5   S#MSG1
+     C                     GOTO ES1100
+     C                     ENDIF
+     C*
+     C           S#RVNO    CHAINSRREC                69    繳款檔不在
+     C           *IN69     IFEQ '1'
+     C                     SETON                     51
+     C                     MOVELT#MSG,6   S#MSG1
+     C                     GOTO ES1100
+     C                     ENDIF
+     C*                                                    開始處理
+     C*          -------------------------------
+     C*
+     C                     MOVELT#MSG,7   S#MSG1
+     C                     WRITEAR059F1
+     C                     EXSR SR1110                     改財會繳款
+     C                     EXSR SR1120                     改營業繳款
+     C*
+     C                     MOVELT#MSG,8   S#MSG1
+     C                     WRITEAR059F1
+     C                     EXSR SR1130                     還原發票
+     C*
+     C                     MOVELT#MSG,9   S#MSG1
+     C                     WRITEAR059F1
+     C                     EXSR SR1140                     登錄異動
+     C*
+     C                     MOVELT#MSG,10  S#MSG1           處理完畢
+     C           S#MSG1    CAT  S#RVNO:1  S#MSG1
+     C                     MOVEL*BLANK    S#RVNO
+     C                     MOVEL*BLANK    S#CGCA
+     CSR         ES1100    ENDSR
+     C*
+     C*----------------------------------------------------------------
+     C*  作廢財會繳款檔 RCVDTL (現金預收沖回CAMBALT)
+     C*----------------------------------------------------------------
+     CSR         SR1110    BEGSR
+TEST C           S#RVNO    IFEQ 'P53203'
+ .   C                     Z-ADD0         W#TEST  10
+ .   C                     ENDIF
+     C                     Z-ADD0         W#CCAM 110       現金預收
+     C                     Z-ADD0         W#2159 110       現金買貨
+9902AC                     Z-ADD0         W#E215 132       原幣暫收款
+     C*
+     C                     CALL 'ARQ015R'
+     C                     PARM           RVNO
+     C                     PARM           RVITEM
+     C                     PARM '1'       P#MODE  1
+     C                     PARM 0         P#RAMT 110
+0209AC                     PARM 0         P#RAM1 132
+     C*
+     C                     EXSR SR1113                     寫入暫收資料
+     C                     MOVEL*BLANK    W#FLAG  1
+     C           S#RVNO    CHAINRVREC                69    明細迴圈
+     C           *IN69     DOWEQ'0'
+     C                     MOVEL'D'       RVFLAG           註記作廢
+     C                     MOVEL'D'       RVDECD
+9908AC                     Z-ADDU#SYSD    RVDEDT
+     C                     MOVELU#AREA    RVTXAR
+9908AC                     Z-ADDU#SYSD    RVTXDT
+     C                     UPDATRVREC
+     C*
+9110 C           S#RVNO    CHAINSRREC               N70
+ .   C   70                MOVE 'X'       W#MKTP  1        繳款來源
+ .   C  N70                MOVE SRMKTP    W#MKTP  1        繳款來源
+     C           RVNTTP    IFEQ 'I'                        信用狀
+ .   C           SRMKTP    ANDNE'1'                        外銷
+     C           RVNTNO    CHAINLLREC                69
+     C           *IN69     IFEQ '0'
+     C                     SUB  RVRAMT    LLAAMT           已押匯減
+     C                     ADD  RVRAMT    LLBAMT           餘額增
+9811AC                     MOVEL*BLANKS   LLCLOS           結案碼
+     C                     UPDATLLREC
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           RVUSTP    IFEQ 'A2'                       預收貨款
+     C           RVNTTP    IFEQ 'F'                        現金類
+     C           RVNTTP    OREQ 'G'
+     C           RVNTTP    OREQ 'H'
+     C           RVNTTP    OREQ 'J'
+     C                     ADD  RVRAMT    W#CCAM           現金預收
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           W#FLAG    IFEQ *BLANK
+     C           D#RESV    IFEQ '*'                        現金買貨
+     C           D#RESV    OREQ '#'
+     C                     MOVELRVCUNO    ARCUNO
+     C                     MOVELRVNO      ARAREA
+     C           K#AR      CHAINARREC                69
+     C           D#RESV    IFEQ '*'
+     C                     SUB  P#RAMT    ARAMT1           減少已兌現
+     C                     ADD  P#RAMT    W#2159           授信金額
+0209AC                     SUB  P#RAM1    ARAMT7           減少已兌現
+0209AC                     ADD  P#RAM1    W#E215           減少已兌現
+9902AC*                    SUB  W#E215    ARAMT7           減少原幣已兌現
+     C                     ELSE
+     C                     SUB  P#RAMT    ARAMT3           減少未兌現
+0209AC                     SUB  P#RAM1    ARAMT9
+0203AC*                    SUB  W#E215    ARAMT8           減少原幣未兌現
+     C                     ENDIF
+     C                     MOVEL'C'       ARFLAG
+     C                     UPDATARREC
+     C                     MOVE 'X'       W#FLAG
+     C                     EXSR SR1114                     異動AR2159D
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           RVACNO    IFEQ '2159'
+     C           RVACTP    ANDEQ'D'                        減少繳貨款
+0109AC           RVACNO    OREQ '211301'
+0109AC           RVACTP    ANDEQ'D'
+     C                     MOVELRVCUNO    ARCUNO
+     C                     MOVELRVNO      ARAREA
+     C           K#AR      CHAINARREC                69
+     C                     SUB  RVRAMT    ARAMT2
+9902AC                     SUB  RVCAMT    ARAMT8
+     C                     MOVEL'C'       ARFLAG
+     C                     UPDATARREC
+     C                     EXSR SR1115                     異動AR2159D
+     C                     ENDIF
+     C*
+     C           S#RVNO    READERVREC                    69
+     C                     ENDDO                           明細迴圈
+     C*
+     C*
+     C           W#CCAM    IFNE 0
+     C                     EXSR SR1111                     授信管控
+     C                     ENDIF
+     C*
+     C           W#2159    IFNE 0
+     C                     EXSR SR1112                     授信管控
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  現金預收寫入授信集中管控異動記錄 CAMBALT
+     C*----------------------------------------
+     CSR         SR1111    BEGSR
+     C                     CLEARCTREC
+9908AC                     Z-ADDU#SYSD    CTDATE           日期
+     C                     TIME           W#SYST
+     C                     Z-ADDD#ST      CTTIME           時間
+     C                     MOVELU#AREA    CTAREA           廠區
+     C                     MOVELS#DEVI    CTDSPN           終端機
+     C                     MOVELU#USID    CTUSER           使用者
+     C                     MOVELRVCUNO    CTCUNO           客戶
+     C                     MOVEL'AC03'    CTTXID           異動代號
+     C                     MOVELRVNO      CTAPNO           單據編號
+     C                     Z-SUBW#CCAM    CTXAMT           異動金額
+     C                     WRITECTREC
+     C*
+     C           'CCLIB/CC'CAT  'P300P':0 W#PGMN 13
+     C                     CALL W#PGMN                     信管介面
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  現金買貨寫入授信集中管控異動記錄 CAMBALT
+     C*----------------------------------------
+     CSR         SR1112    BEGSR
+     C                     CLEARCTREC
+9908AC                     Z-ADDU#SYSD    CTDATE           日期
+     C                     TIME           W#SYST
+     C                     Z-ADDD#ST      CTTIME           時間
+     C                     MOVELRVNO      CTAREA           廠區
+     C           CTAREA    IFEQ 'H'                        型鋼
+     C                     MOVEL'P'       CTAREA           放在台北
+     C                     ENDIF
+     C                     MOVELS#DEVI    CTDSPN           終端機
+     C                     MOVELU#USID    CTUSER           使用者
+     C                     MOVELRVCUNO    CTCUNO           客戶
+     C                     MOVEL'AC01'    CTTXID           異動代號
+     C                     MOVELRVNO      CTAPNO           單據編號
+     C                     Z-SUBW#2159    CTXAMT           異動金額
+     C                     WRITECTREC
+     C*
+     C           'CCLIB/CC'CAT  'P300P':0 W#PGMN 13
+     C                     CALL W#PGMN                     信管介面
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C* 寫入暫收資料
+     C*----------------------------------------
+     CSR         SR1113    BEGSR
+     C*
+     C                     Z-ADD0         I       50
+     C                     MOVEL*ALL'9'   ARY1
+     C                     MOVELS#RVNO    RVNO
+     C                     Z-ADD0         RVITEM
+     C           K#RCVD    SETLLRVREC
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RVREC                    40
+     C   40                LEAVE
+     C*
+     C           S#RVNO    IFNE RVNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           RVACTP    IFEQ 'C'
+     C           RVACNO    ANDEQ'2159'
+     C           RVFLAG    ANDNE'D'
+0109AC           RVACTP    OREQ 'C'
+0109AC           RVACNO    ANDEQ'211301'
+0109AC           RVFLAG    ANDNE'D'
+     C                     Z-ADDRVITEM    D#ITEM
+     C                     MOVELRVRLNO    D#ORNO
+     C                     Z-ADDRVRAMT    D#RAMT
+9902AC                     Z-ADDRVCAMT    D#CAMT
+9902AC*                    ADD  RVCAMT    W#E215
+     C                     ADD  1         I
+     C                     MOVELD#ARY1    ARY1,I
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C* 暫收更新AR2159D-->還原轉暫收金額
+     C*----------------------------------------
+     CSR         SR1114    BEGSR
+     C                     Z-ADDP#RAMT    W#XAMT 110
+0209AC                     Z-ADDP#RAM1    E#XAMT 132
+     C                     SORTAARY1
+     C           1         DO   100       I
+     C                     MOVELARY1,I    D#ARY1
+     C*
+     C           D#ITEM    IFEQ 99
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           W#XAMT    IFLE D#RAMT
+     C                     Z-ADDW#XAMT    W#DAMT 110       全轉
+     C                     SUB  W#XAMT    D#RAMT
+     C                     Z-ADD0         W#XAMT
+0209AC                     Z-ADDE#XAMT    E#DAMT 132
+0209AC                     SUB  E#XAMT    D#CAMT
+0209AC                     Z-ADD0         E#XAMT
+     C                     MOVELD#ARY1    ARY1,I
+     C                     ELSE
+     C                     Z-ADDD#RAMT    W#DAMT
+     C                     SUB  D#RAMT    W#XAMT
+     C                     Z-ADD0         D#RAMT
+0209AC                     Z-ADDD#CAMT    E#DAMT
+0209AC                     SUB  D#CAMT    E#XAMT
+0209AC                     Z-ADD0         D#CAMT
+     C                     MOVELD#ARY1    ARY1,I
+     C                     ENDIF
+     C*
+     C                     MOVELRVCUNO    ADCUNO
+     C                     MOVELRVNO      ADAREA
+     C                     MOVELD#ORNO    ADORNO
+     C           K#2159    CHAINRAR2159D             41
+     C                     MOVEL'C'       ADFLAG
+     C           D#RESV    IFEQ '*'
+     C                     SUB  W#DAMT    ADAMT1           減少已兌現
+0209AC                     SUB  E#DAMT    ADAMT7           減少原幣已兌現
+9902AC*                    SUB  D#CAMT    ADAMT7           減少原幣已兌現
+     C                     ELSE
+     C                     SUB  W#DAMT    ADAMT3           減少未兌現
+0209AC                     SUB  E#DAMT    ADAMT9           減少原幣未兌現
+0203AC*                    SUB  D#CAMT    ADAMT8           減少原幣未兌現
+     C                     ENDIF
+     C  N41                UPDATRAR2159D
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C* 暫收更新AR2159D-->還原繳貨款暫收
+     C*----------------------------------------
+     CSR         SR1115    BEGSR
+     C                     MOVELRVCUNO    ADCUNO
+     C                     MOVELRVNO      ADAREA
+     C                     MOVELRVRLNO    ADORNO
+     C           K#2159    CHAINRAR2159D             42
+     C                     SUB  RVRAMT    ADAMT2
+9902AC                     SUB  RVCAMT    ADAMT8
+     C                     MOVEL'C'       ADFLAG
+     C  N42                UPDATRAR2159D
+     C*
+     CSR                   ENDSR
+     C*----------------------------------------------------------------
+     C*  還原營業繳款檔之過入旗標 SARCVF
+     C*----------------------------------------------------------------
+     CSR         SR1120    BEGSR
+     C           S#RVNO    CHAINSRREC                69
+     C           *IN69     DOWEQ'0'
+9908AC                     Z-ADDU#SYSD    SRTRDT           過入日期
+     C                     MOVELU#USID    SRTRUS           過入人員
+     C                     MOVEL' '       SRFL02           過入碼
+     C                     UPDATSRREC
+     C*911009外銷之信用狀沖銷 START -------
+     C           SRMKTP    IFEQ '1'                        外銷
+     C           SRUSTP    ANDEQ'A1'
+     C           SRNTTP    ANDEQ'J'
+     C           SRACNO    IFEQ '1114'                     外幣存款
+9611 C           SRACNO    OREQ '1138'                     其他應收款
+9805AC           SRACNO    OREQ '1111'                     庫存現金
+0109AC           SRACNO    OREQ '110104'
+0109AC           SRACNO    OREQ '111202'
+0109AC           SRACNO    OREQ '110101'
+     C           SRNTNO    CHAINLLREC                69
+     C           *IN69     IFEQ '0'
+     C                     SUB  SRRAMT    LLAAMT           已押匯減
+     C                     ADD  SRRAMT    LLBAMT           餘額增
+9811AC                     MOVEL*BLANKS   LLCLOS           結案碼
+     C                     UPDATLLREC
+     C                     ENDIF
+9611 C                     ENDIF
+     C                     ENDIF
+     C*911009外銷之信用狀沖銷 END---------
+     C*
+1310AC*處理型鋼外銷繳款金額統計明細工作檔
+1310AC*
+1310AC                     MOVELSRRLNO    W#ORNO
+1310AC           KEY01     CHAINRAR155FA             68
+1310AC           *IN68     IFEQ *OFF
+1310AC                     MOVEL'D'       FAFLAG
+1310AC                     MOVEL'ARP059RS'FAAPNM
+1310AC                     MOVELU#USID    FAUPDM           異動人員
+1310AC                     Z-ADDU#SYSD    FAUPDD           異動日期
+1310AC                     TIME           FAUPDT           異動時間
+1310AC                     WRITEARP15G
+1310AC                     DELETRAR155FA
+1310AC                     ENDIF
+     C*
+     C           S#RVNO    READESRREC                    69
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------------------------------
+     C*  還原發票沖銷檔及作廢發票 SARVIN
+     C*----------------------------------------------------------------
+     CSR         SR1130    BEGSR
+     C           S#RVNO    CHAINSIREC                69
+     C           *IN69     DOWEQ'0'
+     C                     MOVEL' '       SIFL02           過入碼
+     C                     UPDATSIREC
+     C           D#BLK     IFNE *BLANK
+     C                     EXSR SR1131                     作廢發票
+     C                     ENDIF
+     C           S#RVNO    READESIREC                    69
+     C                     ENDDO
+     C*
+     C           S#RVNO    CHAINSOREC                69
+     C           *IN69     DOWEQ'0'
+     C                     MOVEL' '       SOFL02           過入碼
+     C                     UPDATSOREC
+     C           S#RVNO    READESOREC                    69
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------------------------------
+     C*  作廢發票明細 INVDTL, INVMST
+     C*----------------------------------------------------------------
+     CSR         SR1131    BEGSR
+     C           SIINNO    CHAININREC                69
+     C*
+     C                     MOVELINNO      IVNO
+     C                     MOVEL'6'       IVACNT
+     C*
+     C           K#IV      CHAINIVREC                69
+     C           *IN69     DOWEQ'0'
+     C           IVAPNO    IFEQ S#RVNO                     本張繳款單
+     C                     MOVEL'D'       IVFLAG
+     C                     MOVEL'D'       IVDECD
+9908AC                     Z-ADDU#SYSD    IVDEDT
+     C                     MOVELU#AREA    IVTXAR
+9908AC                     Z-ADDU#SYSD    IVTXDT
+     C                     UPDATIVREC
+     C                     LEAVE
+     C                     ENDIF
+     C           K#IV      READEIVREC                    69
+     C                     ENDDO
+     C*
+     C                     MOVEL'C'       INFLAG
+     C                     SUB  IVAMT     INEAMT           繳款金額
+     C                     SUB  IVAMT     INNBAL           發票餘額
+     C                     MOVEL*BLANK    INRCNO           繳款單號
+     C                     Z-ADD0         INRCDT           繳款日期
+     C                     MOVELU#AREA    INTXAR           異動廠區
+9908AC                     Z-ADDU#SYSD    INTXDT           異動日期
+     C                     UPDATINREC
+8907 C*處理ARR001N
+ .   C                     EXSR SR5000
+ .   C*
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------------------------------
+     C*  登錄異動原因
+     C*----------------------------------------------------------------
+     CSR         SR1140    BEGSR
+     C                     CLEARRARALOG
+9908AC                     Z-ADDU#SYSD    AGDATE           日期
+     C                     TIME           W#SYST
+     C                     Z-ADDD#ST      AGTIME           時間
+     C                     MOVELU#USID    AGURID           使用者
+     C                     MOVEL'AID'     AGTRID           異動代號
+     C                     MOVELS#RVNO    AGRENO           相關號碼
+     C                     MOVELS#CGCA    AGCGCA           修改原因
+     C                     WRITERARALOG
+     CSR                   ENDSR
+     C*
+     CSR         SR5000    BEGSR
+     C                     MOVELINAPNO    W#APNO  6
+     C                     MOVE W#APNO    ANAPNO
+     C                     Z-ADD0         ANAPIT
+     C           K#AN      SETLLRARR001N
+     C                     READ RARR001N                 50
+     C           *IN50     DOWEQ*OFF
+     C           ANAPNO    IFNE W#APNO                     請款單號
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVE *BLANK    ANFLAG
+     C                     MOVE 'C'       ANCODE
+     C                     MOVE *BLANK    ANRCNO
+     C                     UPDATRARR001N
+     C*
+     C                     READ RARR001N                 50
+     C                     ENDDO
+     CSR                   ENDSR
+     C**************************************************************
+** T#MSG
+０１－繳款單號必須輸入！
+０２－異動原因必須輸入！
+０３－財會之繳款單不存在！
+０４－繳款單已代開傳票！（還原後請重新代開傳票）
+０５－繳款單已作廢，不得再作廢！
+０６－營業之繳款單不存在！
+０７－還原繳款資料處理中…
+０８－還原發票資料處理中…
+０９－異動原因登錄中…
+１０－還原處理完畢，繳款單為：
+１１－本繳款已托收，需有通關密碼才能還原請洽財務部！
+１２－通關密碼錯誤請洽系工部！
+１３－本繳款已兌現，不得還原！
+

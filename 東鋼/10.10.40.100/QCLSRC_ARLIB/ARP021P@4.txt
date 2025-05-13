@@ -1,0 +1,376 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE  98/12/28 2009AR406 S00WCJ (9812A)  */
+    /*                          103/03/17 2014AR810 S00WCJ (0303A)  */
+    /*                           T03下線                          */
+    /*                          111/07/05 2022AR00028 S00WCJ (1107A)*/
+    /*                          增加I廠傳輸                     */
+    /*                          112/03/03 2023AR00006 S00WCJ (1203A)*/
+    /*                           新增大業廠                       */
+    /*                                                              */
+    /****************************************************************/
+
+        /*  ＝＝＝＜台北　發票主檔INVMST傳輸程式＞＝＝＝   */
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+/*1203A*/    DCL        VAR(&ARA)  TYPE(*CHAR) LEN(11)
+             DCL        VAR(&ARA1) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ARA2) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ARA3) TYPE(*CHAR) LEN(1)
+   /*9812A*/ DCL        VAR(&ARA4) TYPE(*CHAR) LEN(1)
+   /*1107A*/ DCL        VAR(&ARA5) TYPE(*CHAR) LEN(1)
+/*1203A*/    DCL        VAR(&ARA6) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&CNT1) TYPE(*DEC) LEN(1 0)
+             DCL        VAR(&CNT2) TYPE(*DEC) LEN(1 0)
+             RTVJOBA    TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+ START:
+             SBMJOB     JOB(ARP021P) JOBD(ARJOBD) JOBQ(QSYS/QCTL) +
+                          RQSDTA('CALL ARLIB/ARP021P')
+      /*     SNDPGMMSG  +
+                          MSG('發票主檔傳輸已送入批次作業執行中..+
+                          .') TOPGMQ(*EXT)      */
+             GOTO       CMDLBL(ENDCLPGM)
+ BATCH:
+             CHGVAR     VAR(&CNT1) VALUE(0)
+             CHGVAR     VAR(&CNT2) VALUE(0)
+
+
+        /*  台北  INVMST--> ARLIB/INVMSTP  (TEMP-FILE) */
+ PASS:       CALL       PGM(ARLIB/ARP021PA)  PARM('P')
+             MONMSG     MSGID(CPF0000)
+        /*  建立　DDMF & DTAARA ............................ */
+ /*0303A     DLTF       FILE(QTEMP/DDMT)               */
+ /*0303A     MONMSG     MSGID(CPF0000)                 */
+ /*0303A     CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMT)    */
+
+    /*9812A  START */
+             DLTF       FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(U01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMU)
+    /*9812A  END */
+
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMK)
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMH)
+
+/*1107A*/    DLTF       FILE(QTEMP/DDMI)
+/*1107A*/    MONMSG     MSGID(CPF0000)
+/*1107A*/    CRTDUPOBJ  OBJ(I01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMI)
+
+/*1203A*/    DLTF       FILE(QTEMP/DDMN)
+/*1203A*/    MONMSG     MSGID(CPF0000)
+/*1203A*/    CRTDUPOBJ  OBJ(N01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMN)
+
+             DLTDTAARA  DTAARA(QTEMP/ARA)
+             MONMSG     MSGID(CPF0000)
+/*1203A*/    CRTDTAARA  DTAARA(QTEMP/ARA) TYPE(*CHAR) LEN(11) +
+                          VALUE('           ')
+ STEP1: /*  台北　抓　桃園  ARLIB/INVMSTT   ................ */
+ /*0303A     RTVDTAARA  DTAARA(QTEMP/ARA (1 1)) RTNVAR(&ARA1)    */
+ /*0303A     IF         COND(&ARA1 *EQ '0') THEN(GOTO CMDLBL(STEP11)) */
+ /*0303A     SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP021PA) PARM(''T'')') +
+                        DDMFILE(QTEMP/DDMT)                      */
+ /*0303A     MONMSG     MSGID(CPF0000)  EXEC(DO)        */
+ /*0303A     CHGDTAARA  DTAARA(QTEMP/ARA (1 1)) VALUE('1')    */
+ /*0303A     GOTO       CMDLBL(STEP11)                        */
+ /*0303A                ENDDO                                 */
+ /*0303A     CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(*NONSTD +
+                          'ARLIB/INVMSTT') LVLCHK(*NO)        */
+ /*0303A     OVRDBF     FILE(INVMSTT) TOFILE(QTEMP/DDMT)      */
+ /*0303A     OVRDBF     FILE(INVMSTP) TOFILE(ARLIB/INVMSTP)   */
+ /*0303A     OVRDBF     FILE(INVMST)  TOFILE(INVMST)          */
+ /*0303A     CHGDTAARA  DTAARA(*LDA (21 1)) VALUE('T')        */
+ /*0303A     OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                          CPI(15)                             */
+ /*0303A     OVRPRTF    FILE(PRINT1) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                          CPI(15) USRDTA('桃園重複')        */
+ /*0303A     CALL       PGM(ARLIB/ARP021RB)                   */
+ /*0303A     MONMSG     MSGID(CPF0000)  EXEC(DO)              */
+ /*0303A     CHGDTAARA  DTAARA(QTEMP/ARA (1 1)) VALUE('1')    */
+ /*0303A     GOTO       CMDLBL(STEP11)                        */
+ /*0303A                ENDDO                                 */
+ /*0303A     DLTOVR     FILE(*ALL)                            */
+             CHGDTAARA  DTAARA(QTEMP/ARA (1 1)) VALUE('0')
+ /*0303A     CLRPFM     FILE(QTEMP/DDMT)                      */
+ /*0303A     MONMSG     MSGID(CPF0000)                        */
+
+    /*9812A  START */
+
+ STEP11: /*  台北　抓　新桃園  ARLIB/INVMSTU   ................ */
+             RTVDTAARA  DTAARA(QTEMP/ARA (7 1)) RTNVAR(&ARA4)
+/*1107A*/    IF         COND(&ARA4 *EQ '0') THEN(GOTO CMDLBL(STEP12))
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP021PA) PARM(''U'')') +
+                        DDMFILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             CHGDTAARA  DTAARA(QTEMP/ARA (7 1)) VALUE('1')
+/*1107A*/    GOTO       CMDLBL(STEP12)
+                        ENDDO
+             CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(*NONSTD +
+                          'ARLIB/INVMSTU') LVLCHK(*NO)
+             OVRDBF     FILE(INVMSTT) TOFILE(QTEMP/DDMU)
+             OVRDBF     FILE(INVMSTP) TOFILE(ARLIB/INVMSTP)
+             OVRDBF     FILE(INVMST)  TOFILE(INVMST)
+             CHGDTAARA  DTAARA(*LDA (21 1)) VALUE('U')
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                          CPI(15)
+             OVRPRTF    FILE(PRINT1) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                          CPI(15) USRDTA('新桃重複')
+             CALL       PGM(ARLIB/ARP021RB)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             CHGDTAARA  DTAARA(QTEMP/ARA (7 1)) VALUE('1')
+/*1107A*/    GOTO       CMDLBL(STEP12)
+                        ENDDO
+             DLTOVR     FILE(*ALL)
+             CHGDTAARA  DTAARA(QTEMP/ARA (7 1)) VALUE('0')
+             CLRPFM     FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)
+
+    /*9812A  END   */
+
+ STEP12: /*1107A台北　抓　加工中心 ARLIB/INVMSTI  ............. */
+/*1107A*/    RTVDTAARA  DTAARA(QTEMP/ARA (9 1)) RTNVAR(&ARA5)
+/*1107A*/    IF         COND(&ARA5 *EQ '0') THEN(GOTO CMDLBL(STEP2))
+/*1107A*/    SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP021PA) PARM(''I'')') +
+                        DDMFILE(QTEMP/DDMI)
+/*1107A*/    MONMSG     MSGID(CPF0000)  EXEC(DO)
+/*1107A*/    CHGDTAARA  DTAARA(QTEMP/ARA (9 1)) VALUE('1')
+/*1107A*/    GOTO       CMDLBL(STEP2)
+/*1107A*/               ENDDO
+/*1107A*/    CHGDDMF    FILE(QTEMP/DDMI) RMTFILE(*NONSTD +
+                          'ARLIB/INVMSTI') LVLCHK(*NO)
+/*1107A*/    OVRDBF     FILE(INVMSTT) TOFILE(QTEMP/DDMI)
+/*1107A*/    OVRDBF     FILE(INVMSTP) TOFILE(ARLIB/INVMSTP)
+/*1107A*/    OVRDBF     FILE(INVMST)  TOFILE(INVMST)
+/*1107A*/    CHGDTAARA  DTAARA(*LDA (21 1)) VALUE('I')
+/*1107A*/    OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                          CPI(15)
+/*1107A*/    OVRPRTF    FILE(PRINT1) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                          CPI(15) USRDTA('加工重複')
+/*1107A*/    CALL       PGM(ARLIB/ARP021RB)
+/*1107A*/    MONMSG     MSGID(CPF0000)  EXEC(DO)
+/*1107A*/    CHGDTAARA  DTAARA(QTEMP/ARA (9 1)) VALUE('1')
+/*1107A*/    GOTO       CMDLBL(STEP2)
+/*1107A*/               ENDDO
+/*1107A*/    DLTOVR     FILE(*ALL)
+/*1107A*/    CHGDTAARA  DTAARA(QTEMP/ARA (9 1)) VALUE('0')
+/*1107A*/    CLRPFM     FILE(QTEMP/DDMI)
+/*1107A*/    MONMSG     MSGID(CPF0000)
+
+ STEP2:       /*  台北　抓　高雄  ARLIB/INVMSTK ............ */
+             RTVDTAARA  DTAARA(QTEMP/ARA (2 1)) RTNVAR(&ARA2)
+             IF         COND(&ARA2 *EQ '0') THEN(GOTO CMDLBL(STEP21))
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP021PA) PARM(''K'')') +
+                        DDMFILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             CHGDTAARA  DTAARA(QTEMP/ARA (2 1)) VALUE('1')
+             GOTO       CMDLBL(STEP21)
+                        ENDDO
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(*NONSTD +
+                          'ARLIB/INVMSTK') LVLCHK(*NO)
+             OVRDBF     FILE(INVMSTT) TOFILE(QTEMP/DDMK)
+             OVRDBF     FILE(INVMSTP) TOFILE(ARLIB/INVMSTP)
+             OVRDBF     FILE(INVMST)  TOFILE(INVMST)
+             CHGDTAARA  DTAARA(*LDA (21 1)) VALUE('K')
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                          CPI(15)
+             OVRPRTF    FILE(PRINT1) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                          CPI(15) USRDTA('高雄重複')
+             CALL       PGM(ARLIB/ARP021RB)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             CHGDTAARA  DTAARA(QTEMP/ARA (2 1)) VALUE('1')
+             GOTO       CMDLBL(STEP21)
+                        ENDDO
+             DLTOVR     FILE(*ALL)
+             CHGDTAARA  DTAARA(QTEMP/ARA (2 1)) VALUE('0')
+             CLRPFM     FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+ STEP21:      /*  台北　抓　苗栗  ARLIB/INVMSTH ............ */
+             RTVDTAARA  DTAARA(QTEMP/ARA (3 1)) RTNVAR(&ARA3)
+/*1203A*/    IF         COND(&ARA3 *EQ '0') THEN(GOTO CMDLBL(STEP22))
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP021PA) PARM(''H'')') +
+                        DDMFILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             CHGDTAARA  DTAARA(QTEMP/ARA (3 1)) VALUE('1')
+/*1203A*/    GOTO       CMDLBL(STEP22)
+                        ENDDO
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(*NONSTD +
+                          'ARLIB/INVMSTH') LVLCHK(*NO)
+             OVRDBF     FILE(INVMSTT) TOFILE(QTEMP/DDMH)
+             OVRDBF     FILE(INVMSTP) TOFILE(ARLIB/INVMSTP)
+             OVRDBF     FILE(INVMST)  TOFILE(INVMST)
+             CHGDTAARA  DTAARA(*LDA (21 1)) VALUE('H')
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                          CPI(15)
+             OVRPRTF    FILE(PRINT1) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                          CPI(15) USRDTA('苗栗重複')
+             CALL       PGM(ARLIB/ARP021RB)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             CHGDTAARA  DTAARA(QTEMP/ARA (3 1)) VALUE('1')
+/*1203A*/    GOTO       CMDLBL(STEP22)
+                        ENDDO
+             DLTOVR     FILE(*ALL)
+             CHGDTAARA  DTAARA(QTEMP/ARA (3 1)) VALUE('0')
+             CLRPFM     FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+
+
+ STEP22:       /*  台北　抓　大業  ARLIB/INVMSTN .......... */
+/*1203A*/    RTVDTAARA  DTAARA(QTEMP/ARA (10 1)) RTNVAR(&ARA6)
+/*1203A*/    IF         COND(&ARA6 *EQ '0') THEN(GOTO CMDLBL(STEP3))
+/*1203A*/    SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP021PA) PARM(''N'')') +
+                        DDMFILE(QTEMP/DDMN)
+/*1203A*/    MONMSG     MSGID(CPF0000)  EXEC(DO)
+/*1203A*/    CHGDTAARA  DTAARA(QTEMP/ARA (10 1)) VALUE('1')
+/*1203A*/    GOTO       CMDLBL(STEP3)
+/*1203A*/               ENDDO
+/*1203A*/    CHGDDMF    FILE(QTEMP/DDMN) RMTFILE(*NONSTD +
+                          'ARLIB/INVMSTN') LVLCHK(*NO)
+/*1203A*/    OVRDBF     FILE(INVMSTT) TOFILE(QTEMP/DDMN)
+/*1203A*/    OVRDBF     FILE(INVMSTP) TOFILE(ARLIB/INVMSTP)
+/*1203A*/    OVRDBF     FILE(INVMST)  TOFILE(INVMST)
+/*1203A*/    CHGDTAARA  DTAARA(*LDA (21 1)) VALUE('N')
+/*1203A*/    OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                          CPI(15)
+/*1203A*/    OVRPRTF    FILE(PRINT1) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                          CPI(15) USRDTA('大業重複')
+/*1203A*/    CALL       PGM(ARLIB/ARP021RB)
+/*1203A*/    MONMSG     MSGID(CPF0000)  EXEC(DO)
+/*1203A*/    CHGDTAARA  DTAARA(QTEMP/ARA (10 1)) VALUE('1')
+/*1203A*/    GOTO       CMDLBL(STEP3)
+/*1203A*/               ENDDO
+/*1203A*/    DLTOVR     FILE(*ALL)
+/*1203A*/    CHGDTAARA  DTAARA(QTEMP/ARA (10 1)) VALUE('0')
+/*1203A*/    CLRPFM     FILE(QTEMP/DDMN)
+/*1203A*/    MONMSG     MSGID(CPF0000)
+
+   /* ----------------新版台北送廠區開始------------------- */
+
+ STEP3: /*  台北 ARLIB/INVMSTP 送　桃園 DTALIB/INVMST      */
+ /*0303A     RTVDTAARA  DTAARA(QTEMP/ARA (4 1)) RTNVAR(&ARA2)  */
+ /*0303A     IF         COND(&ARA2 *EQ '0') THEN(GOTO CMDLBL(STEP31)) */
+ /*0303A     CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(ARLIB/INVMSTP) +
+                        LVLCHK(*NO)                    */
+ /*0303A     CPYF       FROMFILE(ARLIB/INVMSTP) TOFILE(QTEMP/DDMT) +
+                        MBROPT(*REPLACE)               */
+ /*0303A     MONMSG     MSGID(CPF0000)  EXEC(GOTO ERROR3)   */
+ /*0303A     SBMRMTCMD  CMD('CALL ARLIB/ARP021PCT') +
+                        DDMFILE(QTEMP/DDMT)                 */
+ /*0303A     MONMSG     MSGID(CPF0000)  EXEC(GOTO ERROR3)   */
+
+ /*0303A     GOTO       OK3                                 */
+ /* ERROR3:                                                 */
+ /*0303A     CHGDTAARA  DTAARA(QTEMP/ARA (4 1)) VALUE('1')  */
+ /*0303A     GOTO       CMDLBL(STEP31)                      */
+    OK3:
+             CHGDTAARA  DTAARA(QTEMP/ARA (4 1)) VALUE('0')
+
+    /*9812A  START */
+
+ STEP31: /*  台北 ARLIB/INVMSTP 送　新桃園 DTALIB/INVMST      */
+             RTVDTAARA  DTAARA(QTEMP/ARA (8 1)) RTNVAR(&ARA2)
+             IF         COND(&ARA2 *EQ '0') THEN(GOTO CMDLBL(STEP4))
+             CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(ARLIB/INVMSTP) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(ARLIB/INVMSTP) TOFILE(QTEMP/DDMU) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO ERROR6)
+             SBMRMTCMD  CMD('CALL ARLIB/ARP021PCT') +
+                        DDMFILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO ERROR6)
+
+             GOTO       OK6
+    ERROR6:
+             CHGDTAARA  DTAARA(QTEMP/ARA (8 1)) VALUE('1')
+             GOTO       CMDLBL(STEP4)
+    OK6:
+             CHGDTAARA  DTAARA(QTEMP/ARA (8 1)) VALUE('0')
+
+    /*9812A  END   */
+
+
+ STEP4: /*  台北 ARLIB/INVMSTP 送　高雄 DTALIB/INVMST      */
+             RTVDTAARA  DTAARA(QTEMP/ARA (5 1)) RTNVAR(&ARA2)
+             IF         COND(&ARA2 *EQ '0') THEN(GOTO CMDLBL(STEP5))
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(ARLIB/INVMSTP) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(ARLIB/INVMSTP) TOFILE(QTEMP/DDMK) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO ERROR4)
+             SBMRMTCMD  CMD('CALL ARLIB/ARP021PCK') +
+                        DDMFILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO ERROR4)
+
+             GOTO       OK4
+    ERROR4:
+             CHGDTAARA  DTAARA(QTEMP/ARA (5 1)) VALUE('1')
+             GOTO       CMDLBL(STEP5)
+    OK4:
+             CHGDTAARA  DTAARA(QTEMP/ARA (5 1)) VALUE('0')
+
+ STEP5: /*  台北 ARLIB/INVMSTP 送　苗栗 DTALIB/INVMST      */
+             RTVDTAARA  DTAARA(QTEMP/ARA (6 1)) RTNVAR(&ARA2)
+/*1203A*/    IF         COND(&ARA2 *EQ '0') THEN(GOTO CMDLBL(STEP6))
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(ARLIB/INVMSTP) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(ARLIB/INVMSTP) TOFILE(QTEMP/DDMH) +
+                        MBROPT(*REPLACE) FMTOPT(*NOCHK)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO ERROR5)
+             SBMRMTCMD  CMD('CALL ARLIB/ARP021PCH') +
+                        DDMFILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO ERROR5)
+
+             GOTO       OK5
+    ERROR5:
+             CHGDTAARA  DTAARA(QTEMP/ARA (6 1)) VALUE('1')
+             GOTO       CMDLBL(LOOP2)
+    OK5:
+             CHGDTAARA  DTAARA(QTEMP/ARA (6 1)) VALUE('0')
+
+
+ STEP6: /*  台北 ARLIB/INVMSTP 送　大業 DTALIB/INVMST      */
+/*1203A*/    RTVDTAARA  DTAARA(QTEMP/ARA (11 1)) RTNVAR(&ARA2)
+/*1203A*/    IF         COND(&ARA2 *EQ '0') THEN(GOTO CMDLBL(LOOP2))
+/*1203A*/    CHGDDMF    FILE(QTEMP/DDMN) RMTFILE(ARLIB/INVMSTP) +
+                        LVLCHK(*NO)
+/*1203A*/    CPYF       FROMFILE(ARLIB/INVMSTP) TOFILE(QTEMP/DDMN) +
+                        MBROPT(*REPLACE) FMTOPT(*NOCHK)
+/*1203A*/    MONMSG     MSGID(CPF0000)  EXEC(GOTO ERROR7)
+/*1203A*/    SBMRMTCMD  CMD('CALL ARLIB/ARP021PCN') +
+                        DDMFILE(QTEMP/DDMN)
+/*1203A*/    MONMSG     MSGID(CPF0000)  EXEC(GOTO ERROR7)
+
+/*1203A*/    GOTO       OK7
+    ERROR7:
+/*1203A*/    CHGDTAARA  DTAARA(QTEMP/ARA (11 1)) VALUE('1')
+/*1203A*/    GOTO       CMDLBL(LOOP2)
+    OK7:
+/*1203A*/    CHGDTAARA  DTAARA(QTEMP/ARA (11 1)) VALUE('0')
+
+     /* ------------------新版台北送廠區結束 ------------------- */
+
+ LOOP2: /*   CLEAR .... TEMP-FILE  TAIPEI  & DLCOBJ .......... */
+/*1203A*/    RTVDTAARA  DTAARA(QTEMP/ARA (1 11)) RTNVAR(&ARA)
+/*1203A*/    IF         COND(&ARA *NE '00000000000') THEN(CHGVAR VAR(&CNT2) +
+                          VALUE(&CNT2 + 1))
+             IF         COND(&CNT2 *GT 2) THEN(GOTO CMDLBL(ENDCLPGM))
+             ELSE       DO
+/*1203A*/          IF      COND(&ARA *NE '00000000000') THEN(DO)
+                           DLYJOB   DLY(60)
+                           GOTO     CMDLBL(STEP1)
+                           ENDDO
+                        ENDDO
+    /*       DLCOBJ     OBJ((ARLIB/INVMST *FILE *EXCL))  */
+             CLRPFM     FILE(ARLIB/INVMSTP)
+             MONMSG     MSGID(CPF0000)
+ ENDCLPGM:   ENDPGM
+

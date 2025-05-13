@@ -1,0 +1,123 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    MTS777R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00TPC
+     H*            4.FUNCTION     區間製票代開同步(IFRS同步ROC)
+     H*            5.DATE-WRITTEN  100/11/08 1001108MT S00TPC
+     H*
+     H*****************************************************************
+     H            Y
+     FGLTRANN UF  E           K        DISK                      A
+     F            RGLTRAN                           KRENAMERGLTRANN
+     FGLTRAN  IF  E           K        DISK
+     FACNCMPL1IF  E           K        DISK
+     FGLRECDL1UF  E           K        DISK                      A
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10011010 D#USER
+     I                                     10111020 S#DEVN
+     I                                     10211021 U#LOC
+     C*****************************************************************
+     C*          Parameter List
+     C*****************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#AREA  1        *開立廠區
+     C                     PARM           P#YY    4        *年度
+     C                     PARM           P#TRNS 10        *起始製票號碼
+     C                     PARM           P#TRNE 10        *終止製票號碼
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*FILE => GLTRAN,GLRECDL1
+     C           KEY01     KLIST
+     C                     KFLD           W#AREA
+     C                     KFLD           W#YY
+     C                     KFLD           W#TRNS
+     C*FILE => GLTRAN,GLRECDL1
+     C           KEY02     KLIST
+     C                     KFLD           W#AREA
+     C                     KFLD           W#YY
+     C*FILE => GLRECDL1
+     C           KEY03     KLIST
+     C                     KFLD           GLAREA
+     C                     KFLD           GLYY
+     C                     KFLD           GLTRNO
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C                     MOVELP#AREA    W#AREA  1
+     C                     MOVELP#YY      W#YY    40
+     C                     MOVELP#TRNS    W#TRNS 10
+     C                     MOVELP#TRNE    W#TRNE 10
+     C*
+     C*DELETE IFRS製票檔GLTRANN
+     C           KEY01     SETLLRGLTRANN
+     C                     MOVE *OFF      *IN52
+     C           *IN52     DOWEQ*OFF
+     C           KEY02     READERGLTRANN                 52*EOF
+     C   52                LEAVE
+     C*
+     C           GLTRNO    IFGT W#TRNE
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     DELETRGLTRANN
+     C                     ENDDO
+     C*
+     C*DELETE製票號碼對照檔GLRECDL1
+     C           KEY01     SETLLRGLRECD
+     C                     MOVE *OFF      *IN52
+     C           *IN52     DOWEQ*OFF
+     C           KEY02     READERGLRECD                  52*EOF
+     C   52                LEAVE
+     C*
+     C           SRTRNO    IFGT W#TRNE
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     DELETRGLRECD
+     C                     ENDDO
+     C*
+     C*READ ROC製票檔GLTRAN WRITE TO IFRS製票檔GLTRANN
+     C           KEY01     SETLLRGLTRAN
+     C                     MOVE *OFF      *IN52
+     C           *IN52     DOWEQ*OFF
+     C           KEY02     READERGLTRAN                  52*EOF
+     C   52                LEAVE
+     C*
+     C           GLTRNO    IFGT W#TRNE
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*CHAIN ACNCMP新舊會科對照表
+     C                     MOVELGLNO      W#GLNO  9        *ROC 會計科目
+     C           W#GLNO    CHAINRACNCMP              60    *NR
+     C  N60                MOVELAZNO      GLNO             *IFRS會計科目
+     C*
+     C                     WRITERGLTRANN                   *IFRS製票檔
+     C*
+     C*WRITE製票號碼對照檔GLRECDL1
+     C           KEY03     CHAINRGLRECD              61    *NR
+     C*
+     C                     MOVELGLAREA    SGCARD           *廠別
+     C*
+     C                     Z-ADDGLYY      SIYEAR           *製票年度I
+     C                     MOVELGLTRNO    SITRNO           *製票號碼I
+     C                     Z-ADDGLYMD     SIYMD            *製票日期I
+     C                     MOVELGLEMNO    SIEMNO           *製票員I
+     C*
+     C                     Z-ADDGLYY      SRYEAR           *製票年度R
+     C                     MOVELGLTRNO    SRTRNO           *製票號碼R
+     C                     Z-ADDGLYMD     SRYMD            *製票日期R
+     C                     MOVELGLEMNO    SREMNO           *製票員R
+     C*
+     C   61                WRITERGLRECD
+     C***
+     C                     ENDDO
+     C*
+     C                     MOVE *ON       *INLR
+

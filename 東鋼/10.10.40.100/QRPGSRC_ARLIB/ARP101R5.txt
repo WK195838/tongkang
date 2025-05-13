@@ -1,0 +1,184 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP102R5
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     銷貨利息計算─利息計算
+     H*            5.DATE-WRITTEN  92/04/14
+     H*            6.DATE-UPDATE
+     H*
+     H*        D#DAT1==>銷貨日期
+     H*        D#DAT2==>加權兌現日
+     H*        D#DAT3==>起始日期
+     H*****************************************************************
+     H        1   Y                                     1
+     FARP101F3IP  E           K        DISK
+     FLNMRAT  IF  E           K        DISK
+     FARP101F4O   E           K        DISK
+     IRAR101F3    01
+     I            DS
+     I                                        1   80D#DAT1
+     I                                        1   40D#YY1
+     I                                        5   60D#MM1
+     I                                        7   80D#DD1
+     I                                        1   60D#YM1
+     I            DS
+     I                                        1   80D#DAT2
+     I                                        1   40D#YY2
+     I                                        5   60D#MM2
+     I                                        7   80D#DD2
+     I                                        1   60D#YM2
+     I            DS
+     I                                        1   80D#DAT3
+     I                                        1   40D#YY3
+     I                                        5   60D#MM3
+     I                                        7   80D#DD3
+     I                                        1   60D#YM3
+     I            DS
+     I                                        1   80D#DAT4
+     I                                        1   60D#YM4
+     C*****************************************************************
+     C*          KEY   LIST
+     C*****************************************************************
+     C*FILE==>LNMRAT  短借每月平均利率檔
+     C           W#MRAT    KLIST
+     C                     KFLD           LVYM             年月
+     C                     KFLD           LVCURR           幣別
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C                     EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     Z-ADDA3DAT1    D#DAT1
+     C                     Z-ADDA3DAT2    D#DAT2
+     C           D#YM1     DOWLED#YM2
+     C           D#YM1     IFEQ D#YM2
+     C                     EXSR SR1000                     計算利率
+     C                     ELSE
+     C                     EXSR SR2000
+     C                     ENDIF
+     C*
+     C  N40                EXSR SR3000                     寫入
+     C*
+     C                     ADD  1         D#YM1            年月
+     C                     Z-ADD1         D#DD1
+     C           D#MM1     IFEQ 13
+     C                     ADD  1         D#YY1            年
+     C                     Z-ADD1         D#MM1            月
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#RAMT
+     C*
+     C                     MOVE D#DAT1    W#DAT1  8        起始年月
+     C                     MOVE W#DAT1    P#PDAT
+     C                     MOVE A3DAT2    W#DAT2  8        終止年月
+     C                     MOVE W#DAT2    P#RDAT
+     C*
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT  8        起始日期
+     C                     PARM           P#RDAT  8        終止日期
+     C                     PARM '1'       P#MODE  1        民國年
+     C                     PARM           P#DIF   50       相距天數
+     C                     PARM           P#ERR   1        錯誤碼
+     C*
+     C           P#ERR     IFEQ '0'
+     C                     Z-ADDP#DIF     W#DAY   50       天數
+     C                     ELSE
+     C                     Z-ADD0         W#DAY
+     C                     ENDIF
+     C*
+     C*利息計算＝金額Ｘ利率Ｘ天數／３６５
+     C           W#DAY     IFNE 0
+     C                     Z-ADDD#YM1     LVYM             年月
+     C                     MOVEL'NTD'     LVCURR           幣別
+     C           W#MRAT    CHAINRLNMRAT              40
+     C  N40      LVRATE    DIV  100       LVRATE
+     C  N40      A3AMT     MULT W#DAY     W#RAMT  90
+     C  N40      W#RAMT    MULT LVRATE    W#RAMT
+     C  N40      W#RAMT    DIV  365       W#RAMT    H
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#RAMT
+     C                     Z-ADDD#DAT1    D#DAT3
+     C*
+     C                     SELEC
+     C           D#MM1     WHEQ 1
+     C           D#MM1     OREQ 3
+     C           D#MM1     OREQ 5
+     C           D#MM1     OREQ 7
+     C           D#MM1     OREQ 8
+     C           D#MM1     OREQ 10
+     C           D#MM1     OREQ 12
+     C                     Z-ADD31        D#DD3
+     C           D#MM1     WHEQ 4
+     C           D#MM1     OREQ 6
+     C           D#MM1     OREQ 9
+     C           D#MM1     OREQ 11
+     C                     Z-ADD30        D#DD3
+     C           D#MM1     WHEQ 2
+     C                     Z-ADD28        D#DD3
+     C                     ENDSL
+     C*
+     C                     MOVE D#DAT1    W#DAT1  8        起始年月
+     C                     MOVE W#DAT1    P#PDAT
+     C                     MOVE D#DAT3    W#DAT3  8        終止年月
+     C                     MOVE W#DAT3    P#RDAT
+     C*
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT  8        起始日期
+     C                     PARM           P#RDAT  8        終止日期
+     C                     PARM '1'       P#MODE  1        民國年
+     C                     PARM           P#DIF   50       相距天數
+     C                     PARM           P#ERR   1        錯誤碼
+     C*
+     C           P#ERR     IFEQ '0'
+     C                     Z-ADDP#DIF     W#DAY   50       天數
+     C                     ELSE
+     C                     Z-ADD0         W#DAY
+     C                     ENDIF
+     C*
+     C*利息計算＝金額Ｘ利率Ｘ天數／３６５
+     C           W#DAY     IFNE 0
+     C                     Z-ADDD#YM1     LVYM             年月
+     C                     MOVEL'NTD'     LVCURR           幣別
+     C           W#MRAT    CHAINRLNMRAT              40
+     C  N40      LVRATE    DIV  100       LVRATE
+     C  N40      A3AMT     MULT W#DAY     W#RAMT  90
+     C  N40      W#RAMT    MULT LVRATE    W#RAMT
+     C  N40      W#RAMT    DIV  365       W#RAMT    H
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C                     CLEARRAR101F4
+     C                     Z-ADDA3DAT1    D#DAT4
+     C                     Z-ADDD#YM4     A4YM1            銷貨年月
+     C                     Z-ADDD#YM1     A4YM2            利息年月
+     C                     MOVELA3CUNO    A4CUNO           客戶代號
+     C                     MOVELA3CUNM    A4CUNM           客戶名稱
+     C                     MOVELA3ORNO    A4ORNO           訂單編號
+     C                     MOVELA3PDNM    A4PDNM           品名
+     C                     Z-ADDA3AMT     A4AMT            銷貨金額
+     C                     Z-ADDW#RAMT    A4RAMT           利息
+     C*
+     C                     WRITERAR101F4
+     C*
+     C                     ENDSR
+

@@ -1,0 +1,245 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR111R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     應收帳款帳齡分析表（不含票據繳款）
+     H*            5.DATE-WRITTEN  92/04/29
+     H*            6.DATE-MODIFY
+     H*                           101/09/25  2012AR682  S00WCJ (0109A)
+     H*
+     H*            TXVUNO==>出貨年月
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTLL2IP  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FRCVDTL  IF  E           K        DISK
+     FARR111T O   E             69     PRINTER
+     F*****************************************************************
+     ITXREC
+     I                                              TXCUNOL3
+     I                                              TXVUNOL2
+     I                                              TXIVNOL1
+     I*****************************************************************
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10111020 U#DEVI
+     I                                      300 307 U#DAT1
+     I                                      308 315 U#DAT2
+     I                                      316 321 T#CUN1
+     I                                      322 327 T#CUN2
+     I            DS
+     I                                        1   80D#DATE
+     I                                        1   40D#YY
+     I                                        5   60D#MM
+     I                                        7   80D#DD
+     C*****************************************************************
+     C*          KEY  LIST
+     C*****************************************************************
+     C*FILE==>INVDTL
+     C           W#INVD    KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L3                EXSR L3CLR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CL3 99                EXSR L3SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C  N99                MOVE *ON       *IN99
+     C                     MOVE *ON       *IN69
+     C*
+     C                     MOVE U#DAT1    T#DAT1
+     C                     MOVE U#DAT2    T#DAT2
+     C*
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C                     MOVE *ALL'-'   T#LIN5
+     C                     Z-ADD0         W#CNTA  40
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L3CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR111T1T
+     C                     MOVE *ALL'-'   T#LIN5
+     C                     Z-ADD0         W#CNTT  40
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR111T1S
+     C                     Z-ADD0         W#CNTS  40
+     C                     MOVE *ALL'-'   T#LIN3
+     C                     MOVE *ALL'-'   T#LIN4
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR111T1D
+     C                     Z-ADD0         W#DD    40
+     C                     Z-ADD0         W#CNT   40
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*計算加權出貨日
+     C                     Z-ADDTXDATE    D#DATE
+     C                     ADD  D#DD      W#DD
+     C                     ADD  1         W#CNT
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           TXDATE    IFEQ 920303
+     C                     Z-ADD0         W#TMP   10
+     C                     ENDIF
+     C*
+     C                     MOVELTXIVNO    IVNO
+     C                     MOVEL'6'       IVACNT
+     C                     Z-ADD0         IVITEM
+     C           W#INVD    SETLLIVREC
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ IVREC                    40
+     C   40                LEAVE
+     C*
+     C           IVNO      IFNE TXIVNO
+     C           IVACNT    ORNE '6'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVELIVAPNO    W#APNO  6
+     C           W#APNO    CHAINRVREC                45
+     C  N45      RVACTP    IFEQ 'D'
+     C           RVACNO    IFEQ '1112'
+     C           RVACNO    OREQ '1111'
+0109AC           RVACNO    OREQ '110102'
+0109AC           RVACNO    OREQ '110101'
+     C                     ADD  IVAMT     T#AMT
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*只計算已繳款之發票
+     C           T#AMT     IFNE 0
+     C                     MOVELTXCUNM    T#CUNM           客戶名稱
+     C           W#DD      DIV  W#CNT     D#DD      H
+     C                     Z-ADDD#DATE    T#DATE
+     C                     MOVELTXIVNO    T#INNO           發票號碼
+     C           TXIVNO    CHAININREC                41
+     C  N41                Z-ADDININDT    T#INDT           發票日期
+     C  N41                Z-ADDINAPDT    T#APDT           請款日期
+     C  N41                MOVELINRCNO    T#RVNO           繳款單號
+     C  N41                Z-ADDINRCDT    T#RVDT           繳款日期
+     C  N41                EXSR SR1000
+     C  N41      T#AMT     MULT T#DAY     T#AVG
+     C*
+     C   69                WRITEAR111T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR111T1D
+     C*小計
+     C                     ADD  T#AMT     T#AMTS
+     C                     ADD  T#DAY     T#DAYS
+     C                     ADD  T#AVG     T#AVGS
+     C                     ADD  1         W#CNTS
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C           T#AMTS    IFNE 0
+     C           T#DAYS    DIV  W#CNTS    T#DAYS    H
+     C*
+     C   69                WRITEAR111T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR111T1S
+     C*合計
+     C                     ADD  1         W#CNTT
+     C                     ADD  T#DAYS    T#DAYT
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L3SR      BEGSR
+     C*****************************************************************
+     C           W#CNTT    IFNE 0
+     C           T#DAYT    DIV  W#CNTT    T#DAYT
+     C*
+     C   69                WRITEAR111T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR111T1T
+     C*總計
+     C                     ADD  1         W#CNTA
+     C                     ADD  T#DAYT    T#DAYA
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C           W#CNTA    IFNE 0
+     C           T#DAYA    DIV  W#CNTA    T#DAYA
+     C*
+     C   69                WRITEAR111T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR111T1A
+     C                     ELSE
+     C                     EXSR MSGSR
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*
+     C   69                WRITEAR111T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR111T1M
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C                     MOVE D#DATE    W#DATE  8        出貨日期
+     C                     MOVE W#DATE    P#PDAT
+     C                     MOVE INRCDT    W#RCDT  8        繳款日期
+     C                     MOVE W#RCDT    P#RDAT
+     C*
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT  8        起始日期
+     C                     PARM           P#RDAT  8        終止日期
+     C                     PARM '1'       P#MODE  1        民國年
+     C                     PARM           P#DIF   50       相距天數
+     C                     PARM           P#ERR   1        錯誤碼
+     C*
+     C           P#ERR     IFEQ '0'
+     C                     Z-ADDP#DIF     T#DAY            天數
+     C                     ELSE
+     C                     Z-ADD0         T#DAY
+     C                     ENDIF
+     C*
+     C                     ENDSR
+

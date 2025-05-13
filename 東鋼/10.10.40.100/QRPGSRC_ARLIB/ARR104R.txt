@@ -1,0 +1,132 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR104R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     應收帳款承購(E-FACTORING)發票作廢重開檢核表
+     H*          5.DATE-WRITTEN  92/01/13
+     H*          6.DATE-MODIFY
+     H*
+     H*         先前處理
+     H*****************************************************************
+     H        1   Y                                     1
+     FARINVM  IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FTRNDTL  IF  E           K        DISK
+     FARCUDT  IF  E           K        DISK
+     FARR104F O   E           K        DISK
+     E                    ERR     1   1 70               *錯誤訊息
+     I            DS
+     I                                        1  10 D#IVNO
+     I                                        1   1 D#IVN2
+     I                                        1   6 D#IVN1
+     C*****************************************************************
+     C*          KEY  LIST
+     C*****************************************************************
+     C*FILE==>INVDTL
+     C           W#INVD    KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*FILE==>TRNDTL
+     C           W#TRND    KLIST
+     C                     KFLD           TXCODE
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+     C                     EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     CLEARRAR104F
+     C           AMINNO    CHAININREC                40
+     C           *IN40     IFEQ *OFF
+     C*該筆發票已做廢
+     C           INDECD    IFNE *BLANK
+     C                     MOVELINNO      IVNO
+     C                     MOVEL'1'       IVACNT
+     C                     Z-ADD0         IVITEM
+     C*
+     C*若該筆發票為隨車開立，則憑證編號即為磅單編號
+     C           W#INVD    SETLLIVREC
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ IVREC                    41
+     C*
+     C           IVNO      IFNE INNO
+     C           *IN41     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*找到該磅單編號後，至TRNDTL裡確認該張磅單編號
+     C                     SELEC
+     C           INTYPE    WHEQ '1'
+     C                     MOVEL'SA04'    TXCODE
+     C           INTYPE    WHEQ '3'
+     C                     MOVEL'AR05'    TXCODE
+     C                     ENDSL
+     C*
+     C                     MOVELIVAPNO    TXNO
+     C                     Z-ADD0         TXITEM
+     C           W#TRND    SETLLTXREC
+     C                     MOVE *OFF      *IN42
+     C           *IN42     DOWEQ*OFF
+     C                     READ TXREC                    42
+     C   42                LEAVE
+     C*
+     C           TXNO      IFNE IVAPNO
+     C                     MOVELERR,1     AFTEXT
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVEL*ALL'0'   W#IVNO  6
+     C                     MOVELTXIVNO    D#IVNO
+     C           D#IVN1    IFEQ W#IVNO                      正負沖銷
+     C           D#IVN2    OREQ '*'                         暫不開立
+     C           D#IVN2    OREQ '#'                         永不開立
+     C                     MOVEL*BLANK    AFINNO
+     C                     ELSE
+     C                     MOVELTXIVNO    AFINNO           新開立發票號碼
+     C                     MOVELTXNO      AFTEXT
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     LEAVE
+     C                     ENDDO
+     C*
+     C                     MOVELAMINNO    AFIVNO           發票號碼
+     C                     MOVELAMCUNO    AFCUNO           客戶編號
+     C                     MOVELAMCUNM    AFCUNM           客戶姓名
+     C                     MOVELAMORNO    AFORNO           訂單編號
+     C                     MOVELAMAPN1    AFAPN1           承購單號
+     C                     Z-ADDAMDLD1    AFDLD1           承購下載日
+     C                     Z-ADDAMDAMT    AFAAMT           舊發票金額
+     C                     Z-ADDININDT    AFINDD           舊發票開立日
+     C                     Z-ADDINDEDT    AFDEDT           作廢日期
+     C           AFCUNO    CHAINRARCUDT              44
+     C  N44                MOVELACBKID    AFBKID           銀行代號
+     C  N44                MOVELACBKNM    AFBKNM           銀行名稱
+     C*
+     C*找到新開發票之金額
+     C           AFINNO    CHAININREC                45
+     C  N45                Z-ADDININDT    AFINDT           新開發票日期
+     C  N45                MOVELINCUNM    AFCUNN           新開客戶名稱
+     C  N45                MOVELINORNO    AFORNN           新開訂單編號
+     C  N45                Z-ADDINAAMT    AFBAMT
+     C  N45                ADD  INATAX    AFBAMT           新開發票金額
+     C*
+     C                     WRITERAR104F
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C*
+     CSR                   ENDSR
+**  ERR
+發票採區間開立，無法得知磅單號碼
+

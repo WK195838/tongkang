@@ -1,0 +1,317 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR113RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     發票折扣核對清單
+     H*            5.DATE-WRITTEN  94/09/12
+     H*            6.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR113S CF  E                    WORKSTN
+     F                                        RRN1  KSFILE AR113F2
+     FCBCUST  IF  E           K        DISK
+     FARSAID  IF  E           K        DISK
+     FHSMAST  IF  E           K        DISK
+     FARR113F IF  E           K        DISK                      A
+     E*************************************************************
+     E                    ERR     1  13 70
+     I*************************************************************
+     I           UDS
+     I                                      300 305 U#CUNO
+     I                                      306 306 U#SALE
+     I                                      307 314 U#IND1
+     I                                      315 322 U#IND2
+     I                                      323 323 U#AREA
+     I                                      324 324 U#COD1
+     I                                      325 325 U#TYPE
+     I                                      326 326 U#CHIC
+     I                                     10011010 U#USID
+     I            DS
+     I                                        1   6 D#CUNO
+     I                                        1   1 S1KIND
+     I                                        2   2 S1CUN1
+     I                                        3   5 S1CUN2
+     I                                        6   6 S1CUN3
+     C*****************************************************************
+     C*          KEY  LIST
+     C*****************************************************************
+     C           K#HSMT    KLIST
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C                     EXSR SR0000                     初始程式
+     C*
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C           SR0000    BEGSR
+     C**************************************************************
+     C                     MOVEL'01'      W#PRID  2        畫面一
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C*
+     C                     ENDSR
+     C**************************************************************
+     C           SR1000    BEGSR
+     C**************************************************************
+     C*W#PRID='01'-->畫面一
+     C           W#PRID    DOWEQ'01'
+     C                     WRITEAR113H
+     C                     EXFMTAR113F1                    螢幕輸入
+     C                     MOVEL*BLANK    S#ERR
+     C*
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03           回前畫面
+     C                     MOVEL'00'      W#PRID           結束
+     C                     LEAVE
+     C                     ENDIF
+     C*檢核
+     C                     EXSR SR1100                     檢核
+     C*
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         SR1100    BEGSR
+     C**************************************************************
+     C                     MOVEA'0000000' *IN,30
+     C                     SETOF                     99
+     C           S#CUNO    IFNE *BLANK
+     C           S#CUNO    CHAINCBREC                50
+     C   50                SETON                     3099
+     C   50                MOVELERR,1     S#ERR
+     C                     ENDIF
+     C*
+     C  N99      S#SALE    IFNE *BLANK
+     C                     MOVELS#SALE    W#SALE  2
+     C           W#SALE    CHAINRARSAID              51
+     C   51                SETON                     3199
+     C   51                MOVELERR,2     S#ERR
+     C                     ENDIF
+     C*
+     C  N99      S#IND1    IFEQ 0
+     C                     SETON                     3299
+     C                     MOVELERR,3     S#ERR
+     C                     ENDIF
+     C*
+     C           *IN99     IFEQ *OFF
+     C                     MOVEL*BLANK    P#DATE
+     C                     MOVE S#IND1    P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM ' '       P#FLAG  1
+     C           P#FLAG    IFNE '0'
+     C                     SETON                     3299
+     C                     MOVELERR,4     S#ERR
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      S#IND2    IFEQ 0
+     C                     SETON                     3399
+     C                     MOVELERR,5     S#ERR
+     C                     ENDIF
+     C*
+     C           *IN99     IFEQ *OFF
+     C                     MOVEL*BLANK    P#DATE
+     C                     MOVE S#IND2    P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM ' '       P#FLAG  1
+     C           P#FLAG    IFNE '0'
+     C                     SETON                     3399
+     C                     MOVELERR,6     S#ERR
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      S#IND1    IFGT S#IND2
+     C                     SETON                     323399
+     C                     MOVELERR,7     S#ERR
+     C                     ENDIF
+     C*
+     C  N99      S#COD1    IFEQ *BLANK
+     C                     SETON                     3499
+     C                     MOVELERR,8     S#ERR
+     C                     ENDIF
+     C*
+     C  N99      S#TYPE    IFEQ *BLANK
+     C                     SETON                     3599
+     C                     MOVELERR,9     S#ERR
+     C                     ENDIF
+     C*
+     C  N99      S#CHIC    IFEQ *BLANK
+     C                     SETON                     3699
+     C                     MOVELERR,10    S#ERR
+     C                     ENDIF
+     C*
+     C*成功
+     C           *IN99     IFEQ *OFF
+     C                     MOVELS#CUNO    U#CUNO           客戶代號
+     C                     MOVELS#SALE    U#SALE           業務代號
+     C                     MOVELS#IND1    U#IND1           發票起日
+     C                     MOVELS#IND2    U#IND2           發票止日
+     C                     MOVELS#AREA    U#AREA           廠區
+     C                     MOVELS#COD1    U#COD1           報表內容
+     C                     MOVELS#TYPE    U#TYPE           報表型態
+     C                     MOVELS#CHIC    U#CHIC           訂單挑選
+     C           S#CHIC    IFEQ '1'
+     C                     MOVEL'02'      W#PRID
+     C                     ELSE
+     C                     MOVEL'00'      W#PRID
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*W#PRID='02'--->ARR113S-2 畫面
+     C*
+     C                     Z-ADD1         S#NBR1
+     C                     Z-ADD0         RRN1    50
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN73            SFLCLR
+     C                     WRITEAR113F2C
+     C                     MOVE *OFF      *IN73
+     C*
+     C                     EXSR SR2100                     讀入
+     C*顯示畫面
+     C           W#PRID    DOWEQ'02'
+     C*
+     C                     WRITEAR113H
+     C                     WRITEAR113F2M
+     C                     EXFMTAR113F2C
+     C                     MOVEL*BLANK    S#ERR2
+     C*結束作業
+     C           *IN03     IFEQ *ON
+     C                     MOVEL'1'       P#IN03           回前畫面
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*回上頁
+     C           *IN12     IFEQ *ON
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*CHECK
+     C                     EXSR SR2200
+     C*列印
+     C  N98      *IN05     IFEQ *ON
+     C                     EXSR SR2300
+     C                     MOVEL'00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C*讀入檔頭
+     C                     Z-ADD0         RRN1
+     C           RRN1      DOWLT84
+     C                     ADD  1         RRN1
+     C                     MOVEL*BLANK    S#ORNO           訂單編號
+     C                     WRITEAR113F2
+     C*
+     C                     ENDDO
+     C*
+     C                     Z-ADD1         S#NBR1            SFLRCDNBR
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2200    BEGSR
+     C*****************************************************************
+     C                     SETOF                     309098
+     C                     Z-ADD1         RRN1
+     C*
+     C           *IN90     DOWEQ*OFF
+     C           RRN1      CHAINAR113F2              90
+     C   90                LEAVE
+     C*
+     C           S#ORNO    IFNE *BLANK
+     C*
+     C                     MOVELS#ORNO    S1OREA
+     C                     MOVE S#ORNO    S1ORNO
+     C           K#HSMT    CHAINRHSMAST              40
+     C           *IN40     IFEQ *ON
+     C                     SETON                     309098
+     C                     MOVELERR,12    S#ERR2
+     C                     ELSE
+     C           S#CUNO    IFNE *BLANK
+     C           D#CUNO    ANDNES#CUNO
+     C                     SETON                     309098
+     C                     MOVELERR,13    S#ERR2
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C                     ADD  1         RRN1
+     C*
+     C                     UPDATAR113F2
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2300    BEGSR
+     C*****************************************************************
+     C                     MOVE *OFF      *IN91
+     C                     Z-ADD1         RRN1
+     C*
+     C           *IN91     DOWEQ*OFF
+     C           RRN1      CHAINAR113F2              91
+     C   91                LEAVE
+     C*
+     C           S#ORNO    IFNE *BLANK
+     C           S#ORNO    CHAINRAR113F              45
+     C                     MOVELS#ORNO    AFORNO
+     C                     WRITERAR113F
+     C                     ENDIF
+     C*
+     C                     ADD  1         RRN1
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+** ERR
+０１－客戶代號不存在！
+０２－業務代號不存在！
+０３－請輸入發票起日！
+０４－請輸入發票止日！
+０５－發票起日輸入錯誤！
+０６－發票止日輸入錯誤！
+０７－發票起日不可大於發票止日！
+０８－請輸入報表內容！
+０９－請輸入報表型態！
+１０－請輸入是否挑選訂單！
+１１－請輸入訂單編號！
+１２－訂單編號輸入錯誤！
+１３－該訂單編號與客戶代號不符！
+

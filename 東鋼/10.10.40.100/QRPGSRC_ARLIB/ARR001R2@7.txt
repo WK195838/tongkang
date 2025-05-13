@@ -1,0 +1,469 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR001R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ（原作者不可考）
+     H*            4.FUNCTION     請款單列印作業（出表）
+     H*            5.DATE-WRITTEN  88/10/12
+     H*            6.DATE-UPDATED  89/05/10 加入類別合計
+     H*                            89/07/18  DOWNLOAD  TO NOTES
+     H*
+     H*  <說明> 本程式從原請款單列印作業 ARR001R複製再加以修改。
+     H*           本程式將原來之全手動改成RPG CYCLE 的寫法，並且
+     H*           依訂單別不同而換頁，同一張發票可有多筆磅單。
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR001F IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FARR001N UF  E           K        DISK                      A
+     FARCUDT  IF  E           K        DISK
+     FHIPROD  IF  E           K        DISK
+     FSAMAST  IF  E           K        DISK
+     FSAVOURL5IF  E           K        DISK
+     FARR001T O   E             66     PRINTER
+     E                    ARY        30 21
+     I*************************************************************
+     IARREC
+     I                                              ARORNOL2
+     I                                              ARINNOL1
+     I*------------------------------------------------------------
+     I            DS
+     I                                        1  21 D#ARY
+     I                                        1   1 D#PDN
+     I                                        1   3 D#PDN1
+     I                                        4   6 D#PDS1
+     I                                        7  130D#QTY
+     I                                       14  210D#AMT
+     I            DS
+     I                                        1   80D#DAT1
+     I                                        1   40D#DAT2
+     I                                        5   60D#DAT3
+     I                                        7   80D#DAT4
+     I            DS
+     I                                        1  10 D#DAT5
+     I                                        1   4 D#DAT6
+     I                                        5   5 D#DAT7
+     I                                        6   7 D#DAT8
+     I                                        8   8 D#DAT9
+     I                                        9  10 D#DAT0
+     I            DS
+     I                                        1   9 D#ORNO
+     I                                        1   1 S1OREA
+     I                                        2   60S1ORNO
+     I                                        7   90S1ORTM
+     I            DS
+     I                                        1  10 D#WTNO
+     I                                        1   1 D#VREA
+     I                                        2   3 D#PCOD
+     I                                        4   80D#VRNO
+     I                                        9  100D#VRTM
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     C*****************************************************************
+     C*          KEY     LIST
+     C*****************************************************************
+     C*FILE-->SAVOURL3(磅單檔)
+     C           K#SVUR    KLIST
+     C                     KFLD           S4VREA
+     C                     KFLD           S4PCOD
+     C                     KFLD           S4VRNO
+     C                     KFLD           S4VRTM
+     C*FILE==>INVDTL(發票明細檔)
+     C           K#DTL     KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*FILE==>SAMAST(訂單主檔)
+     C           K#SAMT    KLIST
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C                     KFLD           S1ORTM
+     C*FILE==>ARR001N(請款單下傳檔)
+     C           K#01RN    KLIST
+     C                     KFLD           ANAPNO
+     C                     KFLD           ANAPIT
+     C*FILE==>HIPROD(產品規格基本資料檔)
+     C           K#PROD    KLIST
+     C                     KFLD           F4NAME
+     C                     KFLD           F4STND
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C**************************************************************
+     CSR         INISR     BEGSR
+     C**************************************************************
+     C                     Z-ADD40        N#TCNT  30       頁內總筆數
+     C                     Z-ADD0         W#LCNT  30       已印筆數
+     C*
+     C                     MOVE *ALL'9'   ARY
+     C                     Z-ADD0         ANAPIT
+     C                     MOVE *ALL'9'   W#ORNO  6
+     C                     Z-ADD0         W#AMT  110
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         L2CLR     BEGSR
+     C**************************************************************
+     C*表頭
+     C           ARINNO    CHAININREC                69
+     C                     MOVELINCUNO    R#CUNO           客戶代號
+     C                     MOVELINORNO    R#ORNO           訂單編號
+     C                     Z-ADDINAPDT    R#APDT           請款日期
+     C                     MOVELINCUNM    R#CUNM           客戶名稱
+     C                     MOVELINRVID    R#RVID           收款業務員
+     C                     MOVELINAPNO    R#APNO           請款單號
+     C*
+     C*用客戶代號前五碼去CHAIN ARCUDT,
+     C*如果該客戶辦理承購，則在表頭印-->應收帳款轉讓申請書
+     C*如果該客戶未辦理承購，則在表頭印-->請款單
+     C*
+     C                     MOVELINCUNO    W#CUNO  5
+     C                     MOVELW#CUNO    ACCUNO
+     C           ACCUNO    CHAINRARCUDT              60
+     C*
+     C   60                MOVE *ON       *IN70            非承購
+     C  N60      ACCOD1    IFEQ 'Y'                        承購合併
+     C                     MOVE *ON       *IN70
+     C                     ELSE
+     C                     MOVE *OFF      *IN70            承購不合併
+     C                     ENDIF
+     C*
+     C           W#LCNT    IFEQ 0
+     C                     WRITEAR001T1H                   印出表頭
+     C                     Z-ADD0         W#LCNT  30       已印筆數
+     C                     ELSE
+     C                     EXSR PR0001                     接下一頁
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         L1CLR     BEGSR
+     C**************************************************************
+     C*合計
+     C                     ADD  ARQTY     R#QTYT           出貨數量
+     C                     ADD  ARAAMT    R#TAAM           出貨金額
+     C                     ADD  ARBAMT    R#TBAM           折退金額
+     C                     ADD  ARCAMT    R#TCAM           預收金額
+     C                     ADD  ARDAMT    R#TDAM           銷項稅額
+     C                     ADD  AREAMT    R#TEAM           請款金額
+     C                     ADD  1         R#NUMS
+     C*
+     C                     SETON                     51
+     C*
+     C           *INL2     IFEQ '1'                        第一筆不用
+     C                     GOTO L1ECL
+     C                     ENDIF
+     C*
+     C           W#LCNT    IFLT N#TCNT
+     C                     WRITEAR001T1L
+     C                     ADD  1         W#LCNT           已印一筆
+     C                     ELSE
+     C                     EXSR PR0001                     接下一頁
+     C                     ENDIF
+     C*
+     CSR         L1ECL     ENDSR
+     C**************************************************************
+     CSR         DTLSR     BEGSR
+     C**************************************************************
+     C           ARAAMT    IFNE 0
+     C                     Z-ADDARINDT    R#INDT           發票日期
+     C                     MOVELARINNO    R#INNO           發票號碼
+     C                     MOVELARWTNO    R#WTNO           磅單編號
+     C                     Z-ADDARQTY     R#QTY            出貨數量
+     C                     Z-ADDARAAMT    R#AAMT           出貨金額
+     C                     Z-ADDARBAMT    R#BAMT           折退金額
+     C                     Z-ADDARCAMT    R#CAMT           預收金額
+     C                     Z-ADDARDAMT    R#DAMT           銷項稅額
+     C                     Z-ADDAREAMT    R#EAMT           請款金額
+     C*
+     C           W#LCNT    IFGE N#TCNT
+     C                     EXSR PR0001                     接下一頁
+     C                     ENDIF
+     C*
+     C                     WRITEAR001T1D
+     C                     ADD  1         W#LCNT
+     C*
+     C**寫入請款單下傳檔STRAT
+     C                     MOVE R#APNO    ANAPNO           請款單號
+     C                     ADD  1         ANAPIT           請款單項次
+     C           K#01RN    CHAINRARR001N             50
+     C                     EXSR SR1000
+     C                     MOVELANORNO    W#NO    1
+     C           W#NO      IFEQ 'H'                        型鋼
+     C   50                WRITERARR001N
+     C  N50                UPDATRARR001N
+     C                     ENDIF
+     C**  END
+     C                     SETOF                     51
+     C           ARWTNO    IFNE *BLANK
+     C                     EXSR SR2000                     分類合計
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         L1SR      BEGSR
+     C**************************************************************
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         L2SR      BEGSR
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         LRSR      BEGSR
+     C**************************************************************
+     C           N#TCNT    SUB  3         W#TMP1  30
+     C           N#TCNT    ADD  1         W#TMP2  30
+     C*
+     C           W#LCNT    IFGT W#TMP1
+     C                     EXSR PR0001
+     C                     ENDIF
+     C*
+     C           W#LCNT    IFNE 0
+     C                     WRITEAR001T1M
+     C                     ADD  1         W#LCNT
+     C                     ENDIF
+     C*
+     C                     WRITEAR001T1T
+     C                     ADD  3         W#LCNT
+     C* 8905 列印類別分類合計 START------------
+     C                     SORTAARY
+     C           1         DO   30        I
+     C                     MOVE ARY,I     D#ARY
+     C*型鋼與鋼板不印分類合計
+     C           D#PDN     IFEQ '3'                        型鋼
+     C           D#PDN     OREQ '4'                        鋼板
+     C                     MOVE *ON       *IN41
+     C                     ENDIF
+     C*
+     C           D#PDN1    IFNE '999'                      未經合計
+     C                     MOVE D#PDN1    R#PDN1           類別
+     C                     MOVELD#PDN1    F4NAME
+     C                     MOVEL'*'       F4STND
+     C           K#PROD    CHAINRHIPROD              52
+     C  N52                MOVELF4CHIN    R#NAME
+     C*
+     C           D#PDS1    IFNE '999'
+     C                     MOVELD#PDS1    R#PDS1           徑度
+     C                     ELSE
+     C                     MOVE *BLANK    R#PDS1
+     C                     ENDIF
+     C                     Z-ADDD#QTY     R#QTYP           數量
+     C                     Z-ADDD#AMT     R#TAAP           金額
+     C*
+     C                     ADD  D#QTY     R#QTYQ           數量
+     C                     ADD  D#AMT     R#TAAQ           金額
+     C*
+     C  N41                WRITEAR001T1P
+     C  N41                ADD  1         W#LCNT
+     C*
+     C                     ELSE
+     C*
+     C  N41                WRITEAR001T1Q
+     C  N41                ADD  1         W#LCNT
+     C                     LEAVE
+     C*
+     C                     ENDIF
+     C                     ENDDO
+     C* 8905 列印類別分類合計 END  ------------
+     C           W#TMP2    SUB  W#LCNT    W#TMP1
+     C           1         DO   W#TMP1    I       20
+     C                     WRITEAR001T1L
+     C                     ENDDO
+     C*
+     C                     WRITEAR001T1Y
+     C                     WRITEAR001T1Z
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         MSGSR     BEGSR
+     C**************************************************************
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C*  子函式集
+     C*****************************************************************
+     C*--------------------------------------------
+     C*    接下一頁（印表尾再印表頭）
+     C*--------------------------------------------
+     CSR         PR0001    BEGSR
+     C           N#TCNT    ADD  2         W#TMP3  30
+     C*
+     C           W#TMP3    SUB  W#LCNT    W#TMP4  30
+     C           1         DO   W#TMP4    I       20
+     C                     WRITEAR001T1L
+     C                     ENDDO
+     C*
+     C                     WRITEAR001T1X
+     C                     WRITEAR001T1Z
+     C*
+     C                     WRITEAR001T1H
+     C                     Z-ADD0         W#LCNT
+     CSR                   ENDSR
+     C*
+8906 CSR         SR1000    BEGSR
+ .   C                     MOVE *BLANK    ANFLAG
+ .   C   50                MOVE 'A'       ANCODE
+ .   C  N50                MOVE 'C'       ANCODE
+ .   C                     MOVE R#CUNO    ANCUNO           客戶編號
+9008 C                     MOVELR#ORNO    ANORNO           訂單編號
+8906 C                     Z-ADDR#APDT    D#DAT1
+ .   C                     ADD  1911      D#DAT2
+ .   C                     MOVE D#DAT2    D#DAT6
+ .   C                     MOVE '/'       D#DAT7
+ .   C                     MOVE D#DAT3    D#DAT8
+ .   C                     MOVE '/'       D#DAT9
+ .   C                     MOVE D#DAT4    D#DAT0
+ .   C                     MOVE D#DAT5    ANAPDT           請款日期
+ .   C                     MOVE R#RVID    ANSALE           收款業務
+ .   C   51                MOVE R#INNO    ANINNO           發票號碼
+ .   C  N51                MOVE *BLANK    ANINNO           發票號碼
+ .   C                     Z-ADDR#INDT    D#DAT1
+ .   C                     ADD  1911      D#DAT2
+ .   C                     MOVE D#DAT2    D#DAT6
+ .   C                     MOVE '/'       D#DAT7
+ .   C                     MOVE D#DAT3    D#DAT8
+ .   C                     MOVE '/'       D#DAT9
+ .   C                     MOVE D#DAT4    D#DAT0
+ .   C   51                MOVE D#DAT5    ANINDT           發票日期
+ .   C  N51                MOVE *BLANK    ANINDT
+ .   C  N51                MOVEL'　'    ANINDT           發票日期
+ .   C                     MOVE R#WTNO    ANWTNO           磅單號碼
+ .   C                     Z-ADDR#QTY     ANQTY            出貨數量
+ .   C                     Z-ADDR#AAMT    ANAAMT           出貨金額
+ .   C   51                Z-ADDR#BAMT    ANBAMT           折退金額
+ .   C  N51                Z-ADD0         ANBAMT           折退金額
+ .   C   51                Z-ADDR#CAMT    ANCAMT           預收貨款
+ .   C  N51                Z-ADD0         ANCAMT           預收貨款
+ .   C   51                Z-ADDR#DAMT    ANDAMT           銷貨稅額
+ .   C  N51                Z-ADD0         ANDAMT           銷貨稅額
+ .   C   51                Z-ADDR#EAMT    ANEAMT           請款金額
+ .   C  N51                Z-ADD0         ANEAMT           請款金額
+ .   C           ANORNO    IFEQ W#ORNO
+ .   C                     MOVE *BLANK    ANORN1
+ .   C                     ELSE
+9008 C                     MOVELANORNO    ANORN1
+LYW  C                     MOVELANORNO    W#ORNO
+8906 C                     ENDIF
+ .   CSR                   ENDSR
+     C*****************************************************************
+     CSR         SR2000    BEGSR
+     C*****************************************************************
+     C*分類別合計
+     C                     MOVELARWTNO    D#WTNO           磅單編號
+     C*
+     C*若若該張發票為出貨發票，則須找出銷貨品名之徑度
+     C           D#PCOD    IFEQ '11'
+     C           D#PCOD    OREQ '1E'
+     C*
+     C                     MOVELD#VREA    S4VREA
+     C                     MOVELD#PCOD    S4PCOD
+     C                     Z-ADDD#VRNO    S4VRNO
+     C                     Z-ADD0         S4VRTM
+     C*
+     C           K#SVUR    SETLLRSRVOUR
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RSRVOUR                  40
+     C   40                LEAVE
+     C*
+     C           S4VREA    IFNE D#VREA
+     C           S4PCOD    ORNE D#PCOD
+     C           S4VRNO    ORNE D#VRNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVELS4ORNO    D#ORNO
+     C           K#SAMT    CHAINRSAMAST              45
+     C*
+     C*將類別分別合計至ARY中
+     C                     SORTAARY                        排序
+     C           1         DO   30        I
+     C                     MOVE ARY,I     D#ARY
+     C*
+     C           D#PDN1    IFEQ '999'                      第一次初始
+     C                     MOVE S4PDNM    D#PDN1
+     C                     MOVELS4PDS1    D#PDS1
+     C                     Z-ADDS4NWGT    D#QTY
+     C           S4NWGT    MULT S1UPRC    W#AMT     H
+     C                     Z-ADDW#AMT     D#AMT
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ELSE
+     C           S4PDNM    IFEQ D#PDN1                     類別
+     C           S4PDS1    ANDEQD#PDS1
+     C                     ADD  S4NWGT    D#QTY            數量
+     C           S4NWGT    MULT S1UPRC    W#AMT     H      金額
+     C                     ADD  W#AMT     D#AMT
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ENDIF                           類別
+     C                     ENDIF                            D#PDN1
+     C*
+     C                     ENDDO
+     C                     ENDDO
+     C*
+     C                     ELSE
+     C*
+     C                     MOVE ARINNO    IVNO             發票號碼
+     C                     MOVE '1'       IVACNT           類別
+     C                     Z-ADD0         IVITEM           項次
+     C*
+     C           K#DTL     SETLLIVREC
+     C                     READ IVREC                    40
+     C           *IN40     DOWEQ*OFF
+     C*          ARINNO    ANDNEW#INNO
+     C*
+     C           IVNO      IFNE ARINNO
+     C                     LEAVE
+     C                     ENDIF
+     C*將類別分別合計至ARY中
+     C           IVACNT    IFEQ '1'                        出貨
+     C                     SORTAARY                        排序
+     C           1         DO   30        I
+     C                     MOVE ARY,I     D#ARY
+     C*
+     C           D#PDN1    IFEQ '999'                      第一次初始
+     C                     MOVE IVPDCD    D#PDN1
+     C                     Z-ADDIVQTY     D#QTY
+     C                     Z-ADDIVAMT     D#AMT
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ELSE
+     C           IVPDCD    IFEQ D#PDN1                     類別
+     C                     ADD  IVQTY     D#QTY            數量
+     C                     ADD  IVAMT     D#AMT            金額
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ENDIF                           類別
+     C                     ENDIF                            D#PDN1
+     C*
+     C                     ENDDO
+     C                     ENDIF                            IVACTP
+     C*
+     C                     READ IVREC                    40
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+

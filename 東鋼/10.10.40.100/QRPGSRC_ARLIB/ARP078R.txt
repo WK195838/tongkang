@@ -1,0 +1,148 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP077R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     電子商務介面檔-帳款明細(ARFNDS)
+     H*            5.DATE-WRITTEN  90/09/29
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  IP  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FRCVDTL  IF  E           K        DISK
+     FARFNDS  IF  E           K        DISK
+     FHSINFO  IF  E           K        DISK
+     FARPRPY  O   E           K        DISK
+     IINREC       01
+     I            DS
+     I                                        1  10 AYVTNO
+     I                                        1   8 D#VTNO
+     C*****************************************************************
+     C*         KEY  LIST
+     C*****************************************************************
+     C*INVDTLL1
+     C           K#IDTL    KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*RCVDTL
+     C           K#RDTL    KLIST
+     C                     KFLD           RVNO
+     C                     KFLD           RVITEM
+     C*ARFNDS
+     C           K#FNDS    KLIST
+     C                     KFLD           AFVTNO
+     C                     KFLD           AFORNO
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     CLEARRARPRPY
+     C*
+     C           INCUNO    CHAINCBREC                40
+     C                     MOVELCBMUID    AYVTNO           統編
+     C                     MOVELCBCUNM    AYCUNM
+     C                     MOVELINORNO    AYORNO           訂單號碼
+TEST C                     MOVE INNO      W#NO    8
+     C           D#VTNO    IFEQ '22527555'
+     C           AYORNO    ANDEQ'H01498'
+     C                     Z-ADD0         W#TEST  10
+     C                     ENDIF
+     C           W#NO      IFEQ '03108137'
+     C                     Z-ADD0         W#TEST  10
+TEST C                     ENDIF
+     C*取得票據號碼
+     C                     MOVE INNO      IVNO
+     C                     MOVE '6'       IVACNT           繳款
+     C                     Z-ADD0         IVITEM
+     C           K#IDTL    SETLLIVREC
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ IVREC                    40
+     C   40                LEAVE
+     C           IVNO      IFNE INNO
+     C           IVACNT    ORNE '6'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     EXSR WTRSR
+     C*
+     C                     READ IVREC                    40
+     C                     ENDDO
+     C                     ENDSR
+     C*********************************
+     C*  WTRSR       函式
+     C*********************************
+     CSR         WTRSR     BEGSR
+     C*
+     C                     MOVELINNO      AYINNO
+     C           INEAMT    MULT -1        W#AMT  120
+     C*
+     C                     MOVELINRCNO    RVNO
+     C                     Z-ADD0         RVITEM
+     C           K#RDTL    SETLLRVREC
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ RVREC                    41
+     C   41                LEAVE
+     C           INRCNO    IFNE RVNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           RVUSTP    IFNE 'A2'
+     C           RVACTP    ORNE 'D'
+     C           W#AMT     ORNE RVRAMT
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           RVNTTP    WHEQ 'A'                        支票
+     C           RVNTTP    OREQ 'B'                        背書支票
+     C           RVNTTP    OREQ 'C'                        本票
+     C           RVNTTP    OREQ 'D'                        背書本票
+     C           RVNTTP    OREQ 'E'                        銀行本票
+     C           RVNTTP    OREQ 'F'                        匯票
+     C                     MOVE 'C'       AYBSTS
+     C           RVNTTP    WHEQ 'G'                        匯款
+     C           RVNTTP    OREQ 'H'                        現金
+     C           RVNTTP    OREQ 'J'                        銀行存款
+     C                     MOVE 'M'       AYBSTS
+     C           RVNTTP    WHEQ 'I'                        信用狀
+     C                     MOVE 'L'       AYBSTS
+     C           RVNTTP    WHEQ ' '
+     C           RVACNO    ANDEQ'2159'
+     C                     MOVE 'M'       AYBSTS
+     C                     ENDSL
+     C*
+     C                     MOVELRVNTNO    AYCKNO           票據號碼
+     C           RVDUDT    IFNE 0
+     C           19110000  ADD  RVDUDT    AYPYDT           兌現日
+     C                     ENDIF
+     C*
+     C           AYBSTS    IFEQ 'M'                        現金
+     C           19110000  ADD  RVDATE    AYPYDT
+     C                     ENDIF
+     C*
+     C                     Z-ADDRVRAMT    AYCAMT           收款金額
+     C*取得預收總餘額
+     C                     MOVE AYVTNO    AFVTNO
+     C                     MOVE AYORNO    AFORNO
+     C           K#FNDS    CHAINRARFNDS              42
+     C                     Z-ADDAFRAMT    AYPAMT
+     C           AYVTNO    CHAINRHSINFO             N43
+     C  N42N43             WRITERARPRPY
+     C*                    WRITERARPRPY                    測試用
+     C*
+     C                     READ RVREC                    41
+     C                     ENDDO
+     C                     ENDSR
+

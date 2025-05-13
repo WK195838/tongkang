@@ -1,0 +1,209 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR129R1
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     銷貨調整單開立發票彙總表
+     H*          5.DATE-WRITTEN  96/11/06
+     H*          6.DATE-MODIFY
+     H*                         100/03/08  S00WCJ (0003A)
+     H*                         將T與U合併計算
+     H*                         100/03/23  S00WCJ (0003B)
+     H*                         修正T與U合計
+     H*                         100/08/01 S00WCJ (0008A)
+     H*                          將T與U與D合計
+     H*                         102/01/22 S00WCJ (0201A)
+     H*                          將T.U.D.J.N.R.X.V合併計算
+     H*                         103/08/19 S00WCJ (0308A)
+     H*                          將T.U.D.J.N.R.X.V.Q合併計算
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FTRNDTL  IP  E           K        DISK
+     FHIPROD  IF  E           K        DISK
+     FARR129F UF  E           K        DISK                      A
+     FARR129F1UF  E           K        DISK                      A
+     E*****************************************************************
+     E                    ARY1       20 15
+     E*----------------------------------------------------------------
+     I            DS
+     I                                        1  15 D#ARY1
+     I                                        1   4 D#PDNO
+     I                                        5  150D#AMT
+     I*
+     I            DS
+     I                                        1   4 D#TXPD
+     I                                        1   3 TXPDNM
+     I                                        4   4 TXTXAR
+9910AI            DS
+9910AI                                        1   8 TXPCNO
+9910AI                                        1   1 D#PCNO
+     I*
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10111020 S#DEVN
+     I                                      301 308 D#DAT1
+     I                                      309 316 D#DAT2
+     I                                      317 317 D#TXAR
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+9910AC           KEY01     KLIST
+9910AC                     KFLD           TXTXAR
+9910AC                     KFLD           TXPDNM
+     C*
+     C  N99                EXSR INISR
+     C                     EXSR DTLSR                      分廠銷折算
+     CLR                   EXSR WRLSR                      寫分廠銷折
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVEL*ON       *IN99
+     C                     MOVEA*ALL'9'   ARY1
+     C                     MOVEL*BLANK    W#AREA  1        廠別
+     C                     MOVEL*BLANK    W#PDNO  3        品名
+     C                     Z-ADD0         I       40
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*依廠區別及品名不同，
+     C*分別累計其銷折金額
+     C*
+     C                     Z-ADD1         I
+     C*
+     C                     SORTAARY1
+     C           1         DO   20        I
+     C                     MOVE ARY1,I    D#ARY1
+     C*
+     C           D#TXPD    IFEQ D#PDNO
+     C                     ADD  TXAMT     D#AMT            銷折金額
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           D#PDNO    IFEQ '9999'
+     C                     CLEARARY1,I
+     C                     Z-ADDTXAMT     D#AMT            折讓金額
+     C                     MOVELTXPDNM    D#PDNO           品名代號
+     C                     MOVE TXTXAR    D#PDNO           廠區
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C                     ENDDO
+     C*
+9910AC           KEY01     CHAINARR129F1             50
+9910AC           *IN50     IFEQ *OFF
+9910AC                     SELEC
+9910AC           D#PCNO    WHEQ 'T'
+0003AC           D#PCNO    OREQ 'U'
+0008AC           D#PCNO    OREQ 'D'
+0201AC           D#PCNO    OREQ 'J'
+0201AC           D#PCNO    OREQ 'N'
+0201AC           D#PCNO    OREQ 'R'
+0201AC           D#PCNO    OREQ 'X'
+0201AC           D#PCNO    OREQ 'V'
+0308AC           D#PCNO    OREQ 'Q'
+9910AC                     ADD  TXAMT     F1AMTT
+9910AC           D#PCNO    WHEQ 'M'
+9910AC                     ADD  TXAMT     F1AMTM
+9910AC           D#PCNO    WHEQ 'K'
+9910AC                     ADD  TXAMT     F1AMTK
+9910AC                     ENDSL
+9910AC                     UPDATRAR129F1
+9910AC                     ELSE
+9910AC                     CLEARRAR129F1
+9910AC                     SELEC
+9910AC           D#PCNO    WHEQ 'T'
+0003AC           D#PCNO    OREQ 'U'
+0008AC           D#PCNO    OREQ 'D'
+0201AC           D#PCNO    OREQ 'J'
+0201AC           D#PCNO    OREQ 'N'
+0201AC           D#PCNO    OREQ 'R'
+0201AC           D#PCNO    OREQ 'X'
+0201AC           D#PCNO    OREQ 'V'
+0308AC           D#PCNO    OREQ 'Q'
+9910AC                     Z-ADDTXAMT     F1AMTT
+9910AC           D#PCNO    WHEQ 'M'
+9910AC                     Z-ADDTXAMT     F1AMTM
+9910AC           D#PCNO    WHEQ 'K'
+9910AC                     Z-ADDTXAMT     F1AMTK
+9910AC                     ENDSL
+9910AC                     MOVELTXTXAR    F1AREA
+9910AC                     MOVELTXPDNM    F1PDNO
+9910AC                     WRITERAR129F1
+9910AC                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           WRLSR     BEGSR
+     C*****************************************************************
+     C*將ＡＲＹ資料寫入暫存檔中
+     C*
+     C                     Z-ADD1         I
+     C*
+     C                     SORTAARY1
+     C           1         DO   20        I
+     C                     MOVE ARY1,I    D#ARY1
+     C*
+     C           D#PDNO    IFNE '9999'
+     C                     MOVE D#PDNO    W#AREA           廠區
+     C                     MOVELD#PDNO    W#PDNO           品名
+     C*
+     C                     MOVEA'00'      *IN,40
+     C           W#PDNO    CHAINARR129F              40
+     C*
+     C*如為新資料，則需先清空金額值，
+     C*避免上筆資料金額仍存留舊欄位。
+     C*
+     C           *IN40     IFEQ *ON
+     C                     CLEARRAR129F
+     C                     MOVELD#PDNO    F#PDNO           品名代號
+     C           F#PDNO    CHAINHIPROD               41
+     C  N41                MOVELF4CHIN    F#PDNM           中文品名
+     C   41                MOVEL*BLANK    F#PDNM
+     C                     ENDIF
+     C*
+     C*依廠區別搬入相對應之金額值
+     C*
+     C                     SELEC
+     C           W#AREA    WHEQ 'P'
+     C                     Z-ADDD#AMT     F#AMTP           台北金額
+     C           W#AREA    WHEQ 'T'
+0003AC*0003B     W#AREA    OREQ 'U'
+     C                     Z-ADDD#AMT     F#AMTT           桃園金額
+0003BC           W#AREA    WHEQ 'U'
+0003BC                     ADD  D#AMT     F#AMTT
+0008AC           W#AREA    WHEQ 'D'
+0008AC                     ADD  D#AMT     F#AMTT
+0201AC           W#AREA    WHEQ 'J'
+0201AC                     ADD  D#AMT     F#AMTT
+0201AC           W#AREA    WHEQ 'N'
+0201AC                     ADD  D#AMT     F#AMTT
+0201AC           W#AREA    WHEQ 'R'
+0201AC                     ADD  D#AMT     F#AMTT
+0201AC           W#AREA    WHEQ 'X'
+0201AC                     ADD  D#AMT     F#AMTT
+0201AC           W#AREA    WHEQ 'V'
+0201AC                     ADD  D#AMT     F#AMTT
+0308AC           W#AREA    WHEQ 'Q'
+0308AC                     ADD  D#AMT     F#AMTT
+     C           W#AREA    WHEQ 'M'
+     C                     Z-ADDD#AMT     F#AMTM           台中金額
+     C           W#AREA    WHEQ 'K'
+     C                     Z-ADDD#AMT     F#AMTK           高雄金額
+     C                     ENDSL
+     C*
+     C  N40                UPDATRAR129F
+     C   40                WRITERAR129F
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+

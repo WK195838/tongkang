@@ -1,0 +1,156 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR104R1
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     應收帳款承購(E-FACTORING)發票作廢重開檢核表
+     H*          5.DATE-WRITTEN  92/01/14
+     H*          6.DATE-MODIFY
+     H*
+     H*          *出表
+     H*****************************************************************
+     H        1   Y                                     1
+     FARR104F IP  E           K        DISK
+     FARR104T O   E             66     PRINTER
+     IRAR104F
+     I                                              AFBKIDL2
+     I                                              AFCUNOL1
+     I           UDS
+     I                                     10011010 U#USID
+     I*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C   L2                EXSR L2CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C*          初始程式
+     C*****************************************************************
+     CSR         INISR     BEGSR
+     C                     SETON                     6699
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C                     SETOF                     313233
+     C                     MOVEL*BLANK    W#ORNO  6
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR104T1A
+     C                     Z-ADD0         W#AAMA           作廢發票金額合計
+     C                     Z-ADD0         W#BAMA           新開發票金額合計
+     C                     Z-ADD0         W#CAMA           差異金額小計
+     C                     MOVEL*BLANK    W#CUNO
+     C                     MOVE *OFF      *IN33
+     C                     MOVE *ON       *IN66
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR104T1S
+     C                     Z-ADD0         W#AAMS           作廢發票金額小計
+     C                     Z-ADD0         W#BAMS           新開發票金額小計
+     C                     Z-ADD0         W#CAMS           差異金額小計
+     C                     MOVEL*BLANK    W#CUNO  6
+     C                     SETOF                     3132
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR104T1D
+     C                     MOVELAFBKNM    T#BKNM           承購銀行名稱
+     C                     MOVELAFCUNO    T#CUNO           客戶代號
+     C                     MOVELAFCUNM    T#CUNM           客戶名稱
+     C                     MOVELAFORNO    T#ORNO           訂單號碼
+     C                     MOVELAFIVNO    T#IVNO           作廢發票號碼
+     C                     Z-ADDAFAAMT    T#AAMT           作廢發票金額
+     C                     Z-ADDAFDEDT    T#DEDT           發票作廢日期
+     C                     Z-ADDAFINDD    T#INDD           作廢發票開立日期
+     C                     MOVELAFAPN1    T#APN1           作廢發票承購單號
+     C           AFDLD1    IFEQ 0
+     C                     MOVE *ON       *IN34
+     C                     ELSE
+     C                     MOVE *OFF      *IN34
+     C                     Z-ADDAFDLD1    T#DLD1           作廢發票承購下日
+     C                     ENDIF
+     C                     MOVELAFCUNN    T#CUNN           新開立客戶名稱
+     C                     MOVELAFORNN    T#ORNN           新開立訂單編號
+     C                     MOVELAFINNO    T#INNO           新開立發票號碼
+     C                     Z-ADDAFINDT    T#INDT           新開立發票日期
+     C                     Z-ADDAFBAMT    T#BAMT           新開立發票發票金額
+     C           T#AAMT    SUB  T#BAMT    T#CAMT           差異金額
+     C                     MOVELAFTEXT    T#TEXT           說明
+     C*
+     C*客戶代號，客戶名稱相同則省略不印
+     C           T#CUNO    IFEQ W#CUNO
+     C                     SETON                     3132
+     C                     ELSE
+     C                     SETOF                     3132
+     C                     MOVELT#CUNO    W#CUNO
+     C                     ENDIF
+     C*
+     C*訂單編號相同則省略不印
+     C           AFORNO    IFEQ W#ORNO
+     C                     MOVE *ON       *IN33
+     C                     ELSE
+     C                     MOVE *OFF      *IN33
+     C                     MOVELAFORNO    W#ORNO
+     C                     ENDIF
+     C*
+     C   66                WRITEAR104T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR104T1D
+     C*
+     C                     ADD  AFAAMT    W#AAMS 100
+     C                     ADD  AFBAMT    W#BAMS 100
+     C                     ADD  T#CAMT    W#CAMS 100
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C                     Z-ADDW#AAMS    T#AAMS
+     C                     Z-ADDW#BAMS    T#BAMS
+     C                     Z-ADDW#CAMS    T#CAMS
+     C*
+     C   66                WRITEAR104T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR104T1S
+     C*
+     C                     ADD  T#AAMS    W#AAMA 110
+     C                     ADD  T#BAMS    W#BAMA 110
+     C                     ADD  T#CAMS    W#CAMA 110
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C                     Z-ADDW#AAMA    T#AAMA
+     C                     Z-ADDW#BAMA    T#BAMA
+     C                     Z-ADDW#CAMA    T#CAMA
+     C*
+     C   66                WRITEAR104T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR104T1A
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*****************************************************************
+     C   66                WRITEAR104T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR104T1M
+     C*
+     CSR                   ENDSR
+

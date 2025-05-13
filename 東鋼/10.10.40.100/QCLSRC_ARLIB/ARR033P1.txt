@@ -1,0 +1,55 @@
+    /****************************************************************/
+    /*                                                              */
+    /*    PROGRAM   ID        :   ARR033P1                          */
+    /*    PROGRAM   FUNCTION  :  折讓單依鋼種尺寸長度分攤檢核表   */
+    /*    AUTHER              :   S00WCJ                            */
+    /*    CREATE    DATE      :   104/08/21                         */
+    /*   MAINTAIN  DATE      :                                      */
+    /*   RELATION  PROGRAM   :   ARR033P1,ARR033R1,ARR033T          */
+    /*   NOTE                :                                      */
+    /*   UPDATE  DATE        :                                      */
+    /*                                                              */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM        PARM(&NO)
+             DCL        VAR(&NO)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+ DISPLAY:
+             IF         COND(&NO *EQ  ' ')   THEN(DO)
+       /*               CALL  PGM(ARR033RS)  PARM(&NO &IN03) */
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             ENDDO
+
+             CHGDTAARA  DTAARA(*LDA (301 6))   VALUE(&NO)
+
+       /*    SBMJOB     JOB(ARR033P1) JOBD(ARJOBD) JOBQ(ARJOBQ) +
+                          RQSDTA('CALL PGM(ARR033P1) +
+                         PARM(''' || &NO || ''')')  */
+       /*    RETURN     */
+
+   BATCH:
+             RTVDTAARA  DTAARA(*LDA (301 6))   RTNVAR(&NO)
+
+             OVRDBF     FILE(ARDSDT) TOFILE(ARDSDT) SHARE(*YES)
+
+             OPNQRYF    FILE((ARDSDT))   QRYSLT('              +
+                         ASDXNO *EQ "' || &NO || '"  *AND +
+                         ASDECD *EQ " "') +
+                        KEYFLD((ASDXNO) (ASINNO) (ASTXNO) (ASTXIT))
+
+             OVRPRTF    FILE(ARR033T) TOFILE(ARR033T) +
+                        PAGESIZE(*N 132) CPI(15) HOLD(*YES) +
+                        USRDTA('折鋼分攤')
+
+             CALL       PGM(ARR033R1)
+             DLTOVR     FILE(*ALL)
+             CLOF      OPNID(ARDSDT)
+ENDCLPGM:    ENDPGM
+

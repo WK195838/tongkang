@@ -1,0 +1,229 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR101R4
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     應收帳款承購(E-FACTORING)發票異常檢核表
+     H*            5.DATE-WRITTEN  92/02/24
+     H*            6.DATE-MODIFY
+     H*
+     H*            *已銷貨未開立發票
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FARCUDT  IF  E           K        DISK
+     FARODCT  IF  E           K        DISK
+     FARR101T1O   E             69     PRINTER
+     E*****************************************************************
+     ITXREC
+     I                                              TXRVIDL2
+     I                                              TXRESVL1
+     I           UDS
+     I                                     10011010 U#USID
+     I                                      308 308 U#AREA
+     I                                      309 309 U#RVIS
+     I                                      310 310 U#RVIE
+     C*****************************************************************
+     C*          KEY   LIST
+     C*****************************************************************
+     C*FILE==>ARODCT
+     C           W#ODCT    KLIST
+     C                     KFLD           A2ORNO           訂單編號
+     C                     KFLD           A2CTKD           管制類別
+     C*
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN69
+     C                     Z-ADD0         W#CONT  20
+     C*
+     C                     MOVEL*ALL'='   T#LIN1
+     C                     MOVEL*ALL'='   T#LIN2
+     C*
+     C                     SELEC
+     C           U#AREA    WHEQ ' '
+     C                     MOVE '全部'  T#AREA
+     C           U#AREA    WHEQ 'P'
+     C                     MOVE '台北'  T#AREA
+     C           U#AREA    WHEQ 'T'
+     C                     MOVE '桃園'  T#AREA
+     C           U#AREA    WHEQ 'K'
+     C                     MOVE '高雄'  T#AREA
+     C           U#AREA    WHEQ 'H'
+     C                     MOVE '苗栗'  T#AREA
+     C                     ENDSL
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR101T1T
+     C*
+     C                     MOVE *ON       *IN69
+     C                     MOVEL*ALL'-'   T#LIN3
+     C                     MOVEL*BLANK    W#CUNM 10
+     C*
+     C                     SELEC
+     C           U#AREA    WHEQ ' '
+     C                     MOVE '全部'  T#AREA
+     C           U#AREA    WHEQ 'P'
+     C                     MOVE '台北'  T#AREA
+     C           U#AREA    WHEQ 'T'
+     C                     MOVE '桃園'  T#AREA
+     C           U#AREA    WHEQ 'K'
+     C                     MOVE '高雄'  T#AREA
+     C           U#AREA    WHEQ 'H'
+     C                     MOVE '苗栗'  T#AREA
+     C                     ENDSL
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR101T1S
+     C                     MOVEL*BLANK    W#CUNM 10
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR101T1D
+     C*
+     C                     MOVELTXORNO    W#ORN2  6
+     C                     MOVELW#ORN2    A2ORNO
+     C                     MOVE '001'     A2ORNO           訂單管制
+     C                     MOVEL'04'      A2CTKD           管制類別
+     C           W#ODCT    SETLLRARODCT
+     C                     READ RARODCT                  41
+     C           *IN41     IFEQ *OFF
+     C                     MOVELA2ORNO    W#ORN3  6
+     C           W#ORN3    IFEQ W#ORN2
+     C           A2MTHD    ANDEQ'03'
+     C*
+     C                     MOVELTXCUNO    W#CUNO  5
+     C                     MOVELW#CUNO    W#CUN1  6
+     C                     MOVELTXORNO    W#ORN1  6
+     C*
+     C           W#CUNO    IFEQ 'DP055'
+     C           W#ORN1    IFNE 'P03982'
+     C           W#ORN1    ANDNE'K03408'
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           W#CUN1    CHAINRARCUDT              40
+     C           *IN40     IFEQ *OFF
+     C           TXDATE    ANDGEACDAT1                     承購起日
+     C           TXDATE    ANDLEACDAT2                     承購止日
+     C                     MOVELACCUNO    T#CUNO           客戶編號
+     C                     MOVELACCUNM    T#CUNM           客戶名稱
+     C                     MOVELTXORNO    T#ORNO           訂單號碼
+     C                     MOVELTXNO      T#NO             發票號碼
+     C                     Z-ADDTXDATE    T#DATE           出貨日期
+     C                     MOVELTXPDNM    T#PDNM           品名
+     C                     Z-ADDTXUPRC    T#UPRC           單價
+     C                     Z-ADDTXQTY     T#QTY            數量
+     C                     Z-ADDTXAMT     T#AMT            金額
+     C                     MOVE TXVUNO    T#VUNO           傳票號碼
+     C                     MOVE TXIVTP    T#IVTP           備註
+     C*
+     C*客戶編號，客戶名稱相同省略不印
+     C           T#CUNM    IFEQ W#CUNM
+     C                     MOVE *ON       *IN50
+     C                     ELSE
+     C                     MOVE *OFF      *IN50
+     C                     MOVELT#CUNM    W#CUNM
+     C                     ENDIF
+     C*
+     C*訂單編號相同省略不印
+     C           T#ORNO    IFEQ W#ORNO
+     C                     MOVE *ON       *IN51
+     C                     ELSE
+     C                     MOVE *OFF      *IN51
+     C                     MOVELT#ORNO    W#ORNO  6
+     C                     ENDIF
+     C*
+     C                     MOVELTXRVID    T#RVID
+     C   69                WRITEAR101T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR101T1D
+     C*
+     C                     ADD  TXQTY     T#QTYS           數量小計
+     C                     ADD  TXAMT     T#AMTS           金額小計
+     C                     ADD  1         W#CONT
+     C*
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           DTLEND    ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           T#QTYS    IFNE 0
+     C           T#AMTS    ORNE 0
+     C   69                WRITEAR101T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR101T1L
+     C                     WRITEAR101T1S
+     C*
+     C                     ADD  T#QTYS    T#QTYT
+     C                     ADD  T#AMTS    T#AMTT
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C           T#QTYT    IFNE 0
+     C           T#AMTT    ORNE 0
+     C   69                WRITEAR101T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR101T1T
+     C*
+     C                     ADD  T#QTYT    T#QTYA
+     C                     ADD  T#AMTT    T#AMTA
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C           T#QTYA    IFNE 0
+     C           T#AMTA    ORNE 0
+     C   69                WRITEAR101T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR101T1A
+     C                     ENDIF
+     C*
+     C           W#CONT    IFEQ 0
+     C                     EXSR MSGSR
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*
+     C   69                WRITEAR101T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR101T1M
+     C*
+     C                     ENDSR
+

@@ -1,0 +1,278 @@
+     H****************************************************************
+     H*
+     H*            UPDATE  DATE  99/08/25  2010AR517 S00WCJ (9908A)
+     H*
+     H****************************************************************
+     H        1   Y                                     1                 BR003
+     FARWF02  IP  E                    DISK
+     FINVDTL  UF  E           K        DISK
+     FACTRAN  O   E           K        DISK                      A
+     FQPRINT  O   F     132            PRINTER
+     ****
+     IRARWF02
+     I                                              W2ACDTL1
+     ****
+     I            DS
+     I                                        1   6 VRNOX
+     I                                        2   60NO1
+     I                                       11  17 VUNOG
+     I                                       11  11 VUNOG1
+     I                                       12  12 VUNOG2
+     I                                       13  13 VUNOG3
+     I                                       14  17 VUNOG4
+     I           UDS
+9008 I                                        1   60YM
+     I                                     10011010 D#USER
+     I                                     10211021 TXAR
+     C*****************************************************************
+     C*          KEY  LIST
+     C*****************************************************************
+     C           IVKEY     KLIST
+     C                     KFLD           W2NO
+     C                     KFLD           W2ACNT
+     C                     KFLD           W2ITEM
+     C*****************************************************************
+9908AC           *DATE     SUB  19000000  U#SYSD  80
+     C  N10                EXSR IN#01
+     C   L1                EXSR DL#01
+     C                     EXSR DP#01
+     CL1 10                EXSR TL#01
+     CLR 10                EXSR TL#LR
+     C**--------------------------------------------------**
+     CSR         IN#01     BEGSR
+     C                     MOVE 'F00001'  VRNOX
+     C                     Z-ADD0         AMTT   132
+     C                     Z-ADD0         AMTTF  132
+     C                     Z-ADD0         ITEM    30
+     C                     Z-ADD0         ITEM1   30
+     C                     Z-ADD80        LCNT    20
+     C                     Z-ADD58        TCNT    20
+     C                     Z-ADD0         PAG     30
+     C                     Z-ADD0         COUNT   30
+     C                     MOVE *ALL'-'   ALDSH 120
+     C                     MOVEL*BLANK    VUNOG
+     C                     SETON                     10
+     CSR                   ENDSR
+     C***
+     C**----------------------------------------------**
+     C**    L1 DETAIL TIME                            **
+     C**----------------------------------------------**
+     CSR         DL#01     BEGSR
+     C                     Z-ADD0         ITEM
+     C                     Z-ADD0         ITEM1
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C**       DETAIL TIME                            **
+     C**----------------------------------------------**
+     CSR         DP#01     BEGSR
+     C           ITEM1     IFGE 998
+     C                     Z-ADD0         ITEM1
+     C                     Z-ADD0         ITEM
+     C                     ADD  1         NO1
+     C                     ENDIF
+     C                     Z-ADDITEM1     ITEM
+     C                     ADD  1         ITEM
+     C           ITEM      ADD  1         ITEM1
+     C                     MOVELW2ORNO    KORNO   6
+     C           W2AMT     IFGE 0
+     C                     Z-ADDW2AMT     VAMT   132
+     C                     MOVEL'0'       *IN50
+     C                     ELSE
+     C                     Z-SUBW2AMT     VAMT
+     C                     MOVEL'1'       *IN50
+     C                     END
+     C***
+     C                     Z-ADDW2AMT     AMTX
+     C           W2KIND    IFEQ '2'
+     C           W2FL03    IFEQ 'F'
+     C           W2FL03    OREQ 'E'
+     C           VAMT      DIV  1.05      AMTY    90H
+     C                     Z-ADDAMTY      VAMT
+     C           W2AMT     DIV  1.05      AMTX    90H
+     C                     END
+     C                     END
+     C***
+     C*** 830107 UPDATE BY JEFF
+     C  N50                ADD  AMTX      AMTT
+     C   50                SUB  AMTX      AMTTF
+     C*** END  UPDATE
+     C                     ADD  1         COUNT
+     C                     EXSR WR#01
+     C                     EXSR PR#01
+     C           IVKEY     CHAININVDTL               97
+     C  N97                MOVEL'C'       IVFLAG
+     C  N97                MOVELTXAR      IVTXAR
+9908AC* N97                Z-ADDUDATE     IVTXDT
+9908AC  N97                Z-ADDU#SYSD    IVTXDT
+     C  N97                MOVELTXAR      VUNOG1
+     C  N97                MOVEL'P'       VUNOG2
+     C  N97                MOVELVRNOX     VUNOG3
+     C  N97                MOVE VRNOX     VUNOG4
+     C  N97                MOVELVUNOG     IVACNO
+     C  N97                UPDATIVREC
+     CSR                   ENDSR
+     *****
+     CSR         TL#01     BEGSR
+     C                     ADD  1         NO1
+     C                     ENDSR
+     C**----------------------------------**
+     C**   LR BREAK PROCESS TOTAL TIME    **
+     C**----------------------------------**
+     CSR         TL#LR     BEGSR
+     C**** 830107 UPDATE BY JEFF
+     C*          AMTT      IFLT 0
+     C*                    SETON                     51
+     C*                    ELSE
+     C*                    SETOF                     51
+     C*                    ENDIF
+     C*** END UPDATE
+     C           AMTT      SUB  AMTTF     AMTTN  132
+     C                     EXCPTET#LR
+     C                     EXCPTET#LRR
+     CSR                   ENDSR
+     C*****
+     C**------------------------------------------**
+     C**    DETAIL TIME  WRITE DATA TO ACTRAN     **
+     C**------------------------------------------**
+     CSR         WR#01     BEGSR
+     C****  WRITE  TO TAIPEI
+     C                     CLEARRACVOUR
+     C                     MOVEL'V'       ACVRTY
+     C                     MOVE TXAR      ACDM03
+     C                     MOVEL'P'       ACCARD
+     C                     MOVEL'A'       ACKIND
+     C                     MOVELTXAR      ACAREA           開立廠區
+     C                     Z-ADDYM        ACYM             年月
+     C                     Z-ADDW2ACDT    ACYMD
+9010 C                     Z-ADDW2ACDT    ACDT    60
+     C                     MOVELVRNOX     ACVRNO
+     C                     Z-ADDITEM      ACITEM
+     C   50                MOVEL'C'       ACDC
+     C  N50                MOVEL'D'       ACDC
+     C                     MOVEL'1134'    ACNO
+     C                     MOVEL'G'       ACTYCO
+     C                     MOVELKORNO     ACRLNO
+     C                     MOVELW2CUNM    ACCSNM
+     C                     Z-ADDVAMT      ACAMT
+     C                     MOVEL'A'       ACSEPT
+     C*
+     C                     MOVELD#USER    ACENTM           建檔人員
+9908AC*                    MOVE UDATE     ACENTD           建檔日期
+9908AC                     MOVE U#SYSD    ACENTD           建檔日期
+     C                     TIME           ACENTT           建檔時間
+     C                     MOVELD#USER    ACUPDM           異動人員
+9908AC*                    MOVE UDATE     ACUPDD           異動日期
+9908AC                     MOVE U#SYSD    ACUPDD           異動日期
+     C                     TIME           ACUPDT           異動時間
+     C                     WRITERACVOUR
+     C*
+     C****  WRITE  TO NON-TAIPEI
+     C                     CLEARRACVOUR
+     C                     MOVEL'V'       ACVRTY
+     C                     MOVE TXAR      ACDM03
+     C                     MOVEL'P'       ACCARD
+     C                     MOVEL'A'       ACKIND
+     C                     MOVELTXAR      ACAREA           開立廠區
+     C                     Z-ADDYM        ACYM             年月
+     C                     Z-ADDW2ACDT    ACYMD
+9010 C                     Z-ADDW2ACDT    ACDT
+     C                     MOVELVRNOX     ACVRNO
+     C                     Z-ADDITEM1     ACITEM
+     C   50                MOVEL'D'       ACDC
+     C  N50                MOVEL'C'       ACDC
+     C                     MOVEL'2131'    ACNO
+     C                     MOVEL'G'       ACTYCO
+     C                     MOVELKORNO     ACRLNO
+     C                     MOVELW2CUNM    ACCSNM
+     C                     Z-ADDVAMT      ACAMT
+     C                     MOVEL'A'       ACSEPT
+     C*
+     C                     MOVELD#USER    ACENTM           建檔人員
+9908AC*                    MOVE UDATE     ACENTD           建檔日期
+9908AC                     MOVE U#SYSD    ACENTD           建檔日期
+     C                     TIME           ACENTT           建檔時間
+     C                     MOVELD#USER    ACUPDM           異動人員
+9908AC*                    MOVE UDATE     ACUPDD           異動日期
+9908AC                     MOVE U#SYSD    ACUPDD           異動日期
+     C                     TIME           ACUPDT           異動時間
+     C                     WRITERACVOUR
+     C*
+     CSR                   ENDSR
+     C**--------------------------------------**
+     C**  PRINT OUT DETAIL RECORD             **
+     C**--------------------------------------**
+     CSR         PR#01     BEGSR
+     C           LCNT      COMP TCNT                 75  75
+     C   75                ADD  1         PAG
+     C   75                Z-ADD10        LCNT
+     C   75                EXCPTEH#01
+     C                     EXCPTED#01
+     C                     ADD  2         LCNT
+     CSR                   ENDSR
+     OQPRINT  E  103           EH#01
+     O                                   12 '報表編號：'
+     O                                   18 'ARP014'
+     O                                   71 '預收貨款入帳清單'
+     O                                  112 '列表日期:'
+9908AO*                        UDATE Y  120
+9908AO                         U#SYSD   122 '    /  /  '
+     O        E  1             EH#01
+     O                                   72 '********************'
+     O                                  112 '頁　　數:'
+     O                         PAG   Z  115
+     O        E  1             EH#01
+     O                                   63 '月份:'
+9010 O                         YM        70 '    /  '
+     O        E  1             EH#01
+     O                                   42 '借'
+     O        E  1             EH#01
+     O                                   10 '入帳日期'
+     O                                   22 '發票號碼'
+     O                                   29 '訂單'
+     O                                   38 '客　戶'
+     O                                   42 '貸'
+     O                                   53 '會計科目'
+     O                                   73 '借方金額'
+     O                                   93 '貸方金額'
+     O                                  107 '傳票編號'
+     O        E  1             EH#01
+     O                         ALDSH    120
+     O        E  1             ED#01
+     O                         ACYMD     10 '    /  /  '
+     O                         W2NO      21
+     O                         KORNO     28
+     O                         W2CUNM    38
+     O                   N50             57 'D  1134應收帳款'
+     O                    50             57 'C 1134應收帳款'
+     O                   N50   VAMT  K   75
+     O                    50   VAMT  K   95
+     O                         TXAR      98
+     O                                   99 'P'
+     O                         VRNOX    105
+     O                                  106 '-'
+     O                         ITEM     109
+     O        E  1             ED#01
+     O                         ACYMD     10 '    /  /  '
+     O                         W2NO      21
+     O                    50             57 'D  2131預收貨款'
+     O                   N50             57 'C 2131預收貨款'
+     O                    50   VAMT  K   75
+     O                   N50   VAMT  K   95
+     O                         TXAR      98
+     O                                   99 'P'
+     O                         VRNOX    105
+     O                                  106 '-'
+     O                         ITEM1    109
+     O        E  2             ET#LR
+     O                                   23 '預收款筆數'
+     O                                   57 '預收貨款合計'
+     O                         COUNT K   28
+     O                         AMTTF K   75
+     O                         AMTT  K   95
+     O                                  105 '預收淨額'
+     O                         AMTTN K  125
+     O        E   60           ET#LRR
+     O                                   51 '經理（廠長）：'
+     O                                   74 '複核：'
+     O                                   97 '製票：'
+

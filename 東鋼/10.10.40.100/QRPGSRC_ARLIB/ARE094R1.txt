@@ -1,0 +1,308 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARE094R1
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     應收票據代開傳票後更正作業-財會
+     H*          5.DATE-WRITTEN
+     H*          5.DATE-MODIFY
+     H*                          99/08/24  2010AR517 S00WCJ (9908A)
+     H*                         101/09/20  2012AR682 S00WCJ (0109A)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARE094S CF  E                    WORKSTN
+     F                                        RRN1  KSFILE AR094F2
+     FSARCVFL1IF  E           K        DISK
+     FARE094F UF  E           K        DISK                      A
+     FCBCUST  IF  E           K        DISK
+     F*****************************************************************
+     E                    ERR     1  20 70               *錯誤訊息
+     E*----------------------------------------------------------------
+     I            DS
+     I                                        1   7 D#VNO1
+     I                                        3   6 D#VRNO
+     I*
+     I           UDS
+     I                                     10011010 S#SF2T
+     I                                     10111020 S#DEVI
+     I                                      301 3080D#RVDT
+     I                                      309 314 D#RVNO
+     C*****************************************************************
+     C*         參數傳遞
+     C*****************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN12  1
+     C*****************************************************************
+     C*          KEY       LIST
+     C*****************************************************************
+     C*FILE==>SARCVFL1(營業繳款明細檔)
+     C*
+     C           K#RCV1    KLIST
+     C                     KFLD           K#RVDT  80       繳款日期
+     C                     KFLD           K#RVNO  6        繳款編號
+     C*
+     C*FILE==>ARE094F(應收票據繳款修改ＬＯＧ檔)
+     C*
+     C           K#TMP1    KLIST
+     C                     KFLD           K#RVDT  80       繳款日期
+     C                     KFLD           K#RVNO  6        繳款單號
+     C                     KFLD           K#NTNO 20        票據號碼
+     C                     KFLD           K#ITEM  20       項次
+     C*
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000            READC
+     C           W#PRID    CASEQ'03'      SR3000           存檔
+     C                     ENDCS
+     C                     ENDDO
+     C*
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C                     MOVEL'01'      W#PRID  2
+     C*
+     C                     MOVELS#SF2T    W#USER  1
+     C           W#USER    IFEQ 'F'
+     C           W#USER    OREQ 'S'
+     C                     MOVE *OFF      *IN60
+     C                     ELSE
+     C                     MOVE *ON       *IN60
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->ARE094S-2 畫面
+     C*
+     C           W#FLAG    IFEQ *BLANK
+     C                     Z-SUB5         S#NBR2
+     C                     Z-ADD0         RRN1    50
+     C*
+     C* CLEAR SUBFILE
+     C*
+     C                     MOVE *ON       *IN73            SFLCLR
+     C                     WRITEAR094F2C
+     C                     MOVE *OFF      *IN73
+     C*
+     C*給定SARCVFL1檔KEY值
+     C*
+     C                     Z-ADDD#RVDT    K#RVDT           繳款日期
+     C                     MOVELD#RVNO    K#RVNO           繳款單號
+     C           K#RCV1    SETLLSARCVFL1
+     C                     EXSR SR1100
+     C                     ENDIF
+     C*
+     C           RRN1      IFEQ 0                          SFLDSP OFF
+     C                     MOVE *ON       *IN72
+     C                     MOVELERR,1     S#MSG2
+     C                     ELSE
+     C                     MOVE *OFF      *IN72
+     C                     ENDIF
+     C*
+     C*顯示畫面
+     C*
+     C           W#PRID    DOWEQ'01'
+     C*
+     C                     WRITEAR094F2M
+     C                     EXFMTAR094F2C
+     C*                    MOVEL*BLANK    S#MSG2
+     C*
+     C*結束作業
+     C*
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     MOVEL'0'       P#IN12
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*回上頁
+     C*
+     C           *IN12     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     MOVEL'1'       P#IN12
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C  N72                MOVEL'02'      W#PRID
+     C*
+     C           *IN10     IFEQ *ON
+     C                     MOVEL'02'      W#PRID
+     C  N99                MOVEL'03'      W#PRID
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR                           讀入資料
+     C*****************************************************************
+     C                     MOVE *OFF      *IN40
+     C                     Z-ADD0         S#NAMT
+     C*
+     C           *IN40     DOWEQ*OFF
+     C           K#RCV1    READESRREC                    40
+     C*
+     C   40                LEAVE
+     C*
+     C*檢核是否為應收票據
+     C*
+     C           SRACNO    IFNE '1131'
+0109AC           SRACNO    ANDNE'111001'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     CLEARAR094F2
+     C*
+     C                     MOVE *ON       *IN33
+     C                     MOVEL' '       S#CHK            確認碼
+     C                     MOVELSRACTP    S#ACTP           借貸別
+     C                     MOVELSRUSTP    S#USTP           款項別
+     C                     MOVELSRNTTP    S#NTTP           票據別
+     C                     MOVELSRACNO    S#ACNO           會計科目
+     C                     MOVELSRPBID    S#PBID           付款銀行
+     C                     MOVELSRPANO    S#PANO           付款帳號
+     C                     MOVELSRPLAC    S#PLAC           付款地
+     C                     MOVELSRNTNO    S#NTNO           票據號碼
+     C                     MOVELSRNTNO    S#LLNO           票據號碼
+     C                     MOVELSRRLNO    S#RLNO           相關號碼
+     C                     MOVELSRSANO    S#SANO           存入帳號
+     C                     MOVELSRRESV    S#RESV           保留碼
+     C                     Z-ADDSRRAMT    S#RAMT           收款金額
+     C                     Z-ADDSRDUDT    S#DUDT           到期日期
+     C*
+     C                     MOVELSRRVNO    S#RVNO           繳款編號
+     C                     MOVELSRDPNO    S#DPNO           繳款部門
+     C                     MOVELSRRVID    S#RVID           收款業務
+     C                     MOVELSRCUNO    S#CUNO           客戶編號
+     C                     Z-ADDSRRVDT    S#RVDT           繳款日期
+     C                     Z-ADDSRITEM    S#SFI2           項次
+     C*
+     C                     MOVE *OFF      *IN44
+     C           S#CUNO    CHAINCBCUST               44
+     C  N44                MOVELCBCUNM    S#CUNM           客戶名稱
+     C   44                MOVE *BLANK    S#CUNM
+     C*
+     C                     ADD  S#RAMT    S#NAMT           繳款合計
+     C*
+     C                     ADD  1         RRN1
+     C                     WRITEAR094F2
+     C*
+     C                     ENDDO
+     C*
+     C           RRN1      IFGT 0
+     C                     ADD  6         S#NBR2
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*READC-->AR094F2
+     C*
+     C                     Z-ADD1         RRN1
+     C                     MOVE *OFF      *IN99
+     C*
+     C           W#PRID    DOWEQ'02'
+     C*
+     C                     READCAR094F2                  43
+     C   43                MOVE '01'      W#PRID
+     C   43                MOVE *ON       *IN99
+     C   43                LEAVE
+     C*
+     C           S#CHK     IFEQ *BLANK
+     C                     MOVEL' '       W#FLAG  1
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVELS#CHK     W#CHK   1
+     C*
+     C                     MOVEL'01'      W#PRID
+     C  N10                MOVELERR,2     S#MSG2
+     C                     MOVEL'X'       W#FLAG
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*逐筆存檔
+     C                     Z-ADD1         RRN1
+     C*
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C           RRN1      CHAINAR094F2              90
+     C*
+     C   90                LEAVE
+     C*
+     C           S#CHK     IFNE 'Y'
+     C                     ADD  1         RRN1
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE *OFF      *IN42
+     C*
+     C*寫入ＬＯＧ檔
+     C*
+     C                     MOVELS#RVDT    K#RVDT           繳款日期
+     C                     MOVELS#NTNO    K#NTNO           票據號碼
+     C                     MOVELS#RVNO    K#RVNO           繳款編號
+     C                     Z-ADDS#SFI2    K#ITEM           項次
+     C*
+     C           K#TMP1    CHAINARE094F              42
+     C*
+     C                     TIME           W1UPDT           財異動時間
+9908AC*                    MOVE UDATE     W1UPDD           財異動日期
+9908AC           *DATE     SUB  19000000  W1UPDD           財異動日期
+     C                     MOVELS#SF2T    W1UPDR           財異動人員
+     C                     MOVEL' '       W1CON1           財管控碼
+     C*
+     C           *IN42     IFEQ *ON
+     C                     MOVELS#RVDT    W1RVDT           繳款日期
+     C                     MOVELS#RVNO    W1RVNO           繳款單號
+     C                     MOVELS#NTNO    W1NTNO           票據號碼
+     C                     MOVELS#RLNO    W1RLNO           相關號碼
+     C                     MOVELS#ACTP    W1ACTP           借貸別
+     C                     MOVELS#USTP    W1USTP           款項別
+     C                     MOVELS#NTTP    W1NTTP           票據別
+     C                     MOVELS#ACNO    W1ACNO           會計科目
+     C                     MOVELS#PBID    W1PBID           付款銀行
+     C                     MOVELS#PANO    W1PANO           付款帳號
+     C                     MOVELS#PLAC    W1PLAC           付款地
+     C                     MOVELS#SANO    W1SANO           存入帳號
+     C                     MOVELS#RESV    W1RESV           保留碼
+     C                     MOVELS#DPNO    W1DPNO           繳款部門
+     C                     MOVELS#RVID    W1RVID           收款業務
+     C                     MOVELS#CUNO    W1CUNO           客戶代號
+     C                     Z-ADDS#RAMT    W1RAMT           收款金額
+     C                     Z-ADDS#DUDT    W1DUDT           到期日期
+     C                     Z-ADDS#SFI2    W1ITEM           項次
+     C                     WRITEAE094F
+     C                     ELSE
+     C                     UPDATAE094F
+     C                     ENDIF
+     C*
+     C                     ADD  1         RRN1
+     C*
+     C                     ENDDO
+     C*
+     C                     MOVEL' '       S#CHK
+     C                     MOVEL' '       W#FLAG
+     C                     MOVEL'01'      W#PRID
+     C                     MOVELERR,3     S#MSG2
+     C*
+     C                     ENDSR
+     C*****************************************************************
+**  ERR
+０１－找不到資料！
+０２－請按ＰＦ１０確認存檔！
+０３－已開放控管並存檔，請通知營業人員進行修改！
+

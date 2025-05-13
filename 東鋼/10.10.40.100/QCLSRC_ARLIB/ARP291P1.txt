@@ -1,0 +1,104 @@
+/*              PROGRAM-ID    HSP930P1參照SAP42P2                 */
+/*              AUTHOR        S00LCL                                */
+/*              FUNCTION     新版型鋼檔案上送報表轉送USER         */
+/*              DATE-WRITTEN  105/05/04 S00LCL 2016HS267            */
+/*              UPDATE DATE   105/08/31 S00LCL 1050831HS (0508A)    */
+/*                            修改轉送報表                        */
+/*                            106/07/12 2017AR1082 S00WCJ (0607A)   */
+/*                            增加顯示介面檔名稱                  */
+/*                            113/11/29 S00WCJ                      */
+/*                             更改維護者帳號為S00CCH             */
+/*                                                                  */
+/********************************************************************/
+
+
+/*0508A*/    PGM        PARM(&USER &CURUSER &TUSER &TADDR &TEMAIL &FILE &FILE1 +
+                            &FILE2)
+             DCL        VAR(&USER)    TYPE(*CHAR) LEN(10)
+             DCL        VAR(&CURUSER) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TUSER)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TADDR)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TEMAIL)  TYPE(*CHAR) LEN(50)
+             DCL        VAR(&TERR)    TYPE(*CHAR) LEN(1) VALUE('N')
+             DCL        VAR(&W#ER)    TYPE(*CHAR) LEN(1)
+/*0505A*/    DCL        VAR(&FILE)    TYPE(*CHAR) LEN(7)
+/*0508A*/    DCL        VAR(&FILE1)   TYPE(*CHAR) LEN(8)
+/*0607A*/    DCL        VAR(&FILE2)   TYPE(*CHAR) LEN(9)
+
+             CHGJOB     LOGCLPGM(*YES)
+
+/*==測試完刪除         GOTO CMDLBL(OKMSG)      =====*/
+
+             /*將報表傳送給需要的使用者STR */
+
+             /*發送者（產生者）不需再傳送一次報表*/
+             IF         COND(&CURUSER *EQ &TUSER) THEN(GOTO +
+                          CMDLBL(OKMSG))
+
+             /*接收者需傳送報表*/
+             /*由AS400登入執行*/
+             IF         COND(&CURUSER *EQ &USER) THEN(DO)
+ /*0505A*/   SNDNETSPLF FILE(&FILE) TOUSRID((&TUSER &TADDR)) +
+                          JOB(*) SPLNBR(*LAST) DTAFMT(*ALLDATA)
+             MONMSG     MSGID(CPF0000) EXEC(GOTO CMDLBL(ERRMSG))
+ /*0508A*/   SNDNETSPLF FILE(&FILE1) TOUSRID((&TUSER &TADDR)) +
+                          JOB(*) SPLNBR(*LAST) DTAFMT(*ALLDATA)
+             MONMSG     MSGID(CPF0000) EXEC(GOTO CMDLBL(ERRMSG))
+             ENDDO
+
+             /*由PC登入執行*/
+             ELSE       CMD(DO)
+ /*0505A*/   SNDNETSPLF FILE(&FILE) TOUSRID((&TUSER &TADDR)) +
+                          JOB(&CURUSER/QPRTJOB) SPLNBR(*LAST) +
+                          DTAFMT(*ALLDATA)
+             MONMSG     MSGID(CPF0000) EXEC(GOTO CMDLBL(ERRMSG))
+ /*0508A*/   SNDNETSPLF FILE(&FILE1) TOUSRID((&TUSER &TADDR)) +
+                          JOB(&CURUSER/QPRTJOB) SPLNBR(*LAST) +
+                          DTAFMT(*ALLDATA)
+             MONMSG     MSGID(CPF0000) EXEC(GOTO CMDLBL(ERRMSG))
+             ENDDO
+
+ OKMSG:
+             RTVDTAARA  DTAARA(*LDA (12 1)) RTNVAR(&W#ER)
+             /*有錯誤清單*/
+             IF         COND(&W#ER *EQ 'Y') THEN(DO)
+ /*0607A*/   SNDUSRMSG  MSG(&CURUSER *BCAT +
+                         'PC上送' *BCAT &FILE *BCAT ' /T1 +
+                          報表到您AS400報表槽，有錯誤請+
+                          查核！') MSGTYPE(*INFO) TOUSR(&TUSER)
+             ENDDO
+             /*無錯誤清單*/
+             ELSE       CMD(DO)
+             SNDUSRMSG  MSG(&CURUSER *BCAT +
+                         'PC上送' *BCAT &FILE *BCAT ' /T1+
+                          報表到您AS400報表槽，上送+
+                          成功！') MSGTYPE(*INFO) TOUSR(&TUSER)
+             ENDDO
+             GOTO       CMDLBL(EOJ)
+
+ ERRMSG:     CHGVAR     VAR(&TERR) VALUE('Y')                 /*0209A*/
+ /*0607A*/   SNDUSRMSG  MSG(&CURUSER *BCAT +
+               '無法上送' *BCAT &FILE *BCAT ' /T1報表到AS400報表槽+
+                          ，請通知系工部處理！') MSGTYPE(*INFO) +
+                          TOUSR(&TUSER)
+ /*0607A*/   SNDUSRMSG  MSG(&CURUSER *BCAT +
+               '無法上送' *BCAT &FILE *BCAT '/T1報表到AS400報表槽' +
+                    *BCAT &TUSER *BCAT &TADDR *BCAT +
+                          '請檢查發送與接收者帳號DIRE是否建置？或+
+                          是JOB是否正確？') MSGTYPE(*INFO) +
+                          TOUSR(S02LCS)
+ /*0607A*/   SNDUSRMSG  MSG(&CURUSER *BCAT +
+               '無法上送' *BCAT &FILE *BCAT '/T1報表到AS400報表槽' +
+                   *BCAT  &TUSER *BCAT &TADDR *BCAT +
+                          '請檢查發送與接收者帳號DIRE是否建置？或+
+                          是JOB是否正確？') MSGTYPE(*INFO) +
+                          TOUSR(S00CCH)
+             /*將報表傳送給需要的使用者END */
+
+             /*將訊息傳送給需要的使用者E-MAIL STR */
+ EOJ:        CALL       PGM(ARP290R1) PARM(&USER &CURUSER +
+                          &TUSER &TADDR &TEMAIL &TERR &FILE &FILE2) /*0607A*/
+             /*將訊息傳送給需要的使用者E-MAIL END */
+
+             ENDPGM
+

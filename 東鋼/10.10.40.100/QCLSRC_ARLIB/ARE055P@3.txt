@@ -1,0 +1,119 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARE055P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CSF                                  */
+     /*     4.FUNCTION     營業退款過入財會處理作業               */
+     /*     5.DATE-WRITTEN  93/10/13                                */
+     /*     6.DATE-UPDATE   99/12/27  2010AR569 S00WCJ (9912A)      */
+     /*                                                             */
+     /***************************************************************/
+           PGM
+           DCL        VAR(&TYPE)    TYPE(*CHAR) LEN(1)
+           DCL        VAR(&P#IN03)  TYPE(*CHAR) LEN(1)
+           DCL        VAR(&P#IN12)  TYPE(*CHAR) LEN(1)
+           DCL        VAR(&P#RTDP)  TYPE(*CHAR) LEN(1)
+           DCL        VAR(&P#USTP)  TYPE(*CHAR) LEN(2)
+           DCL        VAR(&P#RTDS)  TYPE(*DEC)  LEN(8 0)
+           DCL        VAR(&P#RTDE)  TYPE(*DEC)  LEN(8 0)
+           DCL        VAR(&C#RTDS)  TYPE(*CHAR) LEN(8)
+           DCL        VAR(&C#RTDE)  TYPE(*CHAR) LEN(8)
+           DCL        VAR(&C#YY)    TYPE(*CHAR) LEN(2)
+           DCL        VAR(&FILE)    TYPE(*CHAR) LEN(10)
+           DCL        VAR(&P#CODE)  TYPE(*CHAR) LEN(1)
+
+ START:    CALL    PGM(ARE055RS) PARM(&P#IN03 &P#RTDP &P#RTDS &P#RTDE &P#USTP +
+                                      &P#CODE)
+           IF         COND(&P#IN03 *EQ '1') THEN(GOTO ENDCLPGM)
+
+           CHGVAR     VAR(&C#RTDS)  VALUE(&P#RTDS)
+           CHGVAR     VAR(&C#RTDE)  VALUE(&P#RTDE)
+           CHGDTAARA  DTAARA(*LDA (300 8))   VALUE(&C#RTDS)
+           CHGDTAARA  DTAARA(*LDA (308 1))   VALUE(&P#CODE)
+           RTVDTAARA  DTAARA(*LDA (302 2))   RTNVAR(&C#YY)
+           CHGVAR     VAR(&FILE)    VALUE('GL' *CAT &P#RTDP *CAT 'R')
+           CHKOBJ     OBJ(&FILE) OBJTYPE(*FILE) AUT(*CHANGE)
+           MONMSG     MSGID(CPF0000) EXEC(RETURN)
+           OVRDBF     FILE(GLTRAN)  TOFILE(&FILE)
+           OVRDBF     FILE(ARRETN)  TOFILE(ARRETN) SHARE(*YES)
+
+           IF         COND(&C#RTDS  *LT '00931101') THEN(DO)
+           CHGVAR     VAR(&C#RTDS)  VALUE('00931101')
+           ENDDO
+
+           IF         COND(&P#RTDP  *NE  'P')   THEN(DO)
+           OPNQRYF    FILE(ARRETN) OPTION(*ALL) QRYSLT('     +
+                      (ANFL01 *EQ "Y")                 *AND  +
+                      (ANFL02 *EQ "Y")                 *AND  +
+                      (RTDT   *GE "' || &C#RTDS || '") *AND  +
+                      (RTDT   *LE "' || &C#RTDE || '") *AND  +
+                      (RTNO   *EQ "' || &P#RTDP || '") *AND  +
+                      (ANUSTP *EQ "' || &P#USTP || '")')     +
+                      MAPFLD((RTNO   '%SST(ANRTNO 1 1)' *CHAR 1 )  +
+                             (RTDT   ANRTDT  *CHAR 8))       +
+                      KEYFLD((ANRTNO) (ANITEM))
+
+           ENDDO
+
+           IF         COND((&P#RTDP  *EQ 'P')          *AND  +
+                           (&P#USTP  *EQ 'A1'))  THEN(DO)
+           OPNQRYF    FILE(ARRETN) OPTION(*ALL) QRYSLT('     +
+                      (ANFL01 *EQ "Y")                 *AND  +
+                      (ANFL02 *EQ "Y")                 *AND  +
+                      (RTDT   *GE "' || &C#RTDS || '") *AND  +
+                      (RTDT   *LE "' || &C#RTDE || '") *AND  +
+                      ((RTNO   *EQ "P")                 *OR  +
+                       (RTNO   *EQ "M")                 *OR  +
+                       (RTNO   *EQ "H")                 *OR  +
+                       (RTNO   *EQ "U")                 *OR  +
+                       (RTNO   *EQ "T"))               *AND  +
+                      (ANUSTP *EQ "' || &P#USTP || '")')     +
+                      MAPFLD((RTNO   '%SST(ANRTNO 1 1)' *CHAR 1 )  +
+                             (RTDT   ANRTDT  *CHAR 8))       +
+                      KEYFLD((ANRTNO) (ANITEM))
+
+           ENDDO
+
+           IF         COND((&P#RTDP  *EQ 'P' )          *AND +
+                           ((&P#USTP  *EQ 'A2')       *OR  +
+                            (&P#USTP  *EQ 'A3'))) THEN(DO)
+           OPNQRYF    FILE(ARRETN) OPTION(*ALL) QRYSLT('     +
+                      (ANFL01 *EQ "Y")                 *AND  +
+                      (ANFL02 *EQ "Y")                 *AND  +
+                      (RTDT   *GE "' || &C#RTDS || '") *AND  +
+                      (RTDT   *LE "' || &C#RTDE || '") *AND  +
+                      ((RTNO   *EQ "T")                 *OR  +
+                       (RTNO   *EQ "U")                 *OR  +
+                       (RTNO   *EQ "P")                 *OR  +
+                       (RTNO   *EQ "M"))               *AND  +
+                      (ANUSTP *EQ "' || &P#USTP || '")')     +
+                      MAPFLD((RTNO   '%SST(ANRTNO 1 1)' *CHAR 1 )  +
+                             (RTDT   ANRTDT  *CHAR 8))       +
+                      KEYFLD((ANRTNO) (ANITEM))
+           ENDDO
+
+           IF         COND((&P#RTDP  *EQ 'P')    *AND        +
+                           (&P#USTP  *EQ 'A4'))  THEN(DO)
+           OPNQRYF    FILE(ARRETN) OPTION(*ALL) QRYSLT('     +
+                      (ANFL01 *EQ "Y")                 *AND  +
+                      (ANFL02 *EQ "Y")                 *AND  +
+                      (RTDT   *GE "' || &C#RTDS || '") *AND  +
+                      (RTDT   *LE "' || &C#RTDE || '") *AND  +
+                      ((RTNO   *EQ "P")                 *OR  +
+                       (RTNO   *EQ "H")                 *OR  +
+                       (RTNO   *EQ "M"))               *AND  +
+                      (ANUSTP *EQ "' || &P#USTP || '")')     +
+                      MAPFLD((RTNO   '%SST(ANRTNO 1 1)' *CHAR 1 )  +
+                             (RTDT   ANRTDT  *CHAR 8))       +
+                      KEYFLD((ANRTNO) (ANITEM))
+           ENDDO
+
+           CALL       ARE055R  PARM(&P#IN12)
+           CLOF       OPNID(ARRETN)
+           DLTOVR     FILE(*ALL)
+           IF         COND(&P#IN12 *EQ '1') THEN(GOTO CMDLBL(START))
+
+ ENDCLPGM: ENDPGM
+

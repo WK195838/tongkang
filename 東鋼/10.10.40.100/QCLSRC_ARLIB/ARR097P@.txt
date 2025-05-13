@@ -1,0 +1,201 @@
+    /*****************************************************************/
+    /*                                                               */
+    /*        >>  PROGRAM INTRODUCTION  <<                           */
+    /*                                                               */
+    /*        1.PROGRAM-ID      ARR097P                              */
+    /*        2.PROGRAM-TYPE    CLP                                  */
+    /*        3.AUTHOR          S02LBU                               */
+    /*        4.FUNCTION       應收帳款明細表（查帳用）            */
+    /*        5.DATE-WRITTEN    91/09/03                             */
+    /*                                                               */
+    /*****************************************************************/
+             PGM
+             DCLF       FILE(ARLIB/ARR097S)
+             DCL        VAR(&TYPE)   TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&FLAG)   TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&QYYMM)  TYPE(*CHAR)   LEN(6)
+             DCL        VAR(&C#YYMM) TYPE(*CHAR)   LEN(4)
+             DCL        VAR(&YYMMS)  TYPE(*CHAR)   LEN(4)
+             DCL        VAR(&YYMME)  TYPE(*CHAR)   LEN(4)
+             DCL        VAR(&MBR)    TYPE(*CHAR)   LEN(5)
+             DCL        VAR(&MB1)    TYPE(*CHAR)   LEN(5)
+             DCL        VAR(&C_YY1)  TYPE(*CHAR)   LEN(2)
+             DCL        VAR(&C_MM1)  TYPE(*CHAR)   LEN(2)
+             DCL        VAR(&C_YY2)  TYPE(*CHAR)   LEN(2)
+             DCL        VAR(&C_MM2)  TYPE(*CHAR)   LEN(2)
+             DCL        VAR(&C_ORNS) TYPE(*CHAR)   LEN(6)
+             DCL        VAR(&C_ORNE) TYPE(*CHAR)   LEN(6)
+             DCL        VAR(&C_CUNS) TYPE(*CHAR)   LEN(6)
+             DCL        VAR(&C_CUNE) TYPE(*CHAR)   LEN(6)
+             DCL        VAR(&D_YY1)  TYPE(*DEC)    LEN(2 0)
+             DCL        VAR(&D_MM1)  TYPE(*DEC)    LEN(2 0)
+             DCL        VAR(&D_YY2)  TYPE(*DEC)    LEN(2 0)
+             DCL        VAR(&D_MM2)  TYPE(*DEC)    LEN(2 0)
+             DCL        VAR(&D#YYMM) TYPE(*DEC)    LEN(4 0)
+    /*                  */
+             RTVJOBA    JOB(&S#DEVN) USER(&S#USER) +
+                        TYPE(&TYPE)
+
+             IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+    /*取得起訖年月之預設值*/
+             RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&QYYMM)
+             CHGVAR     VAR(&C#YYMM)  VALUE(%SST(&QYYMM 1 4))
+             CHGVAR     VAR(&D#YYMM)  VALUE(&C#YYMM)
+             CHGVAR     VAR(&D#YYMM)  VALUE(&D#YYMM - 1)
+             CHGVAR     VAR(&S#YME)   VALUE(&D#YYMM)
+             CHGVAR     VAR(&S#YMS)   VALUE(&D#YYMM - 100)
+
+    START:   SNDRCVF
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+             CHGVAR     VAR(&IN31)    VALUE('0')
+             CHGVAR     VAR(&IN32)    VALUE('0')
+             CHGVAR     VAR(&IN33)    VALUE('0')
+             CHGVAR     VAR(&S#ERR) VALUE(*BLANK)
+
+    /*CHECK 起始年月 */
+             CHGVAR     VAR(&C#YYMM) VALUE(&S#YMS)
+             IF         COND((%SST(&C#YYMM 1 2) *LT '01') *OR +
+                             (%SST(&C#YYMM 1 2) *GT '99') *OR +
+                             (%SST(&C#YYMM 3 2) *LT '01') *OR +
+                             (%SST(&C#YYMM 3 2) *GT '12')) THEN(DO)
+             CHGVAR     VAR(&IN31)    VALUE('1')
+             CHGVAR     VAR(&S#ERR)   VALUE('起始年月錯誤')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             CHGVAR     VAR(&MB1)     VALUE('M' || &C#YYMM)
+             CHGVAR     VAR(&FLAG)    VALUE('0')
+             CHKOBJ     OBJ(ARLIB/ARSTWF) OBJTYPE(*FILE) MBR(&MB1)
+             MONMSG     MSGID(CPF9815) EXEC(CHGVAR VAR(&FLAG) VALUE('1'))
+             IF         COND((&FLAG   *EQ '1')) THEN(DO)
+             CHGVAR     VAR(&IN33)    VALUE('1')
+             CHGVAR     VAR(&S#ERR)   VALUE('無此起始年月之資料')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+    /*CHECK 終止年月 */
+             CHGVAR     VAR(&C#YYMM)  VALUE(&S#YME)
+             IF         COND((&C#YYMM *EQ '    ')            *OR +
+                             (&C#YYMM *GT %SST(&QYYMM 1 4))  *OR +
+                             (%SST(&C#YYMM 1 2) *LT '01')    *OR +
+                             (%SST(&C#YYMM 1 2) *GT '99')    *OR +
+                             (%SST(&C#YYMM 3 2) *LT '01')    *OR +
+                             (%SST(&C#YYMM 3 2) *GT '12'))   THEN(DO)
+             CHGVAR     VAR(&IN32)  VALUE('1')
+             CHGVAR     VAR(&S#ERR) VALUE('終止年月錯誤')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+   /*記錄輸入值*/
+             CHGVAR     VAR(&YYMMS)   VALUE(&S#YMS)
+             CHGVAR     VAR(&YYMME)   VALUE(&S#YME)
+             CHGDTAARA  DTAARA(*LDA (300   4)) VALUE(&YYMMS)
+             CHGDTAARA  DTAARA(*LDA (304   4)) VALUE(&YYMME)
+             CHGDTAARA  DTAARA(*LDA (308   6)) VALUE(&S#ORNO)
+             CHGDTAARA  DTAARA(*LDA (314   6)) VALUE(&S#CUNO)
+
+        /*   SBMJOB     CMD(CALL PGM(ARR097P)) JOB(ARR097P) +
+                        JOBD(ARJOBD)   */
+        /*   RETURN      */
+    BATCH:
+             RTVDTAARA  DTAARA(*LDA (300   4)) RTNVAR(&YYMMS)
+             RTVDTAARA  DTAARA(*LDA (304   4)) RTNVAR(&YYMME)
+             RTVDTAARA  DTAARA(*LDA (308   6)) RTNVAR(&S#ORNO)
+             RTVDTAARA  DTAARA(*LDA (314   6)) RTNVAR(&S#CUNO)
+
+ /*客戶代號如為空白，則顯示全部*/
+             IF         COND(&S#CUNO *EQ '      ') THEN(DO)
+             CHGVAR     VAR(&C_CUNS) VALUE('      ')
+             CHGVAR     VAR(&C_CUNE) VALUE('999999')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&C_CUNS) VALUE(&S#CUNO)
+             CHGVAR     VAR(&C_CUNE) VALUE(&S#CUNO)
+             ENDDO
+
+ /*訂單編號如為空白，則顯示全部*/
+             IF         COND(&S#ORNO *EQ '      ') THEN(DO)
+             CHGVAR     VAR(&C_ORNS) VALUE('      ')
+             CHGVAR     VAR(&C_ORNE) VALUE('999999')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&C_ORNS) VALUE(&S#ORNO)
+             CHGVAR     VAR(&C_ORNE) VALUE(&S#ORNO)
+             ENDDO
+
+ /*起始年月如為空白，則為終止年月之前一年*/
+             CHGVAR     VAR(&C_YY2)  VALUE(%SST(&YYMME 1 2))
+             CHGVAR     VAR(&C_MM2)  VALUE(%SST(&YYMME 3 2))
+             IF         COND(&YYMMS  *EQ '    ') THEN(DO)
+             CHGVAR     VAR(&D_YY2)  VALUE(&C_YY2)
+             CHGVAR     VAR(&D_MM2)  VALUE(&C_MM2)
+             CHGVAR     VAR(&D_YY2)  VALUE(&D_YY2 - 1)
+             CHGVAR     VAR(&C_YY2)  VALUE(&D_YY2)
+             CHGVAR     VAR(&YYMMS)  VALUE(&C_YY2 || &C_MM2)
+             ENDDO
+
+             CLRPFM     ARLIB/W1STWF
+    LOOP:
+             RTVDTAARA  DTAARA(*LDA (300   2)) RTNVAR(&C_YY1)
+             RTVDTAARA  DTAARA(*LDA (302   2)) RTNVAR(&C_MM1)
+             CHGVAR     VAR(&MBR)    VALUE('M' || &C_YY1 || &C_MM1)
+             OVRDBF     FILE(ARSTWF) TOFILE(ARLIB/ARSTWF) MBR(&MBR)
+             CALL       ARLIB/ARR097R1
+
+ /*月份如果等於１３，則年加１，月份等於１*/
+ /*月份如果不等於１３，則月份加１*/
+             CHGVAR     VAR(&D_YY1)  VALUE(&C_YY1)
+             CHGVAR     VAR(&D_MM1)  VALUE(&C_MM1)
+             IF         COND(&D_MM1  *EQ 13) THEN(DO)
+                        CHGVAR  VAR(&D_YY1)  VALUE(&D_YY1 + 1)
+                        CHGVAR  VAR(&D_MM1)  VALUE(1)
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&D_MM1)  VALUE(&D_MM1 + 1)
+             ENDDO
+
+             CHGVAR     VAR(&C_YY1)  VALUE(&D_YY1)
+             CHGVAR     VAR(&C_MM1)  VALUE(&D_MM1)
+             CHGDTAARA   DTAARA(*LDA (300 4)) VALUE(&C_YY1 || &C_MM1)
+
+ /*起始年月如果小於等於終止年月，則跳回LOOP迴圈*/
+             IF         COND((&C_YY1 *LT &C_YY2) *AND +
+                             (&C_MM1 *LE &C_MM2)) THEN(DO)
+                        GOTO CMDLBL(LOOP)
+             ENDDO
+
+             IF         COND((&C_YY1 *EQ &C_YY2) *AND +
+                             (&C_MM1 *LE &C_MM2)) THEN(DO)
+                        GOTO CMDLBL(LOOP)
+             ENDDO
+
+             OVRDBF     FILE(W1STWF) TOFILE(ARLIB/W1STWF) SHARE(*YES)
+             OPNQRYF    FILE(W1STWF) QRYSLT(' +
+                            (ASCUNO *GE "' || &C_CUNS || '") *AND +
+                            (ASCUNO *LE "' || &C_CUNE || '") *AND +
+                            (ASORNO *GE "' || &C_ORNS || '") *AND +
+                            (ASORNO *LE "' || &C_ORNE || '")')
+
+             CALL       ARLIB/ARR097R2
+
+             OVRPRTF    FILE(ARR097T) TOFILE(ARLIB/ARR097T) +
+                        PAGESIZE(*N 198) CPI(15) HOLD(*YES) +
+                        USRDTA('應收帳款')
+             OVRDBF     FILE(W2STWF) TOFILE(ARLIB/W2STWF) SHARE(*YES)
+             OPNQRYF    FILE(W2STWF) +
+                        KEYFLD((W2CUNO)(W2ORNO)(W2IVNO))
+
+             CALL       ARLIB/ARR097R3
+             DLTOVR     FILE(*ALL)
+             CLOF       OPNID(W1STWF)
+             CLOF       OPNID(W2STWF)
+             CLRPFM     ARLIB/W1STWF
+             CLRPFM     ARLIB/W2STWF
+             SNDBRKMSG  MSG('<<應收帳款明細表（查帳用）+
+                            ,已處理完成，請列印...>>') +
+                            TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             ENDPGM
+

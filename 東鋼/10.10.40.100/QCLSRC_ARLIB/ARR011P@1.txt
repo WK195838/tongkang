@@ -1,0 +1,76 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE  101/09/24  2012AR682 S00WCJ (0109A)*/
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)  TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DATE)  TYPE(*DEC)  LEN(8)
+             DCL        VAR(&DATEA) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREA)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&AREAA) TYPE(*CHAR) LEN(1)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARR011RS) PARM(&IN03 &DATE &AREAA)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGVAR     VAR(&DATEA) VALUE(&DATE)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&DATEA)
+             CHGDTAARA  DTAARA(*LDA (9 1)) VALUE(&AREAA)
+
+             SBMJOB     JOB(ARR011P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR011P')
+             RETURN
+             ENDDO
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 8))     RTNVAR(&DATEA)
+             RTVDTAARA  DTAARA(*LDA (9 1))     RTNVAR(&AREAA)
+             RTVDTAARA  DTAARA(*LDA (1021 1))  RTNVAR(&AREA)
+
+             CHGVAR     VAR(&DATE) VALUE(&DATEA)
+             OVRDBF     FILE(RCVDTL) TOFILE(RCVDTL) SHARE(*YES)
+      /*     OPNQRYF    FILE((RCVDTL)) QRYSLT('             RVPRDT +
+                          *EQ ' || &DATEA || '   &   RVAREA *EQ "' +
+                          || &AREA || '"    & RVFLAG *NE +
+                          "D"                  & (RVACNO *EQ "1131" +
+                          *OR RVACNO *EQ "111001")   +
+                          *and (rvtxar *eq "' || &AREAA || '" *or +
+                          rvtxar *eq " ")  ') KEYFLD((RVTBID) +
+                          (RVTANO) (RVPBID) (RVPANO) (RVNTNO)) */
+
+             IF         COND(&AREAA *EQ 'P') THEN(DO)
+ /*0109A*/   OPNQRYF    FILE((RCVDTL)) QRYSLT('             RVPRDT +
+                          *EQ ' || &DATEA || '   &   RVAREA *EQ "' +
+                          || &AREA || '"    & RVFLAG *NE +
+                          "D"                  & (RVACNO *EQ "1131" +
+                          *OR RVACNO *EQ "111001")  +
+                          *and (rvtxar *eq "' || &AREAA || '")  ') +
+                          KEYFLD((RVTBID) (RVTANO) (RVPBID) +
+                          (RVPANO) (RVNTNO))
+             ENDDO
+
+             IF         COND(&AREAA *NE 'P') THEN(DO)
+ /*0109A*/   OPNQRYF    FILE((RCVDTL)) QRYSLT('             RVPRDT +
+                          *EQ ' || &DATEA || '   &   RVAREA *EQ "' +
+                          || &AREA || '"    & RVFLAG *NE +
+                          "D"                  & (RVACNO *EQ "1131" +
+                          *OR RVACNO *EQ "111001")  +
+                          *and (rNO *eq "' || &AREAA || '")     +
+                          *and (RVDPNO *NE "B050")')             +
+                          KEYFLD((RVTBID) (RVTANO) (RVPBID) +
+                          (RVPANO) (RVNTNO)) MAPFLD((RNO '%sst(RVNO +
+                          1 1)' *CHAR 1))
+             ENDDO
+
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 158) +
+                          CPI(12)
+             CALL       PGM(ARR011R)
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

@@ -1,0 +1,113 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP045R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     清除廠區之銷貨明細未傳旗標
+     H*            5.DATE-WRITTEN  86/04/01
+     H*
+     H*****************************************************************
+     H            Y                                     1                 BR100
+     FTRNDTLL4IP  E                    DISK
+     FTRNDTLP UF  E           K        DISK
+     F            TXREC                             KRENAMETXRECP
+     FTRNDTLT UF  E           K        DISK
+     F            TXREC                             KRENAMETXRECT
+     FTRNDTLH UF  E           K        DISK
+     F            TXREC                             KRENAMETXRECH
+     FTRNDTLK UF  E           K        DISK
+     F            TXREC                             KRENAMETXRECK
+     FARP045F O   E                    DISK
+     I*****************************************************************
+     I            DS
+     I                                        1  15 TXRESV
+     I                                       10  10 D#TXRV
+     I            DS
+     I                                        1   8 TXNO
+     I                                        1   1 D#TXAR
+     I            DS
+     I                                        1  140W#SYST
+     I                                        1   60D#ST
+     I                                        7  100D#SY
+     I                                       11  140D#SMD
+     C**************************************************************
+     C*   檔案搜尋欄位組合
+     C**************************************************************
+     C           K#TX      KLIST
+     C                     KFLD           TXCODE
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+     C**************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C*
+     C           D#TXRV    IFEQ '*'                        未傳旗標
+     C                     SELEC
+     C           D#TXAR    WHEQ 'M'                        台中廠
+     C                     ADD  1         W#MREC
+     C                     SETOF                     69
+     C*
+     C           D#TXAR    WHEQ 'T'                        桃園廠
+     C           K#TX      CHAINTXRECT               69
+     C           *IN69     IFEQ '0'
+     C                     MOVEL*BLANK    D#TXRV
+     C                     UPDATTXRECT
+     C                     ADD  1         W#TREC
+     C                     ENDIF
+     C*
+     C           D#TXAR    WHEQ 'H'                        苗栗廠
+     C           K#TX      CHAINTXRECH               69
+     C           *IN69     IFEQ '0'
+     C                     MOVEL*BLANK    D#TXRV
+     C                     UPDATTXRECH
+     C                     ADD  1         W#HREC
+     C                     ENDIF
+     C*
+     C           D#TXAR    WHEQ 'K'                        高雄廠
+     C           K#TX      CHAINTXRECK               69
+     C           *IN69     IFEQ '0'
+     C                     MOVEL*BLANK    D#TXRV
+     C                     UPDATTXRECK
+     C                     ADD  1         W#KREC
+     C                     ENDIF
+     C*
+     C                     OTHER
+     C                     SETON                     69
+     C                     ENDSL
+     C*
+     C           *IN69     IFEQ '0'
+     C           K#TX      CHAINTXRECP               69
+     C                     MOVEL*BLANK    D#TXRV           清台北
+     C                     UPDATTXRECP
+     C                     ENDIF
+     C                     ENDIF                           未傳旗標
+     C*
+     CLR                   EXSR LRSR
+     C**************************************************************
+     CSR         INISR     BEGSR
+     C                     Z-ADD0         W#MREC  60
+     C                     Z-ADD0         W#TREC  60
+     C                     Z-ADD0         W#HREC  60
+     C                     Z-ADD0         W#KREC  60
+     C                     Z-ADDUDATE     W#STRD  60       起始日期
+     C                     TIME           W#SYST
+     C                     Z-ADDD#ST      W#STRT  60       起始時間
+     CSR                   ENDSR
+     C*
+     C*-------------------------------------------------------------
+     CSR         LRSR      BEGSR
+     C                     CLEARRATALOG
+     C                     Z-ADDW#STRD    ATSTRD
+     C                     Z-ADDW#STRT    ATSTRT
+     C                     Z-ADDUDATE     ATENDD           結束日期
+     C                     TIME           W#SYST
+     C                     Z-ADDD#ST      ATENDT           結束時間
+     C                     Z-ADDW#MREC    ATMRCN
+     C                     Z-ADDW#TREC    ATTRCN
+     C                     Z-ADDW#HREC    ATHRCN
+     C                     Z-ADDW#KREC    ATKRCN
+     C                     WRITERATALOG
+     CSR                   ENDSR
+

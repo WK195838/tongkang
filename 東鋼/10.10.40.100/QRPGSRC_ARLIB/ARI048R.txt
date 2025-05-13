@@ -1,0 +1,396 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARI048R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     承購發票訂單別查詢作業
+     H*            5.DATE-WRITTEN  90/12/18
+     H*            6.UPDATE
+     H*****************************************************************
+     H        1   Y                                     1
+     FARI048S CF  E                    WORKSTN
+     F                                        RRN2  KSFILE AR048F2
+     F                                        RRN3  KSFILE AR048F3
+     F                                        RRN4  KSFILE AR048F4
+     FARORDE  IF  E           K        DISK
+     FARBANK  IF  E           K        DISK
+     FARCUDT  IF  E           K        DISK
+     FARINVML1IF  E           K        DISK
+     E                    ERR     1   2 70               *錯誤訊息
+     I           UDS
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVN
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*FILE => ARORDE
+     C           K#ORDE    KLIST
+     C                     KFLD           ARCUNO           客戶代號
+     C                     KFLD           ARORNO           訂單編號
+     C*FILE => ARINVM
+     C           K#INVM    KLIST
+     C                     KFLD           AMCUNO           客戶代號
+     C                     KFLD           AMINDT           發票年月
+     C                     KFLD           AMINNO           發票號碼
+     C****************************************************************
+     C*      MAIN           PROGRAM
+     C****************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000           畫面二
+     C           W#PRID    CASEQ'03'      SR3000            READC1
+     C           W#PRID    CASEQ'04'      SR4000           畫面三
+     C           W#PRID    CASEQ'05'      SR5000            READC2
+     C           W#PRID    CASEQ'06'      SR6000           畫面四
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C                     MOVEL'ARI048S-'S#SRID
+     C                     MOVE '01'      W#PRID  2
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVE *ALL'-'   S#LIN3
+     C                     MOVE *ALL'='   S#LIN4
+     C                     MOVE *ALL'='   S#LIN5
+     C                     MOVE *ALL'-'   S#LIN6
+     C                     MOVE *ALL'='   S#LIN7
+     C                     MOVE *ALL'='   S#LIN8
+     C                     MOVE *ALL'-'   S#LIN9
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->ARI048S-1畫面
+     C                     MOVE *OFF      *IN30
+     C                     MOVE '01'      S#SRID
+     C           W#PRID    DOWEQ'01'
+     C                     WRITEAR048H
+     C                     EXFMTAR048F1
+     C*
+     C                     MOVE *OFF      *IN36
+     C                     MOVE *BLANK    S#ERR
+     C*IN03 IN12
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           S#BANK    IFEQ *BLANK
+     C                     MOVE *ON       *IN36
+     C                     MOVELERR,1     S#ERR
+     C                     ITER
+     C                     ENDIF
+     C*設定初始值
+     C           S#CUN2    IFEQ *BLANK
+     C                     MOVE '999999'  S#CUN2
+     C                     ENDIF
+     C*
+     C                     MOVE *BLANK    S#KEY1
+     C*
+     C                     MOVE '02'      W#PRID
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*W#PRID='02'--->ARE048S-2畫面
+     C                     Z-SUB9         S#NBR2
+     C                     MOVE '02'      S#SRID
+     C                     MOVE *BLANK    S#ERR2
+     C                     MOVE *BLANK    W#CUNO  6
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN74            *SFLCLR
+     C                     WRITEAR048F2C
+     C                     MOVE *OFF      *IN74            *SFLCLR
+     C*
+     C                     Z-ADD0         RRN2    40
+     C*
+     C           S#BANK    CHAINRARBANK             N40
+     C  N40                MOVE ABBKNM    S#BANM
+     C   40                MOVE *BLANK    S#BANM
+     C*
+     C                     MOVE S#KEY1    ARCUNO
+     C                     MOVE *BLANK    ARORNO
+     C           K#ORDE    SETLLRARORDE
+     C  N40                EXSR SR2100                     *讀入SFL
+     C*=======(顯示畫面)
+     C           W#PRID    DOWEQ'02'
+     C                     MOVEA'000'     *IN,71
+     C           RRN2      IFEQ 0
+     C                     MOVELERR,2     S#ERR2
+     C                     MOVE *ON       *IN72            *SFLDSP OFF
+     C                     ENDIF
+     C           W#CNT     IFGE 9
+     C                     MOVE *ON       *IN73            *SFLEND OFF
+     C                     ELSE
+     C                     MOVE *OFF      *IN73
+     C                     ENDIF
+     C*
+     C                     WRITEAR048H
+     C                     WRITEAR048F2M
+     C                     EXFMTAR048F2C
+     C                     MOVE *BLANK    S#ERR2
+     C*F3=結束作業
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*F12=回前畫面
+     C           *IN12     IFEQ *ON
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*PA1=翻下頁
+     C  N40      *IN91     IFEQ *ON
+     C  N42                EXSR SR2100
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE '03'      W#PRID
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C*讀入ARORDE資料
+     C                     Z-ADD0         W#CNT   20
+     C*
+     C                     READ RARORDE                  42
+     C           W#CNT     DOWLE9                          讀後10筆
+     C*
+     C           ARCUNO    CHAINRARCUDT             N40
+     C           ACBKID    IFEQ S#BANK                     銀行代號
+     C           ARCUNO    ANDGES#CUN1                     客戶代號
+     C           ARCUNO    ANDLES#CUN2                     客戶代號
+     C*
+     C           ARCUNO    IFNE W#CUNO                     換客戶代號
+     C           *IN42     OREQ *ON                        最後一筆
+     C*
+     C           W#CUNO    IFNE *BLANK                     預防第一次
+     C                     ADD  1         W#CNT
+     C                     ADD  1         RRN2
+     C                     WRITEAR048F2                    寫入
+     C                     ENDIF
+     C*
+     C   42                LEAVE                           讀完
+     C*
+     C                     MOVE ARCUNO    W#CUNO           客戶代號
+     C*
+     C                     MOVE ARCUNO    S#CUNO           客戶代號
+     C           ARCUNO    CHAINRARCUDT             N40
+     C                     MOVE ACCUNM    S#CUNM           客戶名稱
+     C                     Z-ADDARAAMT    S#AMT1           承購金額
+     C                     Z-ADDARBAMT    S#AMT2           預支金額
+     C                     Z-ADDARCAMT    S#AMT3           沖銷金額
+     C                     ELSE
+     C                     ADD  ARAAMT    S#AMT1           承購金額
+     C                     ADD  ARBAMT    S#AMT2           預支金額
+     C                     ADD  ARCAMT    S#AMT3           沖銷金額
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C                     READ RARORDE                  42
+     C                     ENDDO
+     C*
+     C           W#CNT     IFGE 1
+     C                     ADD  10        S#NBR2
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C***************************************************************
+     C           SR3000    BEGSR
+     C**************************************************************
+     C*READC  AR048F2
+     C           W#PRID    DOWEQ'03'
+     C                     READCAR048F2                  43
+     C   43                MOVE '02'      W#PRID
+     C   43                LEAVE
+     C*
+     C           S#OPT2    IFEQ 0
+     C                     ITER
+     C                     ENDIF
+     C*REPOSITION
+     C                     MOVE S#CUNO    S#KEY1
+     C*
+     C                     Z-ADDS#OPT2    W#OPT   10
+     C                     Z-ADD0         S#OPT2
+     C                     UPDATAR048F2
+     C*
+     C                     MOVE '04'      W#PRID
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C***********************************************************
+     C           SR4000    BEGSR
+     C*****************************************************************
+     C*明細畫面
+     C                     MOVE *ON       *IN77            *SFLCLR
+     C                     WRITEAR048F3C
+     C                     MOVE *OFF      *IN77            *SFLCLR
+     C*
+     C                     Z-ADD0         RRN3    40
+     C*
+     C                     MOVE '03'      S#SRID
+     C                     EXSR SR4100                     讀入
+     C*
+     C           RRN3      IFEQ 0
+     C                     MOVELERR,2     S#ERR3
+     C                     MOVE *ON       *IN76            *SFLDSP OFF
+     C                     ELSE
+     C                     MOVE *BLANK    S#ERR3
+     C                     MOVE *OFF      *IN76            *SFLDSP OFF
+     C                     ENDIF
+     C*
+     C           W#PRID    DOWEQ'04'
+     C                     WRITEAR048H
+     C                     WRITEAR048F3M
+     C                     EXFMTAR048F3C
+     C*
+     C           *IN12     IFEQ '1'
+     C                     MOVE '03'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           *IN03     IFEQ '1'
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVE '05'      W#PRID
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4100    BEGSR
+     C*****************************************************************
+     C*讀入明細
+     C                     MOVE S#CUNO    ARCUNO           客戶代號
+     C                     MOVE *BLANK    ARORNO           訂單號碼
+     C           K#ORDE    SETLLRARORDE
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ RARORDE             N    41
+     C           ARCUNO    IFNE S#CUNO
+     C           *IN41     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVE ARORNO    S#ORNO           訂單號碼
+     C                     Z-ADDARAAMT    S#AAMT           承購金額
+     C                     Z-ADDARBAMT    S#BAMT           預支金額
+     C                     Z-ADDARCAMT    S#CAMT           沖銷金額
+     C                     Z-ADDARDAT1    S#DAT1           承購起日
+     C                     Z-ADDARDAT2    S#DAT2           結案日期
+     C           ARDAT2    IFEQ 0
+     C                     MOVE *ON       *IN69
+     C                     ELSE
+     C                     MOVE *OFF      *IN69
+     C                     ENDIF
+     C                     ADD  1         RRN3
+     C                     WRITEAR048F3                    寫入
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C***************************************************************
+     C           SR5000    BEGSR
+     C**************************************************************
+     C*READC  AR048F3
+     C           W#PRID    DOWEQ'05'
+     C                     READCAR048F3                  43
+     C   43                MOVE '04'      W#PRID
+     C   43                LEAVE
+     C*
+     C           S#OPT3    IFEQ 0
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     Z-ADDS#OPT3    W#OPT   10
+     C                     Z-ADD0         S#OPT3
+     C                     UPDATAR048F3
+     C*
+     C                     MOVE '06'      W#PRID
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C***********************************************************
+     C           SR6000    BEGSR
+     C*****************************************************************
+     C*明細畫面
+     C                     MOVE *ON       *IN83            *SFLCLR
+     C                     WRITEAR048F4C
+     C                     MOVE *OFF      *IN83            *SFLCLR
+     C*
+     C                     Z-ADD0         RRN4    40
+     C*
+     C                     MOVE '04'      S#SRID
+     C*
+     C                     EXSR SR6100                     讀入
+     C*
+     C           RRN4      IFEQ 0
+     C                     MOVE *ON       *IN81            *SFLDSP OFF
+     C                     ELSE
+     C                     MOVE *OFF      *IN81            *SFLDSP OFF
+     C                     ENDIF
+     C*
+     C           W#PRID    DOWEQ'06'
+     C                     WRITEAR048H
+     C                     WRITEAR048F4M
+     C                     EXFMTAR048F4C
+     C*
+     C           *IN12     IFEQ '1'
+     C                     MOVE '05'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           *IN03     IFEQ '1'
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR6100    BEGSR
+     C*****************************************************************
+     C*讀入明細
+     C                     MOVE S#CUNO    AMCUNO           客戶代號
+     C                     Z-ADD0         AMINDT
+     C                     MOVE *BLANK    AMINNO           訂單號碼
+     C           K#INVM    SETLLRARINVM
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ RARINVM             N    41
+     C           AMCUNO    IFNE S#CUNO
+     C           *IN41     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           AMORNO    IFNE S#ORNO
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     Z-ADDAMINDT    S#INDT           發票年月
+     C                     MOVE AMINNO    S#INNO           發票號碼
+     C                     Z-ADDAMDAMT    S#DAM8           發票金額
+     C                     Z-ADDAMEAMT    S#EAM8           預支金額
+     C                     Z-ADDAMFAMT    S#FAM8           沖銷金額
+     C                     MOVE AMDLC1    S#DLC1           承購下載
+     C                     MOVE AMAPCD    S#APCD           承購確認
+     C                     MOVE AMCLOC    S#CLOC           結案
+     C                     ADD  1         RRN4
+     C                     WRITEAR048F4                    寫入
+     C*
+     C                     ENDDO
+     C                     ENDSR
+**  ERR
+01-請指定銀行代號！
+02-無相關資料！
+

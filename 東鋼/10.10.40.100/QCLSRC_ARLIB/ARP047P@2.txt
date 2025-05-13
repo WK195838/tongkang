@@ -1,0 +1,100 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE 100/11/29 2011AR634 S00WCJ (0011A)  */
+    /*                           配合IFRS修改                   */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCL        VAR(&P#YYMM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&P#CODE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&WHOAMI) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&DATEX) TYPE(*CHAR) LEN(8)   /*輸入日期*/
+             DCL        VAR(&DATEE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&ENDD)  TYPE(*CHAR) LEN(2)
+             DCL        VAR(&AREA)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DTARA) TYPE(*CHAR) LEN(11)
+             DCL        VAR(&YM)    TYPE(*CHAR) LEN(6)
+             DCL        VAR(&IN03)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&WSID)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&CNTT)  TYPE(*CHAR) LEN(6) /* 改銷貨數 */
+             DCL        VAR(&CNTA)  TYPE(*CHAR) LEN(6) /* 刪傳票數 */
+ /*0011A*/   DCL        VAR(&D#VNO1) TYPE(*CHAR) LEN(6)
+ /*0011A*/   DCL        VAR(&D#VNO2) TYPE(*CHAR) LEN(6)
+
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&DTARA) VALUE('ACCTLDTA' *CAT &AREA)
+
+             RTVJOBA    TYPE(&INT) USER(&WHOAMI)
+             IF         COND(&INT *EQ '0')  THEN(GOTO BATCH)
+
+             RTVDTAARA  DTAARA(DALIB/&DTARA (9 8)) RTNVAR(&DATEX)
+
+                        /* 傳進已代開日期回還原起日 止日     */
+ DISPLY:     CALL       PGM(ARP047RS) PARM(&IN03 &DATEX &ENDD)
+
+             IF         COND(&IN03 *EQ '0') THEN(DO)
+             CHGVAR     VAR(&DATEE)  VALUE(&DATEX)
+             CHGVAR     VAR(%SST(&DATEE 7 2))  VALUE(&ENDD)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&DATEX)
+             CHGDTAARA  DTAARA(*LDA (9 8)) VALUE(&DATEE)
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&P#YYMM)
+
+             CALL    PGM(ACP101R) PARM(&P#YYMM  &P#CODE)
+             IF         COND(&P#CODE *EQ '1') THEN(DO)
+             SNDBRKMSG  MSG('關帳日期已過，請與相關人員聯絡！') +
+                          TOMSGQ(&WSID)
+             GOTO       CMDLBL(DISPLY)
+             ENDDO
+
+             SBMJOB     JOB(ARP047P) JOBD(ARJOBD)  +
+                        RQSDTA('CALL ARP047P')
+             ENDDO
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 8))    RTNVAR(&DATEX)
+             RTVDTAARA  DTAARA(*LDA (9 8))    RTNVAR(&DATEE)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&YM)  VALUE(%SST(&DATEX 1 6))
+
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL)
+             CPYF       FROMFILE(TRNDTL) TOFILE(QTEMP/TRNDTLW) +
+                        MBROPT(*ADD) CRTFILE(*YES) INCCHAR(*RCD 6 +
+                          *EQ &AREA) INCREL((*IF TXVUNO *NE '       +
+                          ') (*AND TXCODE *EQ 'AR05') (*AND TXFLAG +
+                          *NE 'D') (*AND TXACDT *LE &DATEE) +
+                          (*AND TXACDT *GE &DATEX))
+             OVRDBF     FILE(TRNDTLW) TOFILE(QTEMP/TRNDTLW) LVLCHK(*NO)
+
+             OVRDBF     FILE(ACTRAN) TOFILE('AC' || &AREA || +
+                          'R') LVLCHK(*NO)
+             CPYF       FROMFILE(ACTRAN) TOFILE(QTEMP/ACTRANW) +
+                        MBROPT(*ADD) CRTFILE(*YES) +
+                        INCREL((*IF  ACVRNO *GE 'D00000' ) +
+                               (*AND ACVRNO *LE 'D99999' ) +
+                               (*AND ACAREA *EQ &AREA)     +
+                               (*AND ACYM   *EQ &YM)       +
+                               (*AND ACYMD  *LE &DATEE) +
+                               (*AND ACYMD  *GE &DATEX))
+             OVRDBF     FILE(ACTRANW) TOFILE(QTEMP/ACTRANW) LVLCHK(*NO)
+
+                        /* 還原調整調整並刪除已代開傳票 */
+             CALL       PGM(ARP047R) PARM(&CNTT &CNTA)
+
+             DLTOVR     FILE(*ALL)
+ /*0011A STRAT */
+
+             RTVDTAARA  DTAARA(*LDA (201 6)) RTNVAR(&D#VNO1)
+             RTVDTAARA  DTAARA(*LDA (211 6)) RTNVAR(&D#VNO2)
+
+             CALL       PGM(ARS888P) PARM(&AREA &YM &D#VNO1 &D#VNO2)
+ /*0011A  END */
+/*           CHGDTAARA  DTAARA(DALIB/&DTARA (7 6)) VALUE(&DATEX)   */
+             SNDMSG     MSG('調整代開傳票還原作業已完成，合計改+
+                             調整明細' || &CNTT || '筆，刪傳票' +
+                              || &CNTA || '筆。' || &DATEX) +
+                        TOUSR(&WHOAMI)
+             ENDPGM
+

@@ -1,0 +1,231 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP064P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     客戶訂單管制異動資料即時下傳           */
+     /*     5.DATE-WRITTEN  88/10/28                                */
+     /*     6.UPDATE  DATE  99/01/01 2009AR406 S00WCJ (9901A)       */
+     /*                    102/10/08 S00WCJ (0210A)                 */
+     /*                     T廠不傳輸                             */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&SYSN) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&USER) TYPE(*CHAR) LEN(10)
+    /*0210A*/DCL        VAR(&FLAG) TYPE(*CHAR) LEN(4) VALUE(' XXX')
+             DCL        VAR(&RTFL) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&TRY)  TYPE(*DEC) LEN(1) VALUE(0)
+
+
+/* ----------------------------------------------------------------- */
+
+ INITIAL:    /* 初始程式，判斷本程式為台北或廠區的處理部份 */
+
+             RTVNETA    SYSNAME(&SYSN)
+             IF         COND(&SYSN *EQ 'P02') THEN(GOTO MAJOR)
+
+
+/* ----------------------------------------------------------------- */
+
+ MINOR:      /* 廠區被引發處理的部份 */
+
+             ADDLIBLE   ARLIB
+             MONMSG     CPF0000
+             ADDLIBLE   DALIB
+             MONMSG     CPF0000
+             OVRDBF     FILE(ARCUCTP) TOFILE(DALIB/ARCUCTP)
+             OVRDBF     FILE(ARCUCT)  TOFILE(DALIB/ARCUCT)
+             OVRDBF     FILE(ARODCTP) TOFILE(DALIB/ARODCTP)
+             OVRDBF     FILE(ARODCT)  TOFILE(DALIB/ARODCT)
+             CALL       ARP064R
+             DLTOVR     *ALL
+             RETURN
+
+
+/* ----------------------------------------------------------------- */
+
+ MAJOR:       /* 台北主機 */
+
+             RTVJOBA    USER(&USER) TYPE(&INT)
+
+      /*     IF         COND(&INT *EQ '1') THEN(DO)   */
+
+                        /* 建立客戶管制異動資料 */
+
+             OVRDBF     FILE(ARCUCTP) TOFILE(DALIB/ARCUCTP)
+             OVRDBF     FILE(ARCUCT) TOFILE(DALIB/ARCUCT) SHARE(*YES)
+             OPNQRYF    FILE(ARCUCT) +
+                        OPTION(*ALL) +
+                        QRYSLT('A1FLAG *NE " "')
+             CALL       ARP064R1
+             CLOF       ARCUCT
+             DLTOVR     *ALL
+
+                        /* 建立訂單管制異動資料 */
+
+             OVRDBF     FILE(ARODCTP) TOFILE(DALIB/ARODCTP)
+             OVRDBF     FILE(ARODCT) TOFILE(DALIB/ARODCT) SHARE(*YES)
+             OPNQRYF    FILE(ARODCT) +
+                        OPTION(*ALL) +
+                        QRYSLT('A2FLAG *NE " "')
+             CALL       ARP064R2
+             CLOF       ARODCT
+             DLTOVR     *ALL
+
+             RTVDTAARA  DTAARA(*LDA (1 2)) RTNVAR(&RTFL)
+
+             IF         COND(&RTFL *EQ '  ') THEN(DO)    /* 無資料*/
+             SNDMSG     TOUSR(&USER) +
+                        MSG('訂單管制異動傳輸成功。')
+             RETURN
+          /* ENDDO  */
+
+          /* SBMJOB     JOB(ARP064P) JOBD(ARJOBD) JOBQ(QSYS/QCTL) +
+                        RQSDTA('CALL ARP064P')  */
+          /* RETURN  */
+             ENDDO
+
+ BATCH:
+
+ STEP1:       /* 建立DDM FILE */
+
+             DLTF       FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMT)
+    /*9901A START */
+             DLTF       FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(U01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMU)
+    /*9901A END  */
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMH)
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMK)
+
+
+ STEP2:       /*  台北送廠區   */
+
+             CHGVAR     VAR(&TRY) VALUE(&TRY + 1)
+
+   TY:    /*桃園廠*/
+    /*9901A*/ IF         COND(%SST(&FLAG 1 1) *EQ ' ') THEN(GOTO NU)
+
+             CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(DALIB/ARCUCTP)
+             CLRPFM     FILE(QTEMP/DDMT)
+    /*9901A*/ MONMSG     MSGID(CPF0000) EXEC(GOTO NU)
+           CPYF       FROMFILE(DALIB/ARCUCTP) TOFILE(QTEMP/DDMT) +
+                          MBROPT(*ADD) FMTOPT(*MAP *DROP)
+    /*9901A*/ MONMSG     MSGID(CPF0000)  EXEC(GOTO NU)
+
+             CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(DALIB/ARODCTP)
+             CLRPFM     FILE(QTEMP/DDMT)
+    /*9901A*/ MONMSG     MSGID(CPF0000) EXEC(GOTO NU)
+             CPYF       FROMFILE(DALIB/ARODCTP) TOFILE(QTEMP/DDMT) +
+                        MBROPT(*ADD)
+    /*9901A*/ MONMSG     MSGID(CPF0000)  EXEC(GOTO NU)
+
+             SBMRMTCMD  CMD('CALL ARLIB/ARP064P') DDMFILE(QTEMP/DDMT)
+    /*9901A*/ MONMSG     MSGID(CPF0000)  EXEC(GOTO NU)
+
+             CHGVAR     VAR(%SST(&FLAG 1 1)) VALUE(' ')
+
+    /*9901A START */
+   NU:    /*新桃廠*/
+             IF         COND(%SST(&FLAG 4 1) *EQ ' ') THEN(GOTO ML)
+
+             CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(DALIB/ARCUCTP)
+             CLRPFM     FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000) EXEC(GOTO ML)
+             CPYF       FROMFILE(DALIB/ARCUCTP) TOFILE(QTEMP/DDMU) +
+                          MBROPT(*ADD) FMTOPT(*MAP *DROP)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO ML)
+
+             CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(DALIB/ARODCTP)
+             CLRPFM     FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000) EXEC(GOTO ML)
+             CPYF       FROMFILE(DALIB/ARODCTP) TOFILE(QTEMP/DDMU) +
+                        MBROPT(*ADD)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO ML)
+
+             SBMRMTCMD  CMD('CALL ARLIB/ARP064P') DDMFILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO ML)
+
+             CHGVAR     VAR(%SST(&FLAG 4 1)) VALUE(' ')
+
+    /*9901A END  */
+
+   ML:    /*苗栗廠*/
+             IF         COND(%SST(&FLAG 2 1) *EQ ' ') THEN(GOTO KS)
+
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(DALIB/ARCUCTP)
+             CLRPFM     FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000) EXEC(GOTO KS)
+             CPYF       FROMFILE(DALIB/ARCUCTP) TOFILE(QTEMP/DDMH) +
+                        MBROPT(*ADD)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO KS)
+
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(DALIB/ARODCTP)
+             CLRPFM     FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000) EXEC(GOTO KS)
+             CPYF       FROMFILE(DALIB/ARODCTP) TOFILE(QTEMP/DDMH) +
+                        MBROPT(*ADD)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO KS)
+
+             SBMRMTCMD  CMD('CALL ARLIB/ARP064P') DDMFILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO KS)
+             CHGVAR     VAR(%SST(&FLAG 2 1)) VALUE(' ')
+
+   KS:    /*高雄廠*/
+             IF         COND(%SST(&FLAG 3 1) *EQ ' ') THEN(GOTO STEP3)
+
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(DALIB/ARCUCTP)
+             CLRPFM     FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000) EXEC(GOTO STEP3)
+             CPYF       FROMFILE(DALIB/ARCUCTP) TOFILE(QTEMP/DDMK) +
+                          MBROPT(*ADD) FMTOPT(*NOCHK)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP3)
+
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(DALIB/ARODCTP)
+             CLRPFM     FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000) EXEC(GOTO STEP3)
+             CPYF       FROMFILE(DALIB/ARODCTP) TOFILE(QTEMP/DDMK) +
+                          MBROPT(*ADD) FMTOPT(*NOCHK)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP3)
+
+             SBMRMTCMD  CMD('CALL ARLIB/ARP064P') DDMFILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP3)
+             CHGVAR     VAR(%SST(&FLAG 3 1)) VALUE(' ')
+
+
+ STEP3:       /*  作業結束通知  */
+
+             IF         COND(&FLAG *EQ '   ') THEN(DO)
+             CLRPFM     FILE(DALIB/ARCUCTP)        /* 清除檔案 */
+             CLRPFM     FILE(DALIB/ARODCTP)        /* 清除檔案 */
+             SNDMSG     TOUSR(&USER) +
+                        MSG('訂單管制異動傳輸成功。')
+                        GOTO ENDCLPGM
+             ENDDO
+
+             IF         COND(&TRY *GE 3) THEN(DO)
+             SNDMSG     TOUSR(&USER) +
+                        MSG('客戶訂單管制異動傳輸失敗"' || &FLAG || '"' +
+                            || '請通知維護人員錯誤旗標！')
+                        GOTO ENDCLPGM
+             ENDDO
+
+             DLYJOB     DLY(60)        /* 等候一分鐘再重試 */
+             GOTO       STEP2
+
+ ENDCLPGM:   ENDPGM
+

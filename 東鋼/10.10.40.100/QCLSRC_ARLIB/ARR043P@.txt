@@ -1,0 +1,65 @@
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&S)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&E)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ST)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&EN)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&SYSN) TYPE(*CHAR) LEN(8)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             RTVNETA    SYSNAME(&SYSN)
+
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARR043RS) PARM(&IN03 &S &E &AREA)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGDTAARA  DTAARA(*LDA (1 1)) VALUE(&S)
+             CHGDTAARA  DTAARA(*LDA (2 1)) VALUE(' ')
+             CHGDTAARA  DTAARA(*LDA (3 1)) VALUE(&E)
+             CHGDTAARA  DTAARA(*LDA (4 1)) VALUE(' ')
+             CHGDTAARA  DTAARA(*LDA (5 1)) VALUE(&AREA)
+             SBMJOB     JOB(ARR043P) JOBD(CCJOBD)            +
+                          OUTQ(&OUTQ) RQSDTA('CALL ARR043P')
+             RETURN
+             ENDDO
+
+             RTVDTAARA  DTAARA(*LDA (1 2))   RTNVAR(&ST)
+             RTVDTAARA  DTAARA(*LDA (3 2))   RTNVAR(&EN)
+             RTVDTAARA  DTAARA(*LDA (5 1))   RTNVAR(&AREA)
+
+             OVRPRTF    FILE(QPRINT) PAGESIZE(*N 158) CPI(12)
+             OVRDBF     FILE(INVMST) TOFILE(INVMST) SHARE(*YES)
+
+             /*排除發票MW38881554 (因畸零尾差造成負1 ) */
+
+                     /* 不依請款單分類（台北） */
+             IF         COND(&SYSN *EQ 'P02') THEN(DO)
+             OPNQRYF    FILE(INVMST)                         +
+                        QRYSLT('INRVID *GE "' || &ST || '"   +
+                           *AND INRVID *LE "' || &EN || '"   +
+                           *AND INTYPE *NE "9"               +
+                           *AND INNO   *NE "MW38881554"      +
+                           *AND INDECD *EQ " "')             +
+                        KEYFLD((INRVID) (INCUNM) (INCUNO)    +
+                                        (ININDT) (INNO))
+             CALL       PGM(ARR043R1)
+             ENDDO
+
+                     /* 依請款單分類（高雄） */
+             ELSE       DO
+             OPNQRYF    FILE(INVMST)                         +
+                        QRYSLT('INRVID *GE "' || &ST || '"   +
+                           *AND INRVID *LE "' || &EN || '"   +
+                           *AND INTYPE *NE "9"               +
+                           *AND INDECD *EQ " "')             +
+                        KEYFLD((INRVID) (INCUNM) (INCUNO)    +
+                               (INAPNO) (ININDT) (INNO))
+             CALL       PGM(ARR043R2)
+             ENDDO
+
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

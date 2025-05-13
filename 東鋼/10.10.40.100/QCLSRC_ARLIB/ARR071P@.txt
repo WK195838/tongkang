@@ -1,0 +1,102 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR071P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     未確認營業繳款明細表                   */
+     /*     5.DATE-WRITTEN  87/07/03                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)     TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)   LEN(10)
+             DCL        VAR(&W#FLAG)  TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&W#DATE)  TYPE(*DEC)    LEN(6 0)
+             DCL        VAR(&W#UDATE) TYPE(*CHAR)   LEN(6)
+             DCL        VAR(&W#RVDT)  TYPE(*CHAR)   LEN(8)
+
+             DCL        VAR(&P#PDAT) TYPE(*CHAR) LEN(8)  /*輸入日期*/
+             DCL        VAR(&P#MODE) TYPE(*CHAR) LEN(1)  /*年份別*/
+             DCL        VAR(&P#MTL)  TYPE(*CHAR) LEN(24) /*月日數*/
+             DCL        VAR(&P#LEAP) TYPE(*CHAR) LEN(1)  /*閏年碼*/
+
+             DCLF       FILE(ARLIB/ARR071S)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+             RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&W#UDATE)
+             CHGVAR     VAR(&S#RVDT)  VALUE(&W#UDATE)
+ INPUT:
+             SNDRCVF    RCDFMT(AR071F1)
+             IF         COND(&IN03 *EQ '1' *OR &IN12 *EQ '1') +
+                        THEN(RETURN)
+
+             CHGVAR     VAR(&IN51) VALUE('0')
+             CHGVAR     VAR(&IN52) VALUE('0')
+
+             IF         COND(&S#RVDP *EQ ' ') THEN(DO)
+                CHGVAR  VAR(&IN51) VALUE('1')
+                CHGVAR  VAR(&S#MSG1) VALUE('繳款廠區不可空白')
+                GOTO INPUT
+             ENDDO
+
+         /*  CHGVAR     VAR(&W#DATE) VALUE(&S#RVDT)     */
+         /*  CALL       PGM(C01) PARM(&W#DATE &W#FLAG)  */
+             CHGVAR     VAR(&P#PDAT) VALUE(&S#RVDT)
+             CHGVAR     VAR(&P#MODE) VALUE('1')
+             CALL       PGM(UTS102R) PARM(&P#PDAT &P#MODE +
+                                          &P#MTL &P#LEAP &W#FLAG)
+             IF         COND(&W#FLAG *NE '0') THEN(DO)
+                CHGVAR  VAR(&IN52) VALUE('1')
+                CHGVAR  VAR(&S#MSG1) VALUE('日期格式錯誤！')
+                 GOTO    INPUT
+             ENDDO
+
+             CHGVAR     VAR(&W#DATE)  VALUE(&W#UDATE)
+   /*        IF         COND(&S#RVDT *GT &W#DATE) THEN(DO)           */
+   /*           CHGVAR  VAR(&IN52) VALUE('1')                        */
+   /*           CHGVAR  VAR(&S#MSG1) VALUE('日期不可超過系統日期') */
+   /*           GOTO    INPUT                                        */
+   /*        ENDDO                                                   */
+
+             CHGDTAARA  DTAARA(*LDA (1 1)) VALUE(&S#RVDP)
+             CHGVAR     VAR(&W#RVDT)       VALUE(&S#RVDT)
+             CHGDTAARA  DTAARA(*LDA (2 8)) VALUE(&W#RVDT)
+             SBMJOB     JOB(ARR071P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                        RQSDTA('CALL ARR071P')
+             CHGDTAARA  DTAARA(*LDA (801 70)) +
+             VALUE('未確認營業繳款明細表已匯入排程中。')
+             RETURN
+
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 1)) RTNVAR(&S#RVDP)
+             RTVDTAARA  DTAARA(*LDA (2 8)) RTNVAR(&W#RVDT)
+
+                        /* 未確認  */
+             OVRPRTF    FILE(ARR071T) TOFILE(ARLIB/ARR071T) +
+                        PAGESIZE(66 158) LPI(6) CPI(12) +
+                        OVRFLW(57) HOLD(*YES) USRDTA('未確繳款')
+             OVRDBF     FILE(SARVIN) TOFILE(DALIB/SARVIN)
+             OVRDBF     FILE(SARCVF) TOFILE(DALIB/SARCVF) SHARE(*YES)
+             OPNQRYF    FILE(SARCVF) +
+                        QRYSLT( +
+                         'SRFL02 *EQ " " *AND   +
+                          SRFL01 *EQ " " *AND   +
+                     %SST(SRRVNO 1 1) *EQ "' || &S#RVDP || '" *AND +
+                          SRRVDT *LE ' || &W#RVDT ) +
+                        KEYFLD((SRRVID) (SRRVDT) (SRRVNO))
+
+             CALL       PGM(ARR071R)
+             CLOF       OPNID(SARCVF)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

@@ -1,0 +1,242 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARE053R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     應收帳款承購人工兌現　　　
+     H*          5.DATE-WRITTEN  92/02/11
+     H*          5.DATE-MODIFY
+     H*                          99/08/24  2010AR517  S00WCJ (9908A)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARE053S CF  E                    WORKSTN
+     F                                        RRN1  KSFILE AR053F1
+     FARCUDT  IF  E           K        DISK
+     FARE053F2UF  E           K        DISK
+     FARCVCK  UF  E           K        DISK
+     E                    ERR     1   2 70               *錯誤訊息
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10111020 S#DEVN
+     I                                     10211021 U#AREA
+     I                                      300 302 S#BKID
+     I                                      303 307 S#CUNO
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN12  1
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000            READC
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*----------------------------------------------------------------
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVEL'01'      W#PRID  2
+     C                     MOVE *OFF      *IN99
+     C                     MOVE *OFF      *IN60
+     C                     MOVE *ON       *IN49
+     C*
+     C                     MOVELS#CUNO    W#CUNO  6
+     C           W#CUNO    CHAINARCUDT               50
+     C  N50                MOVELACCUNM    S#CUNM
+     C  N50                MOVELACBKNM    S#BKNM
+     C*FILE==>ARE053F2
+     C           W#AREF    KLIST
+     C                     KFLD           A2DUDT
+     C                     KFLD           A2RCNO
+     C                     KFLD           A2RCTM
+     C*FILE==>ARCVCKN
+     C           W#CVCK    KLIST
+     C                     KFLD           AKRCNO
+     C                     KFLD           AKRCTM
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*----------------------------------------------------------------
+     C*W#PRID='01'--->ARR053S-1 畫面
+     C*
+     C                     Z-SUB6         S#NBR
+     C                     Z-ADD0         RRN1    50
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN73            SFLCLR
+     C                     WRITEAR053F1C
+     C                     MOVE *OFF      *IN73
+     C*
+     C           *LOVAL    SETLLRAR053F2
+     C                     EXSR SR1100
+     C*
+     C           RRN1      IFEQ 0                          SFLDSP OFF
+     C                     MOVE *ON       *IN72
+     C                     MOVELERR,1     S#ERR1
+     C                     ELSE
+     C                     MOVE *OFF      *IN72
+     C                     ENDIF
+     C*
+     C*顯示畫面
+     C           W#PRID    DOWEQ'01'
+     C*
+     C   10 99             MOVELERR,2     S#ERR1
+     C*
+     C                     WRITEAR053H
+     C                     WRITEAR053F1M
+     C                     EXFMTAR053F1C
+     C                     MOVEL*BLANK    S#ERR1
+     C*結束作業
+     C           *IN03     IFEQ *ON
+     C                     MOVEL'00'      W#PRID
+     C                     MOVEL'0'       P#IN12
+     C                     LEAVE
+     C                     ENDIF
+     C*回上頁
+     C           *IN12     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     MOVEL'1'       P#IN12
+     C                     LEAVE
+     C                     ENDIF
+     C*REPOSITION
+     C*          S#KEY1    IFNE *BLANK
+     C*                    LEAVE
+     C*                    ENDIF
+     C*
+     C*F5=查詢全部與未結案
+     C           *IN05     IFEQ *ON
+     C*
+     C           *IN49     IFEQ *ON
+     C                     MOVE *OFF      *IN49
+     C                     ELSE
+     C                     MOVE *ON       *IN49
+     C                     ENDIF
+     C                     LEAVE
+     C*
+     C                     ENDIF
+     C*F10確認結案
+     C           *IN10     IFEQ *ON
+     C                     MOVE '02'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR                           讀入資料
+     C*****************************************************************
+     C                     MOVE *OFF      *IN42
+     C           *IN42     DOWEQ*OFF
+     C                     READ RAR053F2                 42
+     C   42                LEAVE
+     C*
+     C   49      A2NTCD    IFEQ 'Y'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVELA2CUNO    S#CUNO           客戶代號
+     C                     MOVELA2CUNM    S#CUNM           客戶簡稱
+     C                     MOVELA2BKID    S#BKID           銀行代號
+     C                     MOVELA2BKNM    S#BKNM           銀行簡稱
+     C                     Z-ADDA2DUDT    S#DUDT           票據到期日
+9908AC           *DATE     SUB  19000000  U#DATE  80
+9908AC*          S#DUDT    IFLE UDATE
+9908AC           S#DUDT    IFLE U#DATE
+     C                     MOVE *ON       *IN50
+     C                     ELSE
+     C                     MOVE *OFF      *IN50
+     C                     ENDIF
+     C                     MOVELA2RLNO    S#RLNO           票據號碼
+     C                     Z-ADDA2RAMT    S#RAMT           票據金額
+     C                     MOVELA2PLAC    S#PLAC           付款地
+     C                     MOVELA2BANM    S#BANM           付款銀行
+     C                     MOVELA2PANO    S#PANO           付款帳號
+     C                     MOVELA2NTCD    S#NTCD           兌現碼
+     C                     MOVELA2RCNO    S#RCNO           沖銷單號
+     C                     Z-ADDA2RCTM    S#RCTM           沖銷項次
+     C                     Z-ADDA2ACDT    S#ACDT           繳款日期
+     C*
+     C                     ADD  1         RRN1
+     C                     WRITEAR053F1
+     C*
+     C                     ENDDO
+     C*
+     C           RRN1      IFGT 0
+     C                     ADD  7         S#NBR
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*----------------------------------------------------------------
+     C*READC-->AR053F1
+     C                     Z-ADD1         RRN1
+     C                     MOVE *OFF      *IN99
+     C*
+     C           W#PRID    DOWEQ'02'
+     C*
+     C                     READCAR053F1                  43
+     C   43                MOVE '01'      W#PRID
+     C   43                MOVE *ON       *IN99
+     C   43                LEAVE
+     C*
+     C           S#NTCD    IFEQ *BLANK
+     C                     ITER
+     C                     ENDIF
+     C*
+     C  N99                EXSR SR3100
+     C*
+     C                     MOVE '01'      W#PRID
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3100    BEGSR
+     C*****************************************************************
+     C*存檔
+     C                     Z-ADD1         RRN1
+     C*                    MOVE *ON       *IN60
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C           RRN1      CHAINAR053F1              90
+     C   90                LEAVE
+     C*
+     C           S#NTCD    IFNE *BLANK                     兌現碼不為空白
+     C*
+     C*存檔==>ARCVCK
+     C                     MOVELS#RCNO    AKRCNO           繳款單號
+     C                     Z-ADDS#RCTM    AKRCTM           繳款項次
+     C           W#CVCK    CHAINRARCVCK              45
+     C  N45                MOVEL'Y'       AKNTCD           兌現碼
+     C                     UPDATRARCVCK
+     C*存檔==>ARE053F
+     C                     MOVELS#DUDT    A2DUDT           到期日
+     C                     MOVELS#RCNO    A2RCNO           繳款單號
+     C                     Z-ADDS#RCTM    A2RCTM           繳款項次
+     C           W#AREF    CHAINRAR053F2             46
+     C  N46                MOVEL'Y'       A2NTCD           兌現碼
+     C* N46                MOVEL'Y'       A2COD1           異動碼
+     C                     UPDATRAR053F2
+     C*
+     C                     ENDIF
+     C*
+     C                     ADD  1         RRN1
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+**  ERR
+01-無符合條件之資料　
+02-請選擇欲結案之資料
+

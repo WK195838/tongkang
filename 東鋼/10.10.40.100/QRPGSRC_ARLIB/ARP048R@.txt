@@ -1,0 +1,99 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP048R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     作廢已確認折讓單到廠區改發票資料
+     H*            5.DATE-WRITTEN  86/04/20
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  UF  E           K        DISK
+     FINVDTL  UF  E           K        DISK
+     FINVDTLW IF  E           K        DISK
+     F            IVREC                             KRENAMEIVRECW
+     I*************************************************************
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1  140W#SYST
+     I                                        1   60D#ST
+     I                                        7  100D#SY
+     I                                       11  140D#SMD
+     C**************************************************************
+     C*   程式參數接收區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           W#INNO 10        發票號碼
+     C**************************************************************
+     C*   資料搜尋關鍵
+     C**************************************************************
+     C           K#IV      KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C                     Z-ADD0         W#AAMT 110
+     C                     Z-ADD0         W#TAMT 110
+     C*
+     C           W#INNO    CHAINIVRECW               69
+     C           *IN69     DOWEQ'0'
+     C           IVFLAG    IFEQ 'D'                        已刪除者
+     C                     EXSR SR1000                     改開立廠區
+     C                     ENDIF
+     C           W#INNO    READEIVRECW                   69
+     C                     ENDDO
+     C*
+     C           W#AAMT    IFNE 0                          有異動明細
+     C           W#TAMT    ORNE 0
+     C                     EXSR SR2000                     改開立廠區
+     C                     ENDIF
+     C*
+     C                     SETON                     LR
+     C**************************************************************
+     C*   副程式開始
+     C**************************************************************
+     C*----------------------------------------
+     C*  改廠區之發票明細資料
+     C*----------------------------------------
+     CSR         SR1000    BEGSR
+     C           K#IV      CHAINIVREC                69
+     C           *IN69     IFEQ '0'                        有找到才算
+     C           IVFLAG    IFNE 'D'                        非已刪除者
+     C*
+     C           IVACNT    IFEQ '5'                        稅額
+     C                     ADD  IVAMT     W#TAMT
+     C                     ELSE                            折讓金額
+     C                     ADD  IVAMT     W#AAMT
+     C                     ENDIF
+     C*
+     C                     MOVEL'D'       IVFLAG
+     C                     MOVEL'D'       IVDECD
+     C                     MOVELUDATE     IVDEDT
+     C                     UPDATIVREC                      刪除該筆
+     C*
+     C                     ENDIF
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  改廠區之發票主檔資料
+     C*----------------------------------------
+     CSR         SR2000    BEGSR
+     C           W#INNO    CHAININREC                69
+     C           *IN69     IFEQ '0'
+     C                     SUB  W#AAMT    INCAMT           折退金額
+     C                     SUB  W#TAMT    INCTAX           折退稅額
+     C                     SUB  W#AAMT    INNBAL           未收餘額
+     C                     SUB  W#TAMT    INNBAL
+     C                     UPDATINREC                      不寫異動
+     C                     ENDIF
+     CSR                   ENDSR
+

@@ -1,0 +1,175 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR065R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02KRH
+     H*            4.FUNCTION     訂單銷貨發票明細列印
+     H*            5.DATE-WRITTEN  88/10/28
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR065S CF  E                    WORKSTN
+     FARCUCT  IF  E           K        DISK
+     FARODCT  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FSAMAST  IF  E           K        DISK
+     E*************************************************************
+     E                    T#MSG   1   4 70
+     I*************************************************************
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1   6 S#CUNO
+     I                                        1   1 S1KIND
+     I                                        2   2 S1CUN1
+     I                                        3   5 S1CUN2
+     I                                        6  10 S1BK05
+     I            DS
+     I                                        1   5 S#ORNO
+     I                                        1   1 D#AREA
+     I                                        2   50D#ORNO
+     I            DS
+     I                                        1   7 A2ORNO
+     I                                        1   5 D#A2OR
+     C**************************************************************
+     C*   檔案搜尋欄位組合
+     C**************************************************************
+     C           K#S1      KLIST                           訂單主檔
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C*
+     C           K#A1      KLIST                           客戶管制
+     C                     KFLD           A1CUNO
+     C                     KFLD           A1CTKD
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C*   副程式開始
+     C* 編碼原則: SRXOXX  其中O: 1清檢, 2試, 3讀, 4寫
+     C**************************************************************
+     C*----------------------------------------
+     C*  宣告及初始變數
+     C*----------------------------------------
+     CSR         SR0000    BEGSR
+     C                     MOVEL'01'      W#PRID  2        函式代號
+     C                     MOVEL'F'       W#FLAG  1        函式返回值
+     CSR                   ENDSR
+     C************************************
+     C*  畫面一:輸入訂單號碼
+     C************************************
+     CSR         SR1000    BEGSR
+     C                     EXFMTAR030F1
+     C                     SELEC
+     C           *IN03     WHEQ '1'
+     C                     MOVEL'00'      W#PRID
+     C                     OTHER
+     C                     EXSR SR1100                     檢查輸入
+     C           W#FLAG    IFEQ 'T'
+     C                     CALL 'ARR065P'
+     C                     PARM S#ORNO    W#ORNO  5
+     C                     MOVEL*BLANK    S#ORNO           清除輸入
+     C                     MOVELT#MSG,4   S#MSG1
+     C                     ENDIF
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  檢查訂單號碼並設定客戶編號、名稱
+     C*----------------------------------------
+     CSR         SR1100    BEGSR
+     C                     MOVEL'F'       W#FLAG           初始為錯誤
+     C                     SETOF                     51
+     C*
+     C           S#ORNO    IFEQ *BLANK
+     C                     MOVELT#MSG,1   S#MSG1
+     C                     SETON                     51
+     C                     GOTO ES1100
+     C                     ENDIF
+     C*
+     C                     MOVELD#AREA    S1OREA  1        檢查訂單
+     C                     Z-ADDD#ORNO    S1ORNO  40       是否存在
+     C           K#S1      CHAINSAMAST               69    獲得客戶
+     C           *IN69     IFEQ '1'                         編號
+     C                     MOVELT#MSG,1   S#MSG1
+     C                     SETON                     51
+     C                     GOTO ES1100
+     C                     ENDIF
+     C*
+     C           S#CUNO    CHAINCBCUST               69    檢查客戶
+     C           *IN69     IFEQ '1'                        是否存在
+     C                     MOVELT#MSG,2   S#MSG1
+     C                     SETON                     51
+     C                     GOTO ES1100
+     C                     ENDIF
+     C*
+     C                     EXSR SR1101                     查開立方式
+     C           W#RTNV    IFEQ 'F'
+     C                     MOVELT#MSG,3   S#MSG1
+     C                     SETON                     51
+     C                     GOTO ES1100
+     C                     ENDIF
+     C*
+     C                     MOVEL'T'       W#FLAG           查核為正確
+     CSR         ES1100    ENDSR
+     C*
+     C*----------------------------------------
+     C*  客戶訂單管制檢核
+     C*----------------------------------------
+     CSR         SR1101    BEGSR
+     C                     MOVEL'F'       W#RTNV  1
+     C*
+     C                     MOVELS#CUNO    A1CUNO
+     C                     MOVEL'04'      A1CTKD
+     C           K#A1      CHAINRARCUCT              69
+     C           *IN69     IFEQ '0'
+     C           A1MTHD    IFEQ '05'
+     C                     MOVEL'T'       W#RTNV
+     C                     GOTO ES1101
+     C                     ELSE
+     C           A1RFOR    IFEQ ' '
+     C                     GOTO ES1101
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVEL*BLANK    A2ORNO           檢查訂單管
+     C                     MOVELS#ORNO    A2ORNO           制檔
+     C           A2ORNO    SETLLRARODCT              69
+     C  N69                READ RARODCT                  69
+     C           *IN69     DOWEQ'0'
+     C           D#A2OR    IFNE S#ORNO
+     C                     SETON                     69
+     C                     LEAVE
+     C                     ELSE
+     C           A2CTKD    IFEQ '04'
+     C           A2MTHD    ANDEQ'05'
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     READ RARODCT                  69
+     C                     ENDDO
+     C*
+     C           *IN69     IFEQ '0'
+     C                     MOVEL'T'       W#RTNV
+     C                     ENDIF
+     CSR         ES1101    ENDSR
+     C*****************************************************************
+** T#MSG
+０１－無此訂單號碼
+０２－無此客戶編號
+０３－本訂單編號不能用此方式開立發票
+０４－報表列印程式已送入排程中。
+

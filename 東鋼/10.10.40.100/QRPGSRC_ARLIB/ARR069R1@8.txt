@@ -1,0 +1,170 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR069R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     訂單別出貨及發票明細表（磅單）
+     H*            5.DATE-WRITTEN  86/04/26
+     H*            6.DATE-UPDATED  89/06/30 CJAIN HIPRTB
+     H*                            99/04/29 2010AR469 S00WCJ (9904A)
+     H*                            99/08/20 2010AR519 S00WCJ (9908A)
+     H*                           100/10/04 S00WCJ (0010A)
+     H*                            台大捐贈訂單增加P06214
+     H*                           102/09/11 S00WCJ (0209A)
+     H*                            增加記錄規範，以供後續列印報表用
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FWTMASPJ1IP  E           K        DISK
+     FHIPRTB  IF  E           K        DISK
+0209AFSADLVY  IF  E           K        DISK
+     FARR069F O   E           K        DISK
+     F*****************************************************************
+     IRWTMASPJ
+     I                                              W6ENTDL6
+     I                                              W7AREAL5
+     I                                              W7VNO2L4
+     I                                              W7NAMEL3
+     I                                              W7QULTL2
+     I                                              W7SPE1L1
+     I*------------------------------------------------------
+     I           UDS
+9908AI                                      453 453 D#AREA
+     I*
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1   2 W6TRCD
+     I                                        1   1 W#IO
+     I            DS
+     I                                        1   8 W#WTNO
+     I                                        1   1 W7AREA
+     I                                        2   60W7VNO2
+0209AI            DS
+0209AI                                        1   9 W7DVNO
+0209AI                                        1   1 D#ARE1
+0209AI                                        2   60D#DVNO
+0209AI                                        7   90D#ITEM
+0209AC****************************************************************
+0209AC*          KEY       LIST
+0209AC****************************************************************
+0209AC           KEY01     KLIST
+0209AC                     KFLD           D#ARE1
+0209AC                     KFLD           D#DVNO
+0209AC                     KFLD           D#ITEM
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C                     Z-ADD0         W#PDWT 120       地磅重量
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     Z-ADD0         W#PDWT 120       地磅重量
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C           W#IO      IFEQ '1'                        出貨類
+     C           W6TYPE    IFEQ '0'
+     C                     ADD  W7STDW    W#PDWT           理論重
+     C                     ELSE
+     C                     ADD  W7NWGT    W#PDWT           實重
+     C                     ENDIF
+     C*
+     C                     ELSE                            退貨類
+     C           W6TYPE    IFEQ '0'
+     C                     SUB  W7STDW    W#PDWT           理論重
+     C                     ELSE
+     C                     SUB  W7NWGT    W#PDWT           實重
+     C                     ENDIF
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  存檔
+     C*********************************
+     CSR         L1SR      BEGSR
+     C                     CLEARWFREC
+     C                     MOVE W6ORNO    WFORNO
+     C                     MOVE W6CUNO    WFCUNO
+     C                     Z-ADDW6ENTD    WFDATE           日期
+     C                     MOVELW#WTNO    WFWTNO           磅單編號
+     C                     MOVELW7NAME    WFPDNM           品名
+     C*                    MOVELW7QULT    WFQULT           材質
+8906 C* CHAIN HIPRTB START.......
+  .  C                     MOVELW7QULT    W#QULT  5
+  .  C           W#QULT    CHAINHIPRTBR              50
+  .  C  N50                MOVELH1KINN    WFQULT
+  .  C   50                MOVELW7QULT    WFQULT
+8906 C* CHAIN HIPRTB END  .......
+     C                     MOVELW7SPE1    WFSPE1           徑度
+     C                     Z-ADDW#PDWT    WFQTY            數量
+0209AC*
+0209AC           W#IO      IFEQ '1'
+0209AC           W7DVNO    IFEQ *BLANKS
+0209AC                     Z-ADD0         D#DVNO
+0209AC                     Z-ADD0         D#ITEM
+0209AC                     ENDIF
+0209AC*
+0209AC           KEY01     CHAINSADLVY               55
+0209AC   55                MOVEL*BLANKS   WFSTND
+0209AC  N55                MOVELS2MODL    WFSTND
+0209AC                     ENDIF
+9904AC*
+9904AC           W6TRCD    IFEQ '1B'
+9904AC           W6ORNO    ANDNE'T02361'
+0010AC           W6ORNO    ANDNE'P06214'
+9904AC           W6TRCD    OREQ '1C'
+9904AC           W6ORNO    ANDNE'T02361'
+0010AC           W6ORNO    ANDNE'P06214'
+9904AC                     GOTO ENDL1
+9904AC                     ENDIF
+9908AC*
+9908AC           D#AREA    IFNE *BLANKS
+9908AC           D#AREA    ANDNEW7AREA
+9908AC                     GOTO ENDL1
+9908AC                     ENDIF
+9904AC*
+     C           W7VNO2    IFNE 0
+     C                     WRITEWFREC
+     C                     ENDIF
+9904AC*R                   ENDSR
+9904AC           ENDL1     ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  印核覆
+     C*********************************
+     CSR         LRSR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C*                    WRITEAR069T1H
+     C*                    WRITEAR069T1M
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  子函式集
+     C*********************************
+

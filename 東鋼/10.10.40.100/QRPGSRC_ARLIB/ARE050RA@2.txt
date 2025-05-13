@@ -1,0 +1,745 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE050R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     進倉履約折讓自動處理作業
+     H*            5.DATE-WRITTEN  91/02/20
+     H*            6.DATE-UPDATE
+     H*                           102/01/20 S00WCJ (0201A)
+     H*                           增加檢核年不可大於150
+     H*                           102/05/29 2013AR750 S00WCJ (0205A)
+     H*                            增加入帳年月
+     H*                           104/02/06 2015AR911 S00WCJ (0402A)
+     H*                            增加修改上次處理年月功能鍵
+     H*                           104/09/18 2015AR953 S00WCJ (0409A)
+     H*                            產品代碼3碼擴5碼
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARE050S#CF  E                    WORKSTN
+     F                                        RRN2  KSFILE AR050F2
+     F                                        RRN3  KSFILE AR050F3
+     FDISMST  UF  E           K        DISK
+     FDISMSTL1IF  E           K        DISK
+     F            RDISMST                           KRENAMERDISL
+     FDISDTL  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+0402AE                    ERR     1  12 70               *錯誤訊息
+     I            DS
+     I                                        1  10 S#SRID
+     I                                        1   8 D#SRI1
+     I                                        9  10 D#SRI2
+     I            DS
+     I                                        1   60D#YM2
+     I                                        1   40D#YY
+     I                                        5   60D#MM
+     IDSDTA      UDS                              6
+     I                                        1   60U#PRDT
+0402AI*                                      11  20 D#USER
+     I           UDS
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVI
+     C*****************************************************************
+     C*        KEY   LIST
+     C*****************************************************************
+     C*FILE => DISMST
+     C           K#SMST    KLIST
+     C                     KFLD           DMCUNO           客戶代號
+     C                     KFLD           DMORNO           訂單編號
+     C                     KFLD           DMYYMM           處理年月
+     C                     KFLD           DMCONT           處理次數
+     C                     KFLD           DMAREA           處理年月
+     C*FILE => DISMSTL1
+     C           K#DISL    KLIST
+     C                     KFLD           DMYYMM           處理年月
+     C                     KFLD           DMCONT           處理次數
+     C                     KFLD           DMCUNO           客戶代號
+     C                     KFLD           DMORNO           訂單編號
+     C                     KFLD           DMAREA           處理年月
+     C*FILE => DISDTL
+     C           K#SDTL    KLIST
+     C                     KFLD           DSORNO           訂單編號
+     C                     KFLD           DSYYMM           處理年月
+     C                     KFLD           DSCONT           處理次數
+     C                     KFLD           DSINNO           發票號碼
+     C                     KFLD           DSPROD           產品類別
+     C*****************************************************************
+     C*        MAIN  PROGRAM
+     C*****************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000           畫面二
+     C           W#PRID    CASEQ'03'      SR3000            READC
+     C           W#PRID    CASEQ'04'      SR4000           畫面四
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C                     MOVEL'ARE050S-'D#SRI1
+     C                     MOVE '01'      W#PRID  2
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVE *ALL'='   S#LIN3
+     C*
+     C                     MOVE *ON       *IN30
+0402AC                     MOVEL*BLANKS   W#08CK
+0402AC                     MOVEL*OFF      *IN58
+     C*
+ 9305C*                    MOVE '3'       S#PRO1
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->ARE050S-1畫面
+     C                     EXSR SR1100                     讀入資料
+     C*
+     C           W#PRID    DOWEQ'01'
+     C                     WRITEAR050H
+     C                     EXFMTAR050F1
+     C                     SETOF                     3099
+0205AC                     SETOF                     38
+     C*
+0402AC           W#08CK    IFEQ 'Y'
+0402AC                     MOVEL*ON       *IN08
+0402AC                     ENDIF
+     C*
+     C                     MOVE *BLANK    S#ERR1
+     C*IN03 IN12
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     EXSR SR1200                      CHECK DATA
+0402AC*
+0402AC           *IN08     IFEQ *ON
+0402AC           *IN99     ANDEQ*OFF
+0402AC                     MOVE '01'      W#PRID
+0402AC                     LEAVE
+0402AC                     ENDIF
+0402AC*
+     C*重新處理
+     C  N99 05             MOVE S#YM2     W#YM2
+     C  N99 05             CALL 'ARE050PA'
+     C                     PARM           W#YM2
+     C*取得處理次數
+     C           *IN05     IFEQ *ON                        有重新處理
+     C*
+     C                     Z-ADDS#YM2     DMYYMM
+     C                     Z-ADD999       DMCONT
+     C                     MOVE *BLANK    DMCUNO
+     C                     MOVE *BLANK    DMORNO
+     C                     MOVE *BLANK    DMAREA
+     C           K#DISL    SETGTRDISL
+     C                     READPRDISL                    40
+     C           DMYYMM    IFEQ S#YM2
+     C                     Z-ADDDMCONT    S#CONT
+     C                     ELSE
+     C                     Z-ADD1         S#CONT
+     C                     ENDIF
+     C*
+     C                     ELSE
+     C                     Z-ADDS#CON2    S#CONT
+     C                     ENDIF
+     C*讀入畫面二資料
+     C                     MOVE '02'      S#SRID
+     C                     MOVE 'N'       W#SAVE  1         SAVE FLAG
+     C                     MOVE *OFF      *IN98            開立燈號
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN74             SFLCLR
+     C                     WRITEAR050F2C
+     C                     MOVE *OFF      *IN74             SFLCLR
+     C*
+     C                     Z-ADD0         RRN2    40
+     C*初始條件
+     C                     EXSR SR1300
+     C*
+     C                     MOVE *LOVAL    DMCUNO           客戶代號
+     C                     MOVE *LOVAL    DMORNO           訂單號碼
+     C                     MOVE *LOVAL    DMYYMM           處理年月
+     C                     Z-ADDS#CONT    DMCONT           處理次數
+     C           K#SMST    SETLLRDISMST
+     C                     EXSR SR1400                     *讀入SFL
+     C*
+     C                     MOVE *BLANK    S#ERR2
+     C  N99                MOVE '02'      W#PRID
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*取得上次處理年月
+     C           *NAMVAR   DEFN DISCNTDTA DSDTA   6
+     C           *LOCK     IN   DSDTA
+     C                     UNLCKDSDTA
+     C                     Z-ADDU#PRDT    S#YM1
+     C*取得處理次數
+     C                     Z-ADDS#YM1     DMYYMM
+     C                     Z-ADD999       DMCONT
+     C                     MOVE *BLANK    DMCUNO
+     C                     MOVE *BLANK    DMORNO
+     C                     MOVE *BLANK    DMAREA
+     C           K#DISL    SETGTRDISL
+     C                     READPRDISL                    40
+     C           DMYYMM    IFEQ S#YM1
+     C                     Z-ADDDMCONT    S#CON1
+     C                     ENDIF
+     C*
+9908AC*                    MOVELUDATE     W1YM2   4
+9908AC           *DATE     SUB  19000000  W1YM2   80
+     C*處理前個月
+9908AC*                    MOVE W1YM2     W#YM2   6
+9908AC                     MOVELW1YM2     W#YM2   6
+     C                     MOVE W#YM2     D#YM2
+     C           D#MM      IFEQ 1
+     C                     SUB  1         D#YY
+     C                     Z-ADD12        D#MM
+     C                     ELSE
+     C                     SUB  1         D#MM
+     C                     ENDIF
+     C                     MOVE D#YM2     S#YM2            本次處理
+     C*取得處理次數
+     C                     Z-ADDS#YM2     DMYYMM
+     C                     Z-ADD999       DMCONT
+     C                     MOVE *BLANK    DMCUNO
+     C                     MOVE *BLANK    DMORNO
+     C                     MOVE *BLANK    DMAREA
+     C           K#DISL    SETGTRDISL
+     C                     READPRDISL                    40
+     C           DMYYMM    IFEQ S#YM2
+     C           DMCONT    ADD  1         S#CON2
+     C                     ELSE
+     C                     Z-ADD1         S#CON2
+     C                     ENDIF
+     C*
+     C                     MOVE '01'      D#SRI2
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1200    BEGSR
+     C*****************************************************************
+     C*CHECK DATA
+9201 C*  05      S#YM2     IFLT S#YM1                      重新處理
+9201 C*                    MOVE ERR,1     S#ERR1
+9201 C*                    SETON                     3099
+9201 C*                    ENDIF
+     C*
+     C   05N99   S#YM2     IFEQ 0                          重新處理
+     C                     MOVE ERR,3     S#ERR1
+     C                     SETON                     3099
+     C                     ENDIF
+     C*
+0402AC  N05N08   S#YM2     IFGT S#YM1                      查詢模式
+     C                     MOVE ERR,2     S#ERR1
+     C                     SETON                     3099
+     C                     ENDIF
+     C*
+0402AC  N08N99   S1ACYM    IFEQ 0
+0205AC                     MOVE ERR,8     S#ERR1
+0205AC                     SETON                     3899
+0205AC                     ENDIF
+     C*
+0205AC  N08N99   S1ACYM    IFNE 0
+0205AC                     MOVE S1ACYM    W#ACYM  6
+0205AC                     MOVELW#ACYM    W#ACYY  4
+0205AC                     MOVE W#ACYM    W#ACMM  2
+0205AC           W#ACMM    IFLT '01'
+0205AC           W#ACMM    ORGT '12'
+0205AC           W#ACYY    ORGT '0150'
+0205AC                     MOVE ERR,9     S#ERR2
+0205AC                     SETON                     3899
+0205AC                     ENDIF
+0205AC                     ENDIF
+     C*
+0402AC           *IN08     IFEQ *ON
+0402AC  N58                SETON                     5899
+0402AC           W#08CK    IFEQ 'Y'
+0402AC                     MOVEL*OFF      *IN99
+0402AC                     ENDIF
+0402AC           S#YM1     IFEQ 0
+0402AC                     MOVELERR,10    S#ERR1
+0402AC                     SETON                     0899
+0402AC                     ENDIF
+0402AC*
+0402AC                     MOVE S#YM1     W#ACYM
+0402AC                     MOVELW#ACYM    W#ACYY
+0402AC                     MOVE W#ACYM    W#ACMM
+0402AC  N99      W#ACMM    IFLT '01'
+0402AC           W#ACMM    ORGT '12'
+0402AC           W#ACYY    ORGT '0150'
+0402AC                     MOVELERR,11    S#ERR1
+0402AC                     SETON                     0899
+0402AC                     ENDIF
+0402AC  N99      S#YM1     IFNE 0
+0402AC           S#YM1     CHAINRDISL                40
+0402AC   40                MOVELERR,12    S#ERR1
+0402AC   40                SETON                     0899
+0402AC                     ENDIF
+     C*
+0402AC           *IN58     IFEQ *ON
+0402AC           *IN99     ANDEQ*OFF
+0402AC           *LOCK     IN   DSDTA
+0402AC                     MOVELS#YM1     U#PRDT
+0402AC*                    MOVELS#USER    D#USER
+0402AC                     OUT  DSDTA
+0402AC                     UNLCKDSDTA
+0402AC                     MOVEL' '       W#08CK
+0402AC                     MOVEL*OFF      *IN58
+0402AC                     ELSE
+0402AC                     MOVEL'Y'       W#08CK  1
+0402AC                     ENDIF
+0402AC                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1300    BEGSR
+     C*****************************************************************
+     C*初始條件與檔頭
+     C*處理年月
+     C           S#YM2     IFEQ 0
+     C                     MOVE '全部'  S#YM3
+     C                     MOVE *LOVAL    W#YMS   60
+     C                     MOVE *HIVAL    W#YME   60
+     C                     ELSE
+     C                     MOVE S#YM2     S#YM3
+     C                     Z-ADDS#YM2     W#YMS
+     C                     Z-ADDS#YM2     W#YME
+     C                     ENDIF
+     C*客戶代號
+     C           S#CUN1    IFEQ *BLANK
+     C                     MOVE '全部'  S#CUM1
+     C                     MOVE *LOVAL    W#CUNS  6
+     C                     MOVE *HIVAL    W#CUNE  6
+     C                     ELSE
+     C           S#CUN1    CHAINCBREC               N40
+     C  N40                MOVE CBCUNM    S#CUM1
+     C                     MOVE S#CUN1    W#CUNS
+     C                     MOVE S#CUN1    W#CUNE
+     C                     ENDIF
+     C*業務員別
+     C           S#SAL1    IFEQ *BLANK
+     C                     MOVEL'全部'  S#SAL2
+     C                     MOVE *LOVAL    W#SALS  2
+     C                     MOVE *HIVAL    W#SALE  2
+     C                     ELSE
+     C                     MOVEL*BLANK    S#SAL2
+     C                     MOVELS#SAL1    S#SAL2
+     C                     MOVELS#SAL1    W#SALS
+     C                     MOVELS#SAL1    W#SALE
+     C                     ENDIF
+     C*訂單號碼
+     C           S#ORN1    IFEQ *BLANK
+     C                     MOVE '全部'  S#ORN2
+     C                     MOVE *LOVAL    W#ORNS  6
+     C                     MOVE *HIVAL    W#ORNE  6
+     C                     ELSE
+     C                     MOVE S#ORN1    S#ORN2
+     C                     MOVELS#ORN1    W#ORNS
+     C                     MOVELS#ORN1    W#ORNE
+     C                     ENDIF
+     C*產品類別
+     C           S#PRO1    IFEQ *BLANK
+     C                     MOVE '全部'  S#PRO2
+     C                     MOVE *LOVAL    W#PROS  2
+     C                     MOVE *HIVAL    W#PROE  2
+     C                     ELSE
+     C                     MOVE *BLANK    S#PRO2
+     C           S#PRO1    IFEQ '3'
+     C                     MOVE '型鋼'  S#PRO2
+     C                     ELSE
+     C                     MOVE '鋼板'  S#PRO2
+     C                     ENDIF
+     C                     MOVELS#PRO1    W#PROS
+     C                     MOVELS#PRO1    W#PROE
+     C                     ENDIF
+     C*廠區
+     C           S#ARE1    IFEQ *BLANK
+     C                     MOVE '全部'  S#ARE2
+     C                     MOVE *LOVAL    W#ARES  1
+     C                     MOVE *HIVAL    W#AREE  1
+     C                     ELSE
+     C           S#ARE1    IFEQ 'H'
+     C                     MOVE '苗栗'  S#ARE2
+     C                     ELSE
+     C                     MOVE '高雄'  S#ARE2
+     C                     ENDIF
+     C                     MOVELS#ARE1    W#ARES
+     C                     MOVELS#ARE1    W#AREE
+     C                     ENDIF
+     C*
+     C                     MOVE S#PRO2    W#PRO2  6
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1400    BEGSR
+     C*****************************************************************
+     C*一次讀入
+     C                     MOVE *OFF      *IN40
+     C*
+     C           *IN40     DOWEQ*OFF
+     C                     READ RDISMST             N    40
+     C   40                LEAVE
+     C*條件
+     C           DMYYMM    IFLT W#YMS                      處理年月
+     C           DMYYMM    ORGT W#YME
+     C           DMCUNO    ORLT W#CUNS                     客戶代號
+     C           DMCUNO    ORGT W#CUNE
+     C           DMSALE    ORLT W#SALS                     業務員
+     C           DMSALE    ORGT W#SALE
+     C           DMORNO    ORLT W#ORNS                     訂單號碼
+     C           DMORNO    ORGT W#ORNE
+     C           DMPROD    ORLT W#PROS                     產品大類
+     C           DMPROD    ORGT W#PROE
+     C           DMAREA    ORLT W#ARES                     廠區別
+     C           DMAREA    ORGT W#AREE
+     C           DMCONT    ORNE S#CONT                     處理次數
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     CLEARAR050F2
+     C                     Z-ADD0         S#OPT             OP CODE
+     C                     MOVE DMCUNO    S#CUNO           客戶代號
+     C                     MOVE DMCUNM    S#CUNM           客戶名稱
+     C                     MOVE DMORNO    S#ORNO           訂單號碼
+     C                     Z-ADDDMYYMM    S#YYMM           處理年月
+     C                     MOVE DMAREA    S#AREA           廠區別
+     C                     Z-ADDDMQTY1    S#QTY1           發票出貨量
+     C                     Z-ADDDMAMT1    S#AMT1           發票總金額
+     C                     Z-ADDDMAMT2    S#AMT2           其他折讓
+     C                     Z-ADDDMAMT3    S#AMT3           繳款金額
+     C                     Z-ADDDMAMT4    S#AMT4           折讓單價
+     C                     Z-ADDDMAMT5    S#AMT5           折讓總價
+     C                     MOVE DMCOD1    S#COD1           折讓方式
+     C                     MOVE DMCOD2    S#COD2           確認碼
+     C                     MOVE DMCOD3    S#COD3           開立碼
+     C                     MOVE DMCOD4    S#COD4           折扣碼
+0205AC           DMACYM    IFNE 0
+     C                     MOVE DMACYM    S#ACYM           入帳年月
+0205AC                     ELSE
+0205AC                     MOVELS1ACYM    S#ACYM
+0205AC                     ENDIF
+     C*
+     C                     MOVE DMSALE    H#SALE           業務員
+     C                     MOVE DMAREA    H#AREA           廠區別
+     C*
+     C           DMCOD3    IFNE *BLANK                     已開立
+     C                     MOVE *ON       *IN31             PROTECT
+     C                     ELSE
+     C                     MOVE *OFF      *IN31             NOT PROTECT
+     C                     ENDIF
+     C*
+     C                     ADD  1         RRN2
+     C                     MOVE *ON       *IN70
+     C*
+     C                     WRITEAR050F2
+     C*
+     C           S#AREA    IFEQ 'H'
+     C                     ADD  S#AMT5    S#HAMT
+     C                     ELSE
+     C                     ADD  S#AMT5    S#KAMT
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C           RRN2      IFNE 0                          至少一筆
+     C                     Z-ADD1         S#NBR2
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*W#PRID='02'--->ARE050S-02畫面
+     C*=======(顯示畫面)
+     C           W#PRID    DOWEQ'02'
+     C                     MOVEA'00'      *IN,71
+     C           RRN2      IFEQ 0
+     C                     MOVELERR,2     S#ERR2
+     C                     MOVE *ON       *IN72            *SFLDSP OFF
+     C                     ENDIF
+     C*
+     C                     WRITEAR050H
+     C                     WRITEAR050F2M
+     C                     EXFMTAR050F2C
+     C                     MOVE *BLANK    S#ERR2
+     C*F3=結束作業
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*F12=回前畫面
+     C           *IN12     IFEQ *ON
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*F6=開立
+     C           *IN06     IFEQ *ON
+     C   98                MOVE S#YM2     P#YYMM  6
+     C   98                MOVE S#CONT    P#CONT  3
+     C   98                CALL 'ARE050P2'                 開立處理
+     C                     PARM           S#CUN1
+     C                     PARM           P#YYMM
+     C                     PARM           P#CONT
+     C   98                CALL 'ARE050PC'                 列印處理
+     C  N98                MOVE ERR,7     S#ERR2
+     C  N98                MOVE *ON       *IN98
+     C                     ENDIF
+     C*F10=存檔
+     C           *IN10     IFEQ *ON
+     C                     MOVE 'Y'       W#SAVE            SAVE FLAG
+     C                     ENDIF
+     C*
+     C                     MOVE '03'      W#PRID
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*READC
+     C                     Z-ADD0         S#HAMT           H廠合計
+     C                     Z-ADD0         S#KAMT           K廠合計
+     C                     Z-ADD1         RRN2
+     C           W#PRID    DOWEQ'03'
+     C                     READCAR050F2                  50
+     C   50                MOVE '02'      W#PRID
+     C   50                LEAVE
+     C*
+     C           S#OPT     IFEQ 5
+     C                     MOVE '04'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     Z-ADDS#OPT     W#OPT   10
+     C                     Z-ADD0         S#OPT
+     C                     MOVE *ON       *IN70
+     C                     EXSR SR3100                     檢核
+     C                     UPDATAR050F2
+     C*
+     C           S#AREA    IFEQ 'H'
+     C                     ADD  S#AMT5    S#HAMT
+     C                     ELSE
+     C                     ADD  S#AMT5    S#KAMT
+     C                     ENDIF
+     C*
+     C  N99      W#SAVE    IFEQ 'Y'                        存檔
+     C                     EXSR SR3200
+     C                     ENDIF
+     C*
+     C   99                MOVE '02'      W#PRID           回上畫面
+     C   99                LEAVE
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3100    BEGSR
+     C*****************************************************************
+     C                     SETOF                     323399
+     C*
+     C           S#QTY1    MULT S#AMT4    S#AMT5    H
+     C*
+     C           S#QTY1    MULT S#AMT4    W#AMT5 120H
+     C                     SUB  S#AMT5    W#AMT5
+     C           W#AMT5    IFLT -2
+     C           W#AMT5    ORGT 2
+     C                     MOVE ERR,5     S#ERR2
+     C                     SETON                     3299
+     C                     ENDIF
+     C*
+     C  N99      S#AMT4    IFEQ 0
+     C           S#AMT5    ANDNE0
+     C                     MOVE ERR,6     S#ERR2
+     C                     SETON                     3299
+     C                     ENDIF
+     C*
+     C  N99      S#AMT4    IFEQ 0
+     C           S#COD2    ANDNE*BLANK
+     C                     MOVE ERR,6     S#ERR2
+     C                     SETON                     3299
+     C                     ENDIF
+     C*
+     C  N99      S#AMT4    IFNE 0
+     C           S#AMT5    ANDEQ0
+     C                     MOVE ERR,6     S#ERR2
+     C                     SETON                     3299
+     C                     ENDIF
+     C*
+     C  N99      S#COD1    IFEQ *BLANK
+     C           S#COD2    ANDNE*BLANK                     已確認
+     C                     MOVE ERR,6     S#ERR2
+     C                     SETON                     3399
+     C                     ENDIF
+     C*
+     C  N99      S#COD2    IFNE *BLANK
+     C           S#ACYM    ANDEQ0                          已確認
+     C                     MOVE ERR,8     S#ERR2
+     C                     SETON                     3399
+     C                     ENDIF
+     C*檢核入帳年月
+     C  N99      S#ACYM    IFNE 0
+0201AC                     MOVE S#ACYM    W#ACYM  6
+0201AC                     MOVELW#ACYM    W#ACYY  4
+     C                     MOVE W#ACYM    W#ACMM  2
+9908AC*                    MOVELUDATE     W#CUYY  2
+9908AC           *DATE     SUB  19000000  U#CUYY  80
+9908AC                     MOVELU#CUYY    W#CUYY  4
+     C*          W#CUYY    IFNE W#ACYY
+     C*          W#ACMM    ORLT '01'
+     C           W#ACMM    IFLT '01'
+     C           W#ACMM    ORGT '12'
+0201AC           W#ACYY    ORGT '0150'
+     C                     MOVE ERR,9     S#ERR2
+     C                     SETON                     3399
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3200    BEGSR
+     C*****************************************************************
+     C                     MOVE S#CUNO    DMCUNO           客戶代號
+     C                     MOVE S#ORNO    DMORNO           訂單號碼
+     C                     Z-ADDS#YYMM    DMYYMM           處理年月
+     C                     Z-ADDS#CONT    DMCONT           處理次數
+     C                     MOVE S#AREA    DMAREA           廠區別
+     C           K#SMST    CHAINRDISMST              40
+     C                     Z-ADDS#AMT4    DMAMT4           折讓單價
+     C                     Z-ADDS#AMT5    DMAMT5           折讓總價
+     C                     MOVE S#COD1    DMCOD1           處理方式
+     C                     MOVE S#COD2    DMCOD2           確認碼
+     C                     Z-ADDS#ACYM    DMACYM           入帳年月
+     C                     UPDATRDISMST
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4000    BEGSR
+     C*****************************************************************
+     C*W#PRID='03'--->ARE050S-03畫面
+     C                     MOVE '03'      S#SRID
+     C                     MOVE *BLANK    S#ERR3
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN79             SFLCLR
+     C                     WRITEAR050F3C
+     C                     MOVE *OFF      *IN79             SFLCLR
+     C*
+     C                     Z-ADD0         RRN3    40
+     C                     EXSR SR4100                     *讀入SFL
+     C*=======(顯示畫面)
+     C           W#PRID    DOWEQ'04'
+     C                     MOVEA'00'      *IN,76
+     C           RRN3      IFEQ 0
+     C                     MOVELERR,2     S#ERR3
+     C                     MOVE *ON       *IN77            *SFLDSP OFF
+     C                     ENDIF
+     C*
+     C                     WRITEAR050H
+     C                     WRITEAR050F3M
+     C                     EXFMTAR050F3C
+     C                     MOVE *BLANK    S#ERR3
+     C*F3=結束作業
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*F12=回前畫面
+     C           *IN12     IFEQ *ON
+     C                     MOVE '03'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4100    BEGSR
+     C*****************************************************************
+     C*
+     C*          S#PRO1    IFEQ '3'                        型鋼
+     C*                    MOVE *ON       *IN80
+     C*                    ELSE
+     C*                    MOVE *OFF      *IN80
+     C*                    ENDIF
+     C*重SHOW檔頭
+     C                     Z-ADDS#CONT    W#CONT  30       處理次數
+     C*
+     C                     CLEARAR050F3C
+     C*
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C           H#AREA    IFEQ 'H'
+     C                     MOVE '苗栗'  S#ARE3           廠區別
+     C                     ELSE
+     C                     MOVE '高雄'  S#ARE3
+     C                     ENDIF
+     C                     MOVELH#SALE    S#SAL3           業務員
+     C                     MOVE S#CUNO    S#CUN3           客戶代號
+     C                     MOVE S#CUNM    S#CUM3           客戶簡稱
+     C                     MOVE S#YYMM    S#YM3            處理年月
+     C                     MOVE S#ORNO    S#ORN3           訂單號碼
+     C                     MOVE W#PRO2    S#PRO3           產品類別
+     C                     MOVE W#CONT    S#CONT           處理次數
+     C*一次讀入
+     C                     MOVE S#ORNO    DSORNO           訂單號碼
+     C                     Z-ADDS#YYMM    DSYYMM           處理年月
+     C                     Z-ADDS#CONT    DSCONT           處理次數
+     C                     MOVE *BLANK    DSINNO           發票號碼
+     C                     MOVE *BLANK    DSPROD           產品類別
+     C           K#SDTL    SETLLRDISDTL
+     C*
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RDISDTL             N    40
+     C   40                LEAVE
+     C*
+     C           DSORNO    IFNE S#ORNO                     訂單號碼
+     C           DSYYMM    ORNE S#YYMM                     處理年月
+     C           DSAREA    ORNE S#AREA                     發票廠區
+     C           DSCONT    ORNE S#CONT                     發票廠區
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     CLEARAR050F3
+     C*                    MOVE DSCODE    S#CODE           開立碼
+     C                     MOVE DSINNO    S#INNO           發票號碼
+     C                     MOVE DSAREA    S#AREX           發票號碼
+0409AC                     MOVELDSPROD    S#PROD           產品類別
+     C                     Z-ADDDSQTY1    S#QTYX           產品數量
+     C                     Z-ADDDSAMT1    S#AM1X           折讓金額
+     C                     Z-ADDDSAMT2    S#AM2X           折讓稅額
+     C                     MOVELDSTXNO    S#TXNO           折讓單號
+     C                     Z-ADDDSTXIT    S#TXIT           折讓項次
+     C*
+     C                     ADD  1         RRN3
+     C                     WRITEAR050F3
+     C*
+     C                     ENDDO
+     C*
+     C           RRN3      IFNE 0                          至少一筆
+     C                     Z-ADD1         S#NBR3
+     C                     ENDIF
+     C*
+     C                     ENDSR
+**  ERR
+01-資料已存在，不得重新處理！
+02-資料不存在，請重新處理！
+03-本次處理年月不得為０！
+04-請再按一次Ｆ６確認開立！
+05-折讓單價與折讓總價不符，或相差兩元以上！
+06-欄位不得為空白或０！
+07-將針對已存檔確認之資料進行開立處理，請再按一次Ｆ６開始作業！
+08-入帳年月不得為０！
+09-入帳年月輸入錯誤！
+10-上次處理年月不得為0
+11-上次處理年月輸入錯誤!!
+12-此年月未處理過，請確認!！
+

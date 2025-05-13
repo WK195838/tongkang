@@ -1,0 +1,70 @@
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&AREAF)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&AREAT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&CUNOF)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&CUNOT)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&SALEF)  TYPE(*CHAR) LEN(2)
+             DCL        VAR(&SALET)  TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DATS)   TYPE(*DEC)  LEN(8)
+             DCL        VAR(&DATE)   TYPE(*DEC)  LEN(8)
+             DCL        VAR(&C#DATS) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&C#DATE) TYPE(*CHAR) LEN(8)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+
+             CALL       PGM(ARR038RS) PARM(&IN03 &AREAF &AREAT &CUNOF &CUNOT +
+                                           &SALEF &SALET &DATS &DATE)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGVAR     VAR(&C#DATS)    VALUE(&DATS)
+             CHGVAR     VAR(&C#DATE)    VALUE(&DATE)
+             CHGDTAARA  DTAARA(*LDA (1  1)) VALUE(&AREAF)
+             CHGDTAARA  DTAARA(*LDA (2  1)) VALUE(&AREAT)
+             CHGDTAARA  DTAARA(*LDA (3  6)) VALUE(&CUNOF)
+             CHGDTAARA  DTAARA(*LDA (9  6)) VALUE(&CUNOT)
+             CHGDTAARA  DTAARA(*LDA (15 2)) VALUE(&SALEF)
+             CHGDTAARA  DTAARA(*LDA (17 2)) VALUE(&SALET)
+             CHGDTAARA  DTAARA(*LDA (19 8)) VALUE(&C#DATS)
+             CHGDTAARA  DTAARA(*LDA (27 8)) VALUE(&C#DATE)
+
+             SBMJOB     JOB(ARR038P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR038P')
+             RETURN
+             ENDDO
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1  1))   RTNVAR(&AREAF)
+             RTVDTAARA  DTAARA(*LDA (2  1))   RTNVAR(&AREAT)
+             RTVDTAARA  DTAARA(*LDA (3  6))   RTNVAR(&CUNOF)
+             RTVDTAARA  DTAARA(*LDA (9  6))   RTNVAR(&CUNOT)
+             RTVDTAARA  DTAARA(*LDA (15 2))   RTNVAR(&SALEF)
+             RTVDTAARA  DTAARA(*LDA (17 2))   RTNVAR(&SALET)
+             RTVDTAARA  DTAARA(*LDA (19 8))   RTNVAR(&C#DATS)
+             RTVDTAARA  DTAARA(*LDA (27 8))   RTNVAR(&C#DATE)
+
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE((TRNDTL)) QRYSLT('                     +
+                        %SST(TXNO 1 1) *EQ %RANGE("' || &AREAF || '" +
+                          "' || &AREAT || '")                     & +
+                          TXCUNO *GE "' || &CUNOF  || '"          & +
+                          TXCUNO *LE "' || &CUNOT  || '"          & +
+                          TXRVID *GE "' || &SALEF  || '"          & +
+                          TXRVID *LE "' || &SALET  || '"          & +
+                          DATE   *GE "' || &C#DATS || '"          & +
+                          DATE   *LE "' || &C#DATE || '"          & +
+                          TXCODE *EQ "AR06"                       & +
+                          TXFLAG *NE "D"                          & +
+                          TXFL01 *EQ " "')                          +
+                          KEYFLD((TXFL02) (TXCUNO) (TXNO)) +
+                          MAPFLD((TXFL02 '%SST(TXNO   1 5)') +
+                                 (DATE   TXDATE *CHAR 8))
+             CALL       PGM(ARR038R)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

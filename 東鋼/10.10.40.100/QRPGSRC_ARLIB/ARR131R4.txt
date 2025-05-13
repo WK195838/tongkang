@@ -1,0 +1,227 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR131R2
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     外銷出口報單核對明細表
+     H*          5.DATE-WRITTEN  97/02/20
+     H*          6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR131F2IP  E           K        DISK
+     FARR131T O   E             66     PRINTER
+     E*****************************************************************
+     E                    ARY1       30 54
+     E                    ARY2       30 54
+     E*----------------------------------------------------------------
+     IRAR131F2
+     I                                              W2APNOL1
+     I*
+     I            DS
+     I                                        1  54 D#ARY1
+     I                                        1   1 D#AREA
+     I                                        2  21 D#APNO
+     I                                       22  300D#QTY
+     I                                       31  432D#UAMT
+     I                                       44  540D#NAMT
+     I*
+     I            DS
+     I                                        1  54 D#ARY2
+     I                                        1   1 D#TXAR
+     I                                        2  21 D#NO
+     I                                       22  300D#NWGT
+     I                                       31  432D#AAMT
+     I                                       44  540D#TAMT
+     I*
+     I           UDS
+     I                                     10011010 U#USID
+     C*****************************************************************
+     C*          KEY       LIST
+     C*****************************************************************
+     C           K#INVD    KLIST
+     C                     KFLD           K#IVNO 10        發票號碼
+     C                     KFLD           K#ACNT  1        類別
+     C*
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C  N90                EXSR INZ#01
+     C  N90                SETON                     90
+     C   L1                EXSR DL#L1
+     C                     EXSR DP#01
+     CL1 90                EXSR TL#L1
+     CLR 90                EXSR TL#LR
+     CLRN90                EXSR MSGSR
+     C*
+     C*****************************************************************
+     CSR         INZ#01    BEGSR
+     C*****************************************************************
+     C                     MOVEL*ON       *IN66
+     C                     MOVEA*ALL'9'   ARY2
+     C                     Z-ADD0         W#TQTY  90       數量
+     C                     Z-ADD0         W#TUAT 132       美金金額
+     C                     Z-ADD0         W#TNAT 110       台幣金額
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         DL#L1     BEGSR
+     C*****************************************************************
+     C                     MOVELW2APNO    T#APNO           報單號碼
+     C                     MOVEA*ALL'9'   ARY1
+     C                     MOVEL*ON       *IN66
+     C                     Z-ADD0         W#AQTY  90       數量
+     C                     Z-ADD0         W#AUAT 132       美金金額
+     C                     Z-ADD0         W#ANAT 110       台幣金額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         DP#01     BEGSR
+     C*****************************************************************
+     C                     MOVELW2CUNM    T#CUNM           客戶簡稱
+     C                     MOVELW2ORNO    T#ORNO           訂單號碼
+     C                     MOVELW2AREA    T#AREA           廠區
+     C                     MOVELW2WKAR    T#WKAR           交運地點
+     C                     Z-ADDW2DATE    T#DATE           報關日期
+     C                     Z-ADDW2TRAT    T#TRAT           報關匯率
+     C                     Z-ADDW2QTY     T#QTY            數量
+     C                     Z-ADDW2UAMT    T#UAMT           美金金額
+     C                     Z-ADDW2NAMT    T#NAMT           台幣金額
+     C*
+     C   66                WRITEAR131T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR131T1D
+     C*
+     C                     Z-ADD1         I       40
+     C                     SORTAARY1
+     C           1         DO   30        I
+     C                     MOVE ARY1,I    D#ARY1
+     C*
+     C           W2AREA    IFEQ D#AREA                     廠區
+     C           W2APNO    ANDEQD#APNO                     報單號碼
+     C                     ADD  W2QTY     D#QTY            數量
+     C                     ADD  W2UAMT    D#UAMT           美金金額
+     C                     ADD  W2NAMT    D#NAMT           台幣金額
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           D#AREA    IFEQ '9'
+     C                     CLEARARY1,I
+     C                     MOVELW2AREA    D#AREA           廠區
+     C                     MOVELW2APNO    D#APNO           報單號碼
+     C                     Z-ADDW2QTY     D#QTY            數量
+     C                     Z-ADDW2UAMT    D#UAMT           美金金額
+     C                     Z-ADDW2NAMT    D#NAMT           台幣金額
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     Z-ADD1         J       40
+     C                     SORTAARY2
+     C           1         DO   30        J
+     C                     MOVE ARY2,J    D#ARY2
+     C*
+     C           W2AREA    IFEQ D#TXAR                     廠區
+     C                     ADD  W2QTY     D#NWGT           數量
+     C                     ADD  W2UAMT    D#AAMT           美金金額
+     C                     ADD  W2NAMT    D#TAMT           台幣金額
+     C                     MOVE D#ARY2    ARY2,J
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           D#TXAR    IFEQ '9'
+     C                     CLEARARY2,J
+     C                     MOVELW2AREA    D#TXAR           廠區
+     C                     MOVELW2APNO    D#NO             報單號碼
+     C                     Z-ADDW2QTY     D#NWGT           數量
+     C                     Z-ADDW2UAMT    D#AAMT           美金金額
+     C                     Z-ADDW2NAMT    D#TAMT           台幣金額
+     C                     MOVE D#ARY2    ARY2,J
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         TL#L1     BEGSR
+     C*****************************************************************
+     C                     Z-ADD1         I
+     C                     SORTAARY1
+     C           1         DO   30        I
+     C                     MOVE ARY1,I    D#ARY1
+     C*
+     C           D#AREA    IFNE '9'
+     C                     MOVELD#AREA    T#TXAR           廠區
+     C                     Z-ADDD#QTY     T#SQTY           數量
+     C                     Z-ADDD#UAMT    T#SUAT           美金金額
+     C                     Z-ADDD#NAMT    T#SNAT           台幣金額
+     C*
+     C   66                WRITEAR131T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR131T1S
+     C*
+     C                     ADD  T#SQTY    W#AQTY
+     C                     ADD  T#SUAT    W#AUAT
+     C                     ADD  T#SNAT    W#ANAT
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     Z-ADDW#AQTY    T#AQTY           數量
+     C                     Z-ADDW#AUAT    T#AUAT           美金金額
+     C                     Z-ADDW#ANAT    T#ANAT           台幣金額
+     C*
+     C   66                WRITEAR131T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR131T2S
+     C*
+     C*                    ADD  W#AQTY    W#TQTY
+     C*                    ADD  W#AUAT    W#TUAT
+     C*                    ADD  W#ANAT    W#TNAT
+     C*
+     CSR         ENL1SR    ENDSR
+     C*****************************************************************
+     CSR         TL#LR     BEGSR
+     C*****************************************************************
+     C*                    Z-ADDW#TQTY    T#TQTY           數量
+     C*                    Z-ADDW#TUAT    T#TUAT           美金金額
+     C*                    Z-ADDW#TNAT    T#TNAT           台幣金額
+     C*
+     C                     Z-ADD1         J
+     C                     SORTAARY1
+     C           1         DO   30        J
+     C                     MOVE ARY2,J    D#ARY2
+     C*
+     C           D#TXAR    IFNE '9'
+     C                     MOVELD#TXAR    T#TXAR           廠區
+     C                     Z-ADDD#NWGT    T#TQTY           數量
+     C                     Z-ADDD#AAMT    T#TUAT           美金金額
+     C                     Z-ADDD#TAMT    T#TNAT           台幣金額
+     C*
+     C   66                WRITEAR131T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR131T1T
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C*  66                WRITEAR131T1H
+     C*                    MOVE *OFF      *IN66
+     C*                    WRITEAR131T1T
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INZ#01
+     C*
+     C   66                WRITEAR131T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR131T1M
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+

@@ -1,0 +1,56 @@
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DATE1)  TYPE(*DEC)  LEN(6)
+             DCL        VAR(&DATE1A) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DATE2)  TYPE(*DEC)  LEN(6)
+             DCL        VAR(&DATE2A) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&TXAR)   TYPE(*CHAR) LEN(1)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARR041RS) PARM(&IN03 &DATE1 &DATE2)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&DATE1A) VALUE(&DATE1)
+             CHGVAR     VAR(&DATE2A) VALUE(&DATE2)
+             CHGDTAARA  DTAARA(*LDA (1 6)) VALUE(&DATE1A)
+             CHGDTAARA  DTAARA(*LDA (7 6)) VALUE(&DATE2A)
+             SBMJOB     JOB(ARR041P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR041P')
+             RETURN
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (1 6))    RTNVAR(&DATE1A)
+             RTVDTAARA  DTAARA(*LDA (7 6))    RTNVAR(&DATE2A)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&TXAR)
+             CHGVAR     VAR(&DATE1) VALUE(&DATE1A)
+             CHGVAR     VAR(&DATE2) VALUE(&DATE2A)
+             OVRDBF     FILE(RCVDTL) TOFILE(RCVDTL) SHARE(*YES)
+
+
+                  /* 台北之營業收款含括台中及苗栗等廠  */
+             IF         COND(&TXAR = 'P') THEN(DO)
+             OPNQRYF    FILE((RCVDTL)) QRYSLT('                +
+                          RVDATE = %RANGE(' || &DATE1A || '    +
+                                          ' || &DATE2A || ')  *AND +
+                          RVFLAG *NE "D"                      *AND +
+                          RVDECD *EQ " "                      *AND +
+                         (%SST(RVNO 1 1) *EQ "P"              *OR  +
+                         (%SST(RVNO 1 1) *EQ %VALUES("M" "H") *AND +
+                          RVTYPE *NE "3"))')                   +
+                          KEYFLD((RVDPNO)(RVNO))
+             ENDDO
+             ELSE       CMD(DO)
+             OPNQRYF    FILE((RCVDTL)) QRYSLT('                +
+                          RVDATE = %RANGE(' || &DATE1A || '    +
+                                          ' || &DATE2A || ') & +
+                          RVFLAG *NE "D"                     & +
+                          RVDECD *EQ " "                     & +
+                          %SST(RVNO 1 1) *EQ "' || &TXAR || '" ') +
+                          KEYFLD((RVDPNO)(RVNO))
+             ENDDO
+             OVRPRTF    FILE(QPRINT) OVRFLW(64) COPIES(2)
+             CALL       PGM(ARR041R) PARM(&DATE1 &DATE2)
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

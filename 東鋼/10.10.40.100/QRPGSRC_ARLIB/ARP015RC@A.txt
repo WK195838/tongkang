@@ -1,0 +1,193 @@
+     H****************************************************************
+     H*
+     H*            UPDATE  DATE  99/12/02  2010AR556  S00WCJ (9912A)
+     H*                         100/11/28  2011AR634  S00WCJ (0011A)
+     H*                           配合IFRS修改
+     H*                         101/12/13  2012AR704  S00WCJ (0112A)
+     H*                           配合IFRS正式轉換修改
+     H*                         108/12/25  S00WCJ (0812A)
+     H*                          不同代開程式寫入總帳之ACCSNM發生內
+     H*                          碼不一致之情形，與品妃姊討論後，寫入
+     H*                          總帳前再重CHAIN CBCUST
+     H*
+     H****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVDTL  IP  E           K        DISK
+     FARWF02  O   E           K        DISK                      A
+     FINVMST  IF  E           K        DISK
+     FACTRAN  UF  E           K        DISK
+0812AFCBCUST  IF  E           K        DISK
+     F*---------------------------------------------------------------
+     IIVREC
+     I                                              IVNO  L1
+8910 I            DS
+TEST I                                        1  10 IVNO
+ .   I                                        3  10 D#NO
+     I           UDS
+9008 I                                        1   60YM
+0112AI                                      221 2260D#IFRS
+     I                                     10211021 TXAR
+     C*****************************************************************
+     C*          KEY  LIST
+     C*****************************************************************
+     C           ACKEY     KLIST
+     C                     KFLD           TXAR
+     C                     KFLD           YM
+     C                     KFLD           ACVRNO
+     C                     KFLD           ACITEM
+     C*
+     C*****************************************************************
+     C**-------------------------------------------**
+     C**  MAIN LOGIC                               **
+     C**-------------------------------------------**
+     C  N90                EXSR IN#01
+     C   L1                EXSR DL#01
+     C  N11                EXSR DP#01
+     C**-------------------------------------------**
+     C**   INITIAL ROUTINE                         **
+     C**-------------------------------------------**
+     CSR         IN#01     BEGSR
+     C                     MOVEL'G00000'  ACVRNO
+     C                     Z-ADD0         ACITEM
+     C           ACKEY     SETLLACTRAN               95
+     C           *IN95     DOWEQ'0'
+     C                     READ ACTRAN                   95
+     C  N95      ACVRNO    IFGT 'G99999'
+     C                     SETON                     95
+     C                     ENDIF
+     C   95                LEAVE
+     C                     DELETRACVOUR
+     C                     ENDDO
+     C                     SETON                     90
+     C***
+0112AC           YM        IFLT D#IFRS
+0011AC                     MOVEL'G00000'  W#VNO1  6
+0011AC                     MOVEL'G99999'  W#VNO2  6
+0011AC                     CALL 'ARS888P'
+0011AC                     PARM           TXAR
+0011AC                     PARM           YM
+0011AC                     PARM           W#VNO1
+0011AC                     PARM           W#VNO2
+0112AC                     ENDIF
+     CSR                   ENDSR
+     C**-------------------------------------------**
+     C**   L1 PROCESS                              **
+     C**-------------------------------------------**
+     CSR         DL#01     BEGSR
+     C           IVNO      CHAININVMST               11
+     C  N11      INKIND    IFEQ ' '
+     C                     MOVEL'3'       INKIND
+     C                     ENDIF
+     C  N11                SELEC
+     C           TXAR      WHEQ 'P'
+     C           INAREA    ANDNE'P'
+     C           INAREA    ANDNE'T'
+     C           INAREA    ANDNE'L'
+9912AC           INAREA    ANDNE'U'
+     C**         INAREA    ANDNE'H'
+     C                     SETON                     11
+     C           TXAR      WHNE 'P'
+     C           INAREA    ANDNETXAR
+     C                     SETON                     11
+     C           INDECD    WHNE ' '
+     C                     SETON                     11
+     C           INTYPE    WHEQ '9'
+     C                     SETON                     11
+     C                     ENDSL
+     C  N11      INKIND    IFEQ '2'
+8910 C*                    ADD  INBAMT    INAAMT
+8912 C*          INAAMT    DIV  21        TAX    110H
+     C                     ENDIF
+     C****
+     C           INTXTP    IFNE '1'
+     C                     SETON                     11
+     C                     ENDIF
+     CSR                   ENDSR
+     C**--------------------------------------**
+     C**   DEATIL TIME PROCESS                **
+     C**--------------------------------------**
+     CSR         DP#01     BEGSR
+8910 C           D#NO      IFEQ '28203496'
+ .   C                     Z-ADD0         W#TEST  10
+ .   C                     ENDIF
+     C           INKIND    IFEQ '3'
+     C           IVACNT    ANDNE'5'
+     C                     GOTO DP#01Z
+     C                     ENDIF
+     C**** 排除二聯式發票因折讓而產生之稅額項次9002 START
+9002 C           INKIND    IFEQ '2'
+9002 C           IVACNT    ANDEQ'5'
+9002 C                     GOTO DP#01Z
+9002 C                     ENDIF
+     C****  9002  END
+     C           INKIND    IFEQ '2'
+     C                     SELEC
+     C           IVACNT    WHEQ '5'
+     C           IVFL03    ANDNE'C'
+     C           IVFL03    ANDNE'D'
+     C           IVFL03    ANDNE'G'
+     C           IVFL03    ANDNE'H'
+     C                     GOTO DP#01Z
+     C           IVACNT    WHNE '5'
+     C           IVFL03    ANDEQ'C'
+     C           IVFL03    ANDEQ'D'
+     C           IVFL03    ANDEQ'G'
+     C           IVFL03    ANDEQ'H'
+     C                     GOTO DP#01Z
+     C                     ENDSL
+     C                     ENDIF
+     C****
+     C***
+     C           INTYPE    IFEQ '9'
+     C                     GOTO DP#01Z
+     C                     ENDIF
+     C***
+     C                     CLEARRARWF02
+     C                     MOVELIVFLAG    W2FLAG
+     C                     MOVELIVNO      W2NO
+     C                     MOVELIVACNT    W2ACNT
+     C                     MOVELIVITEM    W2ITEM
+     C                     Z-ADDIVACDT    W2ACDT
+     C                     MOVELIVORNO    W2ORNO
+     C                     MOVELIVPDCD    W2PDCD
+     C                     Z-ADDIVQTY     W2QTY
+     C                     Z-ADDIVUPRC    W2UPRC
+     C           INKIND    IFEQ '2'
+     C*由於二聯式發票之銷貨以將稅額內含故/21
+     C*但非銷貨(折讓)並未含稅故* 0.05
+9002 C           IVACNT    IFEQ '1'
+9210 C           IVACNT    OREQ '4'
+     C           IVFL03    ANDEQ'E'
+     C           IVFL03    OREQ 'F'
+     C           IVAMT     DIV  21        W2AMT     H
+9002 C                     ELSE
+9006 C           IVAMT     MULT 0.05      W2AMT     H
+9006 C*          IVAMT     DIV  21        W2AMT     H
+9002 C                     ENDIF
+     C*                    SUB  W2AMT     TAX
+     C*          TAX       IFLT 2
+     C*                    ADD  TAX       W2AMT
+     C*                    ENDIF
+     C                     ELSE
+     C                     Z-ADDIVAMT     W2AMT
+     C                     ENDIF
+     C                     MOVELIVDECD    W2DECD
+     C                     MOVELIVDEDT    W2DEDT
+     C                     MOVELIVAPNO    W2APNO
+     C                     MOVELIVACNO    W2ACNO
+     C                     MOVELIVFL01    W2FL01
+     C                     MOVELIVFL02    W2FL02
+     C                     MOVELIVFL03    W2FL03
+     C                     MOVELIVTXAR    W2TXAR
+     C                     MOVELIVTXDT    W2TXDT
+     C                     MOVELIVRESV    W2RESV
+     C                     MOVELINKIND    W2KIND
+     C                     MOVELINAREA    W2AREA
+     C                     MOVELINCUNO    W2CUNO
+0812AC           INCUNO    CHAINCBCUST              N59
+0812AC  N59                MOVELCBCUNM    W2CUNM
+0812AC   59                MOVELINCUNM    W2CUNM
+     C                     MOVELINORNO    W2RESV
+     C                     WRITERARWF02
+     CSR         DP#01Z    ENDSR
+

@@ -1,0 +1,134 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP076R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     電子商務介面檔-請款單(ARLCDS)
+     H*            5.DATE-WRITTEN  90/09/27
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  IP  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FARLCDSW IF  E           K        DISK
+     FHSINFO  IF  E           K        DISK
+     FARAPLG  IF  E           K        DISK
+     FARLCDS  O   E           K        DISK
+     I*****************************************************************
+     IINREC       01
+TEST I            DS
+ .   I                                        1  10 INNO
+ .   I                                        1   2 D#INN1
+ .   I                                        3  10 D#INNO
+     C*****************************************************************
+     C*         KEY  LIST
+     C*****************************************************************
+     C           K#APLG    KLIST
+     C                     KFLD           A1APNO
+     C                     KFLD           A1ITEM
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     CLEARRARLCDS
+     C           D#INNO    IFEQ '87867859'
+     C           D#INN1    ANDEQ'PZ'
+     C                     Z-ADD0         W#TEST  10
+     C                     ENDIF
+     C*
+     C           INCUNO    CHAINCBREC                40
+     C  N40                MOVELCBMUID    ALVTNO           客戶統編
+     C                     MOVELINCUNM    ALCUNM           客戶簡稱
+     C                     MOVELINAPNO    ALAPNO           請款單號
+     C                     MOVELINORNO    ALORNO           訂單號碼
+     C                     MOVELINNO      ALIVNO           發票號碼
+     C           19110000  ADD  ININDT    ALIVDT           發票日期
+     C*
+     C           INAAMT    ADD  INATAX    ALAMNT           請款金額
+     C                     ADD  INBAMT    ALAMNT
+     C                     ADD  INCAMT    ALAMNT
+     C                     ADD  INCTAX    ALAMNT
+     C                     ADD  INDAMT    ALAMNT
+     C                     ADD  INDTAX    ALAMNT
+     C*                    ADD  INEAMT    ALAMNT
+     C                     ADD  INFAMT    ALAMNT
+     C*
+     C                     Z-ADDALAMNT    ALWAMT           出貨金額
+     C           INCAMT    ADD  INCTAX    W#CAMT 120       發票折讓
+     C                     Z-SUBW#CAMT    ALSAMT
+     C                     Z-SUBINBAMT    ALRAMT           扣預收
+     C                     Z-ADDINATAX    ALITAX           稅額
+     C*
+     C           INEAMT    MULT -1        ALXAMT           繳款金額
+     C                     Z-ADDINNBAL    ALYAMT           發票餘額
+     C*
+     C                     MOVE '1'       ALAPST
+     C           INEAMT    IFEQ 0                          繳款金額
+     C                     MOVE '0'       ALAPST
+     C                     ENDIF
+     C           INNBAL    IFEQ 0                          發票餘額
+     C                     MOVE '2'       ALAPST
+     C                     ENDIF
+     C*
+     C           INRCDT    IFNE 0
+     C           19110000  ADD  INRCDT    ALPDAT           繳款日期
+     C                     ENDIF
+     C*920723  加入註解START
+     C                     MOVELINAPNO    A1APNO           請款單號
+     C                     Z-ADD1         A1ITEM           項次
+     C           K#APLG    CHAINRARAPLG             N50
+     C           *IN50     IFEQ *OFF                       無資料
+     C           A1FLAG    ANDNE'D'                        無資料
+     C*
+     C                     SELEC
+     C           A1CODE    WHEQ '1'
+     C                     MOVEL'信用狀'ALBHKD           單據種類
+     C           A1CODE    WHEQ '2'
+     C                     MOVEL'支票'  ALBHKD           單據種類
+     C           A1CODE    WHEQ '3'
+     C                     MOVEL'匯款'  ALBHKD           單據種類
+     C                     ENDSL
+     C*
+     C                     MOVELA1VNNO    ALBHNO           單據編號
+     C                     MOVELA1BANK    ALBHBK           開立銀行
+     C           A1DAT1    IFNE 0
+     C           19110000  ADD  A1DAT1    ALBHD1           開立日期
+     C                     ENDIF
+     C           A1DAT2    IFNE 0
+     C           19110000  ADD  A1DAT2    ALBHD2           押匯日期
+     C                     ENDIF
+     C                     MOVELA1CURY    ALCURY           幣別
+     C                     Z-ADDA1BAMT    ALBAMT           單據餘額
+     C                     ENDIF
+     C*920723  加入註解END
+     C*
+     C           ALVTNO    CHAINRHSINFO             N42
+     C           ALORNO    CHAINRARLCDSW            N41
+     C           *IN41     IFEQ *OFF
+     C                     MOVE UDATE     W#CHDT  60
+     C           19110000  ADD  W#CHDT    W#USDT  80
+     C                     MOVE AWRCDT    P#DAT1  8
+     C                     MOVE W#USDT    P#DAT2  8
+     C                     CALL 'UTS103R'
+     C                     PARM           P#DAT1
+     C                     PARM           P#DAT2
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM 0         P#RTND  50
+     C                     PARM           P#ERR   1
+     C           P#RTND    IFLE 60
+     C  N40N42             WRITERARLCDS
+     C                     ENDIF
+     C                     ELSE
+     C  N40N42             WRITERARLCDS
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*
+

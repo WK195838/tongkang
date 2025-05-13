@@ -1,0 +1,347 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*             1.PROGRAM-ID    ARE051R
+     H*             2.PROGRAM-TYPE  RPG/400
+     H*             3.AUTHOR        S02LYW
+     H*             4.FUNCTION     發票異常處理(繳款資料移轉)
+     H*             5.DATE-WRITTEN  91/10/21
+     H*             6.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARE051S CF  E                    WORKSTN
+     FINVMST  UF  E           K        DISK
+     FINVDTL  UF  E           K        DISK                      A
+     FSARVINL2UF  E           K        DISK
+     FARALOG  O   E           K        DISK
+     E                    ERR     1   4 70               錯誤訊息
+     E                    ARY        20 87
+     I*****************************************************************
+     I            DS
+     I                                        1  87 D#ARY
+     I                                        1   1 D#FLAG
+     I                                        2   2 D#ACNT
+     I                                        3  100D#ACDT
+     I                                       11  19 D#ORNO
+     I                                       20  22 D#PDCD
+     I                                       23  290D#QTY
+     I                                       30  350D#UPRC
+     I                                       36  460D#AMT
+     I                                       47  47 D#DECD
+     I                                       48  550D#DEDT
+     I                                       56  63 D#APNO
+     I                                       64  70 D#ACNO
+     I                                       71  71 D#FL01
+     I                                       72  72 D#FL02
+     I                                       73  73 D#FL03
+     I                                       74  74 D#TXAR
+     I                                       75  820D#TXDT
+     I                                       83  87 D#RESV
+     I            DS
+     I                                      101 110 D#URIX
+     I                                      101 106 D#URI1
+     I                                      107 1100D#URI2
+     I            DS
+     I                                      301 340 D#RESE
+     I                                      301 310 D#IVNX
+     I                                      311 320 D#IVNY
+     I                                      321 330 D#URID
+     I           UDS
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVI
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*        KEY   LIST
+     C*****************************************************************
+     C*FILE-->INVMST
+     C           K#INVM    KLIST
+     C                     KFLD           INNO
+     C*FILE-->INVDTL
+     C           K#INVD    KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*FILE-->SARVINL2
+     C           K#SARV    KLIST
+     C                     KFLD           SIINNO
+     C*****************************************************************
+     C*        MAIN  PROGRAM
+     C*****************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000           資料搬移
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C                     MOVE '01'      W#PRID
+     C                     MOVEL'ARE051S' S#SRID
+     C                     MOVE *BLANK    S#IVNX           作廢發票
+     C                     MOVE *BLANK    S#IVNY           移轉發票
+     C                     MOVE *BLANK    S#URID           申請人員
+     C                     MOVE *BLANK    S#CGCA           原因簡述
+     C                     MOVE *ALL'9'   ARY
+     C*
+     C                     MOVELS#URID    D#URI1
+     C                     Z-ADD1         D#URI2
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C                     MOVE '01'      W#PRID  2
+     C                     MOVE *OFF      *IN30
+     C*
+     C           W#PRID    DOWEQ'01'
+     C*
+     C                     WRITEAR051H
+     C                     EXFMTAR051T
+     C*
+     C                     MOVE *BLANK    S#ERR
+     C*
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           S#IVNX    IFEQ *BLANK                     作廢發票
+     C           S#IVNY    OREQ *BLANK                     移轉發票
+     C           S#URID    OREQ *BLANK                     申請人員
+     C           S#CGCA    OREQ *BLANK                     原因簡述
+     C                     MOVE *ON       *IN30
+     C                     MOVELERR,1     S#ERR            不得空白
+     C                     ITER
+     C                     ENDIF
+     C*檢核發票號碼START-----
+     C           S#IVNX    CHAININREC                40
+     C           *IN40     IFEQ *ON
+     C           INDECD    ORNE 'D'
+     C                     MOVELERR,2     S#ERR            資料不正確
+     C                     SETON                     3099
+     C                     ELSE
+     C                     MOVELINORNO    W#ORNO  6        訂單號碼
+     C                     MOVELINCUNO    W#CUNO  6        客戶編號
+     C                     MOVELINAPNO    W#APNO  7        請款單號
+     C                     Z-ADDINAPDT    W#APDT  80       請款日期
+     C                     MOVELINRCNO    W#RCNO  6        繳款單號
+     C                     Z-ADDINRCDT    W#RCDT  80       繳款日期
+     C                     ENDIF
+     C*
+     C  N99      S#IVNY    CHAININREC                40
+     C  N99 40   S#IVNY    IFNE INNO
+     C           W#ORNO    ORNE INORNO
+     C           W#CUNO    ORNE INCUNO
+     C                     MOVELERR,4     S#ERR            資料不同
+     C                     ENDIF
+     C*檢核發票號碼END-----
+     C  N99 10             MOVE '02'      W#PRID
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*搬移資料並寫入LOG
+     C                     EXSR SR2100                     舊發票繳款
+     C                     EXSR SR2200                     新發票繳款
+     C                     EXSR SR2300                     改繳款書
+     C                     EXSR SR2400                     寫入LOG
+     C                     MOVE ERR,3     S#ERR            處理成功
+     C                     MOVE '1'       W#PRID
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C*取得舊發票繳款記錄
+     C                     MOVE S#IVNX    IVNO
+     C                     MOVE '6'       IVACNT
+     C                     Z-ADD0         IVITEM
+     C           K#INVD    SETLLIVREC
+     C           *IN41     DOWEQ*OFF
+     C                     READ IVREC                    41
+     C*
+     C           S#IVNX    IFNE IVNO
+     C           IVACNT    ORNE '6'
+     C           *IN41     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVEL'A'       D#FLAG
+     C                     MOVELIVACNT    D#ACNT
+     C                     Z-ADDIVACDT    D#ACDT
+     C                     MOVELIVORNO    D#ORNO
+     C                     MOVELIVPDCD    D#PDCD
+     C                     Z-ADDIVQTY     D#QTY
+     C                     Z-ADDIVUPRC    D#UPRC
+     C                     Z-ADDIVAMT     D#AMT
+     C                     MOVEL' '       D#DECD
+     C                     Z-ADD0         D#DEDT
+     C                     MOVELIVAPNO    D#APNO
+     C                     MOVELIVACNO    D#ACNO
+     C                     MOVELIVFL01    D#FL01
+     C                     MOVELIVFL02    D#FL02
+     C                     MOVELIVFL03    D#FL03
+     C                     MOVELIVTXAR    D#TXAR
+     C                     Z-ADDIVTXDT    D#TXDT
+     C                     MOVELIVRESV    D#RESV
+     C*
+     C                     Z-ADDIVITEM    I
+     C                     MOVE D#ARY     ARY,I
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2200    BEGSR
+     C*****************************************************************
+     C*ARY初始值
+     C                     SORTAARY                        排序
+     C                     Z-ADD1         I
+     C           1         DO   20        I       20
+     C           D#ACNT    IFEQ '9'
+     C                     LEAVE
+     C                     ELSE
+     C                     EXSR SR2210                     寫入
+     C                     EXSR SR2220                     重新合計
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2210    BEGSR
+     C*****************************************************************
+     C*寫入INVDTL新發票繳款記錄
+     C                     MOVE S#IVNY    IVNO
+     C                     MOVE '6'       IVACNT
+     C                     MOVE *HIVAL    IVITEM
+     C           K#INVD    SETGTIVREC
+     C                     READPIVREC                    42
+     C*取得項次
+     C           *IN42     IFEQ *ON
+     C                     Z-ADD1         W#ITEM  20       發票項次
+     C           IVNO      IFEQ S#IVNY
+     C           IVACNT    ANDEQ'6'
+     C                     ADD  1         W#ITEM
+     C                     ELSE
+     C                     Z-ADD1         W#ITEM           發票項次
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVELS#IVNY    IVNO
+     C                     MOVE '6'       IVACNT
+     C                     Z-ADDW#ITEM    IVITEM
+     C           K#INVD    CHAINIVREC                43
+     C*
+     C                     CLEARIVREC
+     C*
+     C                     MOVELS#IVNY    IVNO
+     C                     Z-ADDW#ITEM    IVITEM
+     C                     MOVELD#FLAG    IVFLAG
+     C                     MOVELD#ACNT    IVACNT
+     C                     Z-ADDD#ACDT    IVACDT
+     C                     MOVELD#ORNO    IVORNO
+     C                     MOVELD#PDCD    IVPDCD
+     C                     Z-ADDD#QTY     IVQTY
+     C                     Z-ADDD#UPRC    IVUPRC
+     C                     Z-ADDD#AMT     IVAMT
+     C                     MOVELD#DECD    IVDECD
+     C                     Z-ADDD#DEDT    IVDEDT
+     C                     MOVELD#APNO    IVAPNO
+     C                     MOVELD#ACNO    IVACNO
+     C                     MOVELD#FL01    IVFL01
+     C                     MOVELD#FL02    IVFL02
+     C                     MOVELD#FL03    IVFL03
+     C                     MOVELD#TXAR    IVTXAR
+     C                     Z-ADDD#TXDT    IVTXDT
+     C                     MOVELD#RESV    IVRESV
+     C*確認繳款金額
+     C                     Z-ADDD#AMT     IVAMT            繳款金額
+     C*
+     C   43                WRITEIVREC
+     C  N43                UPDATIVREC
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2220    BEGSR
+     C*****************************************************************
+     C*重新合計INVMST金額
+     C           IVNO      CHAININREC                44
+     C*
+     C                     MOVE 'C'       INFLAG           傳輸碼
+     C                     MOVELW#APNO    INAPNO           請款單號
+     C                     Z-ADDW#APDT    INAPDT           請款日期
+     C                     MOVELW#RCNO    INRCNO           繳款單號
+     C                     Z-ADDW#RCDT    INRCDT           繳款日期
+     C*
+     C                     ADD  IVAMT     INEAMT           繳款金額
+     C*彙總未收餘額
+     C           INAAMT    ADD  INATAX    INNBAL           出+銷項
+     C                     ADD  INBAMT    INNBAL           扣預收
+     C                     ADD  INCAMT    INNBAL           折/銷
+     C                     ADD  INCTAX    INNBAL           折/銷稅
+     C                     ADD  INDAMT    INNBAL           扣預收金額
+     C                     ADD  INDTAX    INNBAL           扣預收稅額
+     C                     ADD  INEAMT    INNBAL           繳款金額
+     C                     ADD  INFAMT    INNBAL           退票金額
+     C*
+     C  N44                UPDATINREC
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2300    BEGSR
+     C*****************************************************************
+     C*UPDATE繳款
+     C                     MOVELINNO      SIINNO
+     C*
+     C           K#SARV    SETLLSIREC                45
+     C           *IN45     DOWEQ*OFF
+     C                     READ SIREC                    45
+     C   45                LEAVE
+     C*
+     C           S#IVNX    IFEQ SIINNO
+     C                     MOVELS#IVNY    SIINNO           發票號碼
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C  N45                UPDATSIREC
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2400    BEGSR
+     C*****************************************************************
+     C*寫入ARALOG檔
+     C                     CLEARRARALOG
+     C                     MOVE UDATE     AGDATE           處理日期
+     C                     TIME           AGTIME           處理時間
+     C*避免資料重覆
+     C                     MOVELD#URID    AGURID           使用者帳號
+     C*
+     C                     MOVE *BLANK    AGTRID           異動代號
+     C                     MOVE *BLANK    AGRENO           相關號碼
+     C                     MOVELS#CGCA    AGCGCA           修改原因
+     C                     MOVE *BLANK    AGCNFR           主管確認碼
+     C*保留碼前1~10放作廢發票號碼
+     C*       11~20放移轉發票號碼
+     C*         21~30放申請人員
+     C                     MOVELS#IVNX    D#IVNX           作廢發票
+     C                     MOVELS#IVNY    D#IVNY           移轉發票
+     C                     MOVELS#URID    D#URID           申請人員
+     C                     MOVELD#RESE    AGRESE
+     C*
+     C                     WRITERARALOG
+     C                     ADD  1         D#URI2
+     C                     ENDSR
+**  ERR
+01-欄位不得為空白。
+02-此張發票並未作廢，請查核。
+03-移轉發票繳款資料作業成功。
+04-此移轉發票號碼與作廢發票號碼之客戶編號或訂單號碼不同。
+

@@ -1,0 +1,104 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR134R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     折讓單統計表（含銷折／銷退／預收）
+     H*          5.DATE-WRITTEN  98/01/12
+     H*          6.DATE-MODIFY
+     H*                         104/10/09  2015AR953  S00WCJ (0409A)
+     H*                          產品代碼3碼擴5碼
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FTRNDTLL3IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FARR134F O   E           K        DISK
+     F*----------------------------------------------------------------
+     ITXREC       01
+     I*
+     I            DS
+0409AI                                        1  30 TXRESV
+     I                                       15  15 D#RESV
+     I*
+     I           UDS
+     I                                      301 3080U#DATS
+     I                                      309 3160U#DATE
+     I                                      317 317 U#ARE1
+     I                                      318 318 U#ARE2
+     I                                      319 319 U#CODE
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C           TXNO      IFEQ 'M02974'
+     C                     Z-ADD0         W#TMP   10
+     C                     ENDIF
+     C*
+     C           U#CODE    IFEQ '1'
+     C           TXTXAR    ANDEQ'H'
+     C                     GOTO ENDTSR
+     C                     ENDIF
+     C*
+     C           TXIVNO    CHAININREC                40
+     C           *IN40     IFEQ *OFF
+     C                     CLEARRAR134F
+     C                     MOVELTXNO      A4NO             折讓單號
+     C                     MOVELTXITEM    A4ITEM           折讓項次
+     C                     Z-ADDTXACDT    A4ACDT           入帳日期
+     C                     MOVELTXCUNM    A4CUNM           客戶名稱
+     C                     MOVELTXORNO    A4ORNO           訂單編號
+     C                     MOVELTXIVNO    A4INNO           發票號碼
+     C                     Z-ADDTXAMT     A4AMT            未稅
+     C                     Z-ADDTXTAX     A4TAX            稅額
+     C           A4AMT     ADD  A4TAX     A4TOT            金額
+     C                     MOVELTXACNT    A4ACNT           折讓原因別
+     C                     MOVELTXTXAR    A4AREA
+     C*
+     C*如為銷折，還需進一步判別其為磅差、價差或其它折讓
+     C*
+     C           A4ACNT    IFEQ '3'
+     C           D#RESV    IFNE '1'
+     C           D#RESV    ANDNE'3'
+     C                     MOVE 'X'       A4ACNT           銷折原因別
+     C                     ELSE
+     C                     MOVE D#RESV    A4ACNT           銷折原因別
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C*TXACNT='4'且TXAMT>0 --->  預收折讓
+     C*TXACNT='4'且TXAMT<0 --->  扣預沖回
+     C*
+     C           TXACNT    IFEQ '4'
+     C           TXAMT     IFGT 0
+     C                     MOVELTXACNT    A4ACNT           折讓原因別
+     C                     ELSE
+     C                     MOVEL'5'       A4ACNT
+     C                     ENDIF
+     C*
+     C*TXACNT='4'且TXACDT=99999999  --->  扣預沖回
+     C*扣預沖回一律掛P
+     C*
+     C           TXACDT    IFEQ 99999999
+     C                     MOVEL'6'       A4ACNT
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     WRITERAR134F
+     C                     ENDIF
+     C*
+     C           ENDTSR    ENDSR
+     C*****************************************************************
+

@@ -1,0 +1,134 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP118R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LBU
+     H*            4.FUNCTION     新桃工程自用發票申請挑選資料
+     H*            5.DATE-WRITTEN  98/02/24
+     H*
+     H* 說明：將新桃工程自用明細內的資料挑出再寫入暫時檔內，
+     H*       同時加上工程編號管控的資訊。
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FUENDTL  IP  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FUENDTLN O   E           K        DISK
+     F*****************************************************************
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10011003 U#DPID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1  11 D#TNNO
+     I                                        1   6 D#PJN1
+     I                                        7  10 D#PJN2
+     I                                       11  11 D#AREA
+     C*****************************************************************
+     C*        KEY   LIST
+     C*****************************************************************
+     C*
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C                     EXSR DTLSR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C*
+     C                     MOVEL*BLANK    W#NO   11
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C*
+     C           UVUPRC    IFEQ 0
+     C           UVAMT     OREQ 0
+     C                     GOTO ENDTSR
+     C                     ENDIF
+     C*
+     C                     EXSR SR1000                     搬移資料
+     C                     WRITETNREC
+     C*
+     CSR         ENDTSR    ENDSR
+     C*-------------------------------
+     C* 搬移資料
+     C*-------------------------------
+     CSR         SR1000    BEGSR
+     C*
+     C                     MOVELUVFLAG    TNFLAG           處理代碼
+     C                     MOVEL'UA04'    TNCODE           單據代碼
+     C                     MOVELUVPJNO    D#TNNO
+     C                     MOVE UVAREA    D#AREA
+     C                     MOVELD#TNNO    TNNO             單據號碼
+     C                     MOVELUVTRCD    TNTRCD           異動代號
+     C                     MOVE UDATE     TNDATE           開立日期
+     C                     MOVE UDATE     TNACDT           申請日期
+     C                     MOVEL'MM002'   TNCUNO           客戶代號
+     C                     MOVELUVCUNO    TNOBNO           目標客號
+     C                     MOVEL*BLANK    TNORNO           訂單編號
+     C                     MOVELUVPJNO    TNPJNO           工程編號
+     C                     MOVELUVNO      TNIVNO           發票號碼
+     C                     MOVELUVVRNO    TNVUNO           傳票號碼
+     C                     MOVEL'T'       TNRVID           收款業務員
+     C                     MOVEL'T'       TNSALE           出貨業務員
+     C                     MOVEL'L'       TNSATP           銷售別
+     C                     MOVEL'3'       TNIVTP           發票別
+     C                     MOVELUVPDNM    TNPDNM           品名代號
+     C                     Z-ADDUVQTY     TNQTY            數量
+     C                     Z-ADDUVUPRC    TNUPRC           單價
+     C                     Z-ADDUVAMT     TNAMT            金額
+     C                     Z-ADDUVTAX     TNTAX            稅額
+     C                     Z-ADDUVYM      TNYM             資料年月
+     C                     MOVEL*BLANK    TNFL01           折讓確認碼
+     C                     MOVEL*BLANK    TNFL02           過發票碼
+     C                     MOVELU#AREA    TNTXAR           異動廠區
+     C                     MOVE UDATE     TNTXDT           異動日期
+     C                     MOVEL*BLANK    TNRESV           保留碼
+     C                     MOVELUVPJNO    TNORN5           六碼工程
+     C*
+     C                     MOVEL*BLANK    W#PJN1  1
+     C                     MOVE D#PJN1    W#PJN1
+     C*
+     C           W#PJN1    IFEQ ' '
+     C                     MOVEL*BLANK    D#PJN2
+     C                     MOVELD#TNNO    TNNO             單據號碼
+     C                     ENDIF
+     C*
+     C           TNNO      IFNE W#NO
+     C                     MOVELTNNO      W#NO
+     C                     Z-ADD1         TNITEM           項次
+     C                     ELSE
+     C                     ADD  1         TNITEM           項次
+     C                     ENDIF
+     C*
+     C                     MOVEL*OFF      *IN30
+     C           TNCUNO    CHAINCBREC                30
+     C  N30                MOVELCBCUNM    TNCUNM           客戶名稱
+     C   30                MOVEL*BLANK    TNCUNM           客戶名稱
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  LR 函式  印核覆
+     C*********************************
+     CSR         LRSR      BEGSR
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+

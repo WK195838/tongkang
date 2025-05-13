@@ -1,0 +1,354 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR098R4
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     自製出貨分析表　　
+     H*            5.DATE-WRITTEN  91/09/30
+     H*            6.DATE-MODIFY
+     H*
+     H*            *將資料寫入報表
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR098F1IP  E           K        DISK
+     FARR098T O   E             69     PRINTER
+     E                    TABA1   6   6  1   TABA2   6
+     E                    TABN1   1   8  3   TABN2  12
+     E                    ARY1       50 75
+     E*****************************************************************
+     IRAR098F1
+     I                                              F1CODEL1
+     I           UDS
+     I                                      410 410 S#AREA
+     I                                      411 416 S#YYMM
+     I                                      417 422 S#YYM1
+     I                                      430 430 S#OPT
+     I*
+     I                                     10011010 U#USID
+     I            DS
+     I                                        1  75 D#ARY1
+     I                                        1   3 D#PDNM
+     I                                        4  140D#CQ
+     I                                       15  270D#CM
+     I                                       28  380D#R89Q
+     I                                       39  510D#R89M
+     I                                       52  620D#R98Q
+     I                                       63  750D#R98M
+     I*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN69
+     C                     MOVE *OFF      *IN32
+     C                     MOVE *OFF      *IN33
+     C*
+     C                     MOVE *ALL'='   R#LIN1
+     C                     MOVE *ALL'='   R#LIN2
+     C                     MOVE *ALL'9'   ARY1
+     C*
+     C                     MOVE S#YYMM    R#ACDS           起始入帳日
+     C                     MOVE S#YYM1    R#ACDE           終止入帳日
+     C*廠區
+     C           S#AREA    LOKUPTABA1     TABA2          60
+     C   60                MOVELTABA2     R#AREA           　　　
+     C*
+     C                     MOVEL'X'       W#FLA1  1
+     C                     MOVEL'Z'       W#FLA2  1
+     C                     Z-ADD0         I       40
+     C                     CLEARAR098T1D
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR098T1S
+     C                     MOVE *ALL'='   R#LIN3
+     C                     MOVE *ON       *IN40
+     C                     MOVE *ON       *IN41
+     C                     MOVE *ON       *IN42
+     C                     Z-ADD0         D#R89Q
+     C                     Z-ADD0         D#R89M
+     C                     Z-ADD0         D#R98Q
+     C                     Z-ADD0         D#R98M
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVEL*BLANK    R#PNOR
+     C                     MOVEL*BLANK    R#PNNM
+     C                     Z-ADD0         R#QTY4
+     C                     Z-ADD0         R#AMT4
+     C                     Z-ADD0         R#PRC4
+     C                     Z-ADD0         R#QTY2
+     C                     Z-ADD0         R#AMT2
+     C                     Z-ADD0         R#AMT3
+     C                     Z-ADD0         R#QTY
+     C                     Z-ADD0         R#AMT
+     C                     Z-ADD0         R#PRC
+     C*
+     C*品名
+     C                     MOVELF1PDNM    W#PDNM  1
+     C           W#PDNM    IFEQ '1'
+     C                     MOVEL'鋼胚'  R#PNNM
+     C                     ENDIF
+     C*
+     C           W#PDNM    IFEQ '2'
+     C           F1PDNM    LOKUPTABN1     TABN2          61
+     C   61                MOVELTABN2     R#PNNM
+     C                     ENDIF
+     C*
+     C           W#PDNM    IFEQ '3'
+     C                     MOVEL'型鋼'  R#PNNM
+     C                     ENDIF
+     C*
+     C           W#PDNM    IFEQ '4'
+     C                     MOVEL'鋼板'  R#PNNM
+     C                     ENDIF
+     C*----------------------------------------------------------------
+     C           F1CODE    IFEQ '1'                        銷貨彙總
+     C*
+     C                     MOVE *OFF      *IN40
+     C                     MOVEL'彙總表'R#NAME
+     C*
+     C                     MOVELF1PDNM    R#PNOR           品名
+     C                     Z-ADDF1QTY4    R#QTY4           數量
+     C                     Z-ADDF1AMT4    R#AMT4           金額
+     C                     Z-ADDF1QTY2    R#QTY2           退貨數量
+     C                     Z-ADDF1AMT2    R#AMT2           退貨金額
+     C                     Z-ADDF1AMT3    R#AMT3           折讓金額
+     C                     Z-ADDF1QTY     R#QTY            銷貨淨數量
+     C                     Z-ADDF1AMT     R#AMT            銷貨淨收入
+     C*
+     C*單價＝金額／數量
+     C           R#QTY4    IFNE 0
+     C           R#AMT4    ANDNE0
+     C           R#AMT4    DIV  R#QTY4    R#PRC4    H      單價
+     C                     ENDIF
+     C*
+     C*單價＝銷貨淨收入／銷貨淨數量
+     C           R#QTY     IFNE 0
+     C           R#AMT     ANDNE0
+     C           R#AMT     DIV  R#QTY     R#PRC     H      單價
+     C                     ENDIF
+     C*
+     C*小計
+     C                     ADD  R#QTY4    R#SQT4
+     C                     ADD  R#AMT4    R#SAM4
+     C                     ADD  R#QTY2    R#SQT2
+     C                     ADD  R#AMT2    R#SAM2
+     C                     ADD  R#AMT3    R#SAM3
+     C                     ADD  R#QTY     R#SQTY
+     C                     ADD  R#AMT     R#SAMT
+     C*
+     C   69                WRITEAR098T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR098T1D
+     C                     MOVE *ON       *IN32
+     C*
+     C                     ENDIF
+     C*----------------------------------------------------------------
+     C           F1CODE    IFEQ '2'                        銷貨彙總
+     C*
+     C                     MOVE *OFF      *IN41
+     C                     MOVEL'外購表'R#NAME
+     C                     MOVELF1PDNM    R#PNOR
+     C                     Z-ADDF1QTY     R#QTY
+     C                     Z-ADDF1AMT     R#AMT
+     C*
+     C*單價＝銷貨淨收入／銷貨淨數量
+     C           R#QTY     IFNE 0
+     C           R#AMT     ANDNE0
+     C           R#AMT     DIV  R#QTY     R#PRC     H      單價
+     C                     ENDIF
+     C*
+     C*小計
+     C                     ADD  R#QTY4    R#SQT4
+     C                     ADD  R#AMT4    R#SAM4
+     C                     ADD  R#QTY2    R#SQT2
+     C                     ADD  R#AMT2    R#SAM2
+     C                     ADD  R#AMT3    R#SAM3
+     C                     ADD  R#QTY     R#SQTY
+     C                     ADD  R#AMT     R#SAMT
+     C*
+     C           W#FLA1    IFEQ 'X'
+     C                     MOVE *OFF      *IN32
+     C                     MOVEL*BLANK    W#FLA1
+     C                     ENDIF
+     C*
+     C   69                WRITEAR098T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR098T1D
+     C                     MOVE *ON       *IN32
+     C*
+     C                     ENDIF
+     C*----------------------------------------------------------------
+     C           F1CODE    IFEQ '3'                        銷貨彙總
+     C*
+     C                     MOVE *OFF      *IN42
+     C                     MOVEL'自製表'R#NAME
+     C                     MOVELF1PDNM    R#PNOR           品名
+     C                     Z-ADDF1QTY4    R#QTY4           數量
+     C                     Z-ADDF1AMT4    R#AMT4           金額
+     C                     Z-ADDF1QTY2    R#QTY2           退貨數量
+     C                     Z-ADDF1AMT2    R#AMT2           退貨金額
+     C                     Z-ADDF1AMT3    R#AMT3           折讓金額
+     C                     Z-ADDF1QTY     R#QTY            銷貨淨數量
+     C                     Z-ADDF1AMT     R#AMT            銷貨淨收入
+     C*單價＝金額／數量
+     C           R#QTY4    IFNE 0
+     C           R#AMT4    ANDNE0
+     C           R#AMT4    DIV  R#QTY4    R#PRC4    H      單價
+     C                     ENDIF
+     C*
+     C*單價＝銷貨淨收入／銷貨淨數量
+     C           R#QTY     IFNE 0
+     C           R#AMT     ANDNE0
+     C           R#AMT     DIV  R#QTY     R#PRC     H      單價
+     C                     ENDIF
+     C*
+     C*小計
+     C                     ADD  R#QTY4    R#SQT4
+     C                     ADD  R#AMT4    R#SAM4
+     C                     ADD  R#QTY2    R#SQT2
+     C                     ADD  R#AMT2    R#SAM2
+     C                     ADD  R#AMT3    R#SAM3
+     C                     ADD  R#QTY     R#SQTY
+     C                     ADD  R#AMT     R#SAMT
+     C*
+     C           W#FLA2    IFEQ 'Z'
+     C                     MOVE *OFF      *IN32
+     C                     MOVEL*BLANK    W#FLA2
+     C                     ENDIF
+     C*
+     C*
+     C   69                WRITEAR098T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR098T1D
+     C                     MOVE *ON       *IN32
+     C*
+     C                     ENDIF
+     C*
+     C                     Z-ADD1         I
+     C                     SORTAARY1
+     C           1         DO   50        I
+     C                     MOVE ARY1,I    D#ARY1
+     C           F1PDNM    IFEQ D#PDNM
+     C  N40                Z-ADDF1QTY     D#CQ
+     C  N40                Z-ADDF1AMT     D#CM
+     C  N41                Z-ADDF1QTY     D#R89Q
+     C  N41                Z-ADDF1AMT     D#R89M
+     C  N42                Z-ADDF1QTY     D#R98Q
+     C  N42                Z-ADDF1AMT     D#R98M
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C                     ELSE
+     C           D#PDNM    IFEQ '999'
+     C                     CLEARARY1,I
+     C                     MOVELF1PDNM    D#PDNM
+     C  N40                Z-ADDF1QTY     D#CQ
+     C  N40                Z-ADDF1AMT     D#CM
+     C  N41                Z-ADDF1QTY     D#R89Q
+     C  N41                Z-ADDF1AMT     D#R89M
+     C  N42                Z-ADDF1QTY     D#R98Q
+     C  N42                Z-ADDF1AMT     D#R98M
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C*
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*單價合計＝金額合計／數量合計
+     C           R#SQT4    IFNE 0
+     C           R#SAMT    ANDNE0
+     C           R#SAM4    DIV  R#SQT4    R#SPR4    H      單價
+     C                     ENDIF
+     C*
+     C*單價合計＝銷貨淨收入合計／銷貨淨數量合計
+     C           R#SQTY    IFNE 0
+     C           R#SAMT    ANDNE0
+     C           R#SAMT    DIV  R#SQTY    R#SPRC    H      單價
+     C                     ENDIF
+     C*
+     C   69                WRITEAR098T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR098T1S
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C*
+     C                     Z-ADD1         I
+     C*
+     C                     SORTAARY1
+     C           1         DO   50        I
+     C                     MOVE ARY1,I    D#ARY1
+     C*
+     C           D#PDNM    IFNE '999'
+     C                     MOVELD#PDNM    R#PDNM
+     C           D#CQ      IFEQ *ALL'9'
+     C                     MOVEL*BLANK    R#CQ
+     C                     MOVEL*BLANK    R#CM
+     C                     ELSE
+     C                     Z-ADDD#CQ      R#CQ
+     C                     Z-ADDD#CM      R#CM
+     C                     ENDIF
+     C           D#R89Q    IFEQ *ALL'9'
+     C                     MOVEL*BLANK    R#R89Q
+     C                     MOVEL*BLANK    R#R89M
+     C                     ELSE
+     C                     Z-ADDD#R89Q    R#R89Q
+     C                     Z-ADDD#R89M    R#R89M
+     C                     ENDIF
+     C           D#R98Q    IFEQ *ALL'9'
+     C                     MOVEL*BLANK    R#R98Q
+     C                     MOVEL*BLANK    R#R98M
+     C                     ELSE
+     C                     Z-ADDD#R98Q    R#R98Q
+     C                     Z-ADDD#R98M    R#R98M
+     C                     ENDIF
+     C                     WRITEAR098T1A
+     C                     MOVE *ON       *IN33
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*
+     C  N69                WRITEAR098T1H
+     C                     MOVE *ON       *IN69
+     C                     WRITEAR098T1M
+     C*
+     C                     ENDSR
+     C*****************************************************************
+**  TABA1 TABA2
+P台北T桃園M台中K高雄H苗栗Z林口
+**  TABN1 TABN2
+211中級銲鋼筋
+212中級鋼筋
+213高拉鋼筋
+218高拉銲鋼筋
+251中級銲定尺
+252中級定尺清
+253高拉定尺清
+258高拉銲定尺
+

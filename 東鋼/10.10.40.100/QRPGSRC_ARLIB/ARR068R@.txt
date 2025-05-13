@@ -1,0 +1,179 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR068R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     訂單別繳款明細表列印報表
+     H*            5.DATE-WRITTEN  86/07/28
+     H*
+     H*****************************************************************
+     FINVDTL  IP  E           K        DISK
+     FRCVDTL  IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FSAMAST  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FARR068T O   E             66     PRINTER
+     I*****************************************************************
+     IIVREC
+     I                                              IVAPNOL1
+     I*------------------------------------------------------
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1   5 W#ORNO
+     I                                        1   1 S1OREA
+     I                                        2   50S1ORNO
+     I            DS
+     I                                        1   6 W#CUNO
+     I                                        1   1 S1KIND
+     I                                        2   2 S1CUN1
+     I                                        3   5 S1CUN2
+     I                                        6  10 S1BK05
+     C**************************************************************
+     C*   程式參數接收區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#ORNO  5
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C                     Z-ADD0         W#RCNT  60       列印筆數
+     C                     SETON                     66    首頁表頭
+     C                     Z-ADD0         R#TTA1
+     C                     Z-ADD0         R#TTA2
+     C                     Z-ADD0         R#STA1
+     C                     Z-ADD0         R#STA2
+     C*
+     C                     MOVEL*BLANK    R#CUNO
+     C                     MOVEL*BLANK    R#CUNM
+     C                     MOVELP#ORNO    R#ORNO
+     C                     MOVELP#ORNO    W#ORNO
+     C           K#OR      KLIST
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C           K#OR      CHAINRSAMAST              69    依訂單找出
+     C           *IN69     IFEQ '0'
+     C                     MOVELW#CUNO    R#CUNO
+     C           W#CUNO    CHAINCBCUST               69    客戶編號
+     C           *IN69     IFEQ '0'
+     C                     MOVELCBCUNM    R#CUNM           客戶名稱
+     C                     ENDIF
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式(換一張繳款單)
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     Z-ADD0         R#STA1           清小計票據
+     C                     Z-ADD0         R#STA2           清小計繳款
+     C*          --------- 印出繳款單之票据明細---------------
+     C                     MOVEL'T'       W#P1ST  1        首次列印旗
+     C                     MOVELIVAPNO    W#RVNO  6
+     C           W#RVNO    CHAINRVREC                69
+     C           *IN69     DOWEQ'0'
+     C                     CLEARAR068T1
+     C           W#P1ST    IFEQ 'T'
+     C                     MOVELRVNO      R#RVNO           繳款編號
+     C                     MOVE 'F'       W#P1ST
+     C                     ENDIF
+     C                     MOVELRVNTNO    R#NTNO           票据號碼
+     C                     MOVELRVACTP    R#ACTP           借貸別
+     C                     Z-ADDRVDATE    R#RVDT           繳款日期
+     C                     Z-ADDRVDUDT    R#DUDT           到期日期
+     C                     Z-ADDRVRAMT    R#RAMT           票据金額
+     C                     EXSR SR#PR1                     印出一筆
+     C           RVACTP    IFEQ 'C'
+     C                     SUB  RVRAMT    R#STA1           貸方
+     C                     ELSE
+     C                     ADD  RVRAMT    R#STA1           借方
+     C                     ENDIF
+     C           W#RVNO    READERVREC                    69
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式     印出發票部份明細
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     CLEARAR068T1
+     C                     MOVELIVNO      R#IVNO           發票號碼
+     C                     Z-ADDIVAMT     R#AAMT           繳款金額
+     C           IVNO      CHAININREC                69
+     C           *IN69     IFEQ '0'
+     C                     Z-ADDININDT    R#INDT           發票日期
+     C                     MOVELINAPNO    R#APNO           請款單號
+     C                     Z-ADDINAPDT    R#APDT           請款日期
+     C                     ENDIF
+     C                     EXSR SR#PR1                     印出一筆
+     C                     ADD  IVAMT     R#STA2           小計
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  列印小計
+     C*********************************
+     CSR         L1SR      BEGSR
+     C           *IN66     IFEQ '1'
+     C                     WRITEAR068TH
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR068T2
+     C*
+     C                     ADD  R#STA1    R#TTA1
+     C                     ADD  R#STA2    R#TTA2
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  列印總計
+     C*********************************
+     CSR         LRSR      BEGSR
+     C           W#RCNT    IFEQ 0
+     C                     EXSR MSGSR
+     C                     ELSE
+     C           *IN66     IFEQ '1'
+     C                     WRITEAR068TH
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR068T3
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     WRITEAR068TH
+     C                     WRITEAR068TM
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+     C*  子函式集
+     C*****************************************************************
+     C*********************************
+     C*  共用子函式  印出明細
+     C*********************************
+     CSR         SR#PR1    BEGSR
+     C                     ADD  1         W#RCNT
+     C           *IN66     IFEQ '1'
+     C                     WRITEAR068TH
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR068T1
+     CSR                   ENDSR
+     C*
+

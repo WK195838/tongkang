@@ -1,0 +1,348 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR087R
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02HYS
+     H*            4.FUNCTION     專案退稅明細表
+     H*            5.DATE-WRITTEN  89/05/04
+     H*                            89/05/19 依發票開立日期加總
+     H*****************************************************************
+     FARBTAXX IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FTRNDTL  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FARR087T O   E             69     PRINTER
+     E                    TAB1   12  12  2 0 TAB2    2 0 *月份*
+     E                    TAB3    6   6  2 0 TAB4    5   *名稱*
+0519 E                    ARY        12 48               *發票年月
+     IRARBTAX     01
+     I                                              AXADDTL4
+     I                                              AXYYMML3
+     I                                              AXCUNOL2
+     I                                              AXORNOL1
+     I           UDS
+     I                                      501 504 D#YYMM
+     I                                      505 508 D#YYM1
+     I            DS
+     I                                        1   60W#ADDT
+     I                                        1   2 W#Y1
+     I                                        3   4 W#Y2
+     I                                        5   60W#M1
+     I            DS
+     I                                        1   7 D#ADDT
+     I                                        1   2 D#Y1
+     I                                        3   7 D#M1
+     I            DS
+     I                                        1   40W#YYMM
+     I                                        1   20W#YY
+     I                                        3   40W#MM
+0519 I*           DS
+0519 I*                                       1  48 W#TOTO
+0519 I*                                       1   2 W#T1
+0519 I*                                       3   4 W#T2
+0519 I*                                       5  150W#T3
+0519 I*                                      16  260W#T4
+0519 I*                                      27  370W#T5
+0519 I*                                      38  480W#T6
+0519 I*           DS
+0519 I*                                       1  48 T#TOTO
+0519 I*                                       1   2 T#T1
+0519 I*                                       3   4 T#T2
+0519 I*                                       5  150T#T3
+0519 I*                                      16  260T#T4
+0519 I*                                      27  370T#T5
+0519 I*                                      38  480T#T6
+0519 I*           DS
+0519 I*                                       1  48 D#TOTO
+0519 I*                                       1   2 D#T1
+0519 I*                                       3   4 D#T2
+0519 I*                                       5  150D#T3
+0519 I*                                      16  260D#T4
+0519 I*                                      27  370D#T5
+0519 I*                                      38  480D#T6
+0519 I*           DS
+0519 I*                                       1   6 W#TT1
+0519 I*                                       1   2 W#T11
+0519 I*                                       3   40W#T12
+0519 I*                                       5   6 W#T13
+0519 I*           DS
+0519 I*                                       1   4 W#TTA
+0519 I*                                       1   2 W#T1A
+0519 I*                                       3   4 W#T2A
+0519 I*           DS
+0519 I*                                       1   4 W#TTB
+0519 I*                                       1   2 W#T1B
+0519 I*                                       3   4 W#T2B
+     C*FILE => INVMST發票主檔
+     C           K#VMST    KLIST
+     C                     KFLD           INNO             *發票號碼
+     C*FILE => TRNDTL廠商
+     C           K#NDTL    KLIST
+     C                     KFLD           TXCODE           *單據代號
+     C                     KFLD           TXNO             *單據號碼
+     C*FILE => CBCUST客戶名稱
+     C           K#CUST    KLIST
+     C                     KFLD           CBCUNO           *客戶編號
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C           *IN99     IFEQ *OFF
+     C                     EXSR INISR
+     C                     ENDIF
+     C   L4                EXSR L4CLR
+     C   L3                EXSR L3CLR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CL3 99                EXSR L3SR
+     CL4 99                EXSR L4SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C                     MOVE *BLANK    T#LIN3
+     C                     MOVE D#YYMM    T#YYMM
+     C                     MOVE D#YYM1    T#YYM1
+0519 C                     MOVE *ALL'9'   ARY              初始陣列
+     C                     SETON                     6999
+     C                     ENDSR
+     C****************************************************************
+     C           L4CLR     BEGSR
+     C*****************************************************************
+     C*
+     C                     Z-ADD0         T#BAM4           *預收貨款
+     C                     Z-ADD0         T#AAM4           *銷售額
+     C                     Z-ADD0         T#ATA4           *稅額
+     C                     Z-ADD0         T#AAT4           *總計
+     C                     MOVE *BLANK    T#CUN4           *表頭
+     C                     ENDSR
+     C*****************************************************************
+     C           L3CLR     BEGSR
+     C*****************************************************************
+     C*
+     C                     MOVE *BLANK    T#CUN5           *客戶名稱
+     C                     Z-ADD0         T#BAM5           *預收貨款
+     C                     Z-ADD0         T#AAM5           *銷售額
+     C                     Z-ADD0         T#ATA5           *稅額
+     C                     Z-ADD0         T#AAT5           *總計
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         T#BAM2           *預收貨款
+     C                     Z-ADD0         T#AAM2           *銷售額
+     C                     Z-ADD0         T#ATA2           *稅額
+     C                     Z-ADD0         T#AAT2           *總計
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         T#BAM1           *預收貨款
+     C                     Z-ADD0         T#AAM1           *銷售額
+     C                     Z-ADD0         T#ATA1           *稅額
+     C                     Z-ADD0         T#AAT1           *總計　
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     Z-ADDAXADDT    W#ADDT           *抓表頭
+     C                     MOVE AXCUNO    CBCUNO           *客戶編號
+     C           K#CUST    CHAINCBREC                55
+     C           *IN55     IFEQ *OFF
+     C  N98                MOVE CBFNAM    T#CUNM
+     C  N98                MOVE CBMUID    T#MUID
+     C   98                MOVE *BLANK    T#CUNM
+     C   98                MOVE *BLANK    T#MUID
+     C                     ENDIF
+     C  N98                MOVE AXORNO    T#ORNO           *合約編號
+     C   98                MOVE *BLANK    T#ORNO
+     C                     MOVE AXIVNO    T#INNO           *作廢發票
+     C                     MOVE AXIVNO    INNO
+     C           K#VMST    CHAININREC                55
+     C           *IN55     IFEQ *OFF
+     C                     Z-ADDININDT    T#INDT           *作發日期
+     C                     Z-ADDINBAMT    T#BAMT           *預收貨款
+     C                     Z-ADDINAAMT    T#AAMT           *銷售額
+     C                     Z-ADDINATAX    T#ATAX           *稅額
+     C           INAAMT    ADD  INATAX    T#AATT           *總額
+     C                     MOVE T#AATT    W#AATT 110
+     C                     ENDIF
+     C                     MOVE AXVNNO    T#VNNO           *訂單號碼
+     C                     MOVE AXCODE    W#1     1
+     C           W#1       IFEQ '1'
+     C                     MOVE 'SA04'    TXCODE
+     C                     ELSE
+     C                     MOVE 'AR05'    TXCODE
+     C                     ENDIF
+     C                     MOVELAXVNNO    TXNO
+*    C           K#NDTL    CHAINTXREC                55
+*    C           *IN55     IFEQ *OFF
+*    C                     MOVE TXIVNO    T#SNNO           *重開發號
+*    C                     MOVE TXIVNO    INNO
+*    C                     ENDIF
+*    C           K#NDTL    SETLLTXREC
+     C                     READ TXREC                    55
+*    C           *IN55     DOWEQ*OFF
+*    C           TXCODE    IFNE AXCODE
+*    C           TXNO      ORNE AXVNNO
+     C                     LEAVE
+     C                     ENDIF
+     C                     MOVE *ALL'0'   W#INNO 10
+     C           TXIVNO    IFNE *BLANK
+     C           TXIVNO    ANDNEW#INNO
+     C           TXIVNO    ANDNE'*'
+     C           TXIVNO    ANDNE'#'
+     C                     MOVE TXIVNO    T#VNNO
+     C                     MOVE T#VNNO    INNO
+     C                     ENDIF
+     C                     ENDDO
+     C           K#VMST    CHAININREC                55
+     C           *IN55     IFEQ *OFF
+     C                     Z-ADDININDT    T#ENDT
+     C                     ENDIF
+0519 C                     SORTAARY
+0519 C           1         DO   12        I       20
+0519 C                     MOVE AXIVNO    INNO             *發票號碼
+0519 C           K#VMST    CHAININREC                55
+0519 C           *IN55     IFEQ *OFF
+0519 C*                    MOVELININDT    W#TT1            *開立日期
+0519 C*          W#T12     IFEQ 1                          *月份歸類
+0519 C*          W#T12     OREQ 3
+0519 C*          W#T12     OREQ 5
+0519 C*          W#T12     OREQ 7
+0519 C*          W#T12     OREQ 9
+0519 C*          W#T12     OREQ 11
+0519 C*                    ADD  1         W#T12
+0519 C*                    ENDIF
+0519 C*                    MOVE W#T11     W#T1             *年　　　
+0519 C*                    MOVE W#T12     W#T2             *月　　　
+0519 C*                    MOVE ARY1,I    T#TOTO           *比較　　
+0519 C*8                   MOVE T#T1      W#T1B
+0519 C*                    MOVE T#T2      W#T2B
+0519 C*                    MOVE T#T1      W#T1A
+0519 C*                    MOVE T#T2      W#T2A
+0519 C*          W#TTB     IFEQ W#TTA
+0519 C*                    ADD  INBAMT    W#T3
+0519 C*                    ADD  INAAMT    W#T4             *銷售額
+0519 C*                    ADD  INATAX    W#T5             *稅額
+0519 C*          INAAMT    ADD  INATAX    W#T6             *總額
+0519 C*                    MOVE W#TOTO    ARY1,I           *紀錄值
+0519 C*                    ENDIF
+0519 C*                    LEAVE
+0519 C*          W#TTB     IFNE W#TTA
+0519 C*8                   MOVE W#T1A     D#T1
+0519 C*                    MOVE W#T2A     D#T2
+0519 C*                    ADD  INBAMT    D#T3
+0519 C*8                   ADD  INAAMT    D#T4             *銷售額
+0519 C*                    ADD  INATAX    D#T5             *稅額
+0519 C*8         INAAMT    ADD  INATAX    D#T6             *總額
+0519 C*                    MOVE D#TOTO    ARY1,I           *紀錄值
+0519 C*                    ENDIF
+0519 C*                    MOVELARY1,I    T#TOTO
+0519 C*                    Z-ADDT#T3      T#BAMA
+0519 C*8                   Z-ADDT#T4      T#AAMA
+0519 C*                    Z-ADDT#T5      T#ATAA
+0519 C*                    Z-ADDT#T6      T#AATA
+0519 C*                    ENDIF
+0519 C*                    ENDDO
+     C   69                WRITEARR087H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEARR0871
+     C                     ADD  INBAMT    T#BAM1
+     C                     ADD  INAAMT    T#AAM1
+     C                     ADD  INATAX    T#ATA1
+     C                     ADD  W#AATT    T#AAT1
+     C                     MOVE *ON       *IN98
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C   69                WRITEARR087H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEARR0872
+     C*                    MOVE T#CUN1    T#CUN2
+     C                     ADD  T#BAM1    T#BAM2
+     C                     ADD  T#AAM1    T#AAM2
+     C                     ADD  T#ATA1    T#ATA2
+     C                     ADD  T#AAT1    T#AAT2
+     C                     MOVE *OFF      *IN98
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C*列印合計
+     C   69                WRITEARR087H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEARR0873
+     C                     ADD  T#BAM2    T#BAM5
+     C                     ADD  T#AAM2    T#AAM5
+     C                     ADD  T#ATA2    T#ATA5
+     C                     ADD  T#AAT2    T#AAT5
+     C                     ENDSR
+     C*****************************************************************
+     C           L3SR      BEGSR
+     C*****************************************************************
+     C*單月合計
+     C                     Z-ADDAXYYMM    W#YYMM
+     C           W#MM      LOKUPTAB1      TAB2           55*抓TABLE
+     C   55                Z-ADDTAB2      W#MM
+     C                     Z-ADDW#YYMM    T#CUN5
+     C   69                WRITEARR087H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEARR0876
+     C                     ADD  T#BAM5    T#BAM4
+     C                     ADD  T#AAM5    T#AAM4
+     C                     ADD  T#ATA5    T#ATA4
+     C                     ADD  T#AAT5    T#AAT4
+     C                     ENDSR
+     C*****************************************************************
+     C           L4SR      BEGSR
+     C*****************************************************************
+     C*月份合計
+     C                     Z-ADDAXADDT    W#ADDT
+     C           W#M1      LOKUPTAB3      TAB4           55*EQ
+     C   55                MOVELTAB4      D#M1
+     C                     MOVE W#Y2      D#Y1
+     C                     MOVE D#ADDT    T#CUN4
+     C   69                WRITEARR087H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEARR0875
+     C                     ADD  T#BAM4    T#BAM3
+     C                     ADD  T#AAM4    T#AAM3
+     C                     ADD  T#ATA4    T#ATA3
+     C                     ADD  T#AAT4    T#AAT3
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C****************************************************************
+     C   69                WRITEARR087H
+     C                     MOVE *OFF      *IN69
+0519 C*                    SORTAARY1
+0519 C*                    WRITEARR087A
+     C                     WRITEARR0874
+     C                     ENDSR
+     C****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C*NO DATA
+     C                     EXSR INISR
+     C                     MOVE D#YYMM    T#YYM1
+     C                     MOVE D#YYM1    T#YYM2
+     C                     WRITEARR087H
+     C                     WRITEARR0877
+     C*
+     C                     ENDSR
+**  TAB1 TAB2
+ 101 202 303 404 505 606 707 808 909101011111212
+**  TAB3 TAB4
+ 201-02 403-04 605-06 807-081009-101211-12
+

@@ -1,0 +1,73 @@
+             PGM
+             DCL        VAR(&INT) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MBR)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&YM)    TYPE(*DEC) LEN(6 0)
+             DCL        VAR(&YMA)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&OYM)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&YMDA)  TYPE(*CHAR) LEN(8)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(CNV030RS) PARM(&IN03 &YM)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&YMA)   VALUE(&YM)
+             CHGDTAARA  DTAARA(*LDA (1 6)) VALUE(&YMA)
+        /*   SBMJOB     JOB(CNV030P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL CNV030P')  */
+        /*   RETURN  */
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (1 6))   RTNVAR(&YMA)
+             RTVDTAARA  DTAARA(*LDA (3 4))   RTNVAR(&OYM)
+
+             IF         COND((&YMA *LE '009707')) THEN(DO)
+             CHGVAR     VAR(&MBR)    VALUE("M" || &OYM)
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&MBR)    VALUE("M" || &YMA)
+             ENDDO
+
+             CHGVAR     VAR(&YMDA)   VALUE(&YMA || '31')
+             CLRPFM     FILE(ARLIB/ARSTWF) MBR(&MBR)
+             MONMSG     MSGID(CPF3141) EXEC(ADDPFM +
+                          FILE(ARLIB/ARSTWF) MBR(&MBR))
+             OVRDBF     FILE(ARSTWF) TOFILE(ARLIB/ARSTWF) MBR(&MBR)
+             OVRDBF     FILE(INVDTL) TOFILE(DALIB/INVDTL) SHARE(*YES)
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OVRDBF     FILE(INVMST) TOFILE(DALIB/INVMST)
+             OPNQRYF    FILE((INVDTL)) QRYSLT('            +
+                        IVACDT *LE ' || &YMDA || '         +
+                        *OR IVACDT *EQ 999999')            +
+                          KEYFLD((IVNO)(IVACNT))
+             CALL       PGM(CNV030R)
+             CLOF       OPNID(INVDTL)
+
+             OPNQRYF    FILE((TRNDTL)) QRYSLT('                  +
+                           TXDATE *GE   821001         &          +
+                           TXDATE *LE ' || &YMDA || '  &          +
+                           TXACDT *GE   821001         &          +
+                           TXACDT *LE ' || &YMDA || '  &          +
+                           TXNO   *NE "T1117145"       &          +
+                          (TXCODE = "SA04" *OR TXCODE = "AR05")') +
+                          KEYFLD((TXRESV)(TXNO)(TXACNT))  +
+                      MAPFLD((TXRESV '%SST(TXORNO 1 6)'))
+             CALL       PGM(CNV031R)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+             RETURN
+
+
+ STEP3:      OVRDBF     FILE(ARSTWF) TOFILE(ARLIB/ARSTWF) MBR(&MBR)
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE((TRNDTL)) QRYSLT('                  +
+                           TXDATE *LE ' || &YMDA || '  &          +
+                           TXCODE = "AR06"             &          +
+                           TXACNT = "2"                &          +
+              (TXACDT =  0 *OR  TXACDT *GT ' || &YMDA || ')')     +
+                          KEYFLD((TXRESV)(TXNO)(TXACNT))  +
+                      MAPFLD((TXRESV '%SST(TXORNO 1 6)'))
+             CALL       PGM(CNV032R)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

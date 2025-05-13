@@ -1,0 +1,273 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR075RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     新版發票列印作業（畫面）
+     H*            5.DATE-WRITTEN  88/03/13
+     H*            6.UPDATE  DATE 107/11/08 2018AR00029 S00WCJ(0711A)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR075S CF  E                    WORKSTN
+0711AFINVMST  IF  E           K        DISK
+0711AFARPRTF  IF  E           K        DISK
+0711AE                    ERR     1  10 70
+     I*************************************************************
+     I           UDS
+     I                                        1   8 U#FRDT
+     I                                       11  18 U#TODT
+     I                                       21  30 U#FRNO
+     I                                       31  40 U#TONO
+0711AI                                       41  41 S#AREA
+     I*
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 S#USID
+0711AI                                     10211021 D#AREA
+0711AIINTR       UDS                             50
+0711AI                                        1   80D#INTR
+     C**************************************************************
+     C*   程式參數接收區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1        結束旗標
+0711AC                     PARM           P#PTMD  1        列印模式
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C*   副程式開始
+     C**************************************************************
+     C*----------------------------------------
+     C*  宣告及初始變數
+     C*----------------------------------------
+     CSR         SR0000    BEGSR
+0711AC           *DATE     SUB  19000000  U#SYSD  80
+0711AC           *NAMVAR   DEFN ARINTRCTL INTR
+0711AC                     UNLCKINTR
+0711AC           U#SYSD    IFLT D#INTR
+0711AC                     MOVEL*OFF      *IN87
+0711AC                     ELSE
+0711AC                     MOVEL*ON       *IN87
+0711AC                     ENDIF
+0711AC                     MOVEL' '       W#CHK   1
+0711AC                     MOVEL*BLANKS   P#NNRB 10
+0711AC                     MOVEL*BLANKS   P#CLMD  1
+     C                     MOVEL'01'      W#PRID  2
+     C                     EXSR SR1100                     初始畫面一
+     CSR                   ENDSR
+     C*
+     C************************************
+     C*  畫面一:輸入日期區間及號碼區間
+     C************************************
+     CSR         SR1000    BEGSR
+     C*
+0711AC           S#USID    CHAINRARPRTF              99
+0711AC   99                MOVELERR,7     S#MSG1
+     C*
+0711AC  N99                MOVELATAREA    S#AREA
+0711AC           U#SYSD    IFLT D#INTR
+0711AC           S#AREA    ANDNED#AREA
+0711AC                     MOVELERR,1     S#MSG1
+0711AC                     MOVEL*ON       *IN99
+0711AC                     ENDIF
+     C                     EXFMTAR075F1
+     C                     MOVEL*BLANK    S#MSG1
+0711AC                     SETOF                     333435
+0711AC                     SETOF                     3699
+     C*
+0711AC                     EXSR SR1300                     檢核
+     C*
+     C                     SELEC
+     C           *IN03     WHEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03
+     C                     MOVEL'00'      W#PRID
+0711AC           *IN99     WHEQ '1'
+0711AC                     MOVEL'01'      W#PRID
+0711AC                     MOVEL*OFF      *IN99
+0711AC           *IN13     WHEQ '1'
+0711AC                     MOVEL'2'       P#CLMD           正本重印
+0711AC                     CALL 'ARS001R'
+0711AC                     PARM           P#CLMD  1
+0711AC                     PARM           P#NNRB 10
+0711AC                     PARM           P#IN12  1
+0711AC           P#IN12    IFNE '1'
+0711AC                     EXSR SR1200
+0711AC                     ENDIF
+0711AC           *IN23     WHEQ '1'
+0711AC                     MOVEL'3'       P#CLMD           補印
+0711AC                     CALL 'ARS001R'
+0711AC                     PARM           P#CLMD
+0711AC                     PARM           P#NNRB
+0711AC                     PARM           P#IN12
+0711AC           P#IN12    IFNE '1'
+0711AC                     EXSR SR1200
+0711AC                     ENDIF
+     C*
+     C                     OTHER
+0711AC                     MOVEL'1'       P#PTMD
+     C                     EXSR SR1200                     存檔
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  初始畫面一
+     C*----------------------------------------
+     CSR         SR1100    BEGSR
+     C                     Z-ADD0         S#FRDT
+     C                     Z-ADD0         S#TODT
+     C                     MOVEL*BLANK    S#FRNO
+     C                     MOVEL*BLANK    S#TONO
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  畫面一：存檔執行
+     C*----------------------------------------
+     CSR         SR1200    BEGSR
+0711AC           *IN13     IFEQ *ON
+0711AC           *IN23     OREQ *ON
+0711AC                     Z-ADD0         S#FRDT
+0711AC                     Z-ADD0         S#TODT
+0711AC                     MOVELP#NNRB    S#FRNO
+0711AC                     MOVELP#NNRB    S#TONO
+0711AC                     ENDIF
+0711AC   13                MOVEL'2'       P#PTMD           正本重印
+0711AC   23                MOVEL'3'       P#PTMD           補印
+0711AC  N87                MOVEL'0'       P#PTMD           未啟用
+0711AC   87                MOVEL'1'       P#PTMD           正本
+     C           S#FRDT    IFEQ 0
+     C                     MOVEL*BLANK    U#FRDT
+     C                     ELSE
+     C                     MOVE S#FRDT    U#FRDT
+     C                     ENDIF
+     C           S#TODT    IFEQ 0
+     C                     MOVELU#FRDT    U#TODT
+     C                     ELSE
+     C                     MOVE S#TODT    U#TODT
+     C                     ENDIF
+     C*
+     C                     MOVELS#FRNO    U#FRNO
+     C           S#TONO    IFEQ *BLANK
+     C                     MOVELU#FRNO    U#TONO
+     C                     ELSE
+     C                     MOVELS#TONO    U#TONO
+     C                     ENDIF
+     C*
+0711AC                     MOVEL'0'       P#IN03
+0711AC                     MOVEL'00'      W#PRID
+     CSR                   ENDSR
+     C*
+0711AC*----------------------------------------
+0711AC*  檢核
+0711AC*----------------------------------------
+0711ACSR         SR1300    BEGSR
+0711AC           S#FRDT    IFNE 0
+0711AC                     MOVE *ALL'0'   P#DATE
+0711AC                     MOVE S#FRDT    P#DATE
+0711AC                     CALL 'UTS102R'
+0711AC                     PARM           P#DATE  8
+0711AC                     PARM '1'       P#MODE  1
+0711AC                     PARM           P#MTL  24
+0711AC                     PARM           P#LY    1
+0711AC                     PARM ' '       FLAG1   1
+0711AC           FLAG1     IFNE '0'
+0711AC                     SETON                     9933
+0711AC                     MOVELERR,2     S#MSG1
+0711AC                     ENDIF
+0711AC           S#FRDT    IFLT D#INTR
+0711AC           S#AREA    ANDNED#AREA                     跨廠區
+0711AC                     MOVELERR,04    S#MSG1
+0711AC                     SETON                     99
+0711AC                     ENDIF
+0711AC*
+0711AC           S#FRDT    IFLT D#INTR
+0711AC           S#AREA    ANDEQD#AREA                     本廠區
+0711AC           W#CHK     ANDNE'Y'
+0711AC                     MOVELERR,06    S#MSG1
+0711AC                     MOVEL'Y'       W#CHK
+0711AC                     SETON                     99
+0711AC                     ENDIF
+0711AC                     ENDIF
+0711AC           S#TODT    IFNE 0
+0711AC                     MOVE *ALL'0'   P#DATE
+0711AC                     MOVE S#FRDT    P#DATE
+0711AC                     CALL 'UTS102R'
+0711AC                     PARM           P#DATE  8
+0711AC                     PARM '1'       P#MODE  1
+0711AC                     PARM           P#MTL  24
+0711AC                     PARM           P#LY    1
+0711AC                     PARM ' '       FLAG1   1
+0711AC           FLAG1     IFNE '0'
+0711AC                     SETON                     9934
+0711AC                     MOVELERR,2     S#MSG1
+0711AC                     ENDIF
+0711AC                     ENDIF
+0711AC           S#TODT    IFEQ 0
+0711AC                     Z-ADDS#FRDT    S#TODT
+0711AC                     ENDIF
+0711AC           S#TODT    IFLT S#FRDT
+0711AC                     MOVELERR,03    S#MSG1
+0711AC                     SETON                     993334
+0711AC                     ENDIF
+0711AC*
+0711AC           S#FRNO    IFNE *BLANKS
+0711AC           S#FRNO    CHAININREC                55
+0711AC  N55      ININDT    IFLT D#INTR
+0711AC           S#AREA    ANDNED#AREA                     跨廠區
+0711AC                     MOVELERR,4     S#MSG1
+0711AC                     SETON                     9935
+0711AC                     ENDIF
+0711AC  N55      ININDT    IFLT D#INTR
+0711AC           S#AREA    ANDEQD#AREA                     本廠區
+0711AC           W#CHK     ANDNE'Y'
+0711AC                     MOVELERR,6     S#MSG1
+0711AC                     MOVEL'Y'       W#CHK
+0711AC                     SETON                     9935
+0711AC                     ENDIF
+0711AC   55                MOVELERR,5     S#MSG1
+0711AC   55                SETON                     9935
+0711AC                     ENDIF
+0711AC*
+0711AC           S#TONO    IFNE *BLANKS
+0711AC           S#FRNO    CHAININREC                55
+0711AC  N55      ININDT    IFLT D#INTR
+0711AC           S#AREA    ANDNED#AREA                     跨廠區
+0711AC                     MOVELERR,4     S#MSG1
+0711AC                     SETON                     9936
+0711AC                     ENDIF
+0711AC  N55      ININDT    IFLT D#INTR
+0711AC           S#AREA    ANDEQD#AREA                     本廠區
+0711AC           W#CHK     ANDNE'Y'
+0711AC                     MOVELERR,6     S#MSG1
+0711AC                     MOVEL'Y'       W#CHK
+0711AC                     SETON                     9935
+0711AC                     ENDIF
+0711AC   55                MOVELERR,5     S#MSG1
+0711AC   55                SETON                     9936
+0711AC                     ENDIF
+0711AC           S#TONO    IFEQ *BLANKS
+0711AC                     MOVELS#FRNO    S#TONO
+0711AC                     ENDIF
+0711AC*
+     CSR                   ENDSR
+     C**************************************************************
+** ERR
+０１－電子發票未上線，不可跨廠區列印發票!
+０２－日期輸入錯誤，請檢核!
+０３－終止日不可小於起始日!
+０４－欲列印之發票為電子計算機發票，請用舊模式列印!
+０５－輸入之發票號碼不存在，請檢核!!
+０６－欲列印之發票為電子計算機發票，請用舊模式列印，按執行鍵繼續!
+０７－帳號未申請列印權限，請洽資訊部協助處理!!
+

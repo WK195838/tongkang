@@ -1,0 +1,131 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARI044R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02HYS
+     H*            4.FUNCTION     單據號碼查詢作業
+     H*            5.DATE-WRITTEN  86/11/13
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FTRNDTLL2IF  E           K        DISK
+     FARI044S CF  E                    WORKSTN
+     F                                        RRN   KSFILE ARI0441
+     E                    ERR     1   4 70               *錯誤訊息
+     I           UDS
+     I                                     10011010 D#USER
+     I                                     10111020 S#DEVN
+0706 C*FILE => TRNDTLL2
+     C*
+     C           K#NDT1    KLIST
+0706 C                     KFLD           TXIVNO           *發票號碼
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C                     EXSR SR0000                     *初值設定
+     C           PRCID     DOUEQ'00'
+     C           PRCID     CASEQ'01'      SR1000           *畫面一
+     C           PRCID     CASEQ'02'      SR2000           *畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*初值設定
+     C                     MOVE *ALL'='   S#LINE
+     C                     MOVEL'ARI004S 'S#SRID
+     C                     MOVE '01'      PRCID   2
+     C                     MOVE *BLANK    S#IVNO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'---> WTE604S-1畫面
+     C* Clear subfile
+     C                     Z-ADD*ZEROS    RRN     40
+     C                     Z-SUB29        POINT
+     C                     MOVE *ON       *IN74            *SFLCLR
+     C                     WRITEARI044C
+     C                     MOVE *OFF      *IN74            *SFLCLR
+     C                     MOVE S#IVNO    TXIVNO
+     C           K#NDT1    SETLLTXREC                78    *NR
+     C  N78                EXSR SR1100                     *讀入SFL
+     C                     MOVEA'000'     *IN,71
+     C           RRN       IFEQ *ZEROS
+     C                     MOVE ERR,2     S#ERR
+     C                     MOVE *ON       *IN72            *SFLDSP OFF
+     C                     ENDIF
+     C*=======
+     C           PRCID     DOWEQ'01'
+     C           W#CNT     IFGE 30
+     C                     MOVE *ON       *IN73            *SFLEND OFF
+     C                     ELSE
+     C                     MOVE *OFF      *IN73            *SFLEND ON
+     C                     ENDIF
+     C                     WRITEARI044H
+     C                     WRITEARI044M
+     C                     EXFMTARI044C
+     C                     MOVE *BLANK    S#ERR
+     C*PF3=Exit
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*F12=Exit
+     C           *IN12     IFEQ *ON
+     C                     MOVE '00'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*PA1=翻下頁
+     C           *IN91     IFEQ *ON
+     C  N78                EXSR SR1100
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE '02'      PRCID
+     C                     ENDDO
+     C*=======
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*讀入SUBFILE ZS005F1
+     C                     Z-ADD*ZERO     W#CNT   20
+     C           W#CNT     DOWLT30
+     C           K#NDT1    READETXREC               N    78* 1->EOF
+     C   78                LEAVE
+     C*MOVE DATA
+     C           TXCODE    IFEQ 'SA04'
+     C           TXCODE    OREQ 'AR05'
+     C                     MOVE TXNO      S#VNNO           *單據號碼
+     C           TXCODE    IFEQ 'SA04'
+     C                     MOVE '1'       S#CODW           *單據別　
+     C                     ELSE
+     C                     MOVE '2'       S#CODW
+     C                     ENDIF
+     C                     ADD  1         RRN
+     C                     ENDIF
+     C                     ADD  1         W#CNT
+     C                     WRITEARI0441
+     C                     ENDDO
+     C           W#CNT     IFGT 0                          *至少一筆
+     C                     ADD  30        POINT
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*初值設定
+     C                     MOVE '01'      PRCID   2
+     C                     ENDSR
+     C*****************************************************************
+**  ERR
+01-資料已存在！
+02-資料不存在！
+03-欄位不可空白或零！
+04-請按功能鍵<F11>確認刪除！
+

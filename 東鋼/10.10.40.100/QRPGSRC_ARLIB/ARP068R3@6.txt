@@ -1,0 +1,224 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP068R3
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     銷貨帳款應收統計處理－銷貨明細合計
+     H*            5.DATE-WRITTEN  88/06/01
+     H*            6.DATE-UPDATE   92/08/18 BY S02CSF
+     H*                            99/08/31 2010AR517 S00WCJ (9908A)
+     H*                           103/07/17  2014AR848 S00WCJ (0307A)
+     H*                           排除訂單M01848 & M01853
+     H*
+     H* 說明：從銷貨明細檔內找出未開立發票者，寫入狀況檔內。
+     H*       從況檔內將所有的記錄補足，並計算其應收金額。
+     H*        9004  排除催收款
+     H*
+     H*        920818 若該張磅單未開發票，則在計算應收金額時不加上稅
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FHSCONT  IF  E           K        DISK
+     FARSAID  IF  E           K        DISK
+     FARSTTX  UF  E           K        DISK                      A
+9004 FBSYSDT  IF  E           K        DISK
+     F*****************************************************************
+     IAXDTA      UDS                             28
+     I                                       13  20 X#DATE
+     I                                       21  28 X#ETXD
+     I            DS
+     I                                        1   6 AXCUNO
+     I                                        1   1 D#CUNO
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10011003 U#DPID
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+9908AC           *DATE     SUB  19000000  U#SYSD  80
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C                     EXSR DTLSR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C           K#AX      KLIST
+     C                     KFLD           AXTXCD
+     C                     KFLD           AXTXNO
+     C                     KFLD           AXINNO
+     C*
+     C           K#SA      KLIST
+     C                     KFLD           S1OREA  1
+     C                     KFLD           S1ORNO  50
+     C*
+     C           *NAMVAR   DEFN ARXCTLDTA AXDTA  28
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     MOVELTXCODE    AXTXCD
+     C                     MOVELTXNO      AXTXNO
+     C                     MOVEL*BLANK    AXINNO           未開發票
+     C           K#AX      CHAINAXREC                69
+9107 C*排除未確認調整單或折讓單
+ .   C           TXCODE    IFNE 'SA04'
+ .   C                     MOVELTXIVNO    W#IVNO  1
+ .   C           W#IVNO    IFEQ '*'
+ .   C           TXFL01    OREQ ' '
+ .   C                     GOTO DTLEND
+ .   C                     ENDIF
+ .   C                     ENDIF
+     C*
+     C           *IN69     IFEQ '1'
+     C                     CLEARAXREC
+     C                     MOVELTXCUNO    AXCUNO           客戶編號
+     C                     MOVELTXORNO    AXORNO           訂單
+     C                     MOVELTXSALE    AXSAID           出貨業務
+     C                     MOVELTXRVID    AXRVID           收款業務
+     C                     MOVELTXCODE    AXTXCD           單據代碼
+     C                     MOVELTXNO      AXTXNO           單據編號
+     C                     Z-ADDTXACDT    AXTXDT           出貨日期
+     C                     Z-ADDTXAMT     AXTXAM           出貨金額
+     C                     WRITEAXREC
+     C*
+     C                     ELSE
+     C                     ADD  TXAMT     AXTXAM           出貨金額
+     C                     UPDATAXREC
+     C                     ENDIF
+     CSR         DTLEND    ENDSR
+     C*
+     C*********************************
+     C*  LR 函式
+     C*********************************
+     CSR         LRSR      BEGSR
+9908AC                     Z-ADDU#SYSD    W#DATE  80       統計日期
+     C                     MOVE W#DATE    X#DATE
+     C                     MOVE W#DATE    X#ETXD           截止日期
+     C*
+     C           *LOVAL    SETLLAXREC
+     C           1         DOWEQ1
+     C                     READ AXREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+9004 C* 排除催收款START
+     C                     MOVE *OFF      *IN51
+     C           AXINNO    CHAINYSREC                50
+     C  N50      YSCODE    IFEQ 'Y'
+     C                     MOVE *ON       *IN51
+     C                     ENDIF
+     C           AXORNO    IFEQ 'K02607'
+     C           AXORNO    OREQ 'K02645'
+0307AC           AXORNO    OREQ 'M01848'
+0307AC           AXORNO    OREQ 'M01853'
+     C                     MOVE *ON       *IN51
+     C                     ENDIF
+TEST C  N50      YSCODE    IFEQ ' '
+ .   C                     Z-ADD0         W#TEST  10
+ .   C                     ENDIF
+9004 C* 排除催收款END
+     C*
+     C           AXTXAM    IFEQ 0                          無應收
+     C                     DELETAXREC                      刪除之
+     C                     ITER
+9004 C                     ELSE
+ .   C   51                DELETAXREC
+ .   C   51                ITER
+     C                     ENDIF
+     C*
+9208 C           AXTXCD    IFNE *BLANK                     非扣預收類
+ .   C           AXTXNO    ANDNE*BLANK
+ .   C           D#CUNO    ANDNE'E'
+ .   C           AXINNO    ANDNE*BLANK
+ .   C           AXTXAM    MULT 1.05      AXTXAM    H      乘上稅額
+9208 C                     ENDIF
+     C*
+     C           AXRVID    CHAINRARSAID              69    營業單位
+     C  N69                MOVELSADEPT    AXDEPT
+     C*
+     C*
+     C           AXINNO    IFEQ *BLANK
+     C                     MOVEL'1'       AXSTCD           未開發票
+     C                     ELSE
+     C           AXRVNO    IFEQ *BLANK
+     C                     MOVEL'3'       AXSTCD           未繳款
+     C           AXAPNO    IFEQ *BLANK
+     C                     MOVEL'2'       AXSTCD           未請款
+     C                     ENDIF
+     C                     ELSE
+     C           AXSTCD    IFEQ ' '
+     C                     MOVEL'4'       AXSTCD           未兌現
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVELAXORNO    S1OREA
+     C                     MOVE AXORNO    S1ORNO
+     C           K#SA      CHAINRHSCONT              69
+     C           *IN69     IFEQ '0'
+     C                     Z-ADDSBPERD    W#ORDT  40       合約票期
+     C                     ELSE
+     C                     Z-ADD45        W#ORDT           預設票期
+     C                     ENDIF
+     C*                                                    45日請領款
+     C                     ADD  45        W#ORDT           應兌現日數
+     C*
+     C                     MOVE AXTXDT    P#DAT1  8        出貨日期
+     C                     MOVE W#ORDT    P#DAYS  4
+     C                     CALL 'UTS104R'                  ＋票期
+     C                     PARM           P#DAT1           ＝合約兌現
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM '2'       P#MOD2  2
+     C                     PARM           P#DAYS
+     C                     PARM           P#DAT2  8
+     C                     PARM           P#ERR   1
+     C                     MOVE P#DAT2    AXORLD           合約兌現日
+     C*
+     C           AXRVLD    IFGT AXORLD
+     C                     MOVE AXORLD    P#DAT1  8
+     C                     MOVE AXRVLD    P#DAT2  8
+     C                     CALL 'UTS103R'
+     C                     PARM           P#DAT1
+     C                     PARM           P#DAT2
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM 0         P#RTND  50
+     C                     PARM           P#ERR   1
+     C           P#ERR     IFEQ '0'
+     C                     Z-ADDP#RTND    AXDELY           延誤日數
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C*
+     C           1         SUB  AXINRT    W#RATE  65       發票未兌率
+     C           AXTXAM    MULT W#RATE    AXINAM    H      應收金額
+     C*
+     C                     MOVE AXTXDT    P#DAT1  8
+     C                     MOVE W#DATE    P#DAT2  8
+     C                     CALL 'UTS103R'
+     C                     PARM           P#DAT1
+     C                     PARM           P#DAT2
+     C                     PARM '1'       P#MOD1  1
+     C                     PARM 0         P#RTNV  50
+     C                     PARM           P#ERR   1
+     C                     Z-ADDP#RTNV    AXINDU           帳齡
+     C*
+     C                     UPDATAXREC
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+

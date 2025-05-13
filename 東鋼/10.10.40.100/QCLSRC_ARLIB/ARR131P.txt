@@ -1,0 +1,115 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR131P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02LBU                                  */
+     /*     4.FUNCTION     外銷出口報單核對明細表               */
+     /*     5.DATE-WRITTEN  97/02/19                                */
+     /*                                                             */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN12)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&YMD1)   TYPE(*DEC)  LEN(8 0)
+             DCL        VAR(&YMD2)   TYPE(*DEC)  LEN(8 0)
+             DCL        VAR(&YMDA)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&YMDB)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&ORNO)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&CUNM)   TYPE(*CHAR) LEN(10)
+
+
+             RTVJOBA    TYPE(&INT) OUTQ(&OUTQ)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+ RDSP:
+             CHGVAR     VAR(&IN03)    VALUE('0')
+             CHGVAR     VAR(&IN12)    VALUE('0')
+             CALL       PGM(ARR131RS) PARM(&IN03 &YMD1 &YMD2 &ORNO &CUNM)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGVAR     VAR(&YMDA)        VALUE(&YMD1)
+             CHGVAR     VAR(&YMDB)        VALUE(&YMD2)
+             CHGDTAARA  DTAARA(*LDA (301  8)) VALUE(&YMDA)
+             CHGDTAARA  DTAARA(*LDA (309  8)) VALUE(&YMDB)
+             CHGDTAARA  DTAARA(*LDA (317  6)) VALUE(&ORNO)
+             CHGDTAARA  DTAARA(*LDA (323 10)) VALUE(&CUNM)
+
+             SBMJOB     JOB(ARR131P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARR131P')
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (301  8)) RTNVAR(&YMDA)
+             RTVDTAARA  DTAARA(*LDA (309  8)) RTNVAR(&YMDB)
+             RTVDTAARA  DTAARA(*LDA (317  6)) RTNVAR(&ORNO)
+             RTVDTAARA  DTAARA(*LDA (323 10)) RTNVAR(&CUNM)
+
+             CLRPFM     FILE(ARLIB/ARR131F1)
+             CLRPFM     FILE(ARLIB/ARR131F2)
+             MONMSG     MSGID(CPF0000)
+             OVRDBF     FILE(HSCINV) TOFILE(HSCINV) SHARE(*YES)
+
+    /*訂單為空白*/
+             IF         COND((&ORNO *EQ '      ') *AND +
+                             (&CUNM *NE '          ')) THEN(DO)
+             OPNQRYF    FILE(HSCINV) QRYSLT(' +
+                               (DATE   *GE "' || &YMDA || '")   *AND  +
+                               (DATE   *LE "' || &YMDB || '")   *AND  +
+                               (C1OCNM *EQ "' || &CUNM || '")   *AND  +
+                               (C1FLAG *NE "D")')                     +
+                        MAPFLD((DATE  C1CDTE  *CHAR 8))               +
+                        KEYFLD((C1OCUS)(C1ORNO)(C1CDTE))
+             ENDDO
+
+             IF         COND((&ORNO *EQ '      ') *AND +
+                             (&CUNM *EQ '          ')) THEN(DO)
+             OPNQRYF    FILE(HSCINV) QRYSLT(' +
+                               (DATE   *GE "' || &YMDA || '")   *AND  +
+                               (DATE   *LE "' || &YMDB || '")   *AND  +
+                               (C1FLAG *NE "D")')                     +
+                        MAPFLD((DATE  C1CDTE  *CHAR 8))               +
+                        KEYFLD((C1OCUS)(C1ORNO)(C1CDTE))
+             ENDDO
+
+    /*訂單不為空白*/
+             IF         COND(&ORNO *NE '       ') THEN(DO)
+             OPNQRYF    FILE(HSCINV) QRYSLT(' +
+                               (C1ORNO *EQ "' || &ORNO || '") *AND  +
+                               (C1FLAG *NE "D")')                   +
+                        KEYFLD((C1OCUS)(C1ORNO)(C1CDTE))
+             ENDDO
+
+             CALL       PGM(ARR131R1)
+             CLOF       OPNID(HSCINV)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(ARR131F1) TOFILE(ARR131F1) SHARE(*YES)
+             OPNQRYF    FILE(ARR131F1) OPTION(*ALL) +
+                        KEYFLD((*FILE))
+             CALL       PGM(ARR131R2)
+             CLOF       OPNID(ARR131F1)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(ARR131F1) TOFILE(ARR131F1) SHARE(*YES)
+             OPNQRYF    FILE(ARR131F1) OPTION(*ALL) +
+                        KEYFLD((*FILE))
+             CALL       PGM(ARR131R3)
+             CLOF       OPNID(ARR131F1)
+             DLTOVR     FILE(*ALL)
+
+             OVRPRTF    FILE(ARR131T) TOFILE(ARR131T) PAGESIZE(*N 158) +
+                        CPI(12) HOLD(*YES) USRDTA('出口明細')
+             OVRDBF     FILE(ARR131F2) TOFILE(ARR131F2) SHARE(*YES)
+             OPNQRYF    FILE(ARR131F2) +
+                        KEYFLD((W2APNO)(W2AREA))
+             CALL       PGM(ARR131R4)
+             CLOF       OPNID(ARR131F2)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

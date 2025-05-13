@@ -1,0 +1,342 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARE098R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     區間發票開立試算表
+     H*            5.DATE-WRITTEN  99/05/27  2010AR421
+     H*            6.UPDATE-DATE   99/08/02  2010AR514
+     H*                            99/12/14  2010AR560  S00WCJ (9912A)
+     H*                           100/02/09  2011ARXXX  S00WCJ (0002A)
+     H*                           101/11/12  2012AR699  S00WCJ (0111A)
+     H*                           101/11/19  S00WCJ (0111B)
+     H*                           101/12/24  2012AR708  S00WCJ (0112A)
+     H*                           102/07/09  2013AR754  S00WCJ (0207A)
+     H*                            增加備註欄位
+     H*                           104/09/22  2015AR953  S00WCJ (0409A)
+     H*                            產品代碼3碼擴5碼
+     H*                           108/09/11  S00WCJ (0809A)
+     H*                            配合磅單過至項次修改
+     H*                           111/11/18 2022AR00053 S00WCJ (1111A)
+     H*                            增加調整後單價欄位，並修改調整後金
+     H*                            額計算方式為調整後單價*調整後數
+     H*                            量
+     H*
+     H*****************************************************************
+     FINVTRL  IP  E           K        DISK
+0207AFINVTRT  IF  E           K        DISK
+     FARE098T O   E             60     PRINTER      KINFDS PRTCTL
+0112AFARE098T1O   E             61     PRINTER
+     F*
+1111AE                    ARY        35 48
+1111AE                    ARY1       35 48
+     E*
+     IRINVTRL
+     I                                              ITTXDEL1
+     IPRTCTL      DS
+     I                                    B 367 3680CURLIN
+     I                                    B 369 3720CURPAG
+     I            DS
+9912AI*                                       1  24 D#ARY
+1111AI                                        1  48 D#ARY
+0409AI                                        1   5 D#PDN1
+0409AI                                        6  120D#QTY
+0409AI                                       13  233D#SAM1
+9908AI                                       24  300D#SQTY
+9908AI                                       31  370D#SAMT
+1111AI                                       38  480D#UAMT
+     I*
+1111AI                                        1  48 D1ARY
+0409AI                                        1   5 D1PDN1
+0409AI                                        6  120D1QTY
+0409AI                                       13  233D1SAM1
+0409AI                                       24  300D1SQTY
+0409AI                                       31  370D1SAMT
+1111AI                                       38  480D1UAMT
+     I           UDS
+0112AI                                      201 201 D#DEL
+     I                                      801 8080R#DATE
+     I                                      951 985 COMP
+     I                                     10011010 U#USID
+     I                                     10111020 DEVNM
+     C*
+     C****************************************************************
+     C*          *ENTRY    PLIST
+     C*                    PARM           R#NO   10
+     C*
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C                     EXSR SR1000
+     C   60                EXSR SR2000
+0112AC   61                EXSR SR2000
+     CL1                   EXSR SR3000
+     CLR                   EXSR SR4000
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*由於表頭資料寫在檔案中，故先讀一筆資料後再印表頭
+     C* 印表頭
+     C                     CLEARAR098T1M
+0112AC                     CLEARAR98T11M
+9912AC                     CLEARAR098T2M
+0112AC                     CLEARAR98T21M
+     C                     MOVEL*ALL'9'   ARY
+0112AC                     MOVEL*ALL'9'   ARY1
+     C                     MOVEL*ON       *IN10
+     C                     MOVELITORNO    R#ORNO
+     C                     MOVELITCUNO    R#CUNO
+     C                     MOVELITCUNM    R#CUNM
+     C                     MOVELITNO      R#NO
+     C                     WRITEAR098T1H
+0112AC                     WRITEAR98T11H
+     C                     MOVEL*OFF      *IN60
+0112AC                     MOVEL*OFF      *IN61
+     C                     MOVEL*ON       *IN51
+0112AC                     MOVEL*ON       *IN31
+0112AC                     MOVEL*OFF      *IN37
+     C                     Z-ADD1         I       20
+0112AC                     Z-ADD1         M       20
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+0112AC  N10                MOVEL*BLANKS   D#DEL
+     C                     Z-ADDITTXDE    R#TXDE
+     C                     MOVELITTXNO    R#TXNO
+     C                     Z-ADDITITEM    R#ITEM
+0809AC                     Z-ADDITVRTM    R#VRTM
+0809AC                     MOVELITPDS1    R#PDS1
+     C                     MOVELITPDNM    R#PDNM
+     C                     Z-ADDITUPRC    R#UPRC
+     C                     Z-ADDITQTY     R#QTY
+     C                     Z-ADDITSQTY    R#SQTY
+     C                     Z-ADDITSPRC    R#SPRC
+     C                     Z-ADDITAMT     R#AMT
+1111AC*
+1111AC           R#UPRC    IFNE R#SPRC
+1111AC           R#UPRC    ADD  R#SPRC    R1UPRC
+1111AC                     ELSE
+1111AC                     Z-ADDR#UPRC    R1UPRC
+1111AC                     ENDIF
+1111AC*
+0112AC                     MOVELITVRYN    R#IVYN
+0112AC           ITVRYN    IFEQ 'Y'
+0112AC                     MOVEL*ON       *IN45
+0112AC                     ELSE
+0112AC                     MOVEL*OFF      *IN45
+0112AC                     ENDIF
+0112AC*
+0112AC           ITSQTY    IFNE 0
+0112AC           ITAMT     ORNE 0
+0112AC                     MOVEL*ON       *IN36
+0112AC  N37      *IN36     IFEQ *ON
+0112AC                     MOVEL'1'       D#DEL   1
+0112AC                     ELSE
+0112AC                     MOVEL'0'       D#DEL
+0112AC                     ENDIF
+0112AC                     MOVEL*ON       *IN37
+0112AC                     ENDIF
+     C*
+9908AC           R#UPRC    MULT R#QTY     R#TAM1    H
+1111AC                     Z-ADDR#TAM1    R#UAMT    H
+0111AC           R#SQTY    IFNE 0
+0111AC           R#AMT     ORNE 0
+0111AC           R#QTY     ADD  R#SQTY    R#UQTY
+0111AC*          R#TAM1    ADD  R#AMT     R#UAMT
+1111AC           R1UPRC    MULT R#UQTY    R#UAMT    H
+0111AC                     ENDIF
+0111AC*
+     C*
+     C  N10                EXSR SR0000
+     C*
+     C*將類別合計至ARY中
+     C*
+     C                     SORTAARY
+     C           1         DO   30        I
+     C                     MOVE ARY,I     D#ARY
+     C*
+0409AC           D#PDN1    IFEQ '99999'
+     C                     MOVELITPDNM    D#PDN1
+     C                     Z-ADDITQTY     D#QTY
+     C                     Z-ADDITSQTY    D#SQTY
+     C                     Z-ADDITAMT     D#SAMT
+9908AC                     Z-ADDR#TAM1    D#SAM1
+1111AC                     Z-ADDR#UAMT    D#UAMT
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ELSE
+     C           ITPDNM    IFEQ D#PDN1
+     C                     ADD  ITQTY     D#QTY
+     C                     ADD  ITSQTY    D#SQTY
+     C                     ADD  ITAMT     D#SAMT
+9908AC                     ADD  R#TAM1    D#SAM1
+1111AC                     ADD  R#UAMT    D#UAMT
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C*
+1111AC           R#SQTY    IFEQ 0
+1111AC           R#SPRC    ANDEQ0
+1111AC                     Z-ADD0         R1UPRC
+1111AC                     Z-ADD0         R#UAMT
+1111AC                     ENDIF
+1111AC*
+     C                     WRITEAR098T1D
+0112AC*
+0112AC           *IN36     IFEQ *ON
+0112AC*
+0112AC*將類別合計至ARY1中
+0112AC*
+0112AC                     SORTAARY1
+0112AC           1         DO   30        M
+0112AC                     MOVE ARY1,M    D1ARY
+     C*
+0409AC           D1PDN1    IFEQ '99999'
+0112AC                     MOVELITPDNM    D1PDN1
+0112AC                     Z-ADDITQTY     D1QTY
+0112AC                     Z-ADDITSQTY    D1SQTY
+0112AC                     Z-ADDITAMT     D1SAMT
+0112AC                     Z-ADDR#TAM1    D1SAM1
+1111AC                     Z-ADDR#UAMT    D1UAMT
+0112AC                     MOVE D1ARY     ARY1,M
+0112AC                     LEAVE
+0112AC                     ELSE
+0112AC           ITPDNM    IFEQ D1PDN1
+0112AC                     ADD  ITQTY     D1QTY
+0112AC                     ADD  ITSQTY    D1SQTY
+0112AC                     ADD  ITAMT     D1SAMT
+0112AC                     ADD  R#TAM1    D1SAM1
+1111AC                     ADD  R#UAMT    D1UAMT
+0112AC                     MOVE D1ARY     ARY1,M
+0112AC                     LEAVE
+0112AC                     ENDIF
+0112AC                     ENDIF
+0112AC                     ENDDO
+     C*
+0112AC                     WRITEAR98T11D
+0112AC                     SETOF                     3136
+0112AC                     ENDIF
+     C*
+     C                     SETOF                     51
+0111AC                     Z-ADD0         R#UQTY
+0111AC                     Z-ADD0         R#UAMT
+     C           END100    ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*
+0112AC   60                WRITEAR098T1X
+0112AC   60                WRITEAR098T1H
+0112AC   60                SETOF                     60
+1111AC   61                WRITEAR98T11X
+1111AC   61                WRITEAR98T11H
+0112AC   61                SETOF                     61
+     C                     ENDSR
+     C*
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*
+     C                     SETON                     51
+0112AC                     SETON                     31
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4000    BEGSR
+     C*****************************************************************
+     C*
+0207AC           ITNO      CHAINRINVTRT              71
+0207AC  N71                MOVELTTTEX1    R#TEX1
+0207AC  N71                MOVELTTTEX2    R#TEX2
+0207AC   71                MOVEL*BLANKS   R#TEX1
+0207AC   71                MOVEL*BLANKS   R#TEX2
+0207AC*
+     C                     Z-ADD1         J       20
+     C                     SORTAARY
+     C           1         DO   30        J
+     C                     MOVE ARY,J     D#ARY
+0409AC           D#PDN1    IFNE '99999'
+0409AC                     MOVELD#PDN1    R#SPDM
+     C                     Z-ADDD#QTY     R#TQTY
+     C                     Z-ADDD#SQTY    R#TQY2
+     C                     Z-ADDD#SAMT    R#TAMT
+9908AC                     Z-ADDD#SAM1    R#TAM2
+1111AC                     Z-ADDD#UAMT    R#UAM2
+9912AC                     ADD  R#TQTY    R1TQTY
+9912AC                     ADD  R#TQY2    R1TQY2
+9912AC                     ADD  R#TAMT    R1TAMT
+9912AC                     ADD  R#TAM2    R1TAM2
+1111AC                     ADD  R#UAM2    R1UAM2
+0111AC           R#TQY2    IFNE 0
+0111AC           R#TAM2    ORNE 0
+0111AC           R#TQTY    ADD  R#TQY2    R#UQY2
+0111AC*          R#TAM2    ADD  R#TAMT    R#UAM2
+0111AC           R1TQTY    ADD  R1TQY2    R1UQY2
+0111AC*          R1TAM2    ADD  R1TAMT    R1UAM2
+0111AC                     ENDIF
+     C*
+     C                     WRITEAR098T1M
+     C                     WRITEAR098T1L
+     C                     MOVEL*ON       *IN55
+     C                     ELSE
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+0002AC*0112A     CURLIN    IFLE 54
+9912AC                     WRITEAR098T2M
+     C*
+0002AC*          CURLIN    IFLE 58
+0207AC*
+     C                     WRITEAR098T1T
+0112AC*                    WRITEAR098T2T
+0112AC*                    ELSE
+0112AC*                    WRITEAR098T1X
+0002AC*0112A               WRITEAR098T1H
+0002AC*0112A               WRITEAR098T2M
+0112AC*                    WRITEAR098T1T
+0112AC*                    WRITEAR098T2T
+0112AC*                    ENDIF
+0112AC*
+0112AC           D#DEL     IFEQ '1'
+0112AC                     Z-ADD1         J       20
+0112AC                     SORTAARY1
+0112AC           1         DO   30        J
+0112AC                     MOVE ARY1,J    D1ARY
+0409AC           D1PDN1    IFNE '99999'
+0409AC                     MOVELD1PDN1    RASPDM
+0112AC                     Z-ADDD1QTY     RATQTY
+0112AC                     Z-ADDD1SQTY    RATQY2
+0112AC                     Z-ADDD1SAMT    RATAMT
+0112AC                     Z-ADDD1SAM1    RATAM2
+1111AC                     Z-ADDD1UAMT    RAUAM2
+0112AC                     ADD  RATQTY    RBTQTY
+0112AC                     ADD  RATQY2    RBTQY2
+0112AC                     ADD  RATAMT    RBTAMT
+0112AC                     ADD  RATAM2    RBTAM2
+1111AC                     ADD  RAUAM2    RBUAM2
+0112AC           RATQY2    IFNE 0
+0112AC           RATAM2    ORNE 0
+0112AC           RATQTY    ADD  RATQY2    RAUQY2
+0112AC*          RATAM2    ADD  RATAMT    RAUAM2
+0112AC           RBTQTY    ADD  RBTQY2    RBUQY2
+0112AC*          RBTAM2    ADD  RBTAMT    RBUAM2
+0112AC                     ENDIF
+0112AC                     WRITEAR98T11M
+0112AC                     WRITEAR98T11L
+0112AC                     MOVEL*ON       *IN35
+     C*
+     C                     ELSE
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+0112AC                     WRITEAR98T21M
+0112AC                     WRITEAR98T11T
+0112AC                     WRITEAR98T21T
+0112AC                     ENDIF
+     C                     ENDSR
+

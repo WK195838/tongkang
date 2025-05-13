@@ -1,0 +1,96 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP068P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     銷貨帳款每日應收統計作業               */
+     /*     5.DATE-WRITTEN  88/05/31                                */
+     /*                                                             */
+     /*  <說明:>                                                  */
+     /*            本作業每日凌晨批次執行。                       */
+     /*            報表可直接執行 ARR076P 來獲得。              */
+     /*            用以彙總出所有尚未結案（繳款且兌現）之磅單     */
+     /*            相關資訊。                                     */
+     /*                                                             */
+     /*  ARXCTLDTA  1 --> 領款日數                                */
+     /*             5 --> 逾期日數                                */
+     /*             9 --> 催收日數                               */
+     /*            13 --> 彙總統計日期                           */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&USER)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+INPUT:
+             SBMJOB     JOB(ARP068P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARP068P')
+             RETURN
+
+
+BATCH:
+
+STEP0:       /* 清除資料檔 */
+
+             CLRPFM     FILE(DALIB/ARSTTX)
+             CLRPFM     FILE(DALIB/ARSTIN)
+             CLRPFM     FILE(DALIB/ARSTRV)
+
+
+STEP1:       /* 統計未兌現繳款書之兌現比率並找出相關發票兌現情形  */
+
+             OVRDBF     FILE(RCVDTLL1) TOFILE(DALIB/RCVDTLL1) +
+                        SHARE(*YES)
+             OPNQRYF    FILE(RCVDTLL1) +
+                        QRYSLT('RVACNO *EQ "1131" *AND +
+                                RVFLAG *NE "D" *AND +
+                                RVACTP *EQ "D" *AND +
+                                RVNTCD *EQ " " *AND +
+                     RVNTTP *EQ %VALUES("A" "B" "C" "D" "E" "I")') +
+                        KEYFLD((RVNO))
+             CALL       ARP068R1
+             CLOF       OPNID(RCVDTLL1)
+             DLTOVR     *ALL
+
+
+STEP2:       /* 統計未繳款完畢之發票的金額（發票餘額）  */
+             /* 計算發票之兌現比率，並找出其相關銷貨資料 */
+
+             OVRDBF     FILE(INVMSTL3) TOFILE(DALIB/INVMSTL3) +
+                        SHARE(*YES)
+             OPNQRYF    FILE(INVMSTL3) +
+                        QRYSLT('INDECD *EQ " " *AND +
+                                INFLAG *NE "D" *AND +
+                                INTYPE *NE "9" *AND +
+                                INNBAL *GT 0 ')   +
+                        KEYFLD((INNO))
+             CALL       ARP068R2
+             CLOF       OPNID(INVMSTL3)
+             DLTOVR     *ALL
+
+
+STEP3:       /* 統計未開立發票之銷貨明細  */
+
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT('TXFLAG *NE "D" *AND +
+                                TXCODE *NE "AR06" *AND +
+                               (TXIVNO *EQ " " *OR +
+                                TXIVNO *EQ "*")')   +
+                        KEYFLD((TXCODE) (TXNO))
+             CALL       ARP068R3
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     *ALL
+
+
+             ENDPGM
+

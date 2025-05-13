@@ -1,0 +1,617 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARE044R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02HYS
+     H*            4.FUNCTION     專案退稅明細表
+     H*            5.DATE-WRITTEN  89/04/06
+     H*            6.UPDATE        89/04/06 S02HYS
+     H*****************************************************************
+     H        1   Y                                     1
+     FARE044S CF  E                    WORKSTN
+     F                                        RRN   KSFILE ARE0F2
+     F*                                       RRNW  KSFILE ARE04W
+     FARBTAX  UF  E           K        DISK                      A
+     FHSMAST  IF  E           K        DISK
+     FSAMAST  IF  E           K        DISK
+     FARBTAXL1IF  E           K        DISK
+     F            RARBTAX                           KRENAMERARBTAX1
+     FTRNDTL  IF  E           K        DISK
+0706 F*TRNDTLL2IF  E           K        DISK
+     F*            TXREC                             KRENAMERTXREC
+     FINVMST  IF  E           K        DISK
+     F            INREC                             KRENAMERINREC
+     FINVMSTL2IF  E           K        DISK
+     E                    TAB1    5   5  1 0 TAB2   10   *名稱*
+     E                    SCR     3   3 10               *螢幕代號
+     E                    ERR     1  14 70               *錯誤訊息
+     IRHSMAST
+     I              S1SALE                          AAAAAA
+     I              S1SND                           BBBBBB
+     I              S1RECV                          CCCCCC
+     I           UDS
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVN
+     I            DS
+     I                                        1   5 W#ORNO
+     I                                        1   1 W#OREA
+     I                                        2   50W#1RNO
+     I            DS
+     I                                        1   40W#DAT
+     I                                        1   20W#NO1
+     I                                        3   40W#NO2
+     I            DS
+     I                                        1   6 W#CUNO
+     I                                        1   1 W#KIND
+     I                                        2   2 W#CUN1
+     I                                        3   5 W#CUN2
+     I                                        6   6 W#CUN3
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*
+     C*FILE => ARBTAX
+     C*
+     C           K#BTAX    KLIST
+     C                     KFLD           AXORNO           *訂單號碼
+     C                     KFLD           AXYYMM           *資料年月
+     C                     KFLD           AXITEM
+     C*FILE => HSMAST
+     C           K#MAST    KLIST
+     C                     KFLD           S1OREA           *區域
+     C                     KFLD           S1ORNO           *編號
+     C*FILE => SAMAST
+     C           K#AMST    KLIST
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C*FILE => TRNDTL
+     C*
+     C           K#NDTL    KLIST
+     C                     KFLD           TXCODE           *單據號碼
+     C                     KFLD           TXNO
+0706 C*FILE => TRNDTLL2
+     C*
+     C*          K#NDT1    KLIST
+0706 C*                    KFLD           TXIVNO           *發票號碼
+     C*FILE => INVMST
+     C*
+     C           K#VMST    KLIST
+     C                     KFLD           INNO             *發票號碼
+     C*FILE => INVMSTL2
+     C           K#2MST    KLIST
+     C                     KFLD           W#ORNO  5        *訂單號碼
+     C                     KFLD           W#ORN1 10        *發票號碼
+     C****************************************************************
+     C*      MAIN           PROGRAM
+     C****************************************************************
+     C                     EXSR SR0000
+     C           PRCID     DOUEQ'00'
+     C           PRCID     CASEQ'01'      SR1000           *初始畫面
+     C           PRCID     CASEQ'02'      SR2000           *畫面一
+     C           PRCID     CASEQ'03'      SR3000           * READC
+     C           PRCID     CASEQ'04'      SR4000           *畫面二（新增）
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C                     CLEARARE0F1
+     C                     MOVE '01'      PRCID   2
+     C                     MOVE *ALL'='   S#1              *========
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->ARE044S-1畫面
+     C                     MOVEASCR,1     S#SRID
+     C                     MOVEA'00'      *IN,30            *FUNCTION
+     C           PRCID     DOWEQ'01'
+     C                     WRITEARE044H
+     C                     EXFMTARE0F1
+     C                     MOVE *BLANK    S#ERR
+     C*EXIT   CANCEL
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*ENTER=CHECK SCREEN FILED
+     C           S#KEY1    IFEQ *BLANK
+     C                     MOVE *ON       *IN31
+     C                     MOVEAERR,3     S#ERR
+     C                     ITER
+     C                     ENDIF
+     C                     MOVE S#KEY1    W#ORNO
+     C                     MOVE W#OREA    S1OREA
+     C                     MOVE W#1RNO    S1ORNO
+     C           K#MAST    CHAINRHSMAST              55
+     C           *IN55     IFEQ *ON
+     C           K#AMST    CHAINRSAMAST              55
+     C           *IN55     IFEQ *ON
+     C                     MOVEAERR,10    S#ERR
+     C                     ITER
+     C                     ENDIF
+     C                     ENDIF
+     C           S#KEY2    IFNE 0
+     C                     MOVE S#KEY2    D#DAT   40
+     C                     Z-ADDD#DAT     W#DAT
+     C           W#NO2     IFGT 12
+     C                     MOVEAERR,11    S#ERR
+     C                     ENDIF
+     C                     ENDIF
+     C*----
+     C                     Z-ADDS#KEY2    S#KEY3
+     C                     Z-ADD1         S#NBR
+     C                     MOVE '02'      PRCID
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*W#PRID='02'--->ARE044S-2畫面
+     C* CLEAR SUBFILE
+     C                     MOVEASCR,2     S#SRID
+     C                     MOVE *OFF      *IN30
+     C                     MOVE *OFF      *IN91
+     C                     MOVE *BLANK    S#ERR
+     C* Clear subfile
+     C                     MOVE *ON       *IN74            *SFLCLR
+    &C                     WRITEARE0CL
+     C                     MOVE *OFF      *IN74            *SFLCLR
+     C*
+     C                     Z-ADD*ZEROS    RRN     40
+     C                     MOVE S1CUNO    S#CUNM           *客戶名稱
+     C                     MOVE S1OREA    S#AREA           *歸屬廠區
+     C                     MOVE S1KIND    W#KIND
+     C                     MOVE S1CUN1    W#CUN1
+     C                     MOVE S1CUN2    W#CUN2
+     C                     MOVE S1CUN3    W#CUN3
+     C                     MOVE W#CUNO    S#CUNO           *客戶編號
+     C                     MOVE S#KEY1    INORNO
+     C                     MOVE S#KEY1    S#ORNO
+     C*
+     C                     MOVELS#KEY1    AXORNO
+     C                     Z-ADDS#KEY3    AXYYMM
+     C                     Z-ADD0         AXITEM
+     C           K#BTAX    SETLLRARBTAX              55
+     C  N55                READ RARBTAX                  55
+     C  N55                EXSR SR2100                     *讀入SFL
+     C*=======(顯示畫面)
+     C                     MOVE *OFF      *IN30
+     C           3         LOKUPTAB1      TAB2           55*EQ
+     C   55                MOVE TAB2      S#MODE
+     C           PRCID     DOWEQ'02'
+     C                     MOVE *OFF      *IN30
+     C                     MOVEA'0000'    *IN,71
+     C           RRN       IFEQ *ZEROS
+     C                     MOVEAERR,2     S#ERR
+     C                     MOVE *ON       *IN72            *SFLDSP OFF
+     C                     ENDIF
+     C           W#CNT     IFGE 10
+     C                     MOVE *ON       *IN73            *SFLEND OFF
+     C                     ELSE
+     C                     MOVE *OFF      *IN73
+     C                     ENDIF
+     C*
+     C                     WRITEARE0F1
+     C                     WRITEARE0MG
+     C                     EXFMTARE0CL
+     C                     MOVE *BLANK    S#ERR
+     C*F3=結束作業
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*F12=回前畫面
+     C           *IN12     IFEQ *ON
+     C                     MOVE '01'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*F6=新增
+     C           *IN06     IFEQ *ON                        * F6=ADD
+     C                     MOVE 1         W#OPT   10       *新增
+     C                     EXSR SR3100
+     C                     MOVE '04'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*PA1=翻下頁
+     C           *IN91     IFEQ *ON
+     C  N55                EXSR SR2100
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE '03'      PRCID
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C*
+     C*Read File MITRNSL1 Write Subfile Screen
+     C*
+     C                     Z-ADD*ZERO     W#CNT   20
+     C           S#KEY3    IFEQ 0
+     C                     Z-ADD0         W#YM1   40
+     C                     Z-ADD9999      W#YM2   40
+     C                     ELSE
+     C                     Z-ADDS#KEY3    W#YM1
+     C                     Z-ADDS#KEY3    W#YM2
+     C                     ENDIF
+     C           W#CNT     DOWLT10                         *讀後12筆
+     C*=====
+     C                     MOVELAXYYMM    S#YYMX           *歸屬年月
+     C                     MOVELAXIVNO    S#IVNX           *發票號碼
+     C                     MOVELAXATTX    S#ATT1           *稅額
+     C                     MOVELAXVUNO    S#VUNX           *傳票號碼
+     C                     MOVE AXITEM    S#ITEM
+     C*------
+     C                     MOVE AXIVNO    INNO
+     C           K#VMST    CHAINRINREC               56    *NR
+     C  N56                Z-ADDININDT    S#DEDT           *發票日期
+     C   56                Z-ADD*ALL'0'   S#DEDT
+     C                     MOVE *OFF      *IN80            - PROTECT
+     C           AXORNO    IFEQ S#KEY1                     *挑選資料
+     C           AXYYMM    ANDGEW#YM1
+     C           AXYYMM    ANDLEW#YM2
+     C           AXFLAG    ANDNE'D'
+     C                     ADD  1         W#CNT
+     C                     ADD  1         RRN
+     C           S#NBR     IFGT RRN
+     C           RRN       ANDNE*ZEROS
+     C                     Z-ADDRRN       S#NBR
+     C                     ENDIF
+    &C                     WRITEARE0F2
+     C                     ENDIF
+     C                     READ RARBTAX                  55
+     C   55                LEAVE
+     C                     ENDDO
+     C                     ENDSR
+     C***************************************************************
+     C           SR3000    BEGSR
+     C**************************************************************
+     C           PRCID     DOWEQ'03'
+     C                     MOVE *OFF      *IN30
+     C                     READCARE0F2                 5555
+     C   55                MOVE '02'      PRCID
+     C   55                LEAVE
+     C           S#OPT     IFEQ *ZEROS
+     C                     ITER
+     C                     ENDIF
+     C                     MOVE S#OPT     W#OPT   10
+     C                     MOVE *ZEROS    S#OPT
+     C                     UPDATARE0F2
+     C                     Z-ADDRRN       S#NBR
+     C                     EXSR SR3100
+     C                     MOVE '04'      PRCID
+     C                     ENDDO
+     C                     ENDSR
+     C****************************************************************
+     C           SR3100    BEGSR
+     C***************************************************************
+     C*1=ADD 2=CHANGE 4=DELETE 5=DISPLAY
+     C*
+     C                     MOVE *OFF      *IN85
+     C           W#OPT     IFEQ 4
+     C           W#OPT     OREQ 5
+     C                     MOVE *ON       *IN85
+     C                     ENDIF
+     C*
+     C*IF W#OPT=1 ADD RECORD INITIALIZE SCREEN => ARE0F3
+     C           W#OPT     IFEQ 1
+     C                     CLEARARE0F3
+     C                     MOVE *BLANK    AXORNO
+     C                     MOVE *BLANK    AXYYMM
+     C                     ENDIF
+     C           W#OPT     LOKUPTAB1      TAB2           55*EQ
+     C   55                MOVE TAB2      S#MODE
+     C*
+     C           W#OPT     IFEQ 2
+     C           W#OPT     OREQ 4
+     C           W#OPT     OREQ 5
+     C                     MOVELS#KEY1    AXORNO
+     C                     MOVE S#YYMX    AXYYMM
+     C                     Z-ADDS#ITEM    AXITEM
+     C                     ENDIF
+     C*Read File MTMATL   Record Write Screen
+     C*
+     C           K#BTAX    CHAINRARBTAX             N55    *NR
+     C           *IN55     IFEQ *OFF
+     C                     MOVELAXORNO    S#ORN1           *訂單號碼
+     C                     MOVELAXYYMM    S#YYMM           *資料年月
+     C                     MOVELAXIVNO    S#IVNO           *發票號碼
+     C                     Z-ADDAXATTX    S#ATTX           *稅額
+     C                     MOVELAXCODE    S#CODE           *單據別
+     C                     MOVELAXVNNO    S#VNNO           *單據號碼
+     C                     MOVELAXVUNO    S#VUNO           *傳票號碼
+     C*
+     C*
+     C*
+     C                     ENDIF
+     C                     ENDSR
+     C***********************************************************
+     C           SR4000    BEGSR
+     C*****************************************************************
+     C*
+     C*Read Subfile Screen Number = '03'
+     C*
+     C                     MOVEASCR,3     S#SRID
+     C                     MOVE *ON       *IN30
+     C           PRCID     DOWEQ'04'
+     C                     WRITEARE044H
+     C                     MOVE S#ORNO    S#ORN1
+     C                     MOVE S#AREA    S#ARE1           *歸屬廠區
+     C                     MOVE S#CUNM    S#1UNM           *客戶名稱
+     C                     EXFMTARE0F3
+     C                     MOVE *BLANK    S#ERR
+     C                     MOVEA'00000000'*IN,29
+     C                     MOVEA'00000000'*IN,38
+     C                     MOVE *ON       *IN30
+     C*
+     C*PF3=Exit
+     C*
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*PF12=Cancel
+     C*
+     C           *IN12     IFEQ *ON
+     C                     MOVE '02'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*Enter = Check Screen Option 5= Display Pass
+     C*
+     C           W#OPT     IFEQ 5
+     C                     MOVE '03'      PRCID
+     C                     ENDIF
+     C*
+     C                     EXSR SR4100
+     C*PF10=Save File
+     C*
+     C  N99      *IN10     IFEQ *ON
+     C                     EXSR SR4200
+     C                     MOVE '03'      PRCID
+     C                     ENDIF
+     C*                    ITER
+     C*
+     C                     MOVE *OFF      *IN30
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4100    BEGSR
+     C*****************************************************************
+     C*CKECK
+     C                     MOVE *OFF      *IN99
+     C*CHECK 日期
+     C           S#YYMM    IFEQ 0
+     C                     MOVE *ON       *IN33
+     C                     MOVEAERR,07    S#ERR
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C                     Z-ADDS#YYMM    W#DAT
+     C  N99      W#NO2     IFGT 12
+     C                     MOVEAERR,07    S#ERR
+     C                     MOVE *ON       *IN33
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C*CHECK發票號碼
+     C                     MOVELS#ORN1    W#ORNO
+     C                     MOVELS#IVNO    W#ORN1
+     C           K#2MST    CHAININREC                55
+     C  N99      *IN55     IFEQ *OFF
+     C                     MOVE INATAX    S#ATTX
+     C                     ELSE
+     C                     MOVEAERR,1     S#ERR
+     C                     MOVE *ON       *IN34
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C           K#2MST    CHAININREC                55
+     C  N99      *IN55     IFEQ *OFF
+     C                     MOVE INDECD    W#DECD  1
+     C           W#DECD    IFNE 'D'
+     C                     MOVEAERR,13    S#ERR
+     C                     MOVE *ON       *IN34
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C                     ENDIF
+     C*CHECK 發票號碼
+     C           W#OPT     IFEQ 1
+0706 C*                    MOVE *ON       *IN38            *WIN畫面
+     C           S#IVNO    CHAINRARBTAX1             55
+     C  N99      *IN55     IFEQ *OFF
+     C                     MOVEAERR,8     S#ERR
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN34
+     C                     ENDIF
+0706 C* N99      *IN07     IFEQ *ON
+0706 C*                    EXSR SR5000
+0706 C*                    ENDIF
+     C                     ENDIF
+     C*CHECK 單據別與單據號碼
+     C           S#CODE    IFEQ '1'
+     C                     MOVE 'SA04'    TXCODE
+     C                     MOVE S#VNNO    TXNO
+     C                     MOVE 'SA04'    T#CODE  4
+     C                     ENDIF
+     C           S#CODE    IFEQ '2'
+     C                     MOVE 'AR05'    TXCODE
+     C                     MOVE S#VNNO    TXNO
+     C                     MOVE 'AR05'    T#CODE  4
+     C                     ENDIF
+     C           K#NDTL    CHAINTXREC                55
+     C  N99      *IN55     IFEQ *ON
+     C                     MOVEAERR,9     S#ERR
+     C                     MOVE *ON       *IN35
+     C                     MOVE *ON       *IN36
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C*檢核單據號碼與單據別與發票號碼有無相符
+     C*                    Z-ADD0         W#1     10
+     C*          K#NDTL    SETLLTXREC
+     C*                    READ TXREC                    55
+     C*          *IN55     DOWEQ*OFF
+     C*          TXCODE    IFNE T#CODE
+     C*          TXNO      ORNE S#VNNO
+     C*                    LEAVE
+     C*                    ENDIF
+     C*          TXIVNO    IFEQ S#IVNO
+     C*                    Z-ADD1         W#1
+     C*                    LEAVE
+     C*                    ENDIF
+     C*                    READ TXREC                    56
+     C*  56                LEAVE
+     C*                    ENDDO
+     C* N99      W#1       IFEQ 0
+     C*                    MOVEAERR,12    S#ERR
+     C*                    MOVEA'11'      *IN,35
+     C*                    ENDIF
+     C           S#ERR     IFEQ *BLANK
+     C                     SELEC
+     C           W#OPT     WHEQ 1
+     C                     MOVEAERR,4     S#ERR
+     C           W#OPT     WHEQ 2
+     C                     MOVEAERR,5     S#ERR
+     C           W#OPT     WHEQ 4
+     C                     MOVEAERR,6     S#ERR
+     C                     ENDSL
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4200    BEGSR
+     C*****************************************************************
+     C*
+     C*Read Screen Record Write File => MTMATL
+     C*1=Add 2=Change 3=Copy 4=Delete 5=Display
+     C           W#OPT     IFEQ 1
+     C                     MOVE S#ORN1    AXORNO
+     C                     MOVE S#YYMM    AXYYMM
+     C                     Z-ADD9999      AXITEM
+     C                     ENDIF
+     C           K#BTAX    CHAINRARBTAX              57    *NR
+     C                     EXSR SR4210
+     C   57                WRITERARBTAX
+     C  N57                UPDATRARBTAX
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4210    BEGSR
+     C*****************************************************************
+     C           W#OPT     IFEQ 1
+     C                     Z-ADD0         W#ITEM
+     C           K#BTAX    SETGTRARBTAX
+     C                     READPRARBTAX                  55
+     C           *IN55     IFEQ *ON
+     C           AXORNO    ORNE S#ORN1
+     C           AXYYMM    ORNE S#YYMM
+     C                     Z-ADD1         W#ITEM  30
+     C                     ELSE
+     C           AXITEM    ADD  1         W#ITEM
+     C                     ENDIF
+     C                     CLEARRARBTAX
+     C                     Z-ADDW#ITEM    AXITEM
+     C                     ENDIF
+     C                     MOVE S#IVNO    INNO
+     C           K#VMST    CHAINRINREC               56    *NR
+     C  N56                Z-ADDININDT    AXDLDT           *發票日期
+     C   56                Z-ADD*ALL'0'   AXDLDT
+     C                     MOVE S#ORNO    AXORNO           *訂單號碼
+     C                     MOVE S#1UNM    AXCUNM           *客戶名稱
+     C                     MOVE S#CUNO    AXCUNO           *客戶編號
+     C                     MOVE S#YYMM    AXYYMM           *歸屬年月
+     C                     MOVE S#IVNO    AXIVNO           *發票號碼
+     C                     MOVE S#ATTX    AXATTX           *發票稅額
+     C                     MOVE S#CODE    AXCODE           *單據別
+     C                     MOVE S#VNNO    AXVNNO           *單據號碼
+     C                     MOVE S#VUNO    AXVUNO           *傳票號碼
+     C                     MOVE S#USER    AXUPDM           *異動人員
+     C                     MOVE UDATE     AXUPDD           *異動日期
+     C                     TIME           AXUPDT           *異動時間
+     C           W#OPT     IFEQ 1
+     C                     MOVE UDATE     AXADDD
+     C                     TIME           AXADDT
+     C                     MOVE S#USER    AXADDM
+     C                     ENDIF
+     C           W#OPT     IFEQ 1
+     C                     MOVE 'A'       AXFLAG
+     C                     ENDIF
+     C           W#OPT     IFEQ 2
+     C                     MOVE 'C'       AXFLAG
+     C                     ENDIF
+     C           W#OPT     IFEQ 4
+     C                     MOVE 'D'       AXFLAG
+     C                     ENDIF
+     C                     MOVE '02'      PRCID
+     C                     ENDSR
+0706 C*****************************************************************
+     C*          SR5000    BEGSR
+     C*****************************************************************
+     C*                    MOVE S#IVNO    TXIVNO
+     C* CLEAR SUBFILE
+     C*                    MOVE *ON       *IN89            *SFLCLR
+     C*                    WRITEARE04WC
+     C*                    MOVE *OFF      *IN89            *SFLCLR
+     C*                    Z-ADD*ZEROS    RRNW    40
+     C*                    Z-SUB5         S#NBRW
+     C*                    EXSR SR5010
+     C*          RRNW      IFEQ *ZEROS
+     C*                    MOVE *ON       *IN86            *SFLDSP OFF
+     C*                    ELSE
+     C*                    MOVE *OFF      *IN86            *SFLDSP OFF
+     C*                    ENDIF
+     C*                    WRITEZP001W2M
+     C*                    EXFMTZP001W2C
+     C*                    ENDSR
+     C*****************************************************************
+     C*          SR5010    BEGSR
+     C*****************************************************************
+     C*          K#NDT1    SETLLRTXREC               62
+     C* N62                READ RTXREC              N    65* 1->EOF
+     C*                    Z-ADD*ZERO     W#CNTW  20
+     C*          W#CNTW    DOWLE5
+     C*          *IN65     ANDEQ*OFF
+     C*MOVE DATA
+     C*          TXCODE    IFEQ 'SA04'
+     C*          TXCODE    ANDEQ'AR05'
+     C*                    MOVE TXIVNO    S#IVNW           *發票號碼
+     C*                    MOVE TXCODE    S#CODW           *單據別　
+     C*                    MOVE TXNO      S#NW             *單據號碼
+     C*                    ENDIF
+     C*
+     C*                    ADD  1         RRNW
+     C*                    ADD  1         W#CNTW
+     C*                    WRITEARE04W
+     C*
+     C*                    READ RTXREC              N    65* 1->EOF
+     C*  65                LEAVE
+     C*
+     C*                    ENDDO
+     C*
+     C*          W#CNTW    IFGT *ZERO                      *至少一筆
+     C*                    ADD  6         S#NBRW
+     C*                    ENDIF
+     C*                    ENDIF
+     C*                    ENDSR
+**  TAB1 TAB2
+1新　　增2修　　改3　　　　4刪　　除5查　　詢
+**  SCR
+ARE044S-1 ARE044S-2 ARE044S-3
+**  ERR
+01-訂單號碼與發票號碼不符
+02-資料不存在！
+03-欄位不可空白！
+04-請按＜ＰＦ１０＞確認新增。
+05-請按＜ＰＦ１０＞確認修改。
+06-請按＜ＰＦ１０＞確認刪除。
+07-歸屬年月錯誤
+08-發票已退稅！
+09-單據別與單據號碼不符
+10-訂單號碼不存在
+11-日期輸入錯誤
+12-單據號碼與單據別與發票號碼不符
+13-該發票尚未作廢
+

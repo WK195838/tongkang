@@ -1,0 +1,234 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR065R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        KRH
+     H*            4.FUNCTION
+     H*            5.DATE-WRITTEN  85/12/18
+     H*
+     H*****************************************************************
+     FINVMST  IP  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FSAMAST  IF  E           K        DISK
+     FARR065T2O   E             69     PRINTER
+     F*****************************************************************
+     E                    ARY1       50 23
+     E                    TAB1    6   6  1   TAB2    6   *地區名稱
+     E*****************************************************************
+     IINREC       01
+     I                                              INNO  L1
+     I*                                             TXPDNML1
+     I            DS
+     I                                        1   5 INORNO
+     I                                        1   5 W#ORNO
+     I                                        1   1 W#AREA
+     I                                        2   5 W#NO
+     I            DS
+     I                                        1  23 A1DATA
+     I                                        1   3 A1PDCD
+     I                                        4  120A1QTY
+     I                                       13  230A1AMT
+     C****************************************************
+     C           K#ORNO    KLIST
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C           *IN99     IFEQ *OFF
+     C                     EXSR INISR
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C*INITIAL設定
+     C                     MOVE *ON       *IN69            *表頭
+     C                     MOVE *ALL'='   R#DASH           *======
+     C*CHAIN地區別
+     C                     MOVE W#AREA    R#AREA
+     C           W#AREA    LOKUPTAB1      TAB2           50*EQ
+     C  N50                MOVE *ALL'*'   R#ARNM
+     C   50                MOVE TAB2      R#ARNM
+     C*CHAIN客戶別
+     C                     MOVE INCUNO    R#CUNO
+     C                     MOVE INCUNM    R#CUNM
+     C                     MOVE W#ORNO    R#ORNO
+     C                     MOVE W#NO      S1ORNO  40
+     C                     MOVE W#AREA    S1OREA  1
+     C*                    MOVE W#ORNO    K#ORNO
+     C           K#ORNO    CHAINSAMAST              N66
+     C  N66                MOVE S1CTNO    R#CTNO
+     C   66                MOVE *ALL'*'   R#CTNO
+     C*
+     C                     Z-ADD0         W#OTAM 110
+     C                     Z-ADD0         W#RVAM 110
+     C                     MOVEL*ALL'9'   ARY1
+     C                     Z-ADD0         A1LEN   20
+     C                     Z-ADD0         I       20
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C*
+     C                     MOVE *OFF      *IN44
+     C   69                WRITEAR065T2H                   *表頭
+     C                     MOVE *OFF      *IN69
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*PROCESS DATA
+     C                     MOVE INNO      R#NO
+     C                     MOVE ININDT    R#INDT
+     C                     MOVE INTYPE    R#TYPE
+     C                     MOVE INKIND    R#KIND
+     C                     MOVE INSALE    R#SALE
+     C*CHAIN品名.....
+     C           R#NO      SETLLINVDTL               60
+     C           *IN60     DOWEQ'0'
+     C*
+     C           R#NO      READEINVDTL                   60
+     C           *IN60     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           IVFLAG    IFEQ 'D'
+     C           IVDECD    OREQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE IVPDCD    R#PDCD
+     C                     MOVE IVACNT    R#ACNT
+     C                     MOVE IVUPRC    R#UPRC
+     C                     MOVE IVQTY     R#QTY
+     C                     MOVE IVAMT     R#AMT
+     C*ARRAY累計
+     C                     EXSR SR1000
+     C*列印明細
+     C   69                WRITEAR065T2H                   *表頭
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR065T21                   *明細
+     C           *IN44     IFEQ *OFF
+     C                     MOVE *ON       *IN44
+     C                     ENDIF
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C                     SORTAARY1                       排序陣列
+     C                     EXSR PR1000                     印品名小計
+     C*
+     C           1         DO   A1LEN     I                合計
+     C                     MOVELARY1,I    A1DATA
+     C                     ADD  A1QTY     R#QTY2
+     C                     ADD  A1AMT     R#AMT2
+     C                     ENDDO
+     C*
+     C   69                WRITEAR065T2H                   印合計
+     C                     SETOF                     69
+     C                     WRITEAR065T24
+     C   69                WRITEAR065T2H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR065T23
+     C*
+     C                     Z-ADDW#OTAM    R#AMT3           印其他
+     C   69                WRITEAR065T2H                    　　
+     C                     SETOF                     69
+     C                     WRITEAR065T24
+     C   69                WRITEAR065T2H                    　　
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR065T25                    　　
+     C*
+     C                     Z-ADDW#RVAM    R#AMT4           印繳款
+     C   69                WRITEAR065T2H                    　　
+     C                     SETOF                     69
+     C                     WRITEAR065T24
+     C   69                WRITEAR065T2H                    　　
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR065T26                    　　
+     C                     ENDSR
+     C********************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C*NO DATA
+     C                     EXSR INISR
+     C                     WRITEAR065T2H               60  *OV
+     C                     WRITEAR065MG2               60  *OV
+     C*
+     C                     ENDSR
+     C*
+     C*****************************************************************
+     C*         統計陣列子函式（將各品名之值累計至陣列中）
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C           R#PDCD    IFEQ *BLANK                     無品名
+     C           R#ACNT    IFEQ '6'                        繳款
+     C                     ADD  R#AMT     W#RVAM
+     C                     ELSE                            其他
+     C                     ADD  R#AMT     W#OTAM
+     C                     ENDIF
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C                     MOVEL'F'       W#FIND  1        有品名
+     C           1         DO   A1LEN     I
+     C                     MOVELARY1,I    A1DATA
+     C           R#PDCD    IFEQ A1PDCD
+     C                     ADD  R#QTY     A1QTY
+     C                     ADD  R#AMT     A1AMT
+     C                     MOVELA1DATA    ARY1,I
+     C                     MOVEL'T'       W#FIND
+     C                     LEAVE
+     C                     ENDIF
+     C           A1PDCD    IFEQ '999'
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           W#FIND    IFEQ 'F'
+     C                     MOVEL*ALL'0'   A1DATA
+     C                     ADD  1         A1LEN
+     C                     Z-ADDA1LEN     I
+     C                     MOVELR#PDCD    A1PDCD
+     C                     Z-ADDR#QTY     A1QTY
+     C                     Z-ADDR#AMT     A1AMT
+     C                     MOVELA1DATA    ARY1,I
+     C                     ENDIF
+     C           ES1000    ENDSR
+     C*
+     C*****************************************************************
+     C*         列印品名小計
+     C*****************************************************************
+     C           PR1000    BEGSR
+     C   69                WRITEAR065T2H                   *表頭
+     C                     SETOF                     69
+     C                     WRITEAR065T24                   *=====
+     C*
+     C           1         DO   A1LEN     I
+     C   69                WRITEAR065T2H                   *表頭
+     C   69                SETOF                     6945
+     C                     MOVELARY1,I    A1DATA
+     C                     MOVE A1PDCD    R#PCD1
+     C                     Z-ADDA1QTY     R#QTY1
+     C                     Z-ADDA1AMT     R#AMT1
+     C           R#PCD1    IFNE *BLANK
+     C                     WRITEAR065T22
+     C           *IN45     IFEQ '0'
+     C                     SETON                     45
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C*
+**  TAB1 TAB2
+P台北T桃園M台中K高雄H苗栗L林口
+

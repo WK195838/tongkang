@@ -1,0 +1,179 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR109R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     客戶暫收貨款餘額明細表（營業）
+     H*          5.DATE-WRITTEN  92/02/25
+     H*          6.DATE-MODIFY   99/07/30 2010AR508 S00WCJ (9907A)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FAR2159D IP  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FINVMSTL1IF  E           K        DISK
+     FARSAID  IF  E           K        DISK
+     FARR109T O   E             66     PRINTER
+     IRAR2159D    01
+     I                                              ADCUNOL1
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10111020 S#DEVN
+     C*****************************************************************
+     C*          KEY   LIST
+     C*****************************************************************
+     C*
+     C           *ENTRY    PLIST
+     C                     PARM           W#SALE  1
+     C*FILE==>INVMSTL1
+     C           W#INVM    KLIST
+     C                     KFLD           INCUNO
+     C                     KFLD           INAPNO
+     C                     KFLD           ININDT
+     C                     KFLD           INNO
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN66
+     C*
+     C                     MOVEL*ALL'='   T#LIN1
+     C                     MOVEL*ALL'='   T#LIN2
+     C                     MOVEL*ALL'-'   T#LIN3
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR109T1S
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*
+     C                     MOVE *BLANK    W#RVID  2
+     C*
+     C           ADCUNO    CHAINCBREC                40
+     C           *IN40     IFEQ *OFF
+     C                     CLEARAR109T1D
+     C                     MOVELADCUNO    T#CUNO           客戶代號
+     C                     MOVELCBCUNM    T#CUNM           客戶名稱
+     C                     MOVELADAREA    T#AREA           廠區
+     C                     MOVELADORNO    T#ORNO           廠區
+     C*
+     C           ADAMT1    ADD  ADAMT3    T#TAMT
+     C                     ADD  ADAMT4    T#TAMT           暫收總金額
+     C                     Z-ADDADAMT1    T#AMT1           暫收已兌現
+     C                     Z-ADDADAMT2    T#AMT2           繳貨款
+     C                     Z-ADDADAMT3    T#AMT3           暫收未兌現
+     C                     Z-ADDADAMT4    T#AMT4           財會切傳票
+     C           ADAMT1    ADD  ADAMT3    T#NBAL
+     C                     SUB  ADAMT2    T#NBAL
+9010 C           ADAMT1    ADD  ADAMT4    T#NBAL
+9010 C                     SUB  ADAMT2    T#NBAL           餘額
+     C*
+     C                     EXSR SAIDSR
+     C*
+     C   66                WRITEAR109T1H
+     C                     MOVE *OFF      *IN66
+9907AC           T#NBAL    IFEQ 0
+9907AC           W#PRT     OREQ 'N'
+9907AC                     GOTO ENDDTL
+9907AC                     ENDIF
+     C                     WRITEAR109T1D
+     C*總計
+     C                     ADD  T#TAMT    T#TAMS           暫收總金額
+     C                     ADD  T#AMT1    T#AM1S           暫收已兌現
+     C                     ADD  T#AMT2    T#AM2S           繳貨款
+     C                     ADD  T#AMT3    T#AM3S           暫收未兌現
+     C                     ADD  T#AMT4    T#AM4S           財會切傳票
+     C                     ADD  T#NBAL    T#NBLS           餘額
+     C*
+     C                     ENDIF
+     C*
+9907AC*                    ENDSR
+9907AC           ENDDTL    ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C   66                WRITEAR109T1H
+     C                     MOVE *OFF      *IN66
+9907AC           T#NBLS    IFNE 0
+     C                     WRITEAR109T1S
+9907AC                     ENDIF
+     C*總計
+     C                     ADD  T#TAMS    T#TAMA           暫收總金額
+     C                     ADD  T#AM1S    T#AM1A           暫收已兌現
+     C                     ADD  T#AM2S    T#AM2A           繳貨款
+     C                     ADD  T#AM3S    T#AM3A           暫收未兌現
+     C                     ADD  T#AM4S    T#AM4A           財會切傳票
+     C                     ADD  T#NBLS    T#NBLA           餘額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C   66                WRITEAR109T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR109T1A
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*
+     C   66                WRITEAR109T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR109T1M
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SAIDSR    BEGSR
+     C*****************************************************************
+     C                     MOVELADCUNO    INCUNO           客戶代號
+     C                     MOVEL*BLANK    INAPNO           請款單號
+     C                     Z-ADD0         ININDT           發票日期
+     C                     MOVEL*BLANK    INNO             發票號碼
+     C           W#INVM    SETLLINREC
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ INREC                    41
+     C   41                LEAVE
+     C*
+     C           INCUNO    IFNE ADCUNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           INTYPE    IFEQ '1'
+     C           INRVID    IFNE W#RVID
+     C                     MOVE INRVID    SARVID           收款業務員
+     C           SARVID    CHAINRARSAID              42
+     C                     MOVELINRVID    W#RVID
+     C  N42                MOVE SANAME    T#RVID
+     C  N42                LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+9907AC           W#SALE    IFNE *BLANKS
+9907AC           SARVID    ANDNEW#SALE
+9907AC                     MOVEL'N'       W#PRT   1
+9907AC                     ELSE
+9907AC                     MOVEL' '       W#PRT
+9907AC                     ENDIF
+     C                     ENDSR
+

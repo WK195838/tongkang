@@ -1,0 +1,104 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR074P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     鋼筋型鋼廠別應收明細表                 */
+     /*     5.DATE-WRITTEN  87/09/10                                */
+     /*     6.UPDATE  DATE 104/10/05  2015AR953  S00WCJ (0409A)     */
+     /*                     產品代碼3碼擴5碼                  */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)     TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)   LEN(10)
+             DCL        VAR(&W#YY)    TYPE(*CHAR)   LEN(4)
+             DCL        VAR(&W#MM)    TYPE(*CHAR)   LEN(2)
+             DCL        VAR(&W#DATE)  TYPE(*CHAR)   LEN(8)
+             DCL        VAR(&C#YYMM)  TYPE(*CHAR)   LEN(4)
+             DCL        VAR(&MBR)     TYPE(*CHAR)   LEN(10)
+             DCLF       FILE(ARLIB/ARR074S)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+ INPUT:
+             SNDRCVF    RCDFMT(AR074F1)
+             IF         COND(&IN03 *EQ '1' *OR &IN12 *EQ '1') +
+                        THEN(RETURN)
+
+             CHGVAR     VAR(&W#YY)  VALUE(&S#YY)
+             CHGDTAARA  DTAARA(*LDA (1 4)) VALUE(&W#YY)
+             CHGVAR     VAR(&W#MM)  VALUE(&S#MM)
+             CHGDTAARA  DTAARA(*LDA (5 2)) VALUE(&W#MM)
+
+             RTVDTAARA  DTAARA(*LDA (3 4)) RTNVAR(&C#YYMM)
+             CHGVAR     VAR(&MBR)    VALUE("M" || &C#YYMM)
+             CHKOBJ     OBJ(ARLIB/ARSTWF) OBJTYPE(*FILE) MBR(&MBR)
+             MONMSG     MSGID(CPF9815) EXEC(DO)
+                CHGVAR  VAR(&S#MSG1) VALUE(+
+                '尚未建立該年月資料，請執行應收帳款明細表(ARR054P)')
+                GOTO    INPUT
+             ENDDO
+
+             SBMJOB     JOB(ARR074P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                        RQSDTA('CALL ARR074P')
+             RETURN
+
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&W#DATE)
+             CHGVAR     VAR(&W#DATE) VALUE(&W#DATE *TCAT '31')
+             CHGVAR     VAR(&C#YYMM) VALUE(%SST(&W#DATE 3 4))
+             CHGVAR     VAR(&MBR)    VALUE("M" || &C#YYMM)
+
+             CRTDUPOBJ  OBJ(ARR074F) FROMLIB(ARLIB) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+
+ STEP1:
+             /* 分廠區別來合計應收款*/
+             OVRDBF     FILE(ARR074F) TOFILE(QTEMP/ARR074F)
+             OVRDBF     FILE(ARSTWF) TOFILE(ARLIB/ARSTWF)  +
+                        MBR(&MBR) SHARE(*YES)
+             OPNQRYF    FILE(ARSTWF) +
+                        KEYFLD((ASCUNO) (ASORNO))
+             CALL       PGM(ARR074R1)
+             CLOF       OPNID(ARSTWF)
+             DLTOVR     FILE(*ALL)
+
+
+ STEP2:
+             /* 列印鋼筋報表*/
+             OVRPRTF    FILE(ARR074T) TOFILE(ARLIB/ARR074T) +
+                        HOLD(*YES) USRDTA('筋廠應收')
+             OVRDBF     FILE(ARR074F) TOFILE(QTEMP/ARR074F) SHARE(*YES)
+ /*0409A*/   OPNQRYF    FILE(ARR074F) +
+                        QRYSLT('PRD1 *EQ "2" ') +
+                        MAPFLD((PRD1 '%SST(ARPDTP 1 1)' *CHAR 1)) +
+                        KEYFLD((ARCUNO) (ARORNO))
+             CHGDTAARA  DTAARA(*LDA (10 1))  VALUE('2')
+             CALL       PGM(ARR074R2)
+             CLOF       OPNID(ARR074F)
+             DLTOVR     FILE(*ALL)
+
+
+ STEP3:
+             /* 列印型鋼報表*/
+             OVRPRTF    FILE(ARR074T) TOFILE(ARLIB/ARR074T) +
+                        HOLD(*YES) USRDTA('型廠應收')
+             OVRDBF     FILE(ARR074F) TOFILE(QTEMP/ARR074F) SHARE(*YES)
+ /*0409A*/   OPNQRYF    FILE(ARR074F) +
+                        QRYSLT('ARPDTP *EQ "33"') +
+                        KEYFLD((ARCUNO) (ARORNO))
+             CHGDTAARA  DTAARA(*LDA (10 1))  VALUE('3')
+             CALL       PGM(ARR074R2)
+             CLOF       OPNID(ARR074F)
+             DLTOVR     FILE(*ALL)
+
+ END:        ENDPGM
+

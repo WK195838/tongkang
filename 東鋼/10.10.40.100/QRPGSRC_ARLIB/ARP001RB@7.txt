@@ -1,0 +1,366 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP001RB
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        MODIFIED BY LIN
+     H*            4.FUNCTION     磅單過入應收帳款作業（Ｈ型鋼）
+     H*            5.DATE-WRITTEN  82/05/13
+     H*            6.UPDATE  DATE  99/08/25  2010AR517  S00WCJ (9908A)
+     H*                           102/12/31  S00WCJ (0212A)
+     H*                          將磅單項次寫入TXRESV第13.14位
+     H*                           104/09/23  2015AR953  S00WCJ (0409A)
+     H*                            產品代碼3碼擴5碼
+     H*
+     H*
+     H*             說明:951222新增如為外銷客戶，銷貨明細檔之
+     H*                   發票號碼上"#"，過發票碼欄位上"Y"
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FHSVOUR  UP  E                    DISK
+     FTRNDTL  IF  E           K        DISK                      A
+9105 FHSCINVL2IF  E           K        DISK
+     FSAMAST  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FPRINT   O   F     132            PRINTER
+     FPRINT1  O   F     132            PRINTER
+     IRHSVOUR
+     I                                              S4AREAL2
+     I                                              S4VNO1L2
+     I                                              S4VNO2L2
+     I                                              S4ORNOL1
+     IAADS        DS
+     I                                        1   6 W1CUNO
+     I                                        1   6 CBKEY
+     I                                        1   1 S1KIND
+     I                                        2   2 S1CUN1
+     I                                        3   5 S1CUN2
+     I                                        6  10 S1BK05
+9008 I                                        6   6 S1CUN3
+LYW  I                                        7   7 S1CD02
+ .   I                                        8   8 S1CD03
+ .   I                                        9   9 S1CD04
+ .   I                                       10  10 S1CD05
+     I                                       11  18 S4KEY
+     I                                       11  11 S4AREA
+     I                                       12  13 S4VNO1
+     I                                       14  180S4VNO2
+     IBBDS        DS
+9008 I                                        1   9 WORNO
+LYW  I                                        1   1 WORNO1
+ .   I                                        2   6 WORNO2
+ .   I                                        7   9 WORNO3
+CLJB I            DS
+0409AI                                        1  30 TXRESV
+CLJE I                                       10  10 D#TXRV
+0212AI                                       13  140D#SQIT
+9105 I            DS
+9105 I                                        1   9 D#ORNO
+9105 I                                        1   6 D#ORN1
+9105 I                                        7   90D#ORN2
+     I           UDS
+9710 I*9908A                                  1   80YMD
+9908AI                                       51  580YMD
+9710 I*9908A                                  9  160YMD1
+9908AI                                        7  120YMD1
+     I                                     10211021 TXAR
+     C*----------------------------------------------------*
+9908AC           *DATE     SUB  19000000  U#SYSD  80
+     C  N81                EXSR INZ#01
+     C  N81                SETON                         81
+     C*----------------------------------------------------*
+     C   L2                EXSR DL#L2
+     C   L1                EXSR DL#L1
+     C                     EXSR DP#01
+     CL1                   EXSR TL#L1
+     CL2                   EXSR TL#L2
+     CLR                   EXSR TL#LR
+     C*----------------------------------------------------*
+     CSR         INZ#01    BEGSR
+     C                     MOVE 'SA04'    CDE1    4
+     C                     MOVE *ALL'='   ALS   111
+     C                     Z-ADD80        LCNT    20
+     C                     Z-ADD55        TCNT    20
+     C                     Z-ADD0         PAG     30
+     C                     Z-ADD0         WITEM   20
+     C*----------------------------------------------------*
+     C           KEY       KLIST
+     C                     KFLD           CDE1
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+     C           KEYT      KLIST
+     C                     KFLD           CDE1
+     C                     KFLD           TXNO
+     C           S1KEY     KLIST
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C                     KFLD           S1ORTM
+9105 C           K#CINV    KLIST
+9105 C                     KFLD           C1ORNO
+9105 C                     KFLD           C1OITM
+9105 C*
+     CSR                   ENDSR
+     C*----------------------------------------------------*
+     CSR         DL#L2     BEGSR
+     C                     Z-ADD0         WAMTT   90
+     C                     Z-ADD0         WAMTP   90
+     C                     Z-ADD0         TWQTY   70
+     CSR                   ENDSR
+     C*----------------------------------------------------*
+     CSR         DL#L1     BEGSR
+     C                     Z-ADD0         WQTY    90
+     CSR                   ENDSR
+     C*----------------------------------------------------*
+     CSR         DP#01     BEGSR
+     C                     MOVE S4ORNO    WORNO
+     C                     MOVE WORNO1    S1OREA
+9008 C                     MOVELWORNO2    S1ORNO
+LYW  C                     MOVELWORNO3    S1ORTM
+     C           S1KEY     CHAINSAMAST               36
+     C           *IN36     IFEQ '0'
+     C           CBKEY     CHAINCBCUST               97
+     C  N97                MOVELCBIVCO    S1CHK
+     C           S1KIND    IFEQ 'D'
+     C           S1KIND    OREQ 'G'
+     C                     MOVE 'L'       WSK
+     C                     ELSE
+     C                     MOVE S1KIND    WSK     1
+     C                     END
+     C           S1UPRC    COMP 0                        35
+     C                     END
+     C           S4ENTD    COMP YMD1                   37
+     C                     SETOF                     90
+     C*9111外銷START
+     C                     MOVELS4CUNO    W#CUNX  1
+     C           W#CUNX    IFEQ 'E'
+     C                     MOVELS4ORNO    C1ORNO
+     C                     MOVE S4ORNO    C1OITM
+     C           K#CINV    CHAINRHSCINV             N38
+     C                     ELSE
+     C                     SETOF                     38
+     C                     ENDIF
+     C*9111外銷END
+     C   37
+     COR 35
+     COR 36
+9111 COR 38                SETON                     90
+     C   90                ADD  1         CNT0    40
+     C   90      CNT0      COMP 1                        33
+     C   90                EXCPT
+     C                     SETOF                     333536
+     C  N90                MOVE 'X'       S4CDE2
+     C  N90                UPDATRHSVOUR
+     C  N90                EXSR DP#02
+     C                     ENDSR
+     C*---------------------------------------------------*
+     CSR         DP#02     BEGSR
+     C           S4TYPE    IFEQ '0'
+     C                     ADD  S4STDW    WQTY
+     C                     ELSE
+     C                     ADD  S4NWGT    WQTY
+     C                     ENDIF
+     CSR                   ENDSR
+     C*---------------------------------------------------*
+     C*  TOTAL TIME  L1                                   *
+     C*---------------------------------------------------*
+     CSR         TL#L1     BEGSR
+     C*9105外銷START
+     C                     MOVELS4ORNO    C1ORNO
+     C                     MOVE S4ORNO    C1OITM
+     C           K#CINV    CHAINRHSCINV             N60
+     C           *IN60     IFEQ *OFF
+9601 C*          S1UPRC    MULT C1RRAT    W#UPRC  75H      單價改乘以
+9601 C           S1UPRC    MULT C1TRAT    W#UPRC  75H      報關匯率
+     C           WQTY      MULT W#UPRC    WAMT
+     C                     ELSE
+     C           WQTY      MULT S1UPRC    WAMT   123
+     C                     ENDIF
+     C*9105外銷END
+     C                     Z-ADDWAMT      WAMTP     H
+     C                     ADD  WAMTP     WAMTT
+     C                     Z-ADDWAMTP     WAMTO  112     80
+     C                     ADD  WQTY      TWQTY
+     C                     ADD  WAMTP     WAMTTT  90
+     C  N80                EXSR FITEM
+     C  N80                EXSR WR#TN
+     C  N80                EXSR OU#01
+     CSR                   ENDSR
+     C*---------------------------------------------------*
+     C*  TOTAL TIME  L2                                   *
+     C*---------------------------------------------------*
+     CSR         TL#L2     BEGSR
+     C           WAMTT     COMP 0                        17
+     C  N17                EXCPTET#01
+     C                     ADD  1         LCNT
+     CSR                   ENDSR
+     C*---------------------------------------------------*
+     C*  TOTAL TIME  LR                                   *
+     C*---------------------------------------------------*
+     CSR         TL#LR     BEGSR
+     C                     Z-ADDWAMTTT    WAMTTR  90
+     C                     EXCPTET#02
+     CSR                   ENDSR
+     C*---------------------------------------------------*
+     C*  FIND LAST NUMBER                                 *
+     C*---------------------------------------------------*
+     CSR         FITEM     BEGSR
+     C                     SETOF                     18
+     C                     MOVE *BLANK    TXNO
+     C                     MOVELS4KEY     TXNO
+     C                     Z-ADD99        TXITEM
+     C           KEY       SETGTTRNDTL
+     C  N18      KEYT      REDPETRNDTL                   18
+     C      18             Z-ADD1         WITEM
+     C     N18   TXITEM    ADD  1         WITEM
+     CSR                   ENDSR
+     C*-----------------------------------------------------------*
+     C** WRITE TO TRNDTL                                          *
+     C*-----------------------------------------------------------*
+     CSR         WR#TN     BEGSR
+     C                     CLEARTXREC
+     C                     MOVE 'A'       TXFLAG
+     C                     MOVELCDE1      TXCODE
+     C                     MOVE '1'       TXACNT
+     C                     MOVE *BLANK    TXNO
+     C                     MOVELS4KEY     TXNO
+     C                     Z-ADDWITEM     TXITEM
+     C                     Z-ADDS4ENTD    TXDATE
+     C                     Z-ADDS4ENTD    TXACDT
+0212AC                     Z-ADDS4SQIT    D#SQIT
+CLJ  C           W1CUNO    CHAINCBCUST               69
+     C  N69                MOVELCBCUNM    TXCUNM
+---  C   69                MOVELS1CUNO    TXCUNM
+     C                     MOVELW1CUNO    TXCUNO
+     C                     MOVELS4ORNO    TXORNO
+     C                     MOVELS1RECV    TXRVID
+     C                     MOVELS1SND     TXSALE
+     C                     MOVELS1KIND    TXSATP
+     C                     MOVELS1CHK     TXIVTP
+     C                     MOVELS4NAME    TXPDNM
+     C                     Z-ADDWQTY      TXQTY
+9105 C*匯率換算
+9105 C  N60                Z-ADDW#UPRC    TXUPRC
+9105 C  N60      W#UPRC    MULT 100000    TPRC    70
+9105 C   60                Z-ADDS1UPRC    TXUPRC
+9105 C   60      S1UPRC    MULT 100000    TPRC    70
+     C                     Z-ADDWAMTO     TXAMT
+     C                     MOVELTXAR      TXTXAR
+9908AC*                    Z-ADDUDATE     TXTXDT
+9908AC                     Z-ADDU#SYSD    TXTXDT
+     C                     MOVELTPRC      TXRESV
+CLJ  C                     MOVEL'*'       D#TXRV           已出貨未傳
+9512 C*
+ .   C           S1KIND    IFEQ 'E'
+ .   C                     MOVEL'#'       TXIVNO           發票號碼
+ .   C                     MOVEL'Y'       TXFL02           過發票碼
+ .   C                     ELSE
+ .   C                     MOVEL*BLANK    TXIVNO           發票號碼
+ .   C                     MOVEL*BLANK    TXFL02           過發票碼
+ .   C                     ENDIF
+9512 C*
+     C                     WRITETXREC
+     CSR                   ENDSR
+     C*-------------------------------------------------------*
+     CSR         OU#01     BEGSR
+     C           LCNT      IFGT TCNT
+     C                     ADD  1         PAG
+     C                     EXCPTEH#01
+     C                     Z-ADD10        LCNT
+     C                     END
+     C                     EXCPTED#01
+     C                     ADD  1         LCNT
+     CSR                   ENDSR
+     C*-------------------------------------------------------*
+     OPRINT1  E  201           EH#01
+     O                                   11 '報表編號:'
+     O                                 +  1 'SAR04'
+     O                                   60 '* 應收帳款過帳單 *'
+     O                                  101 '印表日期'
+     O                                  102 ':'
+9908AO*                        UDATE Y  111
+9908AO                         U#SYSD   113 '    /  /  '
+     O        E  1             EH#01
+     O                                   11 '產品類別:'
+     O                                 +  1 'Ｈ型鋼'
+     O                                  102 '頁　　次:'
+     O                         PAG   Z +  1
+     O        E  1             EH#01
+     O                                   11 '截止日期:'
+9710 O                         YMD     +  1 '    /  /  '
+     O        E  1             EH#01
+     O                         ALS      111
+     O        E  1             EH#01
+     O                                   10 '出貨日期'
+     O                                   23 '磅單編號'
+     O                                   33 '客戶代號'
+     O                                   43 '客戶名稱'
+     O                                   53 '訂單號碼'
+     O                                   59 '品名'
+     O                                   73 '重　量'
+     O                                   75 'kg'
+     O                                   83 '單價'
+     O                                   97 '金　　額'
+     O                                  111 '小　　計'
+     O        E 1              EH#01
+     O                         ALS      111
+     O        E 1              ED#01
+     O                         S4ENTDY   10
+     O                         S4AREA    12
+     O                         S4VNO1    14
+     O                         S4VNO2    19
+     O                                   20 '-'
+     O                         S4SQIT    22
+     O                         W1CUNO    31
+     O                         S4CUNM    43
+     O                         WORNO1    45
+     O                         WORNO2    50
+     O                                   51 '-'
+     O                         WORNO3    54
+0410AO                         S4NAME  +  0
+     O                         WQTY  K   75
+     O                         S1UPRCK   83
+     O                         WAMTP K   97
+     O        E 01             ET#01
+     O                         WAMTT K  111
+     O        E  2             ET#02
+     O                                   10 '銷貨合計'
+     O                                   11 ':'
+     O                         WAMTTT2   25
+     O                                   95 '應收合計'
+     O                                   96 ':'
+     O                         WAMTTRK  111
+     OPRINT   E  103   33
+     O                                    6 'RPG :'
+     O                                 +  1 'SAR04R-2'
+     O                                   55 '*** 單價錯誤清單 ***'           X
+     O                                   90 '印表日期'
+     O                                   91 ':'
+9908AO*                        UDATE Y  100
+9908AO                         U#SYSD   102 '    /  /  '
+     O        E  1     33
+     O                                    8 '日　期'
+     O                                   24 '磅單號碼'
+     O                                   41 '訂單號碼'
+     O                                   60 '數　　量'
+     O                                   80 '備　　註'
+     O        E  1     33
+     O                                    8 '--------'
+     O                                   24 '----------'
+     O                                   41 '----------'
+     O                                   60 '----------'
+     O                                   80 '----------'
+     O        E  1     90
+     O                         S4ENTDY   10
+     O                         S4AREA    15
+     O                         S4VNO1    17
+     O                         S4VNO2    22
+     O                         S4ORNO    40
+     O                         S4NWGTK   60
+     O                 35                80 '單價＝０'
+     O                 36                80 '無此訂單'
+     O                 37                80 '超過入帳日'
+9710 O                 37      YMD1      90 '    /  /  '
+9111 O                 38                80 'ＣＩ錯誤'
+

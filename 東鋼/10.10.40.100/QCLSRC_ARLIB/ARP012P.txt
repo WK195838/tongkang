@@ -1,0 +1,144 @@
+    /****************************************************************/
+    /*                                                              */
+    /*        UPDATE  DATE  100/06/07  2011AR607 S00WCJ (0006A)     */
+    /*                      增加庫別代號寫入摘要三                */
+    /*                      100/11/25  2011AR634 S00WCJ (0011A)     */
+    /*                       配合IFRS修改                       */
+    /*                      101/12/13  2012AR704 S00WCJ (0112A)     */
+    /*                       配合IFRS正式轉換修改               */
+    /*                           107/03/16 2018AR1138 S00WCJ (0703A)*/
+    /*                            依產品品名分項代開              */
+    /*                      109/12/07 2020AR00058 S00WCJ (0912A)    */
+    /*                       代開日期寫入ARCTLDTA，供檢核是否可 */
+    /*                       異動調整單                           */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCL        VAR(&P#YYMM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&P#DATE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&P#CODE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)  TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DATE)  TYPE(*DEC)  LEN(8)
+             DCL        VAR(&DATEA) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATEB) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREA)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&Y)     TYPE(*CHAR) LEN(4)
+             DCL        VAR(&M)     TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DTARA) TYPE(*CHAR) LEN(11)
+             DCL        VAR(&WSID)  TYPE(*CHAR) LEN(10)
+ /*0011A*/   DCL        VAR(&D#VNO1) TYPE(*CHAR) LEN(6)
+ /*0011A*/   DCL        VAR(&D#VNO2) TYPE(*CHAR) LEN(6)
+ /*0011A*/   DCL        VAR(&YM)     TYPE(*CHAR) LEN(6)
+ /*0112A*/   DCL        VAR(&IFRSD)  TYPE(*CHAR) LEN(8)
+ /*0912A*/   DCL        VAR(&D#DATE) TYPE(*CHAR) LEN(8)
+
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&DTARA) VALUE('ACCTLDTA' *CAT &AREA)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             RTVDTAARA  DTAARA(&DTARA (9 8)) RTNVAR(&DATEB)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&WSID)
+
+ DISPLY:     CALL       PGM(ARP012RS) PARM(&IN03 &DATE &AREA &DATEB)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&DATEA) VALUE(&DATE)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&DATEA)
+             CHGDTAARA  DTAARA(*LDA (9 1)) VALUE(&AREA)
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&P#YYMM)
+             RTVDTAARA  DTAARA(*LDA (1 8)) RTNVAR(&P#DATE)
+
+             CALL    PGM(ACP101R) PARM(&P#YYMM  &P#CODE)
+             IF         COND(&P#CODE *EQ '1') THEN(DO)
+             SNDBRKMSG  MSG('關帳日期已過，請與相關人員聯絡！') +
+                          TOMSGQ(&WSID)
+             GOTO       CMDLBL(DISPLY)
+             ENDDO
+
+             SBMJOB     JOB(ARP012P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARP012P')
+             RETURN
+             ENDDO
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 8)) RTNVAR(&DATEA)
+             RTVDTAARA  DTAARA(*LDA (1 4)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (5 2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (9 1)) RTNVAR(&AREA)
+ /*0011A*/   RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&YM)
+ /*0112A*/   RTVDTAARA  DTAARA(ARIFRSCTL (1 8))  RTNVAR(&IFRSD)
+
+   /*0007A    CPYF       FROMFILE(TRNDTL) TOFILE(QTEMP/TXTEMP) +
+                          MBROPT(*ADD) CRTFILE(*YES) INCCHAR(*RCD 6 +
+                          *EQ &AREA) INCREL((*IF TXVUNO *EQ '       +
+                          ') (*AND TXCODE *EQ 'AR05') (*AND TXFLAG +
+                          *NE 'D') (*AND TXACDT *EQ &DATEA))  */
+   /*0007A START*/
+             CLRPFM     TRNDTLZ
+
+    /*由於AMPROD檔案各廠獨立，所以以DDMF的方式讀取U廠之資料*/
+
+             DLTF       FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(U01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMU)
+             CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(*NONSTD +
+                          'DALIB/AMPRODL3') LVLCHK(*NO)
+             OVRDBF     FILE(AMPRODL3) TOFILE(QTEMP/DDMU)
+
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+             OVRDBF     FILE(TRNDTLU) TOFILE(TRNDTL)
+             OPNQRYF    FILE(TRNDTL) OPTION(*ALL) QRYSLT(' +
+                           (TXVUNO *EQ "        ") *AND +
+                           (TXCODE *EQ "AR05") *AND  +
+                           (TXFLAG *NE "D")  *AND +
+                           (ACDT *EQ "' || &DATEA || '") *AND +
+                           (TXTXAR *EQ "' || &AREA || '") +
+                        ') MAPFLD((ACDT TXACDT *CHAR 8))
+
+             CALL       PGM(ARP012RA)
+             CLOF       OPNID(TRNDTL)
+
+   /*0007A  END */
+
+             OVRDBF     FILE(TRNDTLUP) TOFILE(TRNDTL)
+   /*0007A*/ OVRDBF     FILE(TRNDTLZ) TOFILE(TRNDTLZ) SHARE(*YES)
+   /*0007A   OPNQRYF    FILE((TRNDTLZ)) KEYFLD((TXFL02) (TXIVNO) +
+                          (TXCUNO) (TXUPRC)) MAPFLD((TXIVNO +
+                          '%SST(TXORNO 1 6)') (TXFL02 '%SST(TXPCNO +
+                          1 1)'))    */
+
+   /*0703A*/ OPNQRYF    FILE((TRNDTLZ)) KEYFLD((TXFL02) (TXRESV) +
+                             (TXCUNO) (TXIVNO)  +
+                             (TXUPRC)) MAPFLD( +
+                             (TXFL02 '%SST(TXPCNO +
+                          1 1)'))
+
+             OVRDBF     FILE(ACTRAN) TOFILE('AC' || &AREA || +
+                          'R') LVLCHK(*NO)
+   /*0007A*/ OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 176) +
+                          CPI(13.3)
+             CALL       PGM(ARP012R)
+    /*0007A*/CLOF       OPNID(TRNDTLZ)
+             DLTOVR     FILE(*ALL)
+   /*0007A   DLTF       FILE(QTEMP/TXTEMP) */
+
+ /*0912A*/   RTVDTAARA  DTAARA(ARCTLDTA (1 8))  RTNVAR(&D#DATE)
+ /*0912A*/   IF     COND(&DATEA  *GT &D#DATE)  THEN(DO)
+ /*0912A*/      CHGDTAARA  DTAARA(ARCTLDTA (1 8))  VALUE(&DATEA)
+ /*0912A*/   ENDDO
+
+ /*0112A*/  IF    COND(&DATEA  *LT  &IFRSD)  THEN(DO)
+ /*0011A STRAT */
+
+             RTVDTAARA  DTAARA(*LDA (201 6)) RTNVAR(&D#VNO1)
+             RTVDTAARA  DTAARA(*LDA (211 6)) RTNVAR(&D#VNO2)
+
+             CALL       PGM(ARS888P) PARM(&AREA &YM &D#VNO1 &D#VNO2)
+ /*0011A  END */
+ /*0112A*/  ENDDO
+
+             ENDPGM
+

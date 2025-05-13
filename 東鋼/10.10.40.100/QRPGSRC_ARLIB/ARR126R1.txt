@@ -1,0 +1,171 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR126R1
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     期後收回應收帳款明細表（前期處理）
+     H*          5.DATE-WRITTEN  95/06/28
+     H*          6.DATE-MODIFY   95/07/04 UPDATE BY S02CSF
+     H*                         101/09/26 2012AR682 S00WCJ (0109A)
+     H*
+     H*    950704==>原本抓取發票年月判斷該筆發票應收帳款的歸屬年度
+     H*             ，成抓取該張發票對應的出貨年月來判斷其應收帳款
+     H*             歸屬年度
+     H*****************************************************************
+     H        1   Y                                     1
+     FRCVDTL  IP  E           K        DISK
+     F*SARVIN  IF  E           K        DISK
+     FTRNDTLL2IF  E           K        DISK
+     FINVDTLL1IF  E           K        DISK
+     FARR126F O   E           K        DISK
+     F*****************************************************************
+     IRVREC
+     I                                              RVNO  L1
+     I           UDS
+     I                                      301 3080U#DATS
+     I                                      309 3160U#DATE
+     I                                      317 3240U#YMDS
+     I                                      325 3320U#YMDE
+     I                                      333 3360U#YEAR
+     C*****************************************************************
+     C*          KET  LIST
+     C*****************************************************************
+     C*FILE => SARVIN(營業繳款發票沖銷檔)
+     C*          K#SRIN    KLIST
+     C*                    KFLD           SIRVNO
+     C*                    KFLD           SIITEM
+     C*FILE => INVDTL(發票明細檔)
+     C           K#INVD    KLIST
+     C                     KFLD           IVACNT
+     C                     KFLD           IVAPNO
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARRAR126F
+     C                     MOVEL*BLANK    W#FLAG  1
+     C                     MOVEL*BLANK    W#NTCN  1        未兌現碼
+     C                     MOVEL*BLANK    W#NTCY  1        已兌現碼
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C           RVNO      IFEQ 'P60017'
+     C                     MOVEL'X'       W#XXXX  1
+     C                     ENDIF
+     C*
+     C*先判斷此張繳款書是否有沖應收帳款
+     C*
+     C                     MOVEL'6'       IVACNT
+     C                     MOVELRVNO      IVAPNO
+     C           K#INVD    CHAINIVREC                40
+     C           *IN40     IFEQ *OFF
+     C                     MOVEL'X'       W#FLAG
+     C*
+     C*一張繳款書內票據若皆未兌現，則排除此張繳款書
+     C*若部分兌現則寫入檔案
+     C           RVACNO    IFEQ '1131'
+     C           RVNTTP    ANDEQ'A'
+0109AC           RVACNO    OREQ '111001'
+0109AC           RVNTTP    ANDEQ'A'
+     C           RVNTCD    IFEQ '1'
+     C           RVNTDT    ANDLEU#DATE
+     C                     MOVEL'Y'       W#NTCY
+     C                     ELSE
+     C                     MOVEL'N'       W#NTCN
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           W#FLAG    IFNE ' '
+     C*
+     C           W#NTCY    IFEQ ' '
+     C           W#NTCN    ANDNE' '
+     C                     GOTO ENDL1
+     C                     ENDIF
+     C*
+     C*先CHECK所沖銷的應收發票日期
+     C                     EXSR SR1000
+     C*
+     C           W#YEAY    IFEQ 0
+     C           W#YEAN    ANDNEU#YEAR
+     C                     GOTO ENDL1
+     C                     ENDIF
+     C*
+     C                     EXSR SR2000
+     C*
+     C                     ENDIF
+     C*
+     C           ENDL1     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#YEAY  40       符合年度
+     C                     Z-ADD0         W#YEAN  40       不符合年度
+     C*
+     C                     MOVELRVNO      IVAPNO
+     C                     MOVEL'6'       IVACNT
+     C           K#INVD    SETLLIVREC
+     C                     MOVE *OFF      *IN42
+     C           *IN42     DOWEQ*OFF
+     C                     READ IVREC                    42
+     C      42             LEAVE
+     C*
+     C           IVAPNO    IFNE RVNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           IVNO      CHAINTXREC                43
+     C  N43      TXDATE    IFGE U#YMDS
+     C           TXDATE    ANDLEU#YMDE
+     C                     Z-ADDU#YEAR    W#YEAY
+     C                     ELSE
+     C                     Z-ADD9999      W#YEAN
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*寫入暫存檔
+     C                     MOVELRVNO      A1RVNO
+     C                     Z-ADDRVITEM    A1ITEM
+     C                     Z-ADDRVDATE    A1RVDT
+     C                     MOVELRVUSTP    A1USTP
+     C                     MOVELRVNTTP    A1NTTP
+     C                     MOVELRVACTP    A1ACTP
+     C                     MOVELRVACNO    A1ACNO
+     C                     MOVELRVCUNO    A1CUNO
+     C                     MOVELRVCUNM    A1CUNM
+     C                     MOVELRVVNO1    A1VNO1
+     C                     MOVELRVNTNO    A1NTNO
+     C                     Z-ADDRVNTDT    A1NTDT
+     C                     Z-ADDRVDUDT    A1DUDT
+     C                     Z-ADDRVRAMT    A1AMT1
+     C                     WRITERAR126F
+     C*
+     C*
+     C                     ENDSR
+

@@ -1,0 +1,66 @@
+           /******************************************************/
+           /*                                                    */
+           /*   PROGRAM   ID        :   ARR033R                  */
+           /*   PROGRAM   FUNCTION  :  銷退或折讓證明單列印    */
+           /*   AUTHER              :   NANCY                    */
+           /*   CREATE    DATE      :   81/09/30                 */
+           /*   MAINTAIN  DATE      :                            */
+           /*   RELATION  PROGRAM   :   ARR033P,ARR033R,ARR033S  */
+           /*   NOTE                :                            */
+           /*   UPDATE  DATE        : 101/02/02 S00WCJ (0102A)   */
+           /*                        變更印表機代號PPB0006改為*/
+           /*                         PPB0010                    */
+           /*                         107/11/02 S00WCJ (0711A)   */
+           /*                          配合電子發票上線，增加  */
+           /*                          CALL PC端程式執行列印作 */
+           /*                         業                       */
+           /*                                                    */
+           /******************************************************/
+/*0711A*/    PGM        PARM(&NO    &W#PTMD)
+             DCL        VAR(&NO)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+
+/*0711A*/    DCL        VAR(&W#PTMD)   TYPE(*CHAR)  LEN(1)
+/*0711A*/    DCL        VAR(&PATH1)    TYPE(*CHAR)  LEN(18)
+/*0711A*/    DCL        VAR(&CMD)     TYPE(*CHAR)   LEN(28)
+/*0711A*/    DCL        VAR(&CMD1)    TYPE(*CHAR)   LEN(47)
+/*0711A*/    DCL        VAR(&CMD2)    TYPE(*CHAR)   LEN(54)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+ DISPLAY:
+             IF         COND(&NO *EQ  ' ')   THEN(DO)
+/*0711A*/               CALL  PGM(ARR033RS)  PARM(&NO &IN03  &W#PTMD)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             ENDDO
+
+/*0711A      SBMJOB     JOB(ARR033P) JOBD(ARJOBD) JOBQ(ARJOBQ) +
+                         OUTQ(PPB0010) RQSDTA('CALL PGM(ARR033P) +
+                         PARM(''' || &NO || ''')')   */
+/*0711A      RETURN     */
+
+   BATCH:
+/*0711A*/    OVRPRTF    FILE(QPRINT) PAGESIZE(33 96) LPI(6) CPI(12) +
+                          OVRFLW(33) OUTQ(PPB0010) HOLD(*YES) +
+                          SAVE(*YES)
+             CALL       PGM(ARR033R) PARM(&NO)
+             DLTOVR     FILE(*ALL)
+
+/*0711A*/ IF         COND(&W#PTMD *EQ 'Y')  THEN(DO)
+/*0711A*/   CHGVAR   VAR(&PATH1) VALUE('PRINTALLOWANCE.EXE')
+/*0711A*/   STRPCO    PCTA(*NO)
+/*0711A*/   MONMSG     CPF0000
+
+/*0711A*/  CHGVAR   VAR(&CMD)  VALUE('C:\E-INVOICE\PRINTALLOWANCE\')
+/*0711A*/  CHGVAR   VAR(&CMD1) VALUE(&CMD || &PATH1 || ' ')
+/*0711A*/  CHGVAR   VAR(&CMD2) VALUE(&CMD1 || &NO || ' ')
+
+/*0711A*/   STRPCCMD   PCCMD(&CMD2) PAUSE(*YES)
+
+/*0711A*/ ENDDO
+
+ENDCLPGM:    ENDPGM
+

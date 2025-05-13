@@ -1,0 +1,440 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARR007R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     電子發票上送介面檔處理程式
+     H*            5.DATE-WRITTEN 106/12/04  2017AR1112
+     H*            6.UPDATE-DATE  107/01/25  2018AR1125 (0701A)
+     H*                          發票YT44357156，為預收發票，因特殊
+     H*                          需求品名列印為未交單價差
+     H*                           107/06/15  2018AR1162  S00WCJ (0706A)
+     H*                            電子發票介面檔增加處理代號及廠區
+     H*                           107/10/31  2018AR00025 S00WCJ (0710A)
+     H*                            二聯式發票訊息代碼寫入C0401
+     H*                           107/11/08  S00WCJ (0711A)
+     H*                            增加列印廠區及列印模式
+     H*                           107/12/05  S00WCJ (0712A)
+     H*                            增加IVAPNO寫入EDREMK
+     H*                           107/12/14 2018AR00038 S00WCJ (0712A)
+     H*                            增加寫入營業單位
+     H*                           107/12/28 S00WCJ (0712C)
+     H*                            增加判斷若無本廠列印資料，則不CALL
+     H*                             PC端程式
+     H*                           108/01/03 S00WCJ (0801A)
+     H*                            增加訂單編號寫入EMMAR1欄位
+     H*                           108/01/08 S00WCJ (0801B)
+     H*                            修正EMSAMT資料內容
+     H*                           108/01/28 2019ER00001 S00WCJ (0801C)
+     H*                            新增產品代碼Z90
+     H*                           108/05/09 S00WCJ (0805A)
+     H*                            增加寫入電子發票介面LOG異動資訊
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FINVCUT  IP  E           K        DISK
+     FINVMST  UF  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FINVDTY  IF  E           K        DISK
+     F            IVREC                             KRENAMEIVRECY
+     FCBCUST  IF  E           K        DISK
+     FHIPROD  IF  E           K        DISK
+0706AFINEMST  UF  E           K        DISK                      A
+     FINEMSTG O   E           K        DISK
+     F            RINEMST                           KRENAMEINMSTG
+0706AFINEDTL  UF  E           K        DISK                      A
+     FINEDTLG O   E           K        DISK
+     F            RINEDTL                           KRENAMEINDTLG
+     E*
+     E                    TAB1    5   5  1   TAB2    6   *公司代號
+0701AE                    HD      1   6 20
+     E                    MSG     1   9 40
+     E                    CU1     1   3 48
+     E**************************************************************
+     IRINVCUT
+     I                                              CUNO  L1
+     IIVRECY
+     I              IVNO                            F#IVNO
+     I              IVACNT                          F#ACNT
+     I              IVITEM                          F#ITEM
+     I              IVPDCD                          F#PDCD
+     I              IVQTY                           F#QTY
+     I              IVUPRC                          F#UPRC
+     I              IVAMT                           F#AMT
+     I              IVFL03                          F#FL03
+     I            DS
+     I                                        1   8 EMINTT
+     I                                        1   2 D#HH
+     I                                        3   3 D#P1
+     I                                        4   5 D#MM
+     I                                        6   6 D#P2
+     I                                        7   8 D#SS
+     I            DS
+     I                                        1   60W#INTT
+     I                                        1   20D1HH
+     I                                        3   40D1MM
+     I                                        5   60D1SS
+     I            DS
+     I                                        1 255 EDPDCD
+     I                                        1   5 D#PROD
+     I                                        6 255 D#PRNM
+     I            DS
+     I                                        1   6 INRESV
+     I                                        6   6 D#RESV
+0701AI            DS
+0701AI                                        1  10 IVNO
+0701AI                                        1   2 D#IVN1
+0701AI                                        3  10 D#IVN2
+     I           UDS
+0711AI                                       41  41 D#AREA
+0712CI                                       43  43 W#PTYN
+     I                                      951 985 COMP
+     I                                     10011010 U#USID
+     I                                     10111020 DEVNM
+0706AI                                     10211021 TXAR
+     C*
+0711AIINTR       UDS                             50
+0711AI                                        1   80D#INTR
+     C****************************************************************
+     C*          *ENTRY    PLIST
+     C*                    PARM           R#NO   10
+     C*
+0711AC           KEY01     KLIST
+0711AC                     KFLD           CUNO
+0711AC                     KFLD           W1SENR  3
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C   L1N90             EXSR SR0000
+     C                     EXSR SR1000
+     C*L1                   EXSR SR2000
+     C*LR                   EXSR SR3000
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*
+     C           *DATE     SUB  19000000  U#SYSD  80
+0711AC           *NAMVAR   DEFN ARINTRCTL INTR
+0711AC                     UNLCKINTR
+     C*
+0712CC                     MOVEL*BLANKS   W#PTYN  1
+     C                     MOVEL*ON       *IN90
+     C*
+     C           W#INVD    KLIST
+     C                     KFLD           F#IVNO
+     C                     KFLD           F#ACNT
+     C                     KFLD           F#ITEM
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+0711AC*          CUINDT    IFLT D#INTR
+0711AC*                    GOTO EN1000
+0711AC*                    ENDIF
+     C*
+0711AC           CUNO      CHAINRINEMST              66
+0711AC  N66                GOTO ENDMST
+     C*
+     C                     MOVELCUNO      W#INNO 10
+0706AC   66                CLEARRINEMST
+     C*
+     C           CUNO      CHAININREC               N51
+     C*
+0706AC   66                MOVEL'A'       EMFLAG
+0706AC                     MOVELTXAR      EMAREA
+0710AC                     SELEC
+0710AC           INKIND    WHEQ '3'
+     C                     MOVEL'A0401'   EMMSTE
+0710AC           INKIND    WHEQ '2'
+0710AC                     MOVEL'C0401'   EMMSTE
+0710AC                     ENDSL
+     C                     MOVELCUNO      EMNO
+     C           ININDT    ADD  19110000  W#INDT  80
+     C                     MOVELW#INDT    EMINDT
+     C                     TIME           W#INTT  60
+     C*
+     C                     MOVELD1HH      D#HH
+     C                     MOVEL':'       D#P1
+     C                     MOVELD1MM      D#MM
+     C                     MOVEL':'       D#P2
+     C                     MOVELD1SS      D#SS
+     C*
+     C           INAREA    LOKUPTAB1      TAB2           50*EQ
+     C   50                MOVELTAB2      W1CUNO  6
+     C*
+     C           W1CUNO    CHAINCBCUST              N91
+     C                     MOVELCBMUID    EMSLID
+     C                     MOVELCBFNAM    EMSLNM
+     C                     MOVELCBADR1    EMSLAS
+     C                     MOVELCBCMAN    EMSLPE
+     C*
+     C           INCUNO    CHAINCBCUST              N91
+     C                     MOVELCBMUID    EMBYID
+     C                     SELEC
+     C           INCUNO    WHEQ 'DP3031'
+     C                     MOVELCU1,1     EMBYNM
+     C           INCUNO    WHEQ 'DP332'
+     C                     MOVELCU1,2     EMBYNM
+     C           INCUNO    WHEQ 'DP502'
+     C                     MOVELCU1,3     EMBYNM
+     C                     OTHER
+     C                     MOVELCBFNAM    EMBYNM
+     C                     ENDSL
+     C                     MOVELCBADR1    EMBYAS
+     C                     MOVELCBCMAN    EMBYPE
+     C*
+     C                     MOVEL'07'      EMINTE
+     C                     MOVEL'0'       EMDNMK
+0801BC*                    Z-ADDINAAMT    EMSAMT
+     C                     MOVELINTXTP    EMTXTP
+     C                     Z-ADD0.05      EMTXRT
+     C                     Z-ADDINATAX    EMATAX
+     C                     Z-ADDINNBAL    EMAAMT
+     C*
+0801AC                     MOVELINORNO    EMMAR1
+     C                     Z-ADDU#SYSD    EMXPDD
+     C                     TIME           EMXPDT
+     C                     MOVELU#USID    EMXUSR
+0711AC*
+0711AC                     SELEC
+0711AC           CUAREA    WHEQ 'H'
+0711AC           CUTYPE    ANDNE'9'
+0711AC                     MOVEL'P'       EMPTAR           *列印廠區
+0712AC                     MOVEL'3'       EMBUMD           *營業單位
+0712AC           CUAREA    WHEQ 'H'
+0712AC           CUTYPE    ANDEQ'9'
+0712AC                     MOVEL'H'       EMPTAR
+0712AC                     MOVEL'3'       EMBUMD
+0711AC           CUAREA    WHEQ 'T'
+0711AC           CUAREA    OREQ 'U'
+0711AC                     MOVEL'U'       EMPTAR
+0712AC                     MOVEL'2'       EMBUMD           *營業單位
+0711AC                     OTHER
+0711AC                     MOVELCUAREA    EMPTAR
+0712AC                     MOVEL'2'       EMBUMD           *營業單位
+0711AC                     ENDSL
+0712AC*
+0712CC           EMPTAR    IFEQ D#AREA
+0712CC                     MOVEL'Y'       W#PTYN
+0712CC                     ENDIF
+     C*
+0711AC           EMPTAR    IFEQ TXAR
+0711AC                     MOVEL'1'       EMPTMD           *正常列印
+0711AC                     ADD  1         EMPTCN           *列印次數
+0711AC                     ENDIF
+     C*
+0711AC           ENDMST    TAG
+0711AC                     MOVEL'001'     W1SENR
+0711AC           KEY01     CHAINRINEDTL              66
+0711AC  N66                GOTO EN1000
+     C                     Z-ADD0         W#SENR  30
+0801BC                     Z-ADD0         W#AMT  110
+     C           CUNO      SETLLIVREC
+     C                     MOVEL*OFF      *IN52
+     C           *IN52     DOWEQ*OFF
+     C           CUNO      READEIVREC                    52
+     C   52                LEAVE
+     C                     MOVEL*OFF      *IN38            列印單價
+     C*
+     C           IVACNT    IFEQ '2'                        退貨
+     C           IVACNT    OREQ '3'
+     C           IVACNT    OREQ '5'                        稅
+     C           IVACNT    OREQ '6'                        繳款轉入
+     C           IVACNT    OREQ '7'                        轉出
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           IVACNT    IFEQ '1'                        銷貨
+     C           IVFL03    COMP 'A'                  3131  出貨
+     C   31      IVFL03    COMP 'B'                  3131  調整
+     C   31                ITER
+     C                     END
+     C*
+     C           IVACNT    IFEQ '4'                        扣預收
+     C           IVFL03    COMP 'E'                  3131  扣預收
+     C   31      IVFL03    COMP 'F'                  3131  預收
+     C   31                ITER
+     C                     END
+      *
+     C   66                CLEARRINEDTL
+     C*
+0706AC   66                MOVEL'A'       EDFLAG
+0706AC                     MOVELTXAR      EDAREA
+0710AC                     SELEC
+0710AC           INKIND    WHEQ '3'
+     C                     MOVEL'A0401'   EDMSTE
+0710AC           INKIND    WHEQ '2'
+0710AC                     MOVEL'C0401'   EDMSTE
+0710AC                     ENDSL
+     C                     MOVELIVNO      EDNO
+     C                     MOVELEMINDT    EDINDT
+     C                     MOVELEMINTT    EDINTT
+     C*
+     C                     MOVELIVPDCD    EDPROD
+     C           IVPDCD    CHAINHIPROD              N31
+     C           *IN31     IFEQ '0'
+     C                     MOVELIVPDCD    PDCD    1        品名
+     C           PDCD      IFNE 'Z'
+     C           IVPDCD    OREQ 'Z92'
+     C           IVPDCD    OREQ 'Z93'
+     C           IVPDCD    OREQ 'Z94'
+     C           IVPDCD    OREQ 'Z95'
+     C           IVPDCD    OREQ 'Z96'
+     C           IVPDCD    OREQ 'Z97'
+     C           IVPDCD    OREQ 'Z98'
+0802AC           IVPDCD    OREQ 'Z90'
+     C                     MOVELF4CHIN    EDPRNM
+     C                     ELSE
+     C                     SELEC
+     C           IVPDCD    WHEQ 'Z01'
+     C                     MOVELMSG,1     EDPRNM
+     C           IVPDCD    WHEQ 'Z02'
+     C                     MOVELMSG,2     EDPRNM
+     C           IVPDCD    WHEQ 'Z03'
+     C                     MOVELMSG,3     EDPRNM
+     C           IVPDCD    WHEQ 'Z04'
+     C                     MOVELMSG,4     EDPRNM
+     C           IVPDCD    WHEQ 'Z05'
+     C                     MOVELMSG,5     EDPRNM
+     C           IVPDCD    WHEQ 'Z06'
+     C                     MOVELMSG,6     EDPRNM
+     C           IVPDCD    WHEQ 'Z07'
+     C                     MOVELMSG,7     EDPRNM
+     C           IVPDCD    WHEQ 'Z08'
+     C                     MOVELMSG,8     EDPRNM
+     C           IVPDCD    WHEQ 'Z99'
+     C                     MOVELMSG,9     EDPRNM
+     C                     ENDSL
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C*排除規格檔中產品類別為空白，
+     C*否則會相關折扣字樣無法印出。
+     C*
+     C           *IN31     IFEQ *OFF
+     C           PDCD      ANDNE'Z'
+     C           F4NAME    ANDEQ*BLANK
+     C                     MOVE *ON       *IN31
+     C                     ENDIF
+     C*
+     C   31      IVACNT    COMP '4'                      32
+     C   31 32   IVAMT     COMP 0                    33  33
+     C   31 32 33          MOVELHD,1      EDPRNM
+     C   31 32N33          MOVELHD,2      EDPRNM
+     C   31 32   D#RESV    IFEQ 'Y'
+     C                     MOVELHD,5      EDPRNM
+     C                     MOVEL*ON       *IN38            不印單價
+     C                     ENDIF
+0701AC   31 32   D#IVN1    IFEQ 'YT'
+0701AC           D#IVN2    ANDEQ'44357156'
+0701AC                     MOVELHD,6      EDPRNM
+0701AC                     ENDIF
+     C*
+     C                     MOVELEDPROD    D#PROD
+     C                     MOVELEDPRNM    D#PRNM
+     C*
+0712AC                     MOVELIVAPNO    EDREMK
+     C                     Z-ADDIVQTY     EDQTY
+     C  N38                Z-ADDIVUPRC    EDUPRC
+     C   38                Z-ADD0         EDUPRC
+     C                     Z-ADDIVAMT     EDAMT
+0801BC                     ADD  IVAMT     W#AMT
+     C                     ADD  1         W#SENR  30
+     C                     MOVELW#SENR    EDSENR
+     C*
+     C                     Z-ADDU#SYSD    EDXPDD
+     C                     TIME           EDXPDT
+     C                     MOVELU#USID    EDXUSR
+     C                     WRITERINEDTL
+     C                     MOVEL'ARR007R1'EDAPNM
+0805AC                     Z-ADDU#SYSD    EDCHDD
+0805AC                     TIME           EDCHDT
+0805AC                     MOVELU#USID    EDCUSR
+     C                     WRITEINDTLG
+     C*
+     C*抓折扣
+     C*
+     C           IVACNT    IFEQ '1'
+     C                     MOVELIVNO      F#IVNO
+     C                     MOVEL'3'       F#ACNT
+     C                     Z-ADDIVITEM    F#ITEM
+     C           W#INVD    CHAINIVRECY              N50
+     C           *IN50     IFEQ *OFF
+     C           F#FL03    ANDEQ'K'
+     C           F#QTY     IFNE 0
+     C                     MOVELHD,3      EDPRNM
+     C                     MOVELF#PDCD    EDPROD
+     C*
+0712AC                     MOVELIVAPNO    EDREMK
+     C                     MOVELEDPROD    D#PROD
+     C                     MOVELEDPRNM    D#PRNM
+     C                     Z-ADDF#QTY     EDQTY
+     C  N38                Z-ADDF#UPRC    EDUPRC
+     C   38                Z-ADD0         EDUPRC
+     C                     Z-ADDF#AMT     EDAMT
+0801BC                     ADD  F#AMT     W#AMT
+     C*
+     C                     ADD  1         W#SENR
+     C                     MOVELW#SENR    EDSENR
+0712AC                     MOVELIVAPNO    EDREMK
+     C*
+     C                     Z-ADDU#SYSD    EDXPDD
+     C                     TIME           EDXPDT
+     C                     MOVELU#USID    EDXUSR
+     C                     WRITERINEDTL
+     C                     MOVEL'ARR007R1'EDAPNM
+0805AC                     Z-ADDU#SYSD    EDCHDD
+0805AC                     TIME           EDCHDT
+0805AC                     MOVELU#USID    EDCUSR
+     C                     WRITEINDTLG
+0801BC                     ELSE
+0801BC                     ADD  F#AMT     W#AMT
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDDO
+0801BC                     Z-ADDW#AMT     EMSAMT
+0711AC   66                WRITERINEMST
+0711AC  N66                UPDATRINEMST
+     C                     MOVEL'ARR007R1'EMAPNM
+0805AC                     Z-ADDU#SYSD    EMCHDD
+0805AC                     TIME           EMCHDT
+0805AC                     MOVELU#USID    EMCUSR
+     C                     WRITEINMSTG
+     C*
+     C           CUNO      CHAININREC                51
+     C                     MOVEL'X'       INPRTC
+     C                     UPDATINREC
+     C*
+     C           EN1000    ENDSR
+     C*
+     C*****************************************************************
+**  TAB1 TAB2
+PMM001 MMM007 HMM005 KMM003 UMM006
+** HD
+預收貨款
+扣預收款
+折扣
+扣物調款
+鋼筋
+未交單價差
+** MSG
+東和鋼鐵體系企業間電子化計畫第一期款
+東和鋼鐵體系企業間電子化計畫第二期款
+東和鋼鐵體系企業間電子化計畫第三期款
+東和鋼鐵體系企業間電子化計畫第四期款
+東和鋼鐵體系企業間電子化計畫第一期款
+東和鋼鐵體系企業間電子化計畫第二期款
+東和鋼鐵體系企業間電子化計畫第三期款
+東和鋼鐵體系企業間電子化計畫第四期款
+傾銷費用補助款
+** CU1
+春原營造股份有限公司捷運頂埔段工程辦事處
+日商華大成營造工程股份有限公司台灣分公司
+日商清水營造工程股份有限公司台灣分公司
+

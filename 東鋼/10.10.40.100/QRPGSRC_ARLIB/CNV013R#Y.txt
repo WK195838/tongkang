@@ -1,0 +1,107 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    CNV013R#Y
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     檢核或移動錯誤發票明細至備份檔2
+     H*            5.DATE-WRITTEN  86/08/29
+     H*
+     H*****************************************************************
+     H* 說明:本程式是在CNV013P1及CCP029P 等晚間批次程式處理時，
+     H*        呼叫CNV013R#X 將有發票明細卻無發票主檔的發票號碼複製
+     H*        至 INVDTL01 ，本程式則會檢核此項錯誤在本程式執行時
+     H*        是否仍存在（出錯誤報表），或者將錯誤的發票明細從明細檔
+     H*        移至備份2 。（備份１在執行本程式後請自行清除）
+     H*             INVDTL02    INVDTL01
+     H*
+     H* 參數傳入: C  表只檢核不移動資料
+     H*             M  表檢核並移動資料
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVDTL01IP  E           K        DISK
+     F            IVREC                             KRENAMEIVREC01
+     FINVMST  IF  E           K        DISK
+     FINVDTL  UF  E           K        DISK
+     FINVDTL02O   E           K        DISK
+     F            IVREC                             KRENAMEIVREC02
+     FCNV013T O   E             66     PRINTER
+     I*----------------------------------------------------
+     I            DS
+     I                                        1   7 IVORNO
+     I                                        1   5 D#ORNO
+     C*****************************************************************
+     C*  參數傳遞區
+     C*****************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#CKTP  1
+     C*****************************************************************
+     C*  主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C                     EXSR DTLSR
+     CLR                   EXSR LRSR
+     C*****************************************************************
+     C*  子程式集
+     C*****************************************************************
+     CSR         INISR     BEGSR
+     C                     SETON                     66
+     C                     Z-ADD0         W#RCNT  40
+     C                     Z-ADD0         W#TAMT 130
+     C                     MOVEL*BLANK    W#IVNO 10
+     CSR                   ENDSR
+     C*----------------------------------------------------------------
+     CSR         DTLSR     BEGSR
+     C                     MOVELIVNO      W#IVNO
+     C           W#IVNO    CHAININREC                68    檢發票主檔
+     C           W#IVNO    CHAINIVREC                69    備份1
+     C           *IN69     DOWEQ'0'                        在明細檔
+     C*
+     C           *IN68     IFEQ '1'                        無發票主檔
+     C                     EXSR SR1000                     列印
+     C           P#CKTP    IFEQ 'M'                        移動之
+     C                     WRITEIVREC02
+     C                     DELETIVREC
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           W#IVNO    READEIVREC                    69
+     C                     ENDDO
+     CSR                   ENDSR
+     C*----------------------------------------------------------------
+     CSR         SR1000    BEGSR                           列印明細
+     C           *IN66     IFEQ '1'                        列印表頭
+     C                     WRITECNV013TH
+     C                     SETOF                     66    不印表頭
+     C                     ENDIF
+     C*
+     C                     CLEARCNV013TD
+     C                     MOVELD#ORNO    R#ORNO
+     C                     MOVELIVNO      R#IVNO
+     C                     MOVELIVACNT    R#IVAC
+     C                     Z-ADDIVITEM    R#IVIT
+     C                     Z-ADDIVACDT    R#IVAD
+     C                     Z-ADDIVAMT     R#IVAM
+     C                     MOVELIVTXAR    R#IVAR
+     C                     Z-ADDIVTXDT    R#IVDT
+     C                     MOVELIVDECD    R#IVDE
+     C                     Z-ADDIVDEDT    R#IVDD
+     C                     WRITECNV013TD
+     C                     ADD  1         W#RCNT
+     C                     ADD  IVAMT     W#TAMT
+     CSR                   ENDSR
+     C*----------------------------------------------------------------
+     CSR         LRSR      BEGSR
+     C           *IN66     IFEQ '1'                        表頭
+     C                     WRITECNV013TH
+     C                     SETOF                     66    不印表頭
+     C                     ENDIF
+     C*
+     C                     CLEARCNV013TT
+     C                     Z-ADDW#RCNT    R#RCNT
+     C                     Z-ADDW#TAMT    R#TAMT
+     C                     WRITECNV013TT
+     CSR                   ENDSR
+

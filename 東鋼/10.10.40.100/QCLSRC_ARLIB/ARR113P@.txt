@@ -1,0 +1,203 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR113P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CSF                                  */
+     /*     4.FUNCTION     發票折扣核對清單                       */
+     /*     5.DATE-WRITTEN  92/05/31                                */
+     /*     6.DATE-MODIFY                                           */
+     /*                                                             */
+     /*                                                             */
+     /***************************************************************/
+       PGM
+       DCLF       FILE(ARR113S)
+       DCL        VAR(&TYPE)   TYPE(*CHAR) LEN(1)
+       DCL        VAR(&W#FLAG) TYPE(*CHAR) LEN(1)
+       DCL        VAR(&P#PDAT) TYPE(*CHAR) LEN(8)  /*輸入日期*/
+       DCL        VAR(&P#MODE) TYPE(*CHAR) LEN(1)  /*年份別*/
+       DCL        VAR(&P#MTL)  TYPE(*CHAR) LEN(24) /*月日數*/
+       DCL        VAR(&P#LEAP) TYPE(*CHAR) LEN(1)  /*閏年碼*/
+       DCL        VAR(&CUN1)   TYPE(*CHAR) LEN(6)  /*客戶代號起值*/
+       DCL        VAR(&CUN2)   TYPE(*CHAR) LEN(6)  /*客戶代號止值*/
+       DCL        VAR(&SAL1)   TYPE(*CHAR) LEN(1)  /*業務員別起值*/
+       DCL        VAR(&SAL2)   TYPE(*CHAR) LEN(1)  /*業務員別止值*/
+       DCL        VAR(&IND1)   TYPE(*CHAR) LEN(8)  /*發票日期暫存*/
+       DCL        VAR(&IND2)   TYPE(*CHAR) LEN(8)  /*發票日期暫存*/
+       DCL        VAR(&ARE1)   TYPE(*CHAR) LEN(1)  /*發票廠區起值*/
+       DCL        VAR(&ARE2)   TYPE(*CHAR) LEN(1)  /*發票廠區止值*/
+
+       RTVJOBA    JOB(&S#DEVN) USER(&S#USER) TYPE(&TYPE)
+       IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+START: SNDRCVF
+
+       CHGVAR     VAR(&IN30)     VALUE('0')
+       CHGVAR     VAR(&IN31)     VALUE('0')
+       CHGVAR     VAR(&IN32)     VALUE('0')
+
+       IF         COND(&IN03 *EQ '1') THEN(RETURN)
+       IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+  /*  CHECK 客戶代號*/
+       IF         COND(&S#CUNO *EQ ' ') THEN(DO)
+       CHGVAR     VAR(&CUN1)     VALUE('      ')
+       CHGVAR     VAR(&CUN2)     VALUE('999999')
+       ENDDO
+       ELSE (DO)
+       CHGVAR     VAR(&CUN1)     VALUE(&S#CUNO)
+       CHGVAR     VAR(&CUN2)     VALUE(&S#CUNO)
+       ENDDO
+
+  /*  CHECK 業務員別*/
+       IF         COND(&S#SALE *EQ ' ') THEN(DO)
+       CHGVAR     VAR(&SAL1)     VALUE(' ')
+       CHGVAR     VAR(&SAL2)     VALUE('9')
+       ENDDO
+       ELSE (DO)
+       CHGVAR     VAR(&SAL1)     VALUE(&S#SALE)
+       CHGVAR     VAR(&SAL2)     VALUE(&S#SALE)
+       ENDDO
+
+  /*  CHECK 發票日期*/
+       IF         COND(&S#IND1 *GT &S#IND2 ) THEN(DO)
+       CHGVAR     VAR(&S#ERR)  VALUE('發票開立起日不可大於發票開立止日')
+       CHGVAR     VAR(&IN30)     VALUE('1')
+       CHGVAR     VAR(&IN31)     VALUE('1')
+       GOTO       CMDLBL(START)
+       ENDDO
+
+       CHGVAR     VAR(&IND1)      VALUE(&S#IND1)
+       CHGVAR     VAR(&P#PDAT)    VALUE(&IND1)
+       CHGVAR     VAR(&P#MODE)    VALUE('1')
+       CALL       PGM(UTS102R)    PARM(&P#PDAT &P#MODE +
+                                       &P#MTL  &P#LEAP &W#FLAG)
+       IF         COND(&W#FLAG *NE '0') THEN(DO)
+       CHGVAR     VAR(&IN30)      VALUE('1')
+       CHGVAR     VAR(&S#ERR)     VALUE('發票開立起日輸入錯誤！')
+       GOTO       CMDLBL(START)
+       ENDDO
+
+       CHGVAR     VAR(&IND2)      VALUE(&S#IND2)
+       CHGVAR     VAR(&P#PDAT)    VALUE(&IND2)
+       CHGVAR     VAR(&P#MODE)    VALUE('1')
+       CALL       PGM(UTS102R)    PARM(&P#PDAT &P#MODE +
+                                       &P#MTL  &P#LEAP &W#FLAG)
+       IF         COND(&W#FLAG *NE '0') THEN(DO)
+       CHGVAR     VAR(&IN31)      VALUE('1')
+       CHGVAR     VAR(&S#ERR)     VALUE('發票開立止日輸入錯誤！')
+       GOTO       CMDLBL(START)
+       ENDDO
+
+  /*  CHECK 發票廠區*/
+       IF         COND((&S#AREA *NE 'H' )  *AND +
+                       (&S#AREA *NE 'K' )  *AND +
+                       (&S#AREA *NE ' ' )) THEN(DO)
+       CHGVAR     VAR(&S#ERR)  VALUE('發票開立廠區輸入錯誤')
+       CHGVAR     VAR(&IN32)     VALUE('1')
+       GOTO       CMDLBL(START)
+       ENDDO
+
+       IF         COND(&S#AREA *EQ ' ') THEN(DO)
+       CHGVAR     VAR(&ARE1)     VALUE('H')
+       CHGVAR     VAR(&ARE2)     VALUE('K')
+       ENDDO
+       ELSE (DO)
+       CHGVAR     VAR(&ARE1)     VALUE(&S#AREA)
+       CHGVAR     VAR(&ARE2)     VALUE(&S#AREA)
+       ENDDO
+
+  /*  CHECK 報表內容*/
+       IF         COND((&S#COD1 *NE '1' )  *AND +
+                       (&S#COD1 *NE '2' )) THEN(DO)
+       CHGVAR     VAR(&S#ERR)  VALUE('報表內容欄位輸入錯誤')
+       CHGVAR     VAR(&IN33)     VALUE('1')
+       GOTO       CMDLBL(START)
+       ENDDO
+
+
+  /* 傳參數 */
+       CHGVAR     VAR(&IND1)     VALUE(&S#IND1)
+       CHGVAR     VAR(&IND2)     VALUE(&S#IND2)
+       CHGDTAARA  DTAARA(*LDA (300 8))   VALUE(&IND1)
+       CHGDTAARA  DTAARA(*LDA (308 8))   VALUE(&IND2)
+       CHGDTAARA  DTAARA(*LDA (316 6))   VALUE(&CUN1)
+       CHGDTAARA  DTAARA(*LDA (322 6))   VALUE(&CUN2)
+       CHGDTAARA  DTAARA(*LDA (328 1))   VALUE(&ARE1)
+       CHGDTAARA  DTAARA(*LDA (329 1))   VALUE(&ARE2)
+       CHGDTAARA  DTAARA(*LDA (330 1))   VALUE(&SAL1)
+       CHGDTAARA  DTAARA(*LDA (331 1))   VALUE(&SAL2)
+       CHGDTAARA  DTAARA(*LDA (332 6))   VALUE(&S#CUNO)
+       CHGDTAARA  DTAARA(*LDA (338 1))   VALUE(&S#AREA)
+       CHGDTAARA  DTAARA(*LDA (339 1))   VALUE(&S#SALE)
+       CHGDTAARA  DTAARA(*LDA (340 1))   VALUE(&S#COD1)
+
+       SBMJOB     CMD(CALL PGM(ARR113P)) JOB(ARR113P) +
+                     JOBD(ARJOBD)
+       SNDBRKMSG  MSG('<<發票折扣核對清單已開始處理 +
+                   ,請稍待.........>>') +
+                  TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+       RETURN
+
+ BATCH:
+       RTVDTAARA  DTAARA(*LDA (300 8)) RTNVAR(&IND1)
+       RTVDTAARA  DTAARA(*LDA (308 8)) RTNVAR(&IND2)
+       RTVDTAARA  DTAARA(*LDA (316 6)) RTNVAR(&CUN1)
+       RTVDTAARA  DTAARA(*LDA (322 6)) RTNVAR(&CUN2)
+       RTVDTAARA  DTAARA(*LDA (328 1)) RTNVAR(&ARE1)
+       RTVDTAARA  DTAARA(*LDA (329 1)) RTNVAR(&ARE2)
+       RTVDTAARA  DTAARA(*LDA (330 1)) RTNVAR(&SAL1)
+       RTVDTAARA  DTAARA(*LDA (331 1)) RTNVAR(&SAL2)
+       RTVDTAARA  DTAARA(*LDA (332 6)) RTNVAR(&S#CUNO)
+       RTVDTAARA  DTAARA(*LDA (338 1)) RTNVAR(&S#AREA)
+       RTVDTAARA  DTAARA(*LDA (339 1)) RTNVAR(&S#SALE)
+       RTVDTAARA  DTAARA(*LDA (340 1)) RTNVAR(&S#COD1)
+
+       IF         COND(&S#COD1  *EQ '1') THEN(DO)
+       OVRPRTF    FILE(ARR113T) TOFILE(ARR113T) +
+                  PAGESIZE(*N 198) +
+                  CPI(15) HOLD(*YES)  USRDTA('折扣清單')
+       OVRDBF     FILE(ARDSLG)  TOFILE(ARDSLG) SHARE(*YES)
+       OPNQRYF    FILE(ARDSLG)  QRYSLT(' +
+                      (INDT    *GE "' || &IND1 || '") *AND +
+                      (INDT    *LE "' || &IND2 || '") *AND +
+                      (ADCUNO  *GE "' || &CUN1 || '") *AND +
+                      (ADCUNO  *LE "' || &CUN2 || '") *AND +
+                      (ADSALE  *GE "' || &SAL1 || '") *AND +
+                      (ADSALE  *LE "' || &SAL2 || '") *AND +
+                      (ADAREA  *GE "' || &ARE1 || '") *AND +
+                      (ADAREA  *LE "' || &ARE2 || '")')   +
+                  KEYFLD((ADINNO) (ADINDT) ) +
+                  MAPFLD((INDT    ADINDT  *CHAR 8))
+       CALL       PGM(ARR113R)
+       CLOF       OPNID(ARDSLG)
+       DLTOVR     FILE(*ALL)
+       ENDDO
+       ELSE (DO)
+       OVRPRTF    FILE(ARR113T) TOFILE(ARR113T) +
+                  PAGESIZE(*N 198) +
+                  CPI(15) HOLD(*YES)  USRDTA('未扣清單')
+       OVRDBF     FILE(INVMST)  TOFILE(INVMST) SHARE(*YES)
+       OVRDBF     FILE(INVDTY)  TOFILE(INVDTL)
+       OPNQRYF    FILE(INVMST)  QRYSLT(' +
+                      (INDT    *GE "' || &IND1 || '") *AND +
+                      (INDT    *LE "' || &IND2 || '") *AND +
+                      (INCUNO  *GE "' || &CUN1 || '") *AND +
+                      (INCUNO  *LE "' || &CUN2 || '") *AND +
+                      (INSALE  *GE "' || &SAL1 || '") *AND +
+                      (INSALE  *LE "' || &SAL2 || '") *AND +
+                      (INAREA  *GE "' || &ARE1 || '") *AND +
+                      (INAREA  *LE "' || &ARE2 || '")')   +
+                  KEYFLD((ININDT) (INNO) ) +
+                  MAPFLD((INDT    ININDT  *CHAR 8))
+       CALL       PGM(ARR113R1)
+       CLOF       OPNID(INVMST)
+       DLTOVR     FILE(*ALL)
+       ENDDO
+
+       SNDBRKMSG  MSG('<<發票折扣核對清單已處理完成+
+                   ,請列印.........>>') +
+                    TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+       ENDPGM
+

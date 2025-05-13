@@ -1,0 +1,151 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR089R
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     外購成品出貨明細表
+     H*            5.DATE-WRITTEN  89/08/15
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FWTMASPL2IF  E           K        DISK
+     FARR089T2O   E             69     PRINTER
+     ITXREC       01
+     I                                              TXPDNML1
+     I            DS
+     I                                        1   8 D#NO
+     I                                        1   1 D#AREA
+     I                                        2   3 D#VNO1
+     I                                        4   80D#VNO2
+     I           UDS
+     I                                      400 400 U#AREA
+     I                                      401 4060T#DATS
+     I                                      407 4120T#DATE
+     I                                      413 415 T#PDNS
+     I                                      416 418 T#PDNE
+     I                                      419 419 D#KFLD
+     I                                      420 420 D#PRTF
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C           *IN99     IFEQ *OFF
+     C                     EXSR INISR
+     C                     ENDIF
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C                     SETON                     6999
+     C           D#PRTF    IFEQ 'A'
+     C                     MOVE '明細表'T#PRTF
+     C                     ELSE
+     C                     MOVE '彙總表'T#PRTF
+     C                     ENDIF
+     C*
+     C           K#MASP    KLIST
+     C                     KFLD           W6AREA
+     C                     KFLD           W6VNO1
+     C                     KFLD           W6VNO2
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         T#QTY1           *出貨數量
+     C                     Z-ADD0         T#AMT1           *出貨金額
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVELTXNO      D#NO
+     C                     MOVELD#AREA    W6AREA
+     C                     MOVELD#VNO1    W6VNO1
+     C                     Z-ADDD#VNO2    W6VNO2
+     C*
+     C                     MOVE *OFF      *IN40
+     C           K#MASP    SETLLRWTMASP
+     C           *IN40     DOWEQ*OFF
+     C                     READ RWTMASP                  40
+     C   40                LEAVE
+     C*
+     C           W6AREA    IFNE D#AREA
+     C           W6VNO1    ORNE D#VNO1
+     C           W6VNO2    ORNE D#VNO2
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           W6TRCD    IFEQ '1E'
+     C           W6ENTD    ANDGET#DATS
+     C           W6ENTD    ANDLET#DATE
+     C                     Z-ADDTXDATE    T#ENTD           單據日期
+     C                     MOVE TXNO      T#TXNO           磅單號碼
+     C                     MOVELTXCUNO    T#CUNO           客戶編號
+     C                     MOVE TXCUNM    T#CUNM           客戶名稱
+     C                     MOVELTXORNO    T#ORNO           訂單編號
+     C                     MOVE TXPDNM    T#PDNM           品名
+     C                     Z-ADDTXQTY     T#QTY            數量
+     C                     Z-ADDTXUPRC    T#UPRC           單價
+     C                     Z-ADDTXAMT     T#AMT            金額
+     C*
+     C           D#PRTF    IFEQ 'A'                        明細表
+     C   69                WRITEAR089H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR089T1
+     C                     ENDIF
+     C*
+     C                     ADD  T#QTY     T#QTY1
+     C                     ADD  T#AMT     T#AMT1
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           T#QTY1    IFNE 0
+     C           D#PRTF    IFEQ 'A'                        明細表
+     C   69                WRITEAR089H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR089T2
+     C                     ELSE
+     C                     MOVE *BLANK    T#TXNO           磅單號碼
+     C                     MOVE *BLANK    T#CUNO           客戶編號
+     C                     MOVE *BLANK    T#CUNM           客戶名稱
+     C                     MOVEL*BLANK    T#ORNO           訂單編號
+     C                     Z-ADDT#QTY1    T#QTY
+     C                     Z-ADDT#AMT1    T#AMT
+     C           T#QTY     IFNE 0
+     C           T#AMT     DIV  T#QTY     T#UPRC    H
+     C                     ELSE
+     C                     Z-ADD0         T#UPRC
+     C                     ENDIF
+     C   69                WRITEAR089H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR089T1
+     C                     ENDIF
+     C*
+     C                     ADD  T#QTY1    T#QTY3
+     C                     ADD  T#AMT1    T#AMT3
+     C                     ENDIF
+     C                     ENDSR
+     C****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR089H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR089T4
+     C                     ENDSR
+     C****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C*NO DATA
+     C                     ENDSR
+

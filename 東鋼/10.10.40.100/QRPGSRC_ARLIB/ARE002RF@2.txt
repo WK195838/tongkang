@@ -1,0 +1,250 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE002RF
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     關帳後調整單作廢
+     H*            5.DATE-WRITTEN  89/02/18
+     H*            6.DATE-UPDATE   92/06/10 調整單作廢時調整單號一律作廢
+     H*                                      (原先允許不作廢該調整單）
+     H*  調整單在財會做完關帳的作業後不得作廢,而是在本月份寫入一筆
+     H*  負項沖銷原調整單(不同單號同項次)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARE002SFCF  E                    WORKSTN
+     FTRNDTL  UF  E           K        DISK                      A
+     FGENSEQ  UF  E           K        DISK                      A
+     FAMCTRL  IF  E           K        DISK
+     FACCTRL  IF  E           K        DISK
+     E                    ERR     1   6 70
+     I*************************************************************
+     I            DS
+9008 I                                        1   80D#DATE
+LYW  I                                        1   60D#YYMM
+     I            DS
+     I                                        1  15 D#RESV
+     I                                       15  15 D#RE15
+     I            DS
+     I                                        1   6 D#TXNO
+     I                                        1   1 D#TXAR
+     I                                        2   60D#SEQN
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10111020 U#DEVI
+     I                                     10211021 U#AREA
+     C**************************************************************
+     C           K#NDTL    KLIST
+     C                     KFLD           TXCODE
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+     C           K#CTRL    KLIST
+     C                     KFLD           A5AREA
+     C                     KFLD           A5YYMM
+     C           K#CTRC    KLIST
+     C                     KFLD           AAAREA
+     C                     KFLD           AAYYMM
+     C                     KFLD           AAFSYS
+     C           K#NSEQ    KLIST
+     C                     KFLD           GEKIND
+     C                     KFLD           GEPRIN
+     C**************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000           處理
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C           SR0000    BEGSR
+     C**************************************************************
+     C                     MOVE '01'      W#PRID  2
+     C                     MOVE COMP      S#COMP
+     C                     MOVE U#DEVI    S#DEVI
+     C                     MOVE *BLANK    S#ERR
+     C                     ENDSR
+     C**************************************************************
+     C           SR1000    BEGSR
+     C**************************************************************
+     C           W#PRID    DOWEQ'01'
+     C                     EXFMTAR002F1
+     C                     MOVE *OFF      *IN30
+     C                     MOVE *OFF      *IN97
+     C                     MOVE *BLANK    S#ERR
+     C*
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*檢核調整單號
+     C                     MOVE 'AR05'    TXCODE
+     C                     MOVE S#TXNO    TXNO
+     C                     Z-ADD0         TXITEM
+     C           K#NDTL    SETLLTXREC
+     C                     READ TXREC                    40
+     C           *IN40     IFEQ *ON
+     C           TXCODE    ORNE 'AR05'
+     C           TXNO      ORNE S#TXNO
+     C                     MOVE ERR,1     S#ERR
+     C                     MOVE *ON       *IN30
+     C                     MOVE *ON       *IN97
+     C                     ITER
+     C                     ENDIF
+     C*檢核調整單是否未開或已作廢
+     C                     MOVELTXIVNO    W#IVN1  1
+     C           W#IVN1    IFEQ *BLANK
+     C                     MOVE ERR,5     S#ERR
+     C                     MOVE *ON       *IN30
+     C                     MOVE *ON       *IN97
+     C                     ITER
+     C                     ENDIF
+     C           W#IVN1    IFEQ '#'
+     C                     MOVE ERR,6     S#ERR
+     C                     MOVE *ON       *IN30
+     C                     MOVE *ON       *IN97
+     C                     ITER
+     C                     ENDIF
+     C*檢核是否關帳 (台北用ACCTRL 廠區用AMCTRL)
+     C  N97      U#AREA    IFNE 'P'
+     C                     MOVELTXNO      A5AREA
+     C                     Z-ADDTXDATE    D#DATE
+     C                     Z-ADDD#YYMM    A5YYMM
+     C           K#CTRL    CHAINRAMCTRL             N40
+     C           *IN40     IFEQ *OFF
+     C           A5FG12    ANDNE'Y'
+     C                     SETON                     3097
+     C                     MOVE ERR,2     S#ERR
+     C                     ITER
+     C                     ENDIF
+     C                     ELSE
+     C                     MOVELTXNO      AAAREA
+     C                     Z-ADDTXDATE    D#DATE
+     C                     Z-ADDD#YYMM    AAYYMM
+     C                     MOVE 'SA'      AAFSYS
+     C           K#CTRC    CHAINRACCTRL             N40
+     C           *IN40     IFEQ *OFF
+     C           AAESFG    ANDNE'Y'
+     C                     SETON                     3097
+     C                     MOVE ERR,2     S#ERR
+     C                     ITER
+     C                     ENDIF
+     C                     ENDIF                           * TXAR
+     C*F10 : 執行
+     C  N97      *IN10     IFEQ *ON
+     C                     MOVE '02'      W#PRID
+     C                     ELSE
+     C                     MOVE ERR,3     S#ERR
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C**************************************************************
+     C           SR2000    BEGSR
+     C**************************************************************
+     C*取得新調整單號
+     C                     CLEARGEREC
+     C                     MOVEL'05'      GEKIND
+     C                     MOVELU#AREA    GEPRIN
+     C           K#NSEQ    CHAINGENSEQ               40
+     C   40                Z-ADD1         GECUNO
+     C   40                WRITEGEREC
+     C  N40                ADD  1         GECUNO
+     C  N40                UPDATGEREC
+     C*作業開始
+     C                     MOVE 'AR05'    TXCODE
+     C                     MOVE S#TXNO    TXNO
+     C                     Z-ADD0         TXITEM
+     C           K#NDTL    SETLLTXREC
+     C                     READ TXREC                    40
+     C*
+     C           *IN40     DOWEQ*OFF
+     C                     Z-ADDTXITEM    W#ITEM  20
+     C                     MOVE UDATE     W#DATE  60
+     C                     MOVE UDATE     W#ACDT  60
+     C                     MOVE TXACNT    W#ACNT  1
+     C                     MOVE TXCUNO    W#CUNO  6
+     C                     MOVE TXCUNM    W#CUNM 10
+9008 C                     MOVE TXORNO    W#ORNO  9
+     C                     MOVE TXSATP    W#SATP  1
+     C                     MOVE TXPCNO    W#PCNO  8
+     C                     MOVE TXRVID    W#RVID  2
+     C                     MOVE TXSALE    W#SALE  2
+     C                     MOVE TXIVTP    W#IVTP  1
+     C                     MOVE TXPDNM    W#PDNM  3
+     C                     Z-ADDTXQTY     W#QTY   70
+     C                     Z-ADDTXUPRC    W#UPRC  53
+     C                     Z-ADDTXAMT     W#AMT  110
+     C                     MOVE U#AREA    W#TXAR  1
+     C*
+     C                     MOVE TXRESV    D#RESV
+     C                     MOVE 'D'       D#RE15
+     C                     MOVE D#RESV    TXRESV
+     C                     MOVEL'#'       TXIVNO           永不開立
+     C                     MOVE 'Y'       TXFL02
+9607 C*                    UPDATTXREC
+     C*
+     C           S#TXNO    IFNE TXNO
+     C                     MOVE *ON       *IN40
+     C                     ITER
+9607 C                     ELSE
+9607 C                     UPDATTXREC
+     C                     ENDIF
+     C*
+     C                     EXSR WTRSR
+     C*
+     C                     READ TXREC                    40
+     C                     ENDDO
+     C*
+     C                     MOVE *BLANK    S#ERR
+     C                     MOVELERR,04    S#ERR
+     C           S#ERR     CAT  W#TXNO:0  S#ERR
+     C                     MOVE '01'      W#PRID
+     C                     ENDSR
+     C**************************************************************
+     C           WTRSR     BEGSR
+     C**************************************************************
+     C*寫入
+     C                     CLEARTXREC
+     C                     MOVE 'AR05'    TXCODE
+     C                     MOVE U#AREA    D#TXAR
+     C                     Z-ADDGECUNO    D#SEQN
+     C                     MOVELD#TXNO    TXNO
+     C                     Z-ADDW#ITEM    TXITEM
+     C           K#NDTL    CHAINTXREC                50
+     C                     MOVE W#DATE    TXDATE
+     C                     MOVE W#ACDT    TXACDT
+     C                     MOVE W#ACNT    TXACNT
+     C                     MOVE W#CUNO    TXCUNO
+     C                     MOVE W#CUNM    TXCUNM
+     C                     MOVE W#ORNO    TXORNO
+     C                     MOVE W#SATP    TXSATP
+     C                     MOVE W#PCNO    TXPCNO
+     C                     MOVE W#RVID    TXRVID
+     C                     MOVE W#SALE    TXSALE
+     C                     MOVE W#IVTP    TXIVTP
+     C                     MOVE W#PDNM    TXPDNM
+     C                     Z-ADDW#QTY     TXQTY
+     C                     Z-ADDW#UPRC    TXUPRC
+     C           W#AMT     MULT -1        TXAMT
+     C                     MOVE W#TXAR    TXTXAR
+     C                     MOVE UDATE     TXTXDT
+     C                     MOVE D#RESV    TXRESV
+8906 C                     MOVEL'#'       TXIVNO
+  .  C                     MOVE 'Y'       TXFL02
+     C                     WRITETXREC
+     C                     MOVE TXNO      W#TXNO  8
+     C                     ENDSR
+** ERR
+01- 調整單號錯誤!
+02- 本調整單未關帳!
+03- 確認後按F10開始執行!
+  04- 新增之調整單號為
+05- 該調整單未開發票！
+06- 該調整單已作廢！
+

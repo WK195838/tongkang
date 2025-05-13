@@ -1,0 +1,70 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP118P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02LBU                                  */
+     /*     4.FUNCTION     新桃工程自用發票申請作業               */
+     /*     5.DATE-WRITTEN  98/02/27                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM        PARM(&YM)
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&USER)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+
+             DCL        VAR(&W#DATE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#YM)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&W#AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#RTNV) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#IVNO) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&YM)     TYPE(*CHAR) LEN(6)
+             DCL        VAR(&W#MSGT) TYPE(*CHAR) LEN(200)
+
+
+             CHGDTAARA  DTAARA(*LDA (301 6)) VALUE(&YM)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+INPUT:
+
+       /*    SBMJOB     CMD(CALL PGM(ARP118P)) JOB(ARP118P) +
+                          JOBD(ARJOBD) OUTQ(&OUTQ) INLLIBL(*JOBD) */
+       /*    RETURN                                               */
+
+
+BATCH:
+             RTVDTAARA  DTAARA(*LDA (301 6)) RTNVAR(&W#YM)
+
+
+STEP1:       /* 複製暫存資料 */
+
+             CLRPFM     FILE(UENDTLN)
+             OVRDBF     FILE(UENDTLN) TOFILE(ARLIB/UENDTLN)
+             OVRDBF     FILE(UENDTL) TOFILE(UENDTL) SHARE(*YES)
+             OPNQRYF    FILE(UENDTL) +
+                        QRYSLT('(YYMM   *EQ "' || &W#YM   || '") *AND +
+                                (UVFLAG *NE "D")                 *AND +
+                                (UVNO   *EQ " ")')                    +
+                        MAPFLD((YYMM   UVYM     *CHAR 6))             +
+                        KEYFLD((UVAREA)(UVTRCD)(UVPJNO)(UVPDNM)(UVUPRC))
+             CALL       ARP118R1
+             CLOF       UENDTL
+             DLTOVR     *ALL
+
+STEP2:       /* 開立新桃工程自用發票 */
+
+             CLRPFM     FILE(UENAPP)
+             OVRDBF     FILE(UENDTL) TOFILE(UENDTL)
+             OVRDBF     FILE(UENDTLN) TOFILE(ARLIB/UENDTLN) SHARE(*YES)
+             OPNQRYF    FILE(UENDTLN) +
+                        KEYFLD((TNNO) (TNPDNM) (TNUPRC))
+             CALL       ARP118R2
+             CLOF       UENDTLN
+             DLTOVR     *ALL
+
+             ENDPGM
+

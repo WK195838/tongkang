@@ -1,0 +1,163 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE096RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LBU
+     H*            4.FUNCTION     發票暫不開立維護作業（畫面）
+     H*            5.DATE-WRITTEN  98/01/16
+     H*            6.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARE096S CF  E                    WORKSTN
+     FTRNDTLL4IF  E           K        DISK
+     E*************************************************************
+     E                    ERR     1  16 70
+     I*************************************************************
+     I           UDS
+     I                                      301 308 D#DATS
+     I                                      309 316 D#DATE
+     I                                      317 322 D#ORNO
+     I                                     10111020 S#DEVN
+     I                                     10011010 S#USER
+     I                                     10211021 D#AREA
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C                     EXSR SR0000                     初始程式
+     C*
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C           SR0000    BEGSR
+     C**************************************************************
+     C                     MOVEL'01'      W#PRID  2        畫面一
+     C*
+     C                     ENDSR
+     C**************************************************************
+     C           SR1000    BEGSR
+     C**************************************************************
+     C*W#PRID='01'-->畫面一
+     C*
+     C           W#PRID    DOWEQ'01'
+     C                     EXFMTAR096F1                    螢幕輸入
+     C                     MOVEL*BLANK    S#MSG1
+     C                     MOVE *OFF      *IN99
+     C*
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03           回前畫面
+     C                     MOVEL'00'      W#PRID           結束
+     C                     LEAVE
+     C                     ENDIF
+     C*檢核
+     C                     EXSR SR1100                     檢核
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     C           SR1100    BEGSR
+     C**************************************************************
+     C                     MOVEA'000'     *IN,30
+     C*
+     C*檢核出貨起日是否正確
+     C*
+     C           S#DATS    IFEQ 0
+     C                     MOVELERR,1     S#MSG1
+     C                     SETON                     3199  必須輸入
+     C                     GOTO CHKEND
+     C                     ELSE
+     C                     MOVE S#DATS    P#PDAT
+     C                     CALL 'UTS102R'
+     C                     PARM           P#PDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LEAP  1
+     C                     PARM           P#ERR   1
+     C           P#ERR     IFNE '0'
+     C                     MOVELERR,2     S#MSG1           輸入錯誤
+     C                     SETON                     3199
+     C                     GOTO CHKEND
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C*檢核出貨訖日是否正確
+     C*
+     C           S#DATE    IFEQ 0
+     C                     MOVELERR,3     S#MSG1
+     C                     SETON                     3299  必須輸入
+     C                     GOTO CHKEND
+     C                     ELSE
+     C                     MOVE S#DATE    P#PDAT
+     C                     CALL 'UTS102R'
+     C                     PARM           P#PDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LEAP  1
+     C                     PARM           P#ERR   1
+     C           P#ERR     IFNE '0'
+     C                     MOVELERR,4     S#MSG1           輸入錯誤
+     C                     SETON                     3299
+     C                     GOTO CHKEND
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           S#DATS    IFGT S#DATE
+     C                     SETON                     313299
+     C                     MOVELERR,5     S#MSG1           起不可大訖
+     C                     GOTO CHKEND
+     C                     ENDIF
+     C*
+     C*檢核訂單編號是否正確
+     C*
+     C           S#ORNO    IFEQ *BLANK
+     C                     MOVELERR,6     S#MSG1
+     C                     SETON                     3099
+     C                     GOTO CHKEND
+     C                     ELSE
+     C*
+     C                     MOVE *OFF      *IN50
+     C           S#ORNO    CHAINTXREC                50
+     C           *IN50     IFEQ *ON
+     C                     MOVELERR,7     S#MSG1
+     C                     SETON                     3099
+     C                     GOTO CHKEND
+     C                     ELSE
+     C*
+     C           TXTXAR    IFNE D#AREA
+     C                     MOVELERR,8     S#MSG1
+     C                     SETON                     3099
+     C                     GOTO CHKEND
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99                MOVE S#DATS    D#DATS
+     C  N99                MOVE S#DATE    D#DATE
+     C  N99                MOVELS#ORNO    D#ORNO
+     C  N99                MOVEL'00'      W#PRID           成功
+     C*
+     C           CHKEND    ENDSR
+     C*****************************************************************
+** ERR
+０１－出貨起日必須輸入！
+０２－出貨起日輸入錯誤！
+０３－出貨訖日必須輸入！
+０４－出貨訖日輸入錯誤！
+０５－出貨起始日期不可大於終止日期！
+０６－訂單編號必須輸入！
+０７－此訂單之銷貨已全部開立發票！
+０８－此訂單之發票非屬本廠區開立，不可異動！
+

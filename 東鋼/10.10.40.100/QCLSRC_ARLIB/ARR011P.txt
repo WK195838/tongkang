@@ -1,0 +1,206 @@
+    /****************************************************************/
+    /*                                                              */
+    /*        UPDATE  DATE  101/09/24  2012AR682 S00WCJ (0109A)     */
+    /*                      113/01/23  2024AR00005 S00WCJ (1301A)   */
+    /*                       日期改為區間輸入，增加票據別及託收帳 */
+    /*                       號篩選                               */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)  TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DATE)  TYPE(*DEC)  LEN(8)
+             DCL        VAR(&DATEA) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREA)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&AREAA) TYPE(*CHAR) LEN(1)
+/*1301A*/    DCL        VAR(&S#NTTP) TYPE(*CHAR) LEN(1)
+/*1301A*/    DCL        VAR(&S#TANO) TYPE(*CHAR) LEN(10)
+/*1301A*/    DCL        VAR(&S#DATE) TYPE(*DEC)  LEN(8)
+/*1301A*/    DCL        VAR(&S1DATE) TYPE(*CHAR) LEN(8)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+/*1301A*/    CALL       PGM(ARR011RS) PARM(&IN03 &DATE &AREAA &S#DATE +
+/*1301A*/                   &S#NTTP  &S#TANO)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGVAR     VAR(&DATEA) VALUE(&DATE)
+/*1301A*/    CHGVAR     VAR(&S1DATE)  VALUE(&S#DATE)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&DATEA)
+             CHGDTAARA  DTAARA(*LDA (9 1)) VALUE(&AREAA)
+/*1301A*/    CHGDTAARA  DTAARA(*LDA (10 8)) VALUE(&S1DATE)
+/*1301A*/    CHGDTAARA  DTAARA(*LDA (19 1)) VALUE(&S#NTTP)
+/*1301A*/    CHGDTAARA  DTAARA(*LDA (21 10)) VALUE(&S#TANO)
+
+             SBMJOB     JOB(ARR011P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR011P')
+             RETURN
+             ENDDO
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 8))     RTNVAR(&DATEA)
+             RTVDTAARA  DTAARA(*LDA (9 1))     RTNVAR(&AREAA)
+/*1301A*/    RTVDTAARA  DTAARA(*LDA (10 8))    RTNVAR(&S1DATE)
+/*1301A*/    RTVDTAARA  DTAARA(*LDA (19 1))    RTNVAR(&S#NTTP)
+/*1301A*/    RTVDTAARA  DTAARA(*LDA (21 10))   RTNVAR(&S#TANO)
+             RTVDTAARA  DTAARA(*LDA (1021 1))  RTNVAR(&AREA)
+
+             CHGVAR     VAR(&DATE) VALUE(&DATEA)
+             OVRDBF     FILE(RCVDTL) TOFILE(RCVDTL) SHARE(*YES)
+      /*     OPNQRYF    FILE((RCVDTL)) QRYSLT('             RVPRDT +
+                          *EQ ' || &DATEA || '   &   RVAREA *EQ "' +
+                          || &AREA || '"    & RVFLAG *NE +
+                          "D"                  & (RVACNO *EQ "1131" +
+                          *OR RVACNO *EQ "111001")   +
+                          *and (rvtxar *eq "' || &AREAA || '" *or +
+                          rvtxar *eq " ")  ') KEYFLD((RVTBID) +
+                          (RVTANO) (RVPBID) (RVPANO) (RVNTNO)) */
+
+             IF         COND(&AREAA *EQ 'P') THEN(DO)
+
+/*1301A 票據別空白，託收帳號空白*/
+
+/*1301A*/ IF      COND(&S#NTTP *EQ ' '  *AND &S#TANO *EQ ' ') THEN(DO)
+/*1301A*/    OPNQRYF    FILE((RCVDTL)) QRYSLT('( RVPRDT +
+                          *GE ' || &DATEA || ' & RVPRDT +
+                          *LE ' || &S1DATE || ') & +
+                           RVAREA *EQ "' || &AREA || '" & +
+                           RVFLAG *NE "D"  & +
+                           (RVACNO *EQ "1131" +
+                             *OR RVACNO *EQ "111001")  +
+                          *and (rvtxar *eq "' || &AREAA || '")  ') +
+                          KEYFLD((RVTBID) (RVTANO) (RVPBID) +
+                          (RVPANO) (RVNTNO))
+/*1301A*/ ENDDO
+
+/*1301A 票據別不空白，託收帳號空白*/
+
+/*1301A*/ IF      COND(&S#NTTP *NE ' '  *AND &S#TANO *EQ ' ') THEN(DO)
+/*1301A*/    OPNQRYF    FILE((RCVDTL)) QRYSLT('( RVPRDT +
+                          *GE ' || &DATEA || ' & RVPRDT +
+                          *LE ' || &S1DATE || ') & +
+                           RVAREA *EQ "' || &AREA || '" & +
+                           RVFLAG *NE "D"  & +
+                           RVNTTP *EQ "' || &S#NTTP || '" & +
+                           (RVACNO *EQ "1131" +
+                             *OR RVACNO *EQ "111001")  +
+                          *and (rvtxar *eq "' || &AREAA || '")  ') +
+                          KEYFLD((RVTBID) (RVTANO) (RVPBID) +
+                          (RVPANO) (RVNTNO))
+/*1301A*/ ENDDO
+
+/*1301A 票據別不空白，託收帳號不空白*/
+
+/*1301A*/ IF      COND(&S#NTTP *NE ' '  *AND &S#TANO *NE ' ') THEN(DO)
+/*1301A*/    OPNQRYF    FILE((RCVDTL)) QRYSLT('( RVPRDT +
+                          *GE ' || &DATEA || ' & RVPRDT +
+                          *LE ' || &S1DATE || ') & +
+                           RVAREA *EQ "' || &AREA || '" & +
+                           RVFLAG *NE "D"  & +
+                           RVNTTP *EQ "' || &S#NTTP || '" & +
+                           RVTANO *EQ "' || &S#TANO || '" & +
+                           (RVACNO *EQ "1131" +
+                             *OR RVACNO *EQ "111001")  +
+                          *and (rvtxar *eq "' || &AREAA || '")  ') +
+                          KEYFLD((RVTBID) (RVTANO) (RVPBID) +
+                          (RVPANO) (RVNTNO))
+/*1301A*/ ENDDO
+
+/*1301A 票據別空白，託收帳號不空白*/
+
+/*1301A*/ IF      COND(&S#NTTP *EQ ' '  *AND &S#TANO *NE ' ') THEN(DO)
+/*1301A*/    OPNQRYF    FILE((RCVDTL)) QRYSLT('( RVPRDT +
+                          *GE ' || &DATEA || ' & RVPRDT +
+                          *LE ' || &S1DATE || ') & +
+                           RVAREA *EQ "' || &AREA || '" & +
+                           RVFLAG *NE "D"  & +
+                           RVTANO *EQ "' || &S#TANO || '" & +
+                           (RVACNO *EQ "1131" +
+                             *OR RVACNO *EQ "111001")  +
+                          *and (rvtxar *eq "' || &AREAA || '")  ') +
+                          KEYFLD((RVTBID) (RVTANO) (RVPBID) +
+                          (RVPANO) (RVNTNO))
+/*1301A*/ ENDDO
+
+             ENDDO
+
+             IF         COND(&AREAA *NE 'P') THEN(DO)
+/*1301A 票據別空白，託收帳號空白*/
+
+/*1301A*/ IF      COND(&S#NTTP *EQ ' '  *AND &S#TANO *EQ ' ') THEN(DO)
+/*1301A*/    OPNQRYF    FILE((RCVDTL)) QRYSLT('(RVPRDT +
+                          *GE ' || &DATEA || '   &   RVPRDT  +
+                          *LE ' || &S1DATE || ')  &   RVAREA *EQ "' +
+                          || &AREA || '"    & RVFLAG *NE +
+                          "D"                  & (RVACNO *EQ "1131" +
+                          *OR RVACNO *EQ "111001")  +
+                          *and (rNO *eq "' || &AREAA || '")     +
+                          *and (RVDPNO *NE "B050")')             +
+                          KEYFLD((RVTBID) (RVTANO) (RVPBID) +
+                          (RVPANO) (RVNTNO)) MAPFLD((RNO '%sst(RVNO +
+                          1 1)' *CHAR 1))
+/*1301A*/ ENDDO
+
+/*1301A 票據別不空白，託收帳號不空白*/
+
+/*1301A*/ IF      COND(&S#NTTP *NE ' '  *AND &S#TANO *NE ' ') THEN(DO)
+/*1301A*/    OPNQRYF    FILE((RCVDTL)) QRYSLT('(RVPRDT +
+                          *GE ' || &DATEA || '   &   RVPRDT  +
+                          *LE ' || &S1DATE || ')  &   RVAREA *EQ "' +
+                          || &AREA || '"    & RVFLAG *NE +
+                          "D"                  & (RVACNO *EQ "1131" +
+                          *OR RVACNO *EQ "111001")  +
+                          *AND (RVNTTP  *EQ "' || &S#NTTP || '") +
+                          *AND (RVTANO  *EQ "' || &S#TANO || '") +
+                          *and (rNO *eq "' || &AREAA || '")     +
+                          *and (RVDPNO *NE "B050")')             +
+                          KEYFLD((RVTBID) (RVTANO) (RVPBID) +
+                          (RVPANO) (RVNTNO)) MAPFLD((RNO '%sst(RVNO +
+                          1 1)' *CHAR 1))
+/*1301A*/ ENDDO
+
+/*1301A 票據別不空白，託收帳號空白*/
+
+/*1301A*/ IF      COND(&S#NTTP *NE ' '  *AND &S#TANO *EQ ' ') THEN(DO)
+/*1301A*/    OPNQRYF    FILE((RCVDTL)) QRYSLT('(RVPRDT +
+                          *GE ' || &DATEA || '   &   RVPRDT  +
+                          *LE ' || &S1DATE || ')  &   RVAREA *EQ "' +
+                          || &AREA || '"    & RVFLAG *NE +
+                          "D"                  & (RVACNO *EQ "1131" +
+                          *OR RVACNO *EQ "111001")  +
+                          *AND (RVNTTP  *EQ "' || &S#NTTP || '") +
+                          *and (rNO *eq "' || &AREAA || '")     +
+                          *and (RVDPNO *NE "B050")')             +
+                          KEYFLD((RVTBID) (RVTANO) (RVPBID) +
+                          (RVPANO) (RVNTNO)) MAPFLD((RNO '%sst(RVNO +
+                          1 1)' *CHAR 1))
+/*1301A*/ ENDDO
+
+/*1301A 票據別空白，託收帳號不空白*/
+
+/*1301A*/ IF      COND(&S#NTTP *EQ ' '  *AND &S#TANO *NE ' ') THEN(DO)
+/*1301A*/    OPNQRYF    FILE((RCVDTL)) QRYSLT('(RVPRDT +
+                          *GE ' || &DATEA || '   &   RVPRDT  +
+                          *LE ' || &S1DATE || ')  &   RVAREA *EQ "' +
+                          || &AREA || '"    & RVFLAG *NE +
+                          "D"                  & (RVACNO *EQ "1131" +
+                          *OR RVACNO *EQ "111001")  +
+                          *AND (RVTANO  *EQ "' || &S#TANO || '") +
+                          *and (rNO *eq "' || &AREAA || '")     +
+                          *and (RVDPNO *NE "B050")')             +
+                          KEYFLD((RVTBID) (RVTANO) (RVPBID) +
+                          (RVPANO) (RVNTNO)) MAPFLD((RNO '%sst(RVNO +
+                          1 1)' *CHAR 1))
+/*1301A*/ ENDDO
+
+             ENDDO
+
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 158) +
+                          CPI(12)
+             CALL       PGM(ARR011R)
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

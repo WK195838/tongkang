@@ -1,0 +1,177 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR075P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     新版發票列印程式                       */
+     /*     5.DATE-WRITTEN  88/03/12                                */
+     /*     6.UPDATE  DATE  106/12/05  2017AR1112  S00WCJ (0612A)   */
+     /*                      增加寫入電子發票介面檔               */
+     /*                                                             */
+     /*  說明：本作業取代原列印方式（先分類、再依日期或號碼區間） */
+     /*        改成執行一次本程式即可。                           */
+     /*        呼叫原依日期列印程式來印ARR007R                    */
+     /*                                                             */
+     /*   *LDA:    1 --> 起始日期  （空白不採日期）             */
+     /*           11 --> 終止日期                                 */
+     /*           21 --> 起始號碼  （空白不採號碼）             */
+     /*           31 --> 終止號碼                                 */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)     TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)   LEN(10)
+             DCL        VAR(&USER)    TYPE(*CHAR)   LEN(10)
+             DCL        VAR(&AREA)    TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&IN03)    TYPE(*CHAR)   LEN(1)
+
+             DCL        VAR(&W#FRDT)  TYPE(*CHAR)   LEN(8)
+             DCL        VAR(&W#TODT)  TYPE(*CHAR)   LEN(8)
+             DCL        VAR(&W#FRNO)  TYPE(*CHAR)   LEN(10)
+             DCL        VAR(&W#TONO)  TYPE(*CHAR)   LEN(10)
+
+
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+ INPUT:
+             CALL       PGM(ARR075RS) PARM(&IN03)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             SBMJOB     JOB(ARR075P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                        RQSDTA('CALL ARR075P')
+             RETURN
+
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1   8)) RTNVAR(&W#FRDT)
+             RTVDTAARA  DTAARA(*LDA (11  8)) RTNVAR(&W#TODT)
+             RTVDTAARA  DTAARA(*LDA (21 10)) RTNVAR(&W#FRNO)
+             RTVDTAARA  DTAARA(*LDA (31 10)) RTNVAR(&W#TONO)
+
+             DLTF       FILE(QTEMP/INVCUT)
+             MONMSG     CPF0000
+             CRTDUPOBJ  OBJ(INVCUT) FROMLIB(DALIB) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+
+
+ BYDATE:     /* 依日期區間分類 */
+             IF         COND(&W#FRDT *EQ ' ') THEN(GOTO BYNUMBER)
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT)
+             CALL       PGM(ARR075R1)
+             DLTOVR     FILE(*ALL)
+
+
+ BYNUMBER:   /* 依號碼區間分類 */
+             IF         COND(&W#FRNO *EQ ' ') THEN(GOTO PRINTING)
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT)
+             CALL       PGM(ARR075R2)
+             DLTOVR     FILE(*ALL)
+
+
+ PRINTING:   /* 列印發票(CALL ARR007R) */
+
+    /* 台中 */
+             OVRDBF     FILE(INVDTY) TOFILE(INVDTL)
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT) SHARE(*YES)
+             OPNQRYF    FILE(INVCUT) +
+                        QRYSLT('CUAREA *EQ "M"') +
+                        KEYFLD((CUINDT) (CUNO))
+             OVRPRTF    FILE(QPRINT) PAGESIZE(33 80) LPI(6) CPI(10) +
+                        OVRFLW(33) FORMTYPE('發票') HOLD(*YES) +
+                        USRDTA('台中發票')
+             CALL       PGM(ARR007R)
+             CLOF       OPNID(INVCUT)
+             DLTOVR     FILE(*ALL)
+
+
+    /* 台北 */
+             OVRDBF     FILE(INVDTY) TOFILE(INVDTL)
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT) SHARE(*YES)
+             OPNQRYF    FILE(INVCUT) +
+                        QRYSLT('CUAREA *EQ "P"') +
+                        KEYFLD((CUINDT) (CUNO))
+             OVRPRTF    FILE(QPRINT) PAGESIZE(33 80) LPI(6) CPI(10) +
+                        OVRFLW(33) FORMTYPE('發票') HOLD(*YES) +
+                        USRDTA('台北發票')
+             CALL       PGM(ARR007R)
+             CLOF       OPNID(INVCUT)
+             DLTOVR     FILE(*ALL)
+
+
+    /* 桃園 */
+             OVRDBF     FILE(INVDTY) TOFILE(INVDTL)
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT) SHARE(*YES)
+             OPNQRYF    FILE(INVCUT) +
+                        QRYSLT('CUAREA *EQ "T"') +
+                        KEYFLD((CUINDT) (CUNO))
+             OVRPRTF    FILE(QPRINT) PAGESIZE(33 80) LPI(6) CPI(10) +
+                        OVRFLW(33) FORMTYPE('發票') HOLD(*YES) +
+                        USRDTA('桃園發票')
+             CALL       PGM(ARR007R)
+             CLOF       OPNID(INVCUT)
+             DLTOVR     FILE(*ALL)
+
+
+    /* 高雄 */
+             OVRDBF     FILE(INVDTY) TOFILE(INVDTL)
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT) SHARE(*YES)
+             OPNQRYF    FILE(INVCUT) +
+                        QRYSLT('CUAREA *EQ "K"') +
+                        KEYFLD((CUINDT) (CUNO))
+             OVRPRTF    FILE(QPRINT) DEV(PRT18) PAGESIZE(33 80) +
+                        HOLD(*YES) SAVE(*YES) +
+                        OVRFLW(33) FORMTYPE('發票') +
+                        USRDTA('高雄發票')
+             CALL       PGM(ARR007R)
+             CLOF       OPNID(INVCUT)
+             DLTOVR     FILE(*ALL)
+
+
+    /* 型鋼 */
+             OVRDBF     FILE(INVDTY) TOFILE(INVDTL)
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT) SHARE(*YES)
+             OPNQRYF    FILE(INVCUT) +
+                        QRYSLT('CUAREA *EQ "H"') +
+                        KEYFLD((CUINDT) (CUNO))
+             OVRPRTF    FILE(QPRINT) PAGESIZE(33 80) LPI(6) CPI(10) +
+                        OVRFLW(33) FORMTYPE('發票') HOLD(*YES) +
+                        USRDTA('型鋼發票')
+             CALL       PGM(ARR007R)
+             CLOF       OPNID(INVCUT)
+             DLTOVR     FILE(*ALL)
+
+
+ /*0612A寫入電子發票介面檔 */
+
+ /*0612A*/   OVRDBF     FILE(INVDTY) TOFILE(INVDTL)
+ /*0612A*/   OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT) SHARE(*YES)
+ /*0612A*/   CALL       PGM(ARR007R1)
+ /*0612A*/   DLTOVR     FILE(*ALL)
+
+
+ ERRLIST:    /* 錯誤清單 */
+
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT) SHARE(*YES)
+             OPNQRYF    FILE(INVCUT) +
+                        QRYSLT('CUAREA *EQ "*"') +
+                        KEYFLD((CUINDT) (CUNO))
+             OVRPRTF    FILE(ARR075T) TOFILE(ARR075T) +
+                        USRDTA('錯誤清單') HOLD(*YES)
+             CALL       PGM(ARR075R3)
+             CLOF       OPNID(INVCUT)
+             DLTOVR     FILE(*ALL)
+
+
+ SHOWMSG:    /* 結束訊息 */
+
+             SNDMSG     TOUSR(&USER) +
+                        MSG('發票列印作業執行完畢。選擇區間：日期' +
+                            || &W#FRDT || '至' || &W#TODT || '，'+
+                            || '號碼' || &W#FRNO || '至'         +
+                            || &W#TONO)
+
+             ENDPGM
+

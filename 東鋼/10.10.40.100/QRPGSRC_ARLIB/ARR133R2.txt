@@ -1,0 +1,145 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR133R1
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     客戶預收貨款核對明細表(先前處理)
+     H*          5.DATE-WRITTEN  97/05/08
+     H*          6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARR133F UP  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FRCVDTL  IF  E           K        DISK
+     I*****************************************************************
+     IRAR133F     01
+     I*
+     I            DS
+     I                                        1  10 W1INNO
+     I                                        1   2 D#INN1
+     I                                        3  10 D#INN2
+     I*
+     I            DS
+     I                                        1   8 IVAPNO
+     I                                        1   6 D#RVNO
+     I*
+     I           UDS
+     I                                      301 3080D#DAT1
+     I                                      309 3160D#DAT2
+     C*****************************************************************
+     C*          KET  LIST
+     C*****************************************************************
+     C*FILE => INVDTL(發票明細檔)
+     C           K#INVD    KLIST
+     C                     KFLD           K#IVNO 10        發票號碼
+     C                     KFLD           K#ACNT  1        類別
+     C*
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C           W1AMT1    IFEQ 0
+     C                     GOTO ENDTSR
+     C                     ENDIF
+     C*
+     C           D#INN1    IFEQ 'JW'
+     C           D#INN2    ANDEQ'32775506'
+     C                     MOVEL'X'       W#TEST  1
+     C                     ENDIF
+     C*
+     C                     MOVELW1INNO    K#IVNO           發票號碼
+     C                     MOVEL'6'       K#ACNT           類別
+     C*
+     C                     MOVEL*OFF      *IN40
+     C           K#INVD    SETLLIVREC
+     C           *IN40     DOWEQ*OFF
+     C           K#INVD    READEIVREC                    40
+     C*
+     C   40                LEAVE
+     C*
+     C           IVDECD    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     EXSR SR1100
+     C                     ENDDO
+     C*
+     C           W1AMT2    DIV  1.05      W1AMT2    H      已兌現金額
+     C           W1AMT2    IFGT W1AMT1
+     C                     Z-ADDW1AMT1    W1AMT2
+     C                     ENDIF
+     C*
+     C                     UPDATRAR133F
+     C*
+     C           ENDTSR    ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C                     MOVEL*OFF      *IN41
+     C           D#RVNO    SETLLRVREC
+     C           *IN41     DOWEQ*OFF
+     C           D#RVNO    READERVREC                    41
+     C*
+     C   41                LEAVE
+     C*
+     C           RVACNO    IFNE '1131'
+     C           RVACNO    ANDNE'1112'
+     C           RVACNO    ANDNE'2125'
+     C           RVACNO    ANDNE'2159'
+     C           RVACNO    ANDNE'7142'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           RVACNO    IFEQ '1131'
+     C           RVUSTP    ANDNE'A2'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           RVACNO    WHEQ '1131'
+     C           RVNTCD    ANDEQ'1'
+     C                     ADD  RVRAMT    W1AMT2           已兌現金額
+     C*
+     C           RVACNO    WHEQ '1112'
+     C           RVACNO    OREQ '7142'
+     C                     ADD  RVRAMT    W1AMT2           已兌現金額
+     C*
+     C           RVACNO    WHEQ '2159'
+     C           RVRLNO    ANDEQW1ORNO
+     C                     ADD  RVRAMT    W1AMT2           已兌現金額
+     C*
+     C           RVACNO    WHEQ '2125'
+     C           RVRLNO    ANDEQW1ORNO
+     C                     ADD  RVRAMT    W1AMT2           已兌現金額
+     C                     ENDSL
+     C                     ENDDO
+     C*
+     C*高雄票據台北繳款，財會直接切傳票無繳款單
+     C*
+     C           W1ORNO    IFEQ 'P05004'
+     C           W1ORNO    OREQ 'P04778'
+     C           IVAPNO    ANDEQ'P04704'
+     C           W1ORNO    OREQ 'P04890'
+     C           IVAPNO    ANDEQ'P04730'
+     C           W1ORNO    OREQ 'P04997'
+     C           IVAPNO    ANDEQ'P04850'
+     C           W1ORNO    OREQ 'T02980'
+     C           IVAPNO    ANDEQ'T02979'
+     C           IVAMT     MULT -1        IVAMT
+     C                     ADD  IVAMT     W1AMT2
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+

@@ -1,0 +1,61 @@
+        /******************************************************/
+        /*                                                    */
+        /*        >>   PROGRAM INTRODUCTION  <<               */
+        /*        1.PROGRAM-ID     ARR105P                    */
+        /*        2.PROGRAM-TYPE   CLP                        */
+        /*        3.AUTHOR         S02CSF                     */
+        /*        4.FUNCTION      應收帳款承購狀況彙總表　　*/
+        /*        5.DATE-WRITTEN   92/01/24                   */
+        /*        6.DATE-MODIFY                               */
+        /*                                                    */
+        /******************************************************/
+              PGM        PARM(&P#CUNO)
+
+              DCL        VAR(&TYPE)    TYPE(*CHAR)  LEN(1)
+              DCL        VAR(&S#DEVN)  TYPE(*CHAR)  LEN(10)
+              DCL        VAR(&S#USER)  TYPE(*CHAR)  LEN(10)
+              DCL        VAR(&C_CUN1)  TYPE(*CHAR)  LEN(5) /*客戶代號暫存*/
+              DCL        VAR(&C_CUN2)  TYPE(*CHAR)  LEN(5) /*客戶代號暫存*/
+              DCL        VAR(&P#CUNO)  TYPE(*CHAR)  LEN(5) /*客戶代號*/
+
+              RTVJOBA    JOB(&S#DEVN) USER(&S#USER) +
+                         TYPE(&TYPE)
+
+              IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+   START:
+            CHGDTAARA  DTAARA(*LDA  (400  5))  VALUE(&P#CUNO)
+
+            SBMJOB     JOB(ARR105P1) JOBD(ARJOBD) +
+                 RQSDTA('CALL PGM(ARR105P1) PARM(''' || &P#CUNO ||  ''')')
+            RETURN
+   BATCH:
+
+            RTVDTAARA  DTAARA(*LDA (400 5))    RTNVAR(&P#CUNO)
+
+        /*    CHECK客戶代號    */
+            IF         COND(&P#CUNO *EQ '     ') THEN(DO)
+            CHGVAR     VAR(&C_CUN1)    VALUE('     ')
+            CHGVAR     VAR(&C_CUN2)    VALUE('99999')
+            ENDDO
+            ELSE (DO)
+            CHGVAR     VAR(&C_CUN1)    VALUE(&P#CUNO)
+            CHGVAR     VAR(&C_CUN2)    VALUE(&P#CUNO)
+            ENDDO
+
+            OVRPRTF    FILE(ARR105T) TOFILE(ARR105T) PAGESIZE(*N 198)   +
+                       CPI(15) HOLD(*YES) USRDTA('承購彙總')
+            OVRDBF     FILE(ARCUDT) TOFILE(ARCUDT) SHARE(*YES)
+            OPNQRYF    FILE(ARCUDT)  OPTION(*ALL) QRYSLT(' +
+                        (  CUNO    *GE "' || &C_CUN1 || '") *AND +
+                        (  CUNO    *LE "' || &C_CUN2 || '")') +
+                        KEYFLD((ACBKID) (ACCUNO))  +
+                        MAPFLD((CUNO  '%SST(ACCUNO 1 5)' *CHAR 5))
+            CALL       PGM(ARR105R)
+            CLOF       OPNID(ARCUDT)
+            DLTOVR     FILE(*ALL)
+       /*   SNDBRKMSG  MSG('<<應收帳款承購狀況彙總表+
+                          ,已處理完成,請列印...>>')    +
+                          TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO) */
+   END:     ENDPGM
+

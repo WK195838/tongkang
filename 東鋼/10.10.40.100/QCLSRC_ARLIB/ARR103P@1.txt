@@ -1,0 +1,99 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR103P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02CSF                                    */
+        /*        4.FUNCTION      阁紀祇布参璸                     */
+        /*        5.DATE-WRITTEN   92/01/09                                  */
+        /*        6.DATE-MODIFY                                              */
+        /*                                                                   */
+        /*********************************************************************/
+            PGM
+            DCLF       FILE(ARR103S)
+            DCL        VAR(&TYPE)   TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&C#YEAR) TYPE(*CHAR)  LEN(2)
+            DCL        VAR(&C_ARES) TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&C_AREE) TYPE(*CHAR)  LEN(1)
+
+            RTVJOBA    JOB(&S#DEVN) USER(&S#USER) +
+                       TYPE(&TYPE)
+
+            IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+            RTVDTAARA  DTAARA(*LDA (1011 10))   RTNVAR(&S#DEVN)
+            CHGVAR     VAR(&S#YEAR)   VALUE('93')
+
+ START:     SNDRCVF
+
+            CHGVAR     VAR(&IN30)      VALUE('0')
+            CHGVAR     VAR(&S#ERR)     VALUE(*BLANK)
+
+            IF         COND(&IN03 *EQ '1') THEN(RETURN)
+            IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+  /* CHECH  紀 */
+            IF         COND(&S#YEAR *EQ ' ') THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('紀ぃフ')
+            CHGVAR     VAR(&IN30)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+  /* CHECH  紅跋 */
+            IF         COND(&S#AREA *EQ ' ') THEN(DO)
+            CHGVAR     VAR(&C_ARES)    VALUE(' ')
+            CHGVAR     VAR(&C_AREE)    VALUE('9')
+            ENDDO
+            ELSE (DO)
+            CHGVAR      VAR(&C_ARES) VALUE(&S#AREA)
+            CHGVAR      VAR(&C_AREE) VALUE(&S#AREA)
+            ENDDO
+
+            CHGVAR     VAR(&C#YEAR)    VALUE(&S#YEAR)
+            CHGDTAARA  DTAARA(*LDA (300 2))   VALUE(&C#YEAR)
+            CHGDTAARA  DTAARA(*LDA (302 1))   VALUE(&S#AREA)
+            CHGDTAARA  DTAARA(*LDA (303 1))   VALUE(&C_ARES)
+            CHGDTAARA  DTAARA(*LDA (304 1))   VALUE(&C_AREE)
+
+            SBMJOB     CMD(CALL PGM(ARR103P)) JOB(ARR103P) +
+                       JOBD(ARJOBD)
+            SNDBRKMSG  MSG('<<阁祇布紀参璸秨﹍矪瞶+
+                             ,叫祔.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+            RETURN
+
+ BATCH:      RTVDTAARA  DTAARA(*LDA (300 2)) RTNVAR(&C#YEAR)
+             RTVDTAARA  DTAARA(*LDA (302 1)) RTNVAR(&S#AREA)
+             RTVDTAARA  DTAARA(*LDA (303 1)) RTNVAR(&C_ARES)
+             RTVDTAARA  DTAARA(*LDA (304 1)) RTNVAR(&C_AREE)
+
+   /* 秨﹍矪瞶 */
+
+            CLRPFM     ARR103F
+            OVRDBF     FILE(ARBTAX) TOFILE(ARBTAX) SHARE(*YES)
+            OPNQRYF    FILE(ARBTAX) QRYSLT('+
+                       (VUNO   *EQ "' || &C#YEAR || '")')      +
+                      KEYFLD((AXAREA)) +
+                      MAPFLD((VUN1  AXVUNO *CHAR 7) +
+                             (VUNO  '%SST(VUN1  4 2)' *CHAR 2))
+            CALL       PGM(ARR103R)
+            CLOF       OPNID(ARBTAX)
+            DLTOVR     FILE(*ALL)
+
+            OVRPRTF    FILE(ARR103T) TOFILE(ARR103T) +
+                       PAGESIZE(*N 132) +
+                       CPI(10) HOLD(*YES)  USRDTA('紀祇布')
+            OVRDBF     FILE(ARR103F) TOFILE(ARR103F) SHARE(*YES)
+            OPNQRYF    FILE(ARR103F) QRYSLT('  +
+                       (AFAREA *GE "' || &C_ARES || '")  *AND  +
+                       (AFAREA *LE "' || &C_AREE || '")')      +
+                       KEYFLD((AFDEPT) (AFRVID))
+            CALL       PGM(ARR103R1)
+            CLOF       OPNID(ARR103F)
+            DLTOVR     FILE(*ALL)
+
+            SNDBRKMSG  MSG('<<阁祇布紀参璸矪瞶ЧΘ+
+                             ,叫.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+            ENDPGM
+

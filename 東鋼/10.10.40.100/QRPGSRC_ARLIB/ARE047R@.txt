@@ -1,0 +1,310 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE047R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LYW
+     H*            4.FUNCTION     承購銀行基本登錄
+     H*            5.DATE-WRITTEN  90/10/20
+     H*            6.DATE-UPDATE
+     H*****************************************************************
+     H        1   Y                                     1
+     FARBANK  UF  E           K        DISK
+     FARE047S CF  E                    WORKSTN
+     F                                        RRN2  KSFILE AR047F1
+     E                    ERR     1   5 70               *錯誤訊息
+     I            DS
+     I                                        1  10 S#SRID
+     I                                        1   8 D#SID1
+     I                                        9  10 D#SID2
+     I           UDS
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVN
+     I                                     10211021 D#AREA
+     C*****************************************************************
+     C*        KEY   LIST
+     C*****************************************************************
+     C           K#BANK    KLIST
+     C                     KFLD           ABBKID
+     C*****************************************************************
+     C*        MAIN  PROGRAM
+     C*****************************************************************
+     C*
+     C                     EXSR SR0000                     *初值設定
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           *畫面一
+     C           W#PRID    CASEQ'02'      SR2000           * READC
+     C           W#PRID    CASEQ'03'      SR3000           *畫面二
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*初值設定
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVE *ALL'='   S#LIN3
+     C                     MOVE '01'      W#PRID  2
+     C                     MOVE 'ARE047S-'D#SID1
+     C                     MOVE *BLANK    S#KEY1           * REPOSITION
+     C                     MOVE *ON       *IN31            * CURSOR
+     C                     MOVE *OFF      *IN03
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*清除畫面　AR047F1C
+     C                     MOVE *ON       *IN74            *SFLCLR
+     C                     WRITEAR047F1C
+     C                     MOVE *OFF      *IN74
+     C*
+     C                     Z-ADD0         RRN2    40
+     C                     Z-SUB10        S#NBR1
+     C                     MOVE '01'      D#SID2
+     C*
+     C                     MOVE S#KEY1    ABBKID
+     C           K#BANK    SETLLRARBANK
+     C                     EXSR SR1100                     *讀入SFL
+     C*
+     C                     MOVE *BLANK    S#ERR
+     C*
+     C           RRN2      IFEQ 0
+     C                     MOVELERR,1     S#ERR
+     C                     MOVE *ON       *IN72            *SFLDSP
+     C                     ELSE
+     C                     MOVE *OFF      *IN72            *SFLDSP
+     C                     ENDIF
+     C*
+     C           W#PRID    DOWEQ'01'
+     C*
+     C           W#CNT     IFGE 11
+     C                     MOVE *ON       *IN73            *SFLEND OFF
+     C                     ELSE
+     C                     MOVE *OFF      *IN73            *SFLEND ON
+     C                     ENDIF
+     C                     MOVE '1 '      D#SID2
+     C*
+     C                     WRITEAR047H
+     C                     WRITEAR047FM
+     C                     EXFMTAR047F1C
+     C                     MOVE *BLANK    S#ERR
+     C                     MOVE *OFF      *IN31
+     C*F3=離開
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*F12=回上頁
+     C           *IN12     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*翻下頁
+     C           *IN91     IFEQ *ON
+     C  N40                EXSR SR1100
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE '02'      W#PRID
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*讀入SUBFILE
+     C                     Z-ADD0         W#CNT   20
+     C*
+     C                     READ RARBANK             N    40
+     C  N40      W#CNT     DOWLT11
+     C*
+     C                     CLEARAR047F1
+     C*
+     C*          K#BANK    CHAINRARBANK             N57
+     C*          *IN57     IFEQ *OFF
+     C                     Z-ADD0         S#OPT
+     C                     MOVELABBKID    S#BKID           *銀行代號
+     C                     MOVELABBKNM    S#BKNM           *銀行簡稱
+     C*                    ELSE
+     C                     MOVEL*BLANK    S#BKID           *銀行代號
+     C                     MOVEL*BLANK    S#BKNM           *銀行簡稱
+     C*                    ENDIF
+     C*
+     C*                    MOVELABBKID    S#BKID           *銀行代號
+     C*                    MOVELABBKNM    S#BKNM           *銀行簡稱
+     C*
+     C                     ADD  1         RRN2
+     C                     WRITEAR047F1
+     C                     ADD  1         W#CNT
+     C*
+     C                     READ RARBANK             N    40*檔尾
+     C   40                LEAVE
+     C                     ENDDO
+     C*
+     C           W#CNT     IFGT 0                          *至少一筆
+     C                     ADD  11        S#NBR1
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*逐筆處理
+     C*
+     C                     MOVE *OFF      *IN30            *MODE
+     C                     Z-ADD1         RRN2
+     C           W#PRID    DOWEQ'02'
+     C                     WRITEAR047F2
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C*
+     C           S#OPT     IFEQ 0
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     Z-ADDS#OPT     W#OPT   10
+     C                     Z-ADD0         S#OPT
+     C                     UPDATAR047F1
+     C                     EXSR SR2100                     *READ DATA
+     C                     MOVE '03'      W#PRID
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C           S#BKID    CHAINARBANK              N60
+     C           *IN60     IFEQ *OFF
+     C                     EXSR SR2200
+     C                     ELSE
+     C                     MOVEL*BLANK    S#FLAG           *處理代號
+     C                     MOVEL*BLANK    S#BKID           *銀行代號
+     C                     MOVEL*BLANK    S#BKNM           *銀行簡稱
+     C                     MOVEL*BLANK    S#ACN1           *分行別
+     C                     MOVEL*BLANK    S#SRTP           *手續計費
+     C                     MOVEL*BLANK    S#SRCG           *手續比例
+     C*                    MOVEL*BLANK    S#DELT           *刪除碼
+     C*                    Z-ADD0         S#DELD           *刪除日期
+     C                     MOVEL*BLANK    S#UPDM           *異動人員
+     C                     Z-ADD0         S#UPDD           *異動日期
+     C                     Z-ADD0         S#UPDT           *異動時間
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2200    BEGSR
+     C*****************************************************************
+     C*MOVE DATA
+     C                     MOVELABBKID    S#BKID           *銀行代號
+     C                     MOVELABBKNM    S#BKNM           *銀行簡稱
+     C                     MOVELABACN1    S#ACN1           *分行別
+     C                     MOVELABSRTP    S#SRTP           *手續計費
+     C                     MOVELABSRCG    S#SRCG           *手續比例
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*
+     C* N69                MOVE *BLANK    S#MODE
+     C*  69                MOVE TAB2      S#MODE
+     C                     MOVE *ON       *IN30            *MODE
+     C                     MOVEA'00'      *IN,80
+     C                     MOVEA'0'       *IN,99
+     C                     MOVE '2 '      D#SID2           *SCREEN ID
+     C           W#OPT     IFEQ 1                          *新增
+     C                     MOVE *ON       *IN80
+     C                     ENDIF
+     C           W#OPT     IFEQ 2                          *修改
+     C                     MOVE *ON       *IN81
+     C                     ENDIF
+     C           W#OPT     IFEQ 4                          *刪除
+     C                     MOVE *ON       *IN82
+     C                     ENDIF
+     C           W#PRID    DOWEQ'03'
+     C                     MOVE *BLANK    S#ERR
+     C           *IN60     IFEQ *ON
+     C                     MOVE ERR,2     S#ERR            *沒有資料
+     C                     ENDIF
+     C                     WRITEAR047F1
+     C                     EXFMTAR047F2
+     C                     MOVE '00'      *IN34
+     C                     MOVE '0'       *IN99
+     C*F3=結束作業
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*F12=回前畫面
+     C           *IN12     IFEQ *ON
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*新增
+     C           W#OPT     IFEQ 1
+     C                     EXSR SR4000
+     C                     ENDIF
+     C*查詢
+     C           W#OPT     IFEQ 5
+     C                     MOVE '02'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*F10=存檔
+     C           *IN10     IFEQ *ON
+     C                     EXSR SR4000
+     C                     ENDIF
+     C*
+     C                     MOVE '02'      W#PRID
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4000    BEGSR
+     C*****************************************************************
+     C*存檔
+     C           S#BKID    CHAINARBANK               61
+     C*
+     C                     EXSR SR4500
+     C*  61                WRITERARBANK
+     C  N61                UPDATRARBANK
+     C*
+     C           *IN10     IFEQ *OFF
+     C                     MOVELERR,5     S#ERR
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4500    BEGSR
+     C*****************************************************************
+     C                     CLEARRARBANK
+     C                     SELEC
+     C           W#OPT     WHEQ 1                          *新增
+     C                     MOVE 'A'       ABFLAG            處理代號
+     C           W#OPT     WHEQ 2                          *修改
+     C                     MOVE 'C'       ABFLAG            處理代號
+     C           W#OPT     WHEQ 4                          *刪除
+     C                     MOVE 'D'       ABFLAG            處理代號
+     C                     ENDSL
+     C*
+     C                     MOVELS#FLAG    ABFLAG           *處理代號
+     C                     MOVELS#BKID    ABBKID           *銀行代號
+     C                     MOVELS#BKNM    ABBKNM           *銀行簡稱
+     C                     MOVELS#ACN1    ABACN1           *分行別
+     C                     MOVE S#SRTP    ABSRTP           *手續計費
+     C                     Z-ADDS#SRCG    ABSRCG           *手續比例
+     C*                    MOVE S#DELT    ABDELT           *刪除碼
+     C*                    Z-ADDS#DELD    ABDELD           *刪除日期
+     C                     MOVE S#UPDM    ABUPDM           *異動人員
+     C                     Z-ADDUDATE     ABUPDD           *異動日期
+     C                     TIME           ABUPDT           *異動時間
+     C*
+     C                     ENDSR
+     C*****************************************************************
+**  ERR
+01-資料不存在！
+02-欄位不可空白或零！
+03-已到檔頭！
+04-已到檔尾！
+05-請按Ｆ１０存檔！
+

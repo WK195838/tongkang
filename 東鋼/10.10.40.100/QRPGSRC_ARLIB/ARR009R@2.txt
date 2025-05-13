@@ -1,0 +1,304 @@
+     H        1   DA                                    1                 BR003
+     FINVMST  IP  E                    DISK
+     FTRNDTLL1IF  E           K        DISK
+     FQPRINT  O   F     158            PRINTER
+      *************************************************************
+     E**                  TAB1    1   5  1   TABR1  10
+     I*************************************************************
+     IINREC
+     I                                              INCUNOL2
+     I                                              INORNOL1
+     I****
+     IAADS        DS
+     I              'も應收帳款帳齡分析-C         CON3                       X
+     I              '表（含未開發票）も'
+     I              '東和鋼鐵企業股份有-C         CON4                       X
+     I              '限公司'
+      *
+     IBBDS        DS
+9008 I                                       21  280YMD
+LYW  I                                       21  260YM
+ .   I                                       21  240YY
+ .   I                                       25  260MM
+ .   I                                       27  280DD
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C**************************************************************
+     C  N90                EXSR INZ#01
+     C  N90                SETON                     90
+     C   L2                EXSR DL#L2
+     C   L1                EXSR DL#L1
+     C                     EXSR DP#01
+     CL1                   EXSR TL#L1
+     CL2                   EXSR TL#L2
+     CLR                   EXSR TL#LR
+     C**************************************************************
+     C*** SET INITIAL
+     C**************************************************************
+     CSR         INZ#01    BEGSR
+     C*
+     C           *ENTRY    PLIST
+9008 C                     PARM           DATE1   80
+     C*
+     C           TXKEY     KLIST
+     C                     KFLD           TXCUNO
+     C                     KFLD           TXORN5
+     C                     KFLD           TXNO
+      *
+     C                     Z-ADD0         PAG     30
+     C                     Z-ADD80        LCNT    30
+     C                     Z-ADD58        OVRFLW  30
+     C                     MOVE *ALL'='   ALS   146
+     C                     MOVE *ALL'-'   ALQ   136
+     C                     Z-ADD0         HAMT0  100
+     C                     Z-ADD0         HAMT1  100
+     C                     Z-ADD0         HAMT2  100
+     C                     Z-ADD0         HAMT3  100
+     C                     Z-ADD0         HAMT4  100
+     C                     Z-ADD0         HAMT5  100
+     C                     Z-ADD0         HAMT6  100
+     C*
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS                                **
+     C**----------------------------------------------**
+     CSR         @CHKCT    BEGSR
+     C*
+     C           LCNT      COMP OVRFLW               75  75
+     C   75                ADD  1         PAG
+     C   75                EXCPTEH#01
+     C   75                Z-ADD8         LCNT
+     C*
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS L2                             **
+     C**----------------------------------------------**
+     CSR         DL#L2     BEGSR
+     C*
+     C                     SETON                     42
+     C                     Z-ADD0         GAMT0  100
+     C                     Z-ADD0         GAMT1  100
+     C                     Z-ADD0         GAMT2  100
+     C                     Z-ADD0         GAMT3  100
+     C                     Z-ADD0         GAMT4  100
+     C                     Z-ADD0         GAMT5  100
+     C                     Z-ADD0         GAMT6  100
+     C*
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS L1                             **
+     C**----------------------------------------------**
+     CSR         DL#L1     BEGSR
+     C*
+     C                     SETON                     41
+     C                     Z-ADD0         TAMT0  100
+     C                     Z-ADD0         TAMT1  100
+     C                     Z-ADD0         TAMT2  100
+     C                     Z-ADD0         TAMT3  100
+     C                     Z-ADD0         TAMT4  100
+     C                     Z-ADD0         TAMT5  100
+     C                     Z-ADD0         TAMT6  100
+     C*
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS                                **
+     C**----------------------------------------------**
+     CSR         DP#01     BEGSR
+     C*
+9008 C                     Z-ADDININDT    PDATE   80
+     C                     Z-ADDINNBAL    PAMT   110
+     C                     EXSR CA#01
+     C*
+     CSR         DP#01Z    ENDSR
+     C**----------------------------------------------**
+     C* CALCULATE AMOUNT SUBROUTINE                   **
+     C**----------------------------------------------**
+     CSR         CA#01     BEGSR
+     C*
+     C*                    Z-ADD0         WDAY    40
+     C*                    Z-ADDPDATE     BDATE   60
+     C*                    Z-ADDDATE1     EDATE   60
+     C*                    CALL 'C04'
+     C*                    PARM           BDATE
+     C*                    PARM           EDATE
+     C*                    PARM           WDAY
+     C*                    FREE 'C04'
+     C*
+     C                     MOVE *ALL'0'   P#PDAT
+     C                     MOVE PDATE     P#PDAT
+     C                     MOVE *ALL'0'   P#EDAT
+     C                     MOVE DATE1     P#EDAT
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT  8
+     C                     PARM           P#EDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM 0         DAY     50
+     C                     PARM           P#ERR   1
+     C                     Z-ADDDAY       WDAY    40
+     C           WDAY      DIV  30        PPP     51
+      * 如超過９９９９天則須以年判別
+     C                     Z-ADDPDATE     YMD
+     C                     Z-ADDYY        BYY     40
+     C                     Z-ADDDATE1     YMD
+     C                     Z-ADDYY        EYY     40
+     C                     SUB  BYY       EYY
+     C           EYY       COMP 26                   31
+     C   31                Z-ADD300       PPP
+      *
+      *
+     C                     ADD  PAMT      TAMT6
+     C                     ADD  PAMT      GAMT6
+     C                     ADD  PAMT      HAMT6
+      *
+     C           PPP       COMP 5                    31  31
+     C   31                ADD  PAMT      TAMT5
+     C   31                ADD  PAMT      GAMT5
+     C   31                ADD  PAMT      HAMT5
+      *
+     C           PPP       COMP 4                    31  31
+     C   31      PPP       COMP 5                      31
+     C   31                ADD  PAMT      TAMT4
+     C   31                ADD  PAMT      GAMT4
+     C   31                ADD  PAMT      HAMT4
+      *
+     C           PPP       COMP 3                    31  31
+     C   31      PPP       COMP 4                      31
+     C   31                ADD  PAMT      TAMT3
+     C   31                ADD  PAMT      GAMT3
+     C   31                ADD  PAMT      HAMT3
+      *
+     C           PPP       COMP 2                    31  31
+     C   31      PPP       COMP 3                      31
+     C   31                ADD  PAMT      TAMT2
+     C   31                ADD  PAMT      GAMT2
+     C   31                ADD  PAMT      HAMT2
+      *
+     C           PPP       COMP 1                    31  31
+     C   31      PPP       COMP 2                      31
+     C   31                ADD  PAMT      TAMT1
+     C   31                ADD  PAMT      GAMT1
+     C   31                ADD  PAMT      HAMT1
+      *
+     C           PPP       COMP 1                      31
+     C   31                ADD  PAMT      TAMT0
+     C   31                ADD  PAMT      GAMT0
+     C   31                ADD  PAMT      HAMT0
+      *
+     CSR         CA#01Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME L1 PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#L1     BEGSR
+     C*
+     C                     MOVELINCUNO    TXCUNO
+     C                     MOVELINORNO    TXORN5
+     C                     MOVE *BLANK    TXNO
+     C*
+     C           TXKEY     SETLLTRNDTLL1             97
+     C           *IN97     DOWEQ'0'
+     C           INCUNO    READETRNDTLL1                 97
+     C   97                LEAVE
+     C*
+     C           INORNO    IFNE TXORNO
+     C                     ITER
+     C                     ENDIF
+     C*
+9008 C                     Z-ADDTXACDT    PDATE   80
+     C                     Z-ADDTXAMT     PAMT   110
+     C                     EXSR CA#01
+     C                     ENDDO
+      *
+     C                     ADD  1         LCNT
+     C                     EXSR @CHKCT
+     C   75                ADD  1         LCNT
+     C                     EXCPTED#01
+     C                     SETOF                     4142
+     C*
+     CSR         TL#L1Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME L2 PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#L2     BEGSR
+     C*
+     C                     EXCPTET#L2
+     C                     ADD  3         LCNT
+     C*
+     CSR         TL#L2Z    ENDSR
+     C**-----------------------------------------**
+     C**  TOTAL TIME LR PROCESS                  **
+     C**-----------------------------------------**
+     CSR         TL#LR     BEGSR
+     C*
+     C                     EXCPTET#LR
+     C*
+     CSR         TL#LRZ    ENDSR
+      ***********************************************************
+      ****   DEFINE OUPUT FORMAT                             ****
+      ***********************************************************
+     OQPRINT  E   02           EH#01
+     O                                   17 '報表編號: AR009'
+     O                         CON4      89                                    X
+     O                                  138 '製表日期:'
+     O                         UDATE    146 '  /  /  '
+     O        E 1              EH#01
+     O                         CON3      81                                    X
+     O                                  137 '頁　　次'
+     O                                  138 ':'
+     O                         PAG   Z  141
+     O        E 1              EH#01
+     O                                   12 '截止日期: '
+     O                         DATE1        '    /  /  '
+     O        E 1              EH#01
+     O                         ALS      146
+     O        E 1              EH#01
+     O                                  146 '逾期收款原因及'
+     O        E 1              EH#01
+     O                                   10 '客戶編號'
+     O                                   20 '客戶名稱'
+     O                                   32 '訂單號碼'
+     O                                   47 '積欠１月以內'
+     O                                   61 '積欠２月以內'
+     O                                   75 '積欠２－３月'
+     O                                   89 '積欠３－４月'
+     O                                  103 '積欠４－５月'
+     O                                  117 '積欠５月以上'
+     O                                  131 '合　計'
+     O                                  146 '預計收款時間'
+     O        E 1              EH#01
+     O                         ALS      146
+     O        E 1              ED#01
+     O                 42      INCUNO     7
+     O                 42      INCUNM    20
+     O                 41      INORNO    28
+     O                         TAMT0 J   47
+     O                         TAMT1 J   61
+     O                         TAMT2 J   75
+     O                         TAMT3 J   89
+     O                         TAMT4 J  103
+     O                         TAMT5 J  117
+     O                         TAMT6 J  131
+     O        E 1              ET#L2
+     O                         ALQ      146
+     O        E 1              ET#L2
+     O                                   28 '客戶小計：'
+     O                         GAMT0 J   47
+     O                         GAMT1 J   61
+     O                         GAMT2 J   75
+     O                         GAMT3 J   89
+     O                         GAMT4 J  103
+     O                         GAMT5 J  117
+     O                         GAMT6 J  131
+     O        E 1              ET#L2
+     O                         ALQ      146
+     O        E 1              ET#LR
+     O                                   28 '　總合計：'
+     O                         HAMT0 J   47
+     O                         HAMT1 J   61
+     O                         HAMT2 J   75
+     O                         HAMT3 J   89
+     O                         HAMT4 J  103
+     O                         HAMT5 J  117
+     O                         HAMT6 J  131
+

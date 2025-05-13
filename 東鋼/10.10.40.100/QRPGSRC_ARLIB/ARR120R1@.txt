@@ -1,0 +1,150 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR120R1
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     型鋼折讓資負同在查核明細表
+     H*          5.DATE-WRITTEN  94/08/08
+     H*          6.DATE-MODIFY
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FTRNDTL  IP  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FARR120F O   E           K        DISK
+     F*****************************************************************
+     ITXREC
+     I                                              TXNO  L2
+     I                                              TXIVNOL1
+     I           UDS
+     I                                      300 3050U#YYMM
+     I                                      306 311 U#ACDT
+     I            DS
+     I                                        1   80D#ACDT
+     I                                        1   60D#YYMM
+     C*****************************************************************
+     C*          KET  LIST
+     C*****************************************************************
+     C*FILE => INVDTL(發票明細檔)
+     C           K#INVD    KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARRAR120F
+     C*
+     C                     MOVELTXRESV    W#YYMM  40
+     C                     Z-ADDW#YYMM    D#YYMM
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#CNT   10
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C           TXNO      IFEQ 'H16269'
+     C                     MOVEL'X'       W#TEST  1
+     C                     ENDIF
+     C*
+     C                     MOVELTXIVNO    IVNO
+     C                     MOVEL'6'       IVACNT
+     C                     Z-ADD0         IVITEM
+9710 C                     Z-ADD0         W#ITEM  20
+     C           K#INVD    SETLLIVREC
+     C                     MOVEL*OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ IVREC                    40
+     C   40                LEAVE
+     C*
+     C           IVNO      IFNE TXIVNO
+     C           IVACNT    ORNE '6'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           IVDECD    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     ADD  1         W#CNT
+     C*折讓日小於押匯日期
+     C                     MOVELIVACDT    W#ACDT  60
+     C           W#ACDT    IFGT U#YYMM
+     C                     CLEARRAR120F
+     C                     MOVELTXNO      A1TXNO           折讓單號
+     C                     MOVELTXIVNO    A1IVNO           發票號碼
+     C                     MOVELTXCUNO    A1CUNO           客戶代號
+     C                     MOVELTXCUNM    A1CUNM           客戶名稱
+     C                     MOVELTXORNO    A1ORNO           訂單編號
+     C                     Z-ADDD#YYMM    A1ACDT           入帳年月
+     C                     Z-ADDTXAMT     A1AMT1           折讓金額
+     C                     Z-ADDTXTAX     A1TAX            折讓稅額
+     C           TXAMT     ADD  TXTAX     A1AMT2           折讓總額
+     C*
+     C           W#ITEM    IFEQ TXITEM
+     C           W#ITEM    ANDNE0
+     C           TXITEM    ADD  1         A1ITEM           折讓項次
+     C                     ELSE
+     C                     Z-ADDTXITEM    A1ITEM           折讓項次
+     C                     ENDIF
+     C*
+     C                     WRITERAR120F
+     C                     Z-ADDA1ITEM    W#ITEM
+     C                     MOVELA1ACDT    U#ACDT           入帳年月
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C*代表此張發票有做折讓，但尚未押匯！
+     C*
+     C           W#CNT     IFEQ 0
+     C                     CLEARRAR120F
+     C                     MOVELTXNO      A1TXNO           折讓單號
+     C                     Z-ADDTXITEM    A1ITEM           折讓項次
+     C                     MOVELTXIVNO    A1IVNO           發票號碼
+     C                     MOVELTXCUNO    A1CUNO           客戶代號
+     C                     MOVELTXCUNM    A1CUNM           客戶名稱
+     C                     MOVELTXORNO    A1ORNO           訂單編號
+     C                     Z-ADDD#YYMM    A1ACDT           入帳年月
+     C                     Z-ADDTXAMT     A1AMT1           折讓金額
+     C                     Z-ADDTXTAX     A1TAX            折讓稅額
+     C           TXAMT     ADD  TXTAX     A1AMT2           折讓總額
+     C                     WRITERAR120F
+     C                     MOVELA1ACDT    U#ACDT           入帳年月
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C*
+     C                     ENDSR
+

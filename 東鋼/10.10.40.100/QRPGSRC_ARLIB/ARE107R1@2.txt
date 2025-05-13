@@ -1,0 +1,190 @@
+     H*****************************************************************
+     H*
+     H*         *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*        1.PROGRAM-ID    ARE107R1
+     H*        2.PROGRAM-TYPE  RPG/400
+     H*        3.AUTHOR        S00WCJ
+     H*        4.FUNCTION     電子押匯確認上傳處理及報表產生
+     H*        5.DATE-WRITTEN  112/06/09 2023AR00031
+     H*        6.UPDATE-DATE   112/07/04 S00WCJ (1207A)
+     H*                        總計新台幣數字(EDGDAT)選填欄位改為必
+     H*                        填欄位
+     H*
+     H*****************************************************************
+     H            Y
+     FRCVDTL  UF  E           K        DISK
+     FSARCVF  UF  E           K        DISK
+     FSARVIN  IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FINEDTL  IF  E           K        DISK
+     FLLCMSN  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FARELCD  UF  E           K        DISK                      A
+     FARELCDG O   E           K        DISK
+     F            RARELCD                           KRENAMEARELCG
+1207AFINEMST  IF  E           K        DISK
+     FARE107T O   E             60     PRINTER
+     E*
+     E                    EDNM    1   1 20
+     I*
+     IRINEDTL
+     I              EDFLAG                          F#FLAG
+     I              EDINDT                          F#INDT
+     I              EDMAR1                          F#MAR1
+     I              EDTMDT                          F#TMDT
+     I              EDTMTM                          F#TMTM
+     I              EDTMOP                          F#TMOP
+     I              EDTAWS                          F#TAWS
+     I              EDSTCL                          F#STCL
+     I              EDXPDD                          F#XPDD
+     I              EDXPDT                          F#XPDT
+     I              EDXUSR                          F#XUSR
+     I*
+     I            DS
+     I                                        1  12 RVRES2
+     I                                        1   1 D#UPCK
+     I            DS
+     I                                        1  16 SRREV2
+     I                                        1   1 D1UPCK
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10011010 U#USID
+     I                                     10111020 DEVNM
+     C*
+     C****************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           W#RVNO  6
+     C                     PARM           W#DUDT  8
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           W1RVNO 16
+     C                     KFLD           W1INNO 16
+     C*
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C  N99                EXSR SR0000
+     C                     EXSR SR1000
+     C                     MOVEL*ON       *INLR
+     C*
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*
+     C           *DATE     SUB  19000000  U#SYSD  80
+     C                     MOVELW#DUDT    R#DUDT
+     C                     WRITEAR107T1H
+     C                     MOVEL*OFF      *IN60
+     C                     MOVEL*ON       *IN51
+     C                     MOVEL*ON       *IN99
+     C                     MOVEL*BLANKS   W#PTYN  1
+1207AC                     CLEARAR107T1T
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C           W#RVNO    CHAINRVREC                55
+     C*
+     C                     MOVELRVNO      W1RVNO
+     C           RVNO      SETLLSIREC
+     C                     MOVEL*OFF      *IN56
+     C           *IN56     DOWEQ*OFF
+     C           RVNO      READESIREC                    56
+     C   56                LEAVE
+     C*
+     C*處理檔案
+     C*
+     C                     MOVELSIINNO    W1INNO
+     C*
+     C           KEY01     CHAINRARELCD              65
+     C   65                CLEARRARELCD
+     C   65                MOVEL'A'       EDFLAG           *處理代碼
+     C  N65      EDSTCL    IFNE *BLANKS
+     C           EDTMDT    ANDNE0
+     C                     ITER
+     C                     ENDIF
+     C*
+     C  N65                MOVEL'C'       EDFLAG
+     C                     MOVELRVCUNO    EDCUNO           *客戶編號
+     C                     MOVELRVNO      EDRVNO           *繳款單號
+     C           19110000  ADD  RVDUDT    EDRVDT           *繳款單到期日
+     C                     MOVELRVNTNO    EDRLNO           *信用狀號碼
+     C                     Z-ADDRVRAMT    EDEAMT           *匯票金額
+     C           RVNTNO    CHAINLLCMSN              N56
+     C  N56                MOVELLNOTEC    EDEDNM           *貨品名稱
+     C   56                MOVELEDNM,1    EDEDNM
+     C*
+     C           RVCUNO    CHAINCBCUST              N56
+     C           *IN56     IFEQ *OFF
+     C                     MOVELCBMUID    EDBYID           *買受人統編
+     C                     MOVELCBADR1    EDBYAS           *買受人地址
+     C                     MOVELCBFNAM    EDBYNM           *買受人名稱
+     C                     ENDIF
+     C*
+     C*處理報表
+     C*
+     C                     MOVELW#RVNO    R#RVNO
+     C                     MOVELRVCUNO    R#CUNO
+     C                     MOVELRVCUNM    R#CUNM
+     C                     MOVELRVNTNO    R#NTNO
+     C                     MOVELRVPBID    R#PBID
+     C                     Z-ADDRVRAMT    R#RAMT
+     C*
+     C                     MOVELSIINNO    EDINNO           *發票號碼
+     C           SIINNO    CHAININREC               N57
+     C  N57      19110000  ADD  ININDT    EDINDT           *出貨日
+     C  N57      19110000  ADD  ININDT    EDIVDT           *發票日期
+     C           SIINNO    CHAINRINEDTL             N57
+     C  N57                MOVELEDPRNM    EDPDBF           *產品摘要
+     C*
+1207AC           SIINNO    CHAINRINEMST             N57
+1207AC  N57                Z-ADDEMAAMT    EDGDAT
+1207AC   57                Z-ADD0         EDGDAT
+1207AC                     Z-ADDEDGDAT    R#INAM
+1207AC                     ADD  R#INAM    R#AAMT
+1207AC*
+     C                     Z-ADDU#SYSD    EDXPDD
+     C                     TIME           EDXPDT
+     C                     MOVELU#USID    EDXUSR
+     C*
+     C   65                WRITERARELCD
+     C  N65                UPDATRARELCD
+     C*
+     C                     MOVEL'ARE107R1'ELAPNM
+     C                     Z-ADDU#SYSD    ELCHDD
+     C                     TIME           ELCHDT
+     C                     MOVELU#USID    ELCUSR
+     C                     WRITEARELCG
+     C*
+     C                     MOVELEDINNO    R#INNO
+     C                     Z-ADDEDIVDT    R#INDT
+     C                     WRITEAR107T1D
+     C                     MOVEL*OFF      *IN51
+     C                     MOVEL'Y'       W#PTYN
+     C   60                WRITEAR107T1X
+     C   60                WRITEAR107T1H
+     C   60                MOVEL*ON       *IN51
+     C                     MOVEL*OFF      *IN60
+     C                     ENDDO
+     C*
+     C                     MOVEL'Y'       D#UPCK
+     C  N55                UPDATRVREC
+     C           W#RVNO    CHAINSRREC                58
+     C                     MOVEL'Y'       D1UPCK
+     C  N58                UPDATSRREC
+     C*
+     C                     WRITEAR107T1T
+     C*
+     C           W#PTYN    IFEQ *BLANKS
+     C                     WRITEAR107T1M
+     C                     ENDIF
+     C*
+     C           END100    ENDSR
+     C*****************************************************************
+** EDNM
+鋼材一批
+

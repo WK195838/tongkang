@@ -1,0 +1,489 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR036RN
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     未開立發票明細表
+     H*            5.DATE-WRITTEN  89/04/06
+     H*            6.UPDATE  DATE  99/12/06  2010ARXXX  S00WCJ (9912A)
+     H*                            增加U廠選項
+     H*                           100/08/05  S00WCJ (0008A)
+     H*                            增加D廠選項
+     H*                           101/10/08 S00WCJ (0110A)
+     H*                            增加X廠選項
+     H*                           101/10/25 2012AR695 S00WCJ (0110B)
+     H*                            增加R廠選項
+     H*                           101/11/29 2012AR703 S00WCJ (0111A)
+     H*                            增加J廠選項
+     H*                           101/12/05 2012AR705 S00WCJ (0112A)
+     H*                            增加N廠選項
+     H*                           102/01/22 2013AR726 S00WCJ (0201A)
+     H*                            增加V廠選項
+     H*                           103/04/11 2014AR820 S00WCJ (0304A)
+     H*                            增加Q廠選項
+     H*                           104/09/30 2015AR953 S00WCJ (0409A)
+     H*                            產品代碼3碼擴5碼
+     H*
+     H*  說明：發票號碼為空白或雖已開立發票但發票開立日期大於所選定
+     H*        之月份;但若作廢日期在報稅日期之後則不納入
+     H*        若廠區為台北,則需寫入ARR036F
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTLX IP  E           K        DISK
+     F            TXREC                             KRENAMETXRECL
+     FTRNDTL  IF  E           K        DISK
+     FTRNDTLT IF  E           K        DISK
+     F            TXREC                             KRENAMETXRECT
+     FINVMST  IF  E           K        DISK
+     FARBTAXL2IF  E           K        DISK
+     FARR036F UF  E           K        DISK                      A
+     FARR036T O   E             69     PRINTER
+0304AE                    TABA1   1  15  1   TABA2  10
+     ITXRECL      01
+     I              TXFL01                          F#FL01
+     I              TXCODE                          F#CODE
+     I              TXCUNO                          F#CUNO
+     I              TXPCNO                          F#PCNO
+     I              TXNO                            F#NO
+     I              TXIVNO                          F#IVNO
+     I              TXORNO                          F#ORNO
+     I              TXAMT                           F#AMT
+     I              TXDATE                          F#DATE
+     I              TXACDT                          F#ACDT
+     I              TXCUNM                          F#CUNM
+     I                                              F#FL01L4
+     I                                              F#CUNOL3
+     I                                              F#PCNOL2
+     I                                              F#NO  L1
+     ITXRECT
+     I              TXFL01                          X#FL01
+     I              TXCODE                          X#CODE
+     I              TXCUNO                          X#CUNO
+     I              TXPCNO                          X#PCNO
+     I              TXNO                            X#NO
+     I              TXIVNO                          X#IVNO
+     I              TXORNO                          X#ORNO
+     I              TXAMT                           X#AMT
+     I              TXDATE                          X#DATE
+     I              TXACDT                          X#ACDT
+     I              TXCUNM                          X#CUNM
+     I            DS
+9010 I                                        1   80D#DEDT
+LYW  I                                        1   40D#YY
+ .   I                                        5   60D#MM
+ .   I                                        7   80D#DD
+     I            DS
+     I                                        1  10 D#IVNO
+     I                                        1   1 D#IVN1
+     I                                        1   6 D#TXIV
+     I            DS
+9010 I                                        1   80F#DATE
+LYW  I                                        1   60D#TXDT
+     I            DS
+9010 I                                        1   80F#ACDT
+LYW  I                                        1   60D#ACDT
+     I           UDS
+     I                                      508 5150D#DATE
+     I                                      508 5130T#YYMM
+     I                                      516 516 D#AREA
+     I                                     10011010 T#USID
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*              MAIN  PROGRAM
+     C*****************************************************************
+     C           *IN99     IFEQ *OFF
+     C                     EXSR INISR
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C   L4                EXSR L4CLR
+     C   L3                EXSR L3CLR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CL3 99                EXSR L3SR
+     CL4 99                EXSR L4SR
+     CLRN99                EXSR MSGSR
+     CLR 99                EXSR LRSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C*
+0304AC           D#AREA    LOKUPTABA1     TABA2          55
+0304AC   55                MOVE TABA2     T#BARA
+0304AC  N55                MOVEL*BLANKS   T#BARA
+     C*
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C                     MOVE *ALL'0'   W#IVNO  6
+     C*
+     C           K#DTL     KLIST
+     C                     KFLD           W#CODE  4
+     C                     KFLD           W#NO    8
+     C                     KFLD           W#ITEM  20
+     C*
+     C           K#BTAX    KLIST
+     C                     KFLD           AXCODE
+     C                     KFLD           AXVNNO
+     C                     ENDSR
+     C           K#036F    KLIST
+     C                     KFLD           ARWTNO
+     C                     KFLD           ARWTIT
+     C*****************************************************************
+     C           L4CLR     BEGSR
+     C*****************************************************************
+     C*廠區別小計
+     C                     Z-ADD0         T#QTY4
+     C                     Z-ADD0         T#AMT4
+     C                     MOVE *ON       *IN69
+     C                     ENDSR
+     C*****************************************************************
+     C           L3CLR     BEGSR
+     C*****************************************************************
+     C*客戶別小計
+     C                     Z-ADD0         T#QTY3
+     C                     Z-ADD0         T#AMT3
+     C                     MOVE *OFF      *IN41
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C*訂單別小計
+     C                     Z-ADD0         T#QTY2
+     C                     Z-ADD0         T#AMT2
+     C                     MOVE *OFF      *IN42
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C*磅單別小計
+     C                     Z-ADD0         T#QTY1
+     C                     Z-ADD0         T#AMT1
+     C                     MOVE *OFF      *IN43
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVE F#IVNO    D#IVNO
+TEST C           F#NO      IFEQ 'T1104401'
+ .   C                     Z-ADD0         W#TEST  10
+ .   C                     ENDIF
+TEST C           F#NO      IFEQ 'T1174841'
+ .   C                     Z-ADD0         W#TEST  10
+ .   C                     ENDIF
+     C*                    EXSR SR1000                     作廢日期
+     C           F#IVNO    IFEQ *BLANK                     未開發票
+9201 C*          F#IVNO    OREQ W#IVNO
+9201 C           D#TXIV    OREQ W#IVNO
+     C           D#IVN1    OREQ '*'                        暫不開立
+     C           D#IVN1    OREQ '#'                        永不開立
+     C                     EXSR SR1000                     作廢日期
+     C  N90                EXSR SR2000                     先前判斷
+     C*
+     C                     ELSE
+     C*
+     C           F#IVNO    CHAININREC                40
+     C           *IN40     IFEQ *OFF
+     C*
+     C           ININDT    IFGT D#DATE                     開立日期
+     C                     EXSR SR1000                     作廢日期
+     C  N90                EXSR SR2000                     先前判斷
+     C                     ENDIF
+     C*
+     C                     ENDIF                            *IN40
+     C*
+     C                     ENDIF                            TXIVNO
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           T#QTY1    IFNE 0
+     C           T#AMT1    ANDNE0
+     C   69                WRITEAR036TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR036T2
+     C*
+     C                     ADD  T#QTY1    T#QTY2
+     C                     ADD  T#AMT1    T#AMT2
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C           T#QTY2    IFNE 0
+     C           T#AMT2    ANDNE0
+     C   69                WRITEAR036TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR036T3
+     C*
+     C                     ADD  T#QTY2    T#QTY3
+     C                     ADD  T#AMT2    T#AMT3
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           L3SR      BEGSR
+     C*****************************************************************
+     C           T#QTY3    IFNE 0
+     C           T#AMT3    ANDNE0
+     C   69                WRITEAR036TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR036T4
+     C*
+     C                     ADD  T#QTY3    T#QTY4
+     C                     ADD  T#AMT3    T#AMT4
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           L4SR      BEGSR
+     C*****************************************************************
+     C           T#QTY4    IFNE 0
+     C           T#AMT4    ANDNE0
+     C   69                WRITEAR036TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR036T5
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C   69                WRITEAR036TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR036T6
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C           W#CONT    IFEQ 0
+     C                     EXSR MSGSR
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           WTRSR     BEGSR
+     C*****************************************************************
+     C*印明細
+     C   41                MOVE *BLANK    T#CUNO           客戶編號
+     C   41                MOVE *BLANK    T#CUNM           客戶名稱
+     C   42                MOVE *BLANK    T#ORNO           訂單編號
+     C   43                MOVE *BLANK    T#IVNO           磅單編號
+     C   43                Z-ADD0         T#DATE           出貨日期
+     C  N41                MOVE F#CUNO    T#CUNO           客戶編號
+     C  N41                MOVE F#CUNM    T#CUNM           客戶名稱
+     C* N42                MOVELTXPCNO    T#ORNO           訂單編號
+LYW  C  N42                MOVELF#ORNO    T#ORNO           訂單編號
+     C  N43                MOVE F#NO      T#IVNO           磅單編號
+     C  N43                Z-ADDTXDATE    T#DATE           出貨日期
+0409AC                     MOVELTXPDNM    T#PDNM           品名
+     C                     Z-ADDTXUPRC    T#UPRC           單價
+     C                     Z-ADDTXQTY     T#QTY            數量
+     C                     Z-ADDTXAMT     T#AMT            金額
+     C                     MOVE TXVUNO    T#VUNO           傳票號碼
+     C                     MOVE *BLANK    T#IVTP
+     C*入帳日必須與單據日同月
+     C           TXNO      IFEQ 'T1170953'
+     C                     Z-ADD0         W#TEST  10
+     C                     ENDIF
+     C           TXACDT    IFLE D#DATE
+     C   69                WRITEAR036TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR036T1
+     C                     MOVEA'111'     *IN,41
+     C*
+     C                     ADD  1         W#CONT  60
+     C*
+     C                     ADD  T#QTY     T#QTY1
+     C                     ADD  T#AMT     T#AMT1
+8907 C           U#AREA    IFEQ 'P'
+ .   C                     EXSR SR3000
+ .   C                     ENDIF
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C                     MOVE *OFF      *IN90
+     C*
+     C           F#CODE    IFEQ 'SA04'
+     C                     MOVE '1'       AXCODE           單據別
+     C                     ENDIF
+     C*
+     C           F#CODE    IFEQ 'AR05'
+     C                     MOVE '2'       AXCODE           單據別
+     C                     ENDIF
+     C*
+     C                     MOVE F#NO      AXVNNO           單據號碼
+     C           K#BTAX    CHAINRARBTAX              52
+     C           *IN52     IFEQ *OFF
+     C*取得原作廢之發票號碼
+     C           AXIVNO    CHAININREC                52
+     C*
+     C           INDECD    IFEQ 'D'                        已作廢
+     C                     Z-ADDININDT    D#DEDT           開立日期
+     C*計算報稅日期
+     C                     SELEC
+     C           D#MM      WHEQ 1
+     C           D#MM      OREQ 2
+     C                     Z-ADD3         D#MM
+     C           D#MM      WHEQ 3
+     C           D#MM      OREQ 4
+     C                     Z-ADD5         D#MM
+     C           D#MM      WHEQ 5
+     C           D#MM      OREQ 6
+     C                     Z-ADD7         D#MM
+     C           D#MM      WHEQ 7
+     C           D#MM      OREQ 8
+     C                     Z-ADD9         D#MM
+     C           D#MM      WHEQ 9
+     C           D#MM      OREQ 10
+     C                     Z-ADD11        D#MM
+     C           D#MM      WHEQ 11
+     C           D#MM      OREQ 12
+     C                     Z-ADD1         D#MM
+     C                     ADD  1         D#YY
+     C                     ENDSL
+     C                     Z-ADD15        D#DD
+     C*
+     C           INDEDT    IFGE D#DEDT
+     C                     MOVE *ON       *IN90
+     C                     ENDIF
+     C*
+     C                     ENDIF                            INDECD
+     C*
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*先前判斷是否經一正一負處理,
+     C*若當月僅有調減(負數)未有重新開發票或開發票非與調減同月
+     C*便需納入計算
+     C           F#NO      IFNE W#NOX
+     C                     MOVEA'00'      *IN,50
+     C*
+     C                     MOVELF#CODE    W#CODE
+     C                     MOVE F#NO      W#NO
+     C                     Z-ADD0         W#ITEM
+     C           K#DTL     SETLLTXREC
+     C           *IN50     DOWEQ*OFF
+     C                     READ TXREC                    50
+     C*
+     C           *IN50     IFEQ *ON
+     C           TXNO      ORNE F#NO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+TEST C           TXNO      IFEQ 'M1139082'
+ .   C                     Z-ADD0         W#TEST  10
+ .   C                     ENDIF
+TEST C           TXNO      IFEQ 'T1168635'
+ .   C                     Z-ADD0         W#TEST  10
+ .   C                     ENDIF
+     C*
+     C                     MOVE TXIVNO    D#IVNO
+9106 C           D#IVNO    CHAININREC               N60
+9106 C                     MOVE *OFF      *IN61
+9201 C  N60      ININDT    DIV  100       W#IND1  40
+9201 C   60                MOVE TXIVNO    W#IND1
+9106 C           D#DATE    DIV  100       W#IND2  40
+9106 C  N60      W#IND1    IFEQ W#IND2                     同月份
+9106 C                     MOVE *ON       *IN61
+9106 C                     ENDIF
+     C           D#TXIV    IFEQ W#IVNO                     一正一負
+0622 C*          D#IVN1    OREQ '#'
+     C*
+0622 C*          TXAMT     IFGT 0
+9201 C           W#IND1    IFEQ W#IND2                     同月份
+9201 C                     EXSR SR2100                      IN62
+     C  N61 62             EXSR WTRSR
+     C                     MOVE *ON       *IN51
+9201 C                     ENDIF
+     C*
+     C                     ELSE
+     C   51N61             MOVE *OFF      *IN51
+     C* IN51為判斷是否列印過一正一負之資料
+     C*若列印過,則已開立之發票資料不予列印
+9112 C           TXACDT    DIV  100       W#ACDT  60
+ .   C  N51N61   W#ACDT    IFEQ T#YYMM
+     C                     EXSR WTRSR
+ .   C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C                     MOVE F#NO      W#NOX   8
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C*判對是否有新開發票
+     C*以IN62判別
+     C                     MOVE *ON       *IN62
+     C           K#DTL     SETLLTXRECT
+     C           *IN62     DOWEQ*ON
+     C                     READ TXRECT                   63
+     C*
+     C           X#NO      IFNE TXNO
+     C           X#CODE    ORNE TXCODE
+     C           *IN63     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVELX#IVNO    W#IVNX  6
+     C*
+     C           W#IVNX    IFEQ '000000'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           X#IVNO    CHAININREC               N63
+     C           ININDT    DIV  100       W#IVDX  40
+     C           W#IND1    IFEQ W#IVDX
+     C                     MOVE *OFF      *IN62
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+TEST C           TXNO      IFEQ 'T1160242'
+ .   C                     Z-ADD0         W#TEST  10
+ .   C                     ENDIF
+TEST C           TXNO      IFEQ 'T1176166'
+ .   C                     Z-ADD0         W#TEST  10
+ .   C                     ENDIF
+     C                     MOVE TXNO      ARWTNO           磅單編號
+     C                     Z-ADDTXITEM    ARWTIT
+     C           K#036F    CHAINRARR036F             40
+     C                     MOVE TXCUNO    ARCUNO           客戶編號
+     C                     MOVE TXCUNM    ARCUNM           客戶名稱
+     C                     MOVELTXPCNO    ARORNO           訂單編號
+     C                     MOVE TXNO      ARWTNO           磅單編號
+     C                     Z-ADDTXITEM    ARWTIT
+     C                     Z-ADDTXDATE    ARDATE           出貨日期
+0409AC                     MOVELTXPDNM    ARPDNM           品名
+     C                     Z-ADDTXUPRC    ARUPRC           單價
+     C                     Z-ADDTXQTY     ARQTY            數量
+     C                     Z-ADDTXAMT     ARAMT            金額
+     C                     MOVE TXSALE    ARSALE
+     C   40                WRITERARR036F
+     C  N40                UPDATRARR036F
+     C                     ENDSR
+**  TABA1 TABA2
+T八德
+U桃園
+D大園
+X觀音
+R和佑鑫
+J友德
+N嘉山
+V保障
+H苗栗
+M台中
+K高雄
+Q東鋼營造
+ 全部
+

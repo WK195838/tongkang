@@ -1,0 +1,806 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP074R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     折讓退回代開
+     H*            5.DATE-WRITTEN  90/01/03
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FACTRAN  O   E                    DISK
+     FARP074T O   E             69     PRINTER
+9104 FARP074F O   E           K        DISK
+     E                    ARY     1   6 14
+9002 E                    ARY2       30 29
+9002 E                    ARY3       30 29
+9002 E                    ARY5       30 29
+9002 E                    ARY6       30 29
+     I*****************************************************************
+     ITXREC
+     I                                              TXNO  L2
+     I                                              TXPDNML1
+     I*------------------------------------------------------
+TEST I            DS
+ .   I                                        1  10 TXIVNO
+ .   I                                        3  10 D#IVNO
+     I            DS
+     I                                        1   5 T#NO
+     I                                        1   1 D#TNO1
+9002 I            DS
+  .  I                                        1  29 D#ARY
+  .  I                                        1   3 D#PDN1
+  .  I                                        4  110D#QTY1
+  .  I                                       12  210D#AMT1
+  .  I                                       22  290D#TAX1
+     I            DS
+     I                                        1   6 D#VRNO
+     I                                        1   1 D#VRN1
+     I                                        2   60D#VRN2
+     I            DS
+     I                                        1   3 D#DSC
+     I                                        1   1 D#DSC1
+     I                                        2   2 D#DSC2
+     I            DS
+     I                                        1   6 D#NO
+     I                                        1   1 D#NO1
+     I                                        2   2 D#NO2
+     I                                        3   6 D#NO3
+     I           UDS
+     I                                        1   60U#YYMM
+     I                                        5   60U#MM
+     I                                        7   7 U#AREA
+     I                                     10011010 U#USID
+     C*****************************************************************
+     C*         KEY  LIST
+     C*****************************************************************
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C*初始傳票編號
+     C                     MOVE 'P'       D#VRN1
+     C                     Z-ADD600       D#VRN2
+     C                     Z-ADD0         W#VRIT  30
+     C                     MOVE *OFF      *IN98            項次燈號
+     C*
+     C                     EXSR DATSR                      傳票日期
+     C*
+     C                     Z-ADDD#YMD     R#DATE           入帳日期
+     C                     MOVE *ALL'-'   T#LINE
+     C                     MOVE *ON       *IN69
+     C                     MOVE *OFF      *IN71
+     C*
+9002 C                     MOVE *ALL'9'   ARY2
+9002 C                     MOVE *ALL'9'   ARY3
+9002 C                     MOVE *ALL'9'   ARY5
+9002 C                     MOVE *ALL'9'   ARY6
+9002 C                     MOVE *ALL'9'   W#ACN1  4
+     C*
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2清除函式換發票
+     C*********************************
+     CSR         L2CLR     BEGSR
+     C                     Z-ADD0         W#AMTC 120
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式換發票
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     Z-ADD0         W#AMTA 120
+     C                     Z-ADD0         W#AMTB 120
+     C                     Z-ADD0         W#QTY  120
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C           TXNO      IFEQ 'H01847'
+TEST C                     Z-ADD0         TEST    10
+ .   C                     ENDIF
+ .   C                     ADD  TXAMT     W#AMTA           總金額
+     C                     ADD  TXTAX     W#AMTB           總稅額
+     C                     ADD  TXQTY     W#QTY
+     CSR         ESDTL     ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  寫入傳票
+     C*********************************
+     CSR         L1SR      BEGSR
+     C*寫入傳票檔
+     C           TXIVNO    CHAININREC                40
+     C  N40      INAREA    IFEQ U#AREA
+9110 C           INTYPE    ANDNE'9'                        排除其他纇
+     C                     MOVELTXCUNO    D#CUNO  1
+     C  N98                ADD  1         D#VRN2
+     C  N98                MOVE *ON       *IN98            項次燈號
+     C                     ADD  W#AMTA    W#AMTC           總金額
+     C                     ADD  W#AMTB    W#AMTC           總金額
+     C*
+     C                     EXSR SR1100                     寫入借方
+     C                     EXSR WTRSR                      報表
+     C*
+9002 C                     EXSR SR2000                     寫入陣列
+     C*
+     C                     EXSR SR1200                     寫入借方
+     C                     EXSR WTRSR                      報表
+     C*
+9002 C                     EXSR SR2000                     寫入陣列
+     C*
+     C                     ENDIF
+     CSR                   ENDSR
+     C*********************************
+     C*  L2 函式  寫入傳票
+     C*********************************
+     CSR         L2SR      BEGSR
+     C*
+     C           INAREA    IFEQ U#AREA
+     C                     EXSR SR1300                     寫入貸方
+     C                     EXSR WTRSR                      報表
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  LR 函式 （印出合計）
+     C*********************************
+     CSR         LRSR      BEGSR
+     C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074T2
+     C*
+9002 C                     EXSR SR2100                     印出陣列值
+     C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074TX
+     C*
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074TM
+     C*
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  子函式集
+     C*********************************
+     C*寫入借方
+     CSR         SR1100    BEGSR
+     C*
+     C                     CLEARRACVOUR
+     C                     ADD  1         W#VRIT
+     C                     MOVE U#AREA    ACDM03            ACDM03
+     C                     MOVE U#AREA    ACCARD           廠別
+     C                     MOVE 'A'       ACKIND           類別
+     C                     MOVE U#AREA    ACAREA           開立廠區
+     C                     Z-ADDU#YYMM    ACYM             年月
+     C                     Z-ADDD#YMD     ACYMD            入帳日期
+     C                     MOVELD#VRNO    ACVRNO           傳票號碼
+     C                     Z-ADDW#VRIT    ACITEM           項目
+     C                     MOVEL'D'       ACDC             借貸
+     C*
+     C           TXACNT    IFEQ '2'                        退貨
+     C           D#CUNO    IFEQ 'E'
+     C                     MOVEL'4115'    ACNO             會計科目
+     C                     ELSE
+     C                     MOVEL'4112'    ACNO             會計科目
+     C                     ENDIF
+     C                     ELSE                            銷折
+     C           D#CUNO    IFEQ 'E'
+     C                     MOVEL'4116'    ACNO             會計科目
+     C                     ELSE
+     C                     MOVEL'4113'    ACNO             會計科目
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVEL'L'       ACTYCO           方式要件
+     C                     MOVELTXORNO    ACRLNO           相關號碼
+     C                     MOVELTXCUNM    ACCSNM           客戶簡稱
+     C*
+     C                     SELEC
+     C           U#AREA    WHEQ 'K'
+     C                     MOVEL'K210'    ACDPNO           部門代號
+     C           U#AREA    WHEQ 'H'
+     C                     MOVEL'H800'    ACDPNO           部門代號
+     C                     ENDSL
+     C*
+     C           W#AMTA    IFLT 0
+     C                     Z-ADD99        ACCORT           更正代號
+     C                     Z-SUBW#AMTA    ACAMT            金額
+     C                     ELSE
+     C                     Z-ADD0         ACCORT
+     C                     Z-ADDW#AMTA    ACAMT            金額
+     C                     ENDIF
+     C*
+     C                     MOVELTXPDNM    ACDSC1           輔助摘要
+     C                     MOVE *ALL'0'   ACDSC2
+     C                     MOVE W#QTY     ACDSC2           數量
+     C                     MOVEL'A'       ACSEPT
+     C                     MOVELTXNO      ACDM04           折讓單號
+     C*
+     C                     MOVELU#USID    ACENTM           建檔人員
+     C                     MOVE UDATE     ACENTD           建檔日期
+     C                     TIME           ACENTT           建檔時間
+     C                     MOVELU#USID    ACUPDM           異動人員
+     C                     MOVE UDATE     ACUPDD           異動日期
+     C                     TIME           ACUPDT           異動時間
+     C*
+     C                     WRITERACVOUR
+     C*陣列用
+     C                     MOVELACNO      W#ACNO  4        會計科目
+     C                     MOVE TXPDNM    W#PDN1  3        品名
+     C                     MOVE '1'       W#TYPE  1        金額
+     C*
+     CSR                   ENDSR
+     C*寫入貸方
+     CSR         SR1200    BEGSR
+     C*
+     C                     CLEARRACVOUR
+     C                     ADD  1         W#VRIT
+     C                     MOVE U#AREA    ACDM03            ACDM03
+     C                     MOVE U#AREA    ACCARD           廠別
+     C                     MOVE 'A'       ACKIND           類別
+     C                     MOVE U#AREA    ACAREA           開立廠區
+     C                     Z-ADDU#YYMM    ACYM             年月
+     C                     Z-ADDD#YMD     ACYMD            入帳日期
+     C                     MOVE D#VRNO    ACVRNO           傳票號碼
+     C                     Z-ADDW#VRIT    ACITEM           項目
+     C                     MOVE 'D'       ACDC             借貸
+     C                     MOVEL'2127'    ACNO             會計科目
+     C                     MOVEL'A'       ACTYCO           方式要件
+     C*                    MOVELTXORNO    ACRLNO           相關號碼
+     C*                    MOVE TXCUNM    ACCSNM           客戶簡稱
+     C*
+     C           W#AMTB    IFLT 0
+     C                     Z-ADD99        ACCORT           更正代號
+     C                     Z-SUBW#AMTB    ACAMT            稅額
+     C                     ELSE
+     C                     Z-ADD0         ACCORT
+     C                     Z-ADDW#AMTB    ACAMT            稅額
+     C                     ENDIF
+     C*
+     C                     MOVE 'A'       ACSEPT
+     C                     MOVELTXNO      ACDM04           折讓單號
+     C*
+     C                     MOVELU#USID    ACENTM           建檔人員
+     C                     MOVE UDATE     ACENTD           建檔日期
+     C                     TIME           ACENTT           建檔時間
+     C                     MOVELU#USID    ACUPDM           異動人員
+     C                     MOVE UDATE     ACUPDD           異動日期
+     C                     TIME           ACUPDT           異動時間
+     C*
+     C                     WRITERACVOUR
+     C*陣列用
+     C                     MOVE '2'       W#TYPE           稅額
+     CSR                   ENDSR
+     C*寫入貸方
+     CSR         SR1300    BEGSR
+     C*
+     C                     CLEARRACVOUR
+     C  N98                ADD  1         D#VRN2
+     C  N98                MOVE *ON       *IN98            項次燈號
+     C   98                ADD  1         W#VRIT
+     C                     MOVE U#AREA    ACDM03            ACDM03
+     C                     MOVE U#AREA    ACCARD           廠別
+     C                     MOVE 'A'       ACKIND           類別
+     C                     MOVE U#AREA    ACAREA           開立廠區
+     C                     Z-ADDU#YYMM    ACYM             年月
+     C                     Z-ADDD#YMD     ACYMD            入帳日期
+     C                     MOVE D#VRNO    ACVRNO           傳票號碼
+     C                     Z-ADDW#VRIT    ACITEM           項目
+     C                     MOVE 'C'       ACDC             借貸
+     C                     MOVEL'2129'    ACNO             會計科目
+     C                     MOVEL'E'       ACTYCO           方式要件
+     C*
+     C*                    MOVELTXORNO    ACRLNO           相關號碼
+     C                     MOVELTXCUNM    ACCSNM           客戶簡稱
+     C*
+     C           W#AMTC    IFLT 0
+     C                     Z-ADD99        ACCORT           更正代號
+     C                     Z-SUBW#AMTC    ACAMT            金額
+     C                     ELSE
+     C                     Z-ADD0         ACCORT
+     C                     Z-ADDW#AMTC    ACAMT            金額
+     C                     ENDIF
+     C*
+     C                     MOVEL'A'       ACSEPT
+     C                     MOVELTXNO      ACDM04           發票號碼
+     C*
+     C                     MOVELU#USID    ACENTM           建檔人員
+     C                     MOVE UDATE     ACENTD           建檔日期
+     C                     TIME           ACENTT           建檔時間
+     C                     MOVELU#USID    ACUPDM           異動人員
+     C                     MOVE UDATE     ACUPDD           異動日期
+     C                     TIME           ACUPDT           異動時間
+     C*
+     C                     WRITERACVOUR
+     C*
+     C           W#VRIT    IFGT 83
+     C                     MOVE *OFF      *IN98
+     C                     Z-ADD0         W#VRIT
+     C                     ENDIF
+     CSR                   ENDSR
+9002 C*寫入陣列START------------------
+     CSR         SR2000    BEGSR
+     C                     SORTAARY2
+     C                     SORTAARY3
+     C                     SORTAARY5
+     C                     SORTAARY6
+     C*
+ 9205C           1         DO   30        I       20
+     C                     SELEC
+     C           W#ACNO    WHEQ '4112'
+     C                     MOVE ARY2,I    D#ARY
+     C           W#ACNO    WHEQ '4113'
+     C                     MOVE ARY3,I    D#ARY
+     C           W#ACNO    WHEQ '4115'
+     C                     MOVE ARY5,I    D#ARY
+     C           W#ACNO    WHEQ '4116'
+     C                     MOVE ARY6,I    D#ARY
+     C                     ENDSL
+     C*
+     C           D#PDN1    IFEQ '999'                       INI
+     C                     MOVE W#PDN1    D#PDN1           品名
+     C                     Z-ADDW#QTY     D#QTY1           數量
+     C                     Z-ADDACAMT     D#AMT1           金額
+     C                     MOVE *ON       *IN90
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           W#PDN1    IFEQ D#PDN1
+     C           W#TYPE    IFEQ '1'                        金額
+     C                     ADD  W#QTY     D#QTY1           數量
+     C                     ADD  ACAMT     D#AMT1           金額
+     C                     ELSE
+     C   90                Z-ADDACAMT     D#TAX1           稅額
+     C  N90                ADD  ACAMT     D#TAX1           稅額
+     C                     MOVE *OFF      *IN90
+     C                     ENDIF
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     SELEC
+     C           W#ACNO    WHEQ '4112'
+     C                     MOVE D#ARY     ARY2,I
+     C           W#ACNO    WHEQ '4113'
+     C                     MOVE D#ARY     ARY3,I
+     C           W#ACNO    WHEQ '4115'
+     C                     MOVE D#ARY     ARY5,I
+     C           W#ACNO    WHEQ '4116'
+     C                     MOVE D#ARY     ARY6,I
+     C                     ENDSL
+     C*
+     CSR                   ENDSR
+9002 C*寫入陣列END  ------------------
+9002 C*印出陣列START------------------
+     CSR         SR2100    BEGSR
+     C                     SORTAARY2
+     C*
+     C                     MOVE '4112'    W#ACNO
+     C                     MOVE ARY,1     T#NO2
+     C*
+ 9205C           1         DO   30        I       20
+     C                     MOVE ARY2,I    D#ARY
+     C*
+     C           D#PDN1    IFEQ '999'                       INI
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           W#ACNO    IFNE W#ACN1
+     C                     MOVE W#ACNO    T#NO1
+     C                     MOVE W#ACNO    W#ACN1
+     C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074T3
+     C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074T4
+     C                     ENDIF
+     C*
+     C                     MOVE D#PDN1    T#PDN1
+     C                     Z-ADDD#QTY1    T#QTY1
+     C                     Z-ADDD#AMT1    T#AMT1
+     C                     Z-ADDD#TAX1    T#TAX1
+9004 C*計算合計
+ .   C                     ADD  T#QTY1    T#QTY2
+ .   C                     ADD  T#AMT1    T#AMT2
+ .   C                     ADD  T#TAX1    T#TAX2
+     C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074T5
+     C                     ENDIF
+     C*
+     C                     ENDDO
+9004 C*印出ARY2合計
+ .   C           T#AMT2    IFNE 0
+ .   C   69                WRITEAR074TH
+ .   C                     MOVE *OFF      *IN69
+ .   C                     WRITEAR074T6
+ .   C                     Z-ADD0         T#QTY2
+ .   C                     Z-ADD0         T#AMT2
+ .   C                     Z-ADD0         T#TAX2
+ .   C                     ENDIF
+     C*
+     C                     SORTAARY3
+     C*
+     C                     MOVE '4113'    W#ACNO
+     C                     MOVE ARY,5     T#NO2
+     C*
+ 9205C           1         DO   30        I       20
+     C                     MOVE ARY3,I    D#ARY
+     C*
+     C           D#PDN1    IFEQ '999'                       INI
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           W#ACNO    IFNE W#ACN1
+     C                     MOVE W#ACNO    T#NO1
+     C                     MOVE W#ACNO    W#ACN1
+     C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074T3
+     C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074T4
+     C                     ENDIF
+     C*
+     C                     MOVE D#PDN1    T#PDN1
+     C                     Z-ADDD#QTY1    T#QTY1
+     C                     Z-ADDD#AMT1    T#AMT1
+     C                     Z-ADDD#TAX1    T#TAX1
+     C*
+9004 C                     ADD  T#QTY1    T#QTY2
+ .   C                     ADD  T#AMT1    T#AMT2
+ .   C                     ADD  T#TAX1    T#TAX2
+ .   C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074T5
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*印出ARY3合計
+9004 C           T#AMT2    IFNE 0
+ .   C   69                WRITEAR074TH
+ .   C                     MOVE *OFF      *IN69
+ .   C                     WRITEAR074T6
+ .   C                     Z-ADD0         T#QTY2
+ .   C                     Z-ADD0         T#AMT2
+ .   C                     Z-ADD0         T#TAX2
+ .   C                     ENDIF
+     C*
+     C                     SORTAARY5
+     C*
+     C                     MOVE '4115'    W#ACNO
+     C                     MOVE ARY,2     T#NO2
+     C*
+ 9205C           1         DO   30        I       20
+     C                     MOVE ARY5,I    D#ARY
+     C*
+     C           D#PDN1    IFEQ '999'                       INI
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           W#ACNO    IFNE W#ACN1
+     C                     MOVE W#ACNO    T#NO1
+     C                     MOVE W#ACNO    W#ACN1
+     C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074T3
+     C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074T4
+     C                     ENDIF
+     C*
+     C                     MOVE D#PDN1    T#PDN1
+     C                     Z-ADDD#QTY1    T#QTY1
+     C                     Z-ADDD#AMT1    T#AMT1
+     C                     Z-ADDD#TAX1    T#TAX1
+     C*
+9004 C                     ADD  T#QTY1    T#QTY2
+ .   C                     ADD  T#AMT1    T#AMT2
+ .   C                     ADD  T#TAX1    T#TAX2
+     C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074T5
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*印出ARY5合計
+9004 C           T#AMT2    IFNE 0
+ .   C   69                WRITEAR074TH
+ .   C                     MOVE *OFF      *IN69
+ .   C                     WRITEAR074T6
+ .   C                     Z-ADD0         T#QTY2
+ .   C                     Z-ADD0         T#AMT2
+ .   C                     Z-ADD0         T#TAX2
+ .   C                     ENDIF
+     C*
+     C                     SORTAARY6
+     C*
+     C                     MOVE '4116'    W#ACNO
+     C                     MOVE ARY,6     T#NO2
+     C*
+ 9205C           1         DO   30        I       20
+     C                     MOVE ARY6,I    D#ARY
+     C*
+     C           D#PDN1    IFEQ '999'                       INI
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           W#ACNO    IFNE W#ACN1
+     C                     MOVE W#ACNO    T#NO1
+     C                     MOVE W#ACNO    W#ACN1
+     C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074T3
+     C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074T4
+     C                     ENDIF
+     C*
+     C                     MOVE D#PDN1    T#PDN1
+     C                     Z-ADDD#QTY1    T#QTY1
+     C                     Z-ADDD#AMT1    T#AMT1
+     C                     Z-ADDD#TAX1    T#TAX1
+     C*
+9004 C                     ADD  T#QTY1    T#QTY2
+ .   C                     ADD  T#AMT1    T#AMT2
+ .   C                     ADD  T#TAX1    T#TAX2
+ .   C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074T5
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*印出ARY6合計
+9004 C           T#AMT2    IFNE 0
+ .   C   69                WRITEAR074TH
+ .   C                     MOVE *OFF      *IN69
+ .   C                     WRITEAR074T6
+ .   C                     Z-ADD0         T#QTY2
+ .   C                     Z-ADD0         T#AMT2
+ .   C                     Z-ADD0         T#TAX2
+ .   C                     ENDIF
+     C*
+     CSR                   ENDSR
+9002 C*寫入陣列END  ------------------
+     C*取得該月之最後一日
+     CSR         DATSR     BEGSR
+     C           U#YYMM    MULT 100       D#YMD   80
+     C                     ADD  1         D#YMD
+     C*
+     C                     MOVE D#YMD     P#PDAT  8        第一天
+     C                     MOVE '1'       P#MODE  1        中元年
+     C                     MOVE *BLANK    P#MT1   2
+     C                     MOVE *BLANK    P#MT2   2
+     C                     MOVE *BLANK    P#MT3   2
+     C                     MOVE *BLANK    P#MT4   2
+     C                     MOVE *BLANK    P#MT5   2
+     C                     MOVE *BLANK    P#MT6   2
+     C                     MOVE *BLANK    P#MT7   2
+     C                     MOVE *BLANK    P#MT8   2
+     C                     MOVE *BLANK    P#MT9   2
+     C                     MOVE *BLANK    P#MT10  2
+     C                     MOVE *BLANK    P#MT11  2
+     C                     MOVE *BLANK    P#MT12  2
+     C                     MOVE *BLANK    P#LEAP  1        閏年碼
+     C                     MOVE '0'       P#ERR   1        錯誤碼
+     C                     CALL 'UTS101R'
+     C                     PARM           P#PDAT
+     C                     PARM           P#MODE
+     C                     PARM           P#MT1
+     C                     PARM           P#MT2
+     C                     PARM           P#MT3
+     C                     PARM           P#MT4
+     C                     PARM           P#MT5
+     C                     PARM           P#MT6
+     C                     PARM           P#MT7
+     C                     PARM           P#MT8
+     C                     PARM           P#MT9
+     C                     PARM           P#MT10
+     C                     PARM           P#MT11
+     C                     PARM           P#MT12
+     C                     PARM           P#LEAP
+     C                     PARM           P#ERR
+     C*
+     C                     SUB  1         D#YMD
+     C                     SELEC
+     C           U#MM      WHEQ 1
+     C                     MOVE P#MT1     D#MT    20
+     C                     ADD  D#MT      D#YMD
+     C           U#MM      WHEQ 2
+     C                     MOVE P#MT2     D#MT
+     C                     ADD  D#MT      D#YMD
+     C           U#MM      WHEQ 3
+     C                     MOVE P#MT3     D#MT
+     C                     ADD  D#MT      D#YMD
+     C           U#MM      WHEQ 4
+     C                     MOVE P#MT4     D#MT
+     C                     ADD  D#MT      D#YMD
+     C           U#MM      WHEQ 5
+     C                     MOVE P#MT5     D#MT
+     C                     ADD  D#MT      D#YMD
+     C           U#MM      WHEQ 6
+     C                     MOVE P#MT6     D#MT
+     C                     ADD  D#MT      D#YMD
+     C           U#MM      WHEQ 7
+     C                     MOVE P#MT7     D#MT
+     C                     ADD  D#MT      D#YMD
+     C           U#MM      WHEQ 8
+     C                     MOVE P#MT8     D#MT
+     C                     ADD  D#MT      D#YMD
+     C           U#MM      WHEQ 9
+     C                     MOVE P#MT9     D#MT
+     C                     ADD  D#MT      D#YMD
+     C           U#MM      WHEQ 10
+     C                     MOVE P#MT10    D#MT
+     C                     ADD  D#MT      D#YMD
+     C           U#MM      WHEQ 11
+     C                     MOVE P#MT11    D#MT
+     C                     ADD  D#MT      D#YMD
+     C           U#MM      WHEQ 12
+     C                     MOVE P#MT12    D#MT
+     C                     ADD  D#MT      D#YMD
+     C                     ENDSL
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         WTRSR     BEGSR
+     C                     CLEARAR074T1
+     C*
+     C                     MOVELACDM04    T#TXNO           發票號碼
+     C                     MOVELACRLNO    T#ORNO           訂單號碼
+     C                     MOVELACCSNM    T#CUNM           客戶簡稱
+     C                     MOVELACDC      T#DC             借貸別
+     C                     MOVELACNO      T#NO             會計科目
+     C*
+     C                     SELEC
+     C           T#NO      WHEQ '4112'
+     C                     MOVELARY,1     T#NONM           科目名稱
+     C           T#NO      WHEQ '4115'
+     C                     MOVELARY,2     T#NONM
+     C           T#NO      WHEQ '2127'
+     C                     MOVELARY,3     T#NONM
+     C           T#NO      WHEQ '2129'
+     C                     MOVELARY,4     T#NONM
+     C           T#NO      WHEQ '4113'
+     C                     MOVELARY,5     T#NONM
+     C           T#NO      WHEQ '4116'
+     C                     MOVELARY,6     T#NONM
+     C                     ENDSL
+     C           T#NO      IFEQ '4112'
+     C           T#NO      OREQ '4115'
+     C                     Z-ADDW#QTY     T#QTY
+     C                     ADD  W#QTY     T#QTYT
+     C                     ELSE
+     C                     Z-ADD0         T#QTY
+     C                     ENDIF
+     C*
+     C                     MOVELACTYCO    T#TYCO           方式要件
+     C*                    MOVELTXPDNM    T#DSC2           類別
+9005 C                     MOVELACDSC1    T#DSC2
+     C                     MOVELT#DSC2    D#DSC
+     C*
+     C                     SELEC
+     C           D#DSC1    WHEQ '3'
+     C                     MOVEL'H型鋼' T#DSCN           類別名稱
+     C           D#DSC1    WHEQ '4'
+     C                     MOVEL'鋼　板'T#DSCN
+     C                     ENDSL
+     C*
+     C                     MOVE ACCORT    T#CORT           更正代號
+     C*
+     C*          T#DC      IFEQ 'D'                        借方
+     C* N71                Z-ADDACAMT     T#DAMT
+     C*  71                Z-ADDACAMT     T#CAMT
+     C*                    ELSE
+     C* N71                Z-ADDACAMT     T#CAMT
+     C*  71                Z-ADDACAMT     T#DAMT
+     C*                    ENDIF
+     C           T#DC      IFEQ 'D'                        借方
+     C                     Z-ADDACAMT     T#DAMT
+     C                     ELSE
+     C                     Z-ADDACAMT     T#CAMT
+     C                     ENDIF
+     C*
+ .   C                     MOVE ACDPNO    T#DPNO           部門
+     C                     MOVE ACVRNO    T#VRNO           傳票編號
+     C                     MOVE ACITEM    T#ITEM           項次
+     C*
+     C*合計
+     C           ACDC      IFEQ 'D'
+     C           ACCORT    IFEQ 0
+     C                     ADD  ACAMT     T#CNTD
+     C                     ELSE
+     C                     SUB  ACAMT     T#CNTD
+     C                     ENDIF
+     C                     ELSE
+     C           ACCORT    IFEQ 0
+     C                     ADD  ACAMT     T#CNTC
+     C                     ELSE
+     C                     SUB  ACAMT     T#CNTC
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ADD  1         T#RCNT
+     C*
+     C   69                WRITEAR074TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR074T1
+9104 C*
+ .   C                     EXSR WTSR                        DOWNLOAD
+ .   C*
+     CSR                   ENDSR
+9104 C*****************************************************************
+ .   C           WTSR      BEGSR
+ .   C*****************************************************************
+ .   C*存入ARP074F  FOR DOWNLOAD
+ .   C                     MOVE T#TXNO    ARTXNO           折讓單號
+ .   C                     MOVE T#ORNO    ARORNO           訂單號碼
+ .   C                     MOVELT#CUNM    ARCUNM           客戶名稱
+ .   C                     MOVE T#DC      ARDC             借貸別
+ .   C                     MOVE T#NO      ARNO             會計科目
+ .   C                     MOVE T#NONM    ARNONM           科目名稱
+ .   C                     MOVE T#TYCO    ARTYCO           方式要件
+ .   C                     MOVE T#DSC2    ARDSC2           類別
+ .   C                     MOVELT#DSCN    ARDSCN           類別名稱
+ .   C                     MOVE T#QTY     ARQTY            數量
+ .   C                     MOVE T#CORT    ARCORT           更正代號
+ .   C                     Z-ADDT#DAMT    ARDAMT           借方金額
+ .   C                     Z-ADDT#CAMT    ARCAMT           貸方金額
+ .   C                     MOVE T#DPNO    ARDPNO           部門
+ .   C                     MOVE T#VRNO    ARVRNO           傳票號碼
+ .   C                     MOVE T#ITEM    ARITEM           傳票項次
+ .   C                     WRITERARP074
+ .   CSR                   ENDSR
+**  ARY
+內銷銷貨退回
+外銷銷貨退回
+銷項稅額
+其他應付款
+內銷銷貨折讓
+外銷銷貨折讓
+

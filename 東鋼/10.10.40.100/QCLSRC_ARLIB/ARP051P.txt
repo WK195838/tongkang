@@ -1,0 +1,90 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP051P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     日期客戶別磅單差異分析表（地磅Ｖ應收） */
+     /*     5.DATE-WRITTEN  86/04/29                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&YMS)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&YME)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+             CLRPFM     FILE(ARLIB/ARP051FO)
+             CALL       PGM(ARP051RS) PARM(&IN03 &YMS &YME)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&YMS)
+             CHGDTAARA  DTAARA(*LDA (9 8)) VALUE(&YME)
+             SBMJOB     JOB(ARP051P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARP051P')
+             RETURN
+
+ BATCH:      RTVDTAARA  DTAARA(*LDA (1 8))      RTNVAR(&YMS)
+             RTVDTAARA  DTAARA(*LDA (9 8))      RTNVAR(&YME)
+             RTVDTAARA  DTAARA(*LDA (1021 1))   RTNVAR(&AREA)
+
+             CRTDUPOBJ  OBJ(ARP051FO) FROMLIB(ARLIB) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) DATA(*YES)
+             OVRDBF   FILE(ARP051FO) TOFILE(QTEMP/ARP051FO) SHARE(*YES)
+
+             CRTDUPOBJ  OBJ(ARP051F) FROMLIB(ARLIB) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP)
+             OVRDBF     FILE(ARP051F) TOFILE(QTEMP/ARP051F) SHARE(*YES)
+
+ STEP1:                 /* 計算地磅重 */
+             OVRDBF   FILE(WTMASPJ1) TOFILE(DALIB/WTMASPJ1) SHARE(*YES)
+             OPNQRYF  FILE(WTMASPJ1) +
+                        QRYSLT( +
+                           'W6FLAG *NE "D" *AND +
+                            W6AREA *EQ "' || &AREA || '" *AND +
+                            W6ENTD *GE ' || &YMS || ' *AND +
+                            W6ENTD *LE ' || &YME || ' *AND +
+                            W6TRCD *EQ %VALUES("11" "1E" "1F" "1G" +
+                                               "0A") *AND +
+                            W7SPLT *EQ %VALUES("W" "1" "2" "3" "4" +
+                                    "5" "6" "7" "8" "9" " ") ') +
+                   KEYFLD((W6CUNO) (W6ORNO) (W6AREA) (W6VNO1) (W6VNO2))
+             CALL       PGM(ARP051R1)
+             CLOF       OPNID(WTMASPJ1)
+
+ STEP2:                 /* 計算銷貨重（出貨） */
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        QRYSLT( +
+                           'TXDATE *GE ' || &YMS || ' *AND    +
+                            TXDATE *LE ' || &YME || ' *AND    +
+                            TXFLAG *NE "D" *AND    +
+                            TXCODE *EQ "SA04" *AND +
+                            %SST(TXNO 1 1) *EQ "' || &AREA || '"') +
+                        MAPFLD((TXRESV '%SST(TXORNO 1 6)')) +
+                        KEYFLD((TXCUNO) (TXRESV) (TXNO))
+
+             CALL       PGM(ARP051R2)
+             CLOF       OPNID(TRNDTL)
+
+ STEP3:                 /* 彙總數量 */
+             CALL       PGM(ARP051R3)
+
+ STEP4:                 /* 列印差異表 */
+             OPNQRYF    FILE(ARP051F) +
+                        KEYFLD((WDCUNO) (WDORNO))
+             OVRPRTF    FILE(ARP051T) TOFILE(ARLIB/ARP051T) +
+                        HOLD(*YES) USRDTA('磅單重差')
+             CALL       PGM(ARP051R4)
+
+             CLOF       OPNID(ARP051F)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

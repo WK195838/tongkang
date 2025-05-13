@@ -1,0 +1,84 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR120P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02CSF                                    */
+        /*        4.FUNCTION      型鋼資負同在查核明細表                   */
+        /*        5.DATE-WRITTEN   94/08/08                                  */
+        /*        6.DATE-MODIFY                                              */
+        /*                                                                   */
+        /*********************************************************************/
+             PGM
+             DCL      VAR(&TYPE)   TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#IN03) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#YYMM) TYPE(*CHAR) LEN(6)
+             DCL      VAR(&C#YYMM) TYPE(*CHAR) LEN(4)
+             DCL      VAR(&P#ACDT) TYPE(*CHAR) LEN(6)  /*入帳年月*/
+             DCL      VAR(&C#ACYY) TYPE(*CHAR) LEN(2)  /*入帳年*/
+             DCL      VAR(&C#ACMM) TYPE(*CHAR) LEN(2)  /*入帳月*/
+             DCL      VAR(&S#DEVN) TYPE(*CHAR) LEN(10)
+             DCL      VAR(&S#USER) TYPE(*CHAR) LEN(10)
+
+             RTVJOBA  JOB(&S#DEVN) USER(&S#USER) TYPE(&TYPE)
+             IF       COND(&TYPE *EQ '0') THEN(GOTO BATCH)
+
+             CALL     PGM(ARR120RS) PARM(&P#IN03)
+             IF       COND(&P#IN03 *EQ '1') THEN(RETURN)
+
+             SBMJOB     CMD(CALL PGM(ARR120P)) JOB(ARR120P) +
+                        JOBD(ARJOBD)
+             SNDBRKMSG  MSG('<<型鋼折讓資負同在查核明細表+
+                         已開始處理,請稍待.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             RETURN
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (300  6)) RTNVAR(&P#YYMM)
+             RTVDTAARA  DTAARA(*LDA (302  4)) RTNVAR(&C#YYMM)
+
+             CLRPFM     ARR120F
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE((TRNDTL)) QRYSLT(' +
+                        (RESV   *LE "' ||  &C#YYMM || '")     *AND +
+                        (TXCODE *EQ "AR06")                   *AND +
+                        (DAT1   *GE "940701")                 *AND +
+                        (ACD1   *EQ "999999")                 *AND +
+                        (TXFLAG *NE "D")                      *AND +
+                        (AREA   *EQ "H")')                         +
+                        MAPFLD((RESV  '%SST(TXRESV 1 4)' *CHAR 4)  +
+                               (AREA  '%SST(TXNO   1 1)' *CHAR 1)  +
+                               (ACDT   TXACDT            *CHAR 8)  +
+                               (ACD1  '%SST(ACDT   3 6)' *CHAR 6)  +
+                               (DATE   TXDATE            *CHAR 8)  +
+                               (DAT1  '%SST(DATE   3 6)' *CHAR 6)) +
+                        KEYFLD((TXCUNO) (TXORNO) (TXNO))
+             CALL       PGM(ARR120R1)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+/*抓取傳票資料*/
+             RTVDTAARA  DTAARA(*LDA (306  6)) RTNVAR(&P#ACDT)
+             RTVDTAARA  DTAARA(*LDA (308  2)) RTNVAR(&C#ACYY)
+             RTVDTAARA  DTAARA(*LDA (310  2)) RTNVAR(&C#ACMM)
+             CLRPFM     ARR120F1
+             CPYF       FROMFILE(DALIB/('ACVR' || &C#ACYY)) +
+                          TOFILE(ARLIB/ARR120F1) FROMMBR('VR' || +
+                          &C#ACMM) MBROPT(*REPLACE) INCREL((*IF +
+                          ACNO *EQ '4113')) FMTOPT(*MAP *DROP)
+             MONMSG     MSGID(CPF0000)
+
+             OVRPRTF    FILE(ARR120T) TOFILE(ARR120T) PAGESIZE(*N 198)  +
+                        CPI(15) HOLD(*YES)  USRDTA('型折資負')
+             OVRDBF     FILE(ARR120F1) TOFILE(ARR120F1)
+             OVRDBF     FILE(ARR120F) TOFILE(ARR120F) SHARE(*YES)
+             OPNQRYF    FILE((ARR120F))                     +
+                        KEYFLD((A1CUNO) (A1ORNO) (A1TXNO) (A1ITEM))
+             CALL       PGM(ARR120R)
+             CLOF       OPNID(ARR120F)
+             DLTOVR     FILE(*ALL)
+
+             SNDBRKMSG  MSG('<<型鋼折讓資負同在查核明細表+
+                        已處理完成,請列印.........>>') +
+                      TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             ENDPGM
+

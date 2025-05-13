@@ -1,0 +1,170 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP051R5
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     日期訂單別磅單重量差異分析（報表）
+     H*            5.DATE-WRITTEN  86/04/26
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARP051F IP  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FARP051T O   E             66     PRINTER
+     F*****************************************************************
+     E                    TAB1    1   5  1   TABR1   8
+     E*****************************************************************
+     IWDREC
+     I                                              WDCUNOL2
+     I                                              WDORNOL1
+     I*------------------------------------------------------
+     I           UDS
+     I                                        1   60R#YMS
+     I                                        7  120R#YME
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1   1 S1KIND
+     I                                        2   2 S1CUN1
+     I                                        3   5 S1CUN2
+     I                                        6  10 S1BK05
+     I                                        1   6 W#CUNO
+     I            DS
+     I                                        1   5 W#ORNO
+     I                                        1   1 W#S1AR
+     I                                        2   50W#S1OR
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1                   EXSR L1SR
+     CL2                   EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C           U#AREA    LOKUPTAB1      TABR1          69
+     C   69                MOVELTABR1     R#AREA
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2清除函式
+     C*********************************
+     CSR         L2CLR     BEGSR
+     C                     SETON                     66    首頁表頭
+     C*
+     C                     Z-ADD0         W#L2RN  60       列印筆數
+     C*
+     C                     Z-ADD0         R#TTWT
+     C                     Z-ADD0         R#TT04
+     C                     Z-ADD0         R#TTDF
+     C*
+     C                     MOVELWDCUNO    R#CUNO
+     C           WDCUNO    CHAINCBCUST               69
+     C           *IN69     IFEQ '0'
+     C                     MOVELCBCUNM    R#CUNM
+     C                     ELSE
+     C                     MOVEL*BLANK    R#CUNM
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     MOVEL'T'       W#ISOR  1        首筆訂單
+     C*
+     C                     Z-ADD0         W#L1RN  60       列印筆數
+     C*
+     C                     Z-ADD0         R#STWT
+     C                     Z-ADD0         R#ST04
+     C                     Z-ADD0         R#STDF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     CLEARAR051T1D
+     C*
+     C           *IN66     IFEQ '1'
+     C           W#ISOR    OREQ 'T'
+     C                     MOVEL'F'       W#ISOR
+     C                     MOVELWDORNO    R#ORNO           訂單號碼
+     C                     ENDIF
+     C*
+     C                     MOVELWDWTNO    R#WTNO           磅單號碼
+     C                     MOVELWDVNO1    R#VNO1           進出別
+     C                     MOVELWDGROP    R#GROP           產品大類
+     C                     MOVELWDTRCD    R#TRCD           異動碼
+     C                     Z-ADDWDPDWT    R#PDWT           地磅重
+     C                     Z-ADDWDSA04    R#SA04           銷貨重
+     C                     Z-ADDWDPADF    R#PADF           差異重
+     C*
+     C                     ADD  1         W#L1RN
+     C                     ADD  1         W#L2RN
+     C           *IN66     IFEQ '1'
+     C                     WRITEAR051T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C                     WRITEAR051T1D
+     C*
+     C                     ADD  R#PDWT    R#STWT           小計
+     C                     ADD  R#SA04    R#ST04
+     C                     ADD  R#PADF    R#STDF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  存檔
+     C*********************************
+     CSR         L1SR      BEGSR
+     C           W#L1RN    IFNE 0
+     C                     ADD  R#STWT    R#TTWT           合計
+     C                     ADD  R#ST04    R#TT04
+     C                     ADD  R#STDF    R#TTDF
+     C                     WRITEAR051T1S
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2 函式  存檔
+     C*********************************
+     CSR         L2SR      BEGSR
+     C           W#L2RN    IFNE 0
+     C                     WRITEAR051T1T
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  印核覆
+     C*********************************
+     CSR         LRSR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     WRITEAR051T1H
+     C                     WRITEAR051T1M
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  子函式集
+     C*********************************
+** TAB1
+K高雄廠
+T桃園廠
+H苗栗廠
+M台中廠
+P台北
+

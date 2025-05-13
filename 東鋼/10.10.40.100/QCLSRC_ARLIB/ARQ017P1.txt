@@ -1,0 +1,38 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARQ017P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02CSF                                    */
+        /*        4.FUNCTION      發票別出貨明細查詢─ＦＯＲ型鋼           */
+        /*        5.DATE-WRITTEN   93/08/19                                  */
+        /*        6.DATE-MODIFY                                              */
+        /*                                                                   */
+        /*********************************************************************/
+             PGM
+             DCL      VAR(&TYPE)   TYPE(*CHAR) LEN(1)
+             DCL      VAR(&S#DEVN) TYPE(*CHAR) LEN(10)
+             DCL      VAR(&S#USER) TYPE(*CHAR) LEN(10)
+
+             RTVJOBA  JOB(&S#DEVN) USER(&S#USER) TYPE(&TYPE)
+             IF       COND(&TYPE *EQ '0') THEN(GOTO BATCH)
+
+             SBMJOB     CMD(CALL PGM(ARQ017P1)) JOB(ARQ017P1) +
+                        JOBD(ARJOBD)
+             RETURN
+ BATCH:
+
+             OVRPRTF    FILE(ARQ017T) TOFILE(ARQ017T) PAGESIZE(*N 198)  +
+                        CPI(15) HOLD(*YES)  USRDTA('出貨明細')
+             OVRDBF     FILE(ARQ017F) TOFILE(ARQ017F) SHARE(*YES)
+             OPNQRYF    FILE((ARQ017F)) +
+                        KEYFLD((A7INNO) (A7PDNM) (A7VRNO))
+             CALL       PGM(ARQ017R2)
+             CLOF       OPNID(ARQ017F)
+             DLTOVR     FILE(*ALL)
+
+             SNDBRKMSG  MSG('<<發票別出貨明細表已處理完成+
+                         ,請列印.........>>') +
+                        TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             ENDPGM
+

@@ -1,0 +1,42 @@
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DATE1)  TYPE(*DEC)  LEN(8)
+             DCL        VAR(&DATE1A) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATE2)  TYPE(*DEC)  LEN(8)
+             DCL        VAR(&DATE2A) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&TXAR)   TYPE(*CHAR) LEN(1)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARR042RS) PARM(&IN03 &DATE1 &DATE2)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&DATE1A) VALUE(&DATE1)
+             CHGVAR     VAR(&DATE2A) VALUE(&DATE2)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&DATE1A)
+             CHGDTAARA  DTAARA(*LDA (9 8)) VALUE(&DATE2A)
+             SBMJOB     JOB(ARR042P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR042P')
+             RETURN
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (1 8))    RTNVAR(&DATE1A)
+             RTVDTAARA  DTAARA(*LDA (9 8))    RTNVAR(&DATE2A)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&TXAR)
+             CHGVAR     VAR(&DATE1) VALUE(&DATE1A)
+             CHGVAR     VAR(&DATE2) VALUE(&DATE2A)
+             OVRDBF     FILE(INVDTL) TOFILE(INVDTL) SHARE(*YES)
+             OPNQRYF    FILE((INVDTL)) QRYSLT('                +
+                          IVACDT = %RANGE(' || &DATE1A || '    +
+                                          ' || &DATE2A || ') & +
+                          IVACNT *EQ "6"                     & +
+                          IVFLAG *NE "D"                     & +
+                          IVDECD *EQ " "                     & +
+                          %SST(IVAPNO 1 1) *EQ "' || &TXAR || '"  & +
+                          %SST(IVAPNO 6 1) *NE " " ')  +
+                          KEYFLD((IVAPNO)(IVORNO))
+             OVRPRTF    FILE(QPRINT) COPIES(2)
+             CALL       PGM(ARR042R) PARM(&DATE1 &DATE2)
+             CLOF       OPNID(INVDTL)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

@@ -1,0 +1,544 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARP090R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     現金流入預估處理(含人工調整)
+     H*            5.DATE-WRITTEN  91/03/08
+     H*            6.UPDATE
+     H*                            99/08/31  2010AR517 S00WCJ (9908A)
+     H*****************************************************************
+     H        1   Y                                     1
+     FARP090S CF  E                    WORKSTN
+     F                                        RRN2  KSFILE AR090F2
+     F                                        RRN3  KSFILE AR090F3
+     FARP090F UF  E           K        DISK
+     FARP090X UF  E           K        DISK
+     E                    ERR     1   4 70               *錯誤訊息
+     E                    MSG     1   2 10               *螢幕模式
+     I            DS
+     I                                        1   6 D#DATE
+     I                                        1   4 D#YYMM
+     I                                        5   6 D#DD
+     I           UDS
+     I                                      301 301 D#SLC1
+     I                                      302 309 D#SDAT
+     I                                      310 317 D#EDAT
+     I                                      318 318 D#FLAG
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVI
+     C****************************************************************
+     C*      MAIN           PROGRAM
+     C****************************************************************
+9908AC           *DATE     SUB  19000000  U#SYSD  80
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000            READC
+     C           W#PRID    CASEQ'03'      SR3000           畫面二
+     C           W#PRID    CASEQ'04'      SR4000            READC
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C                     MOVE *BLANK    D#FLAG
+     C                     MOVE '01'      W#PRID  2
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVE *ALL'-'   S#LIN3
+     C*設定畫面一的預設值
+     C*預估流入起日
+9908AC                     MOVE U#SYSD    P#PDAT
+     C                     MOVE '2'       P#MODE
+     C                     MOVE '2'       P#OMOD
+     C                     CALL 'UTS104R'
+     C                     PARM           P#PDAT  8        起始日
+     C                     PARM           P#MODE  1        民國年
+     C                     PARM           P#OMOD  1        向後
+     C                     PARM '0001'    P#DAYS  4        天數
+     C                     PARM           P#RDAT  8        回傳日期
+     C                     PARM           P#ERR   1        錯誤碼
+     C           P#ERR     IFEQ '0'
+     C                     MOVE P#RDAT    S#DATS           預估起日
+     C                     ENDIF
+     C*預估流入止日
+     C                     MOVE S#DATS    P#PDAT
+     C                     MOVE '2'       P#MODE
+     C                     MOVE '2'       P#OMOD
+     C                     CALL 'UTS104R'
+     C                     PARM           P#PDAT           起始日
+     C                     PARM           P#MODE           民國年
+     C                     PARM           P#OMOD           向後
+     C                     PARM '0030'    P#DAYS           天數
+     C                     PARM           P#RDAT           回傳日期
+     C                     PARM           P#ERR            錯誤碼
+     C           P#ERR     IFEQ '0'
+     C                     MOVE P#RDAT    S#DATE           預估止日
+     C                     ENDIF
+     C*調整參考值
+     C                     MOVE '1'       S#SLC1           客戶別
+     C*調整參考終止年月
+9908AC                     MOVE U#SYSD    D#DATE
+     C                     MOVE '01'      D#DD
+     C                     MOVE D#DATE    P#PDAT
+     C                     MOVE '1'       P#MODE
+     C                     MOVE '1'       P#OMOD
+     C                     CALL 'UTS104R'
+     C                     PARM           P#PDAT           起始日
+     C                     PARM           P#MODE           民國年
+     C                     PARM           P#OMOD           向前
+     C                     PARM '0001'    P#DAYS           天數
+     C                     PARM           P#RDAT           回傳日期
+     C                     PARM           P#ERR            錯誤碼
+     C           P#ERR     IFEQ '0'
+     C                     MOVE P#RDAT    D#DATE
+     C                     MOVE D#YYMM    S#YME            參考終止
+     C                     ENDIF
+     C*調整參考起始年月
+     C                     MOVE D#DATE    P#PDAT
+     C                     MOVE '1'       P#MODE
+     C                     MOVE '1'       P#OMOD
+     C                     CALL 'UTS104R'
+     C                     PARM           P#PDAT           起始日
+     C                     PARM           P#MODE           民國年
+     C                     PARM           P#OMOD           向前
+     C                     PARM '0070'    P#DAYS           天數
+     C                     PARM           P#RDAT           回傳日期
+     C                     PARM           P#ERR            錯誤碼
+     C           P#ERR     IFEQ '0'
+     C                     MOVE P#RDAT    D#DATE
+     C                     MOVE D#YYMM    S#YMS            參考起始
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->ARP090S-1  畫面
+     C*
+     C           W#PRID    DOWEQ'01'
+     C                     WRITEAR090F1M
+     C                     EXFMTAR090F1
+     C                     MOVE *BLANK    S#ERR1
+     C                     SETOF                     303199
+     C*IN03  IN12
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     EXSR SR1100                     檢核
+     C   99                ITER
+     C*
+     C                     MOVELERR,3     S#ERR1
+     C                     WRITEAR090F1M
+     C*準備歷史資料
+     C                     MOVE S#YMS     P#YMS   4
+     C                     MOVE S#YME     P#YME   4
+     C                     CALL 'ARP090P1'                 呼叫副程式
+     C                     PARM           P#YMS
+     C                     PARM           P#YME
+     C*產生調整數
+     C                     CALL 'ARP090P2'                 呼叫副程式
+     C                     PARM           S#PROD           產品別
+     C                     PARM           S#SLC1           調整別
+     C*產生兌現明細
+     C                     MOVE S#DATS    P#DATS  6
+     C                     MOVE S#DATE    P#DATE  6
+     C                     CALL 'ARP090P3'                 呼叫副程式
+     C                     PARM           P#DATS           預估起日
+     C                     PARM           P#DATE           預估止日
+     C*
+     C                     MOVE '02'      W#PRID
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*檢核畫面一資料
+     C*預估流入起日
+     C                     MOVE S#DATS    W#DATE  80
+     C                     MOVE W#DATE    P#PDAT
+     C                     MOVE '2'       P#MODE
+     C                     MOVE '2'       P#OMOD
+     C                     CALL 'UTS104R'
+     C                     PARM           P#PDAT  8        起始日
+     C                     PARM           P#MODE  1        民國年
+     C                     PARM           P#OMOD  1        向後
+     C                     PARM '0000'    P#DAYS  4        天數
+     C                     PARM           P#RDAT  8        回傳日期
+     C                     PARM           P#ERR   1        錯誤碼
+     C           P#ERR     IFNE '0'
+     C                     MOVELERR,1     S#ERR1           預估起日
+     C                     SETON                     3099
+     C                     ENDIF
+     C*預估流入止日
+     C                     MOVE S#DATE    W#DATE  80
+     C                     MOVE W#DATE    P#PDAT
+     C                     MOVE '2'       P#MODE
+     C                     MOVE '2'       P#OMOD
+     C                     CALL 'UTS104R'
+     C                     PARM           P#PDAT  8        起始日
+     C                     PARM           P#MODE  1        民國年
+     C                     PARM           P#OMOD  1        向後
+     C                     PARM '0000'    P#DAYS  4        天數
+     C                     PARM           P#RDAT  8        回傳日期
+     C                     PARM           P#ERR   1        錯誤碼
+     C  N99      P#ERR     IFNE '0'
+     C                     MOVELERR,1     S#ERR1           預估起日
+     C                     SETON                     3099
+     C                     ENDIF
+     C*
+     C  N99      S#DATS    IFGT S#DATE
+     C                     MOVELERR,2     S#ERR1
+     C                     SETON                     3099
+     C                     ENDIF
+     C*調整參考年月
+     C                     MOVE S#YMS     D#YYMM
+     C                     MOVE '01'      D#DD
+     C                     MOVE D#DATE    W#DATE
+     C                     MOVE W#DATE    P#PDAT
+     C                     MOVE '2'       P#MODE
+     C                     MOVE '2'       P#OMOD
+     C                     CALL 'UTS104R'
+     C                     PARM           P#PDAT  8        起始日
+     C                     PARM           P#MODE  1        民國年
+     C                     PARM           P#OMOD  1        向後
+     C                     PARM '0000'    P#DAYS  4        天數
+     C                     PARM           P#RDAT  8        回傳日期
+     C                     PARM           P#ERR   1        錯誤碼
+     C  N99      P#ERR     IFNE '0'
+     C                     MOVELERR,1     S#ERR1           預估起日
+     C                     SETON                     3199
+     C                     ENDIF
+     C*調整參考年月
+     C                     MOVE S#YME     D#YYMM
+     C                     MOVE D#DATE    W#DATE
+     C                     MOVE W#DATE    P#PDAT
+     C                     MOVE '2'       P#MODE
+     C                     MOVE '2'       P#OMOD
+     C                     CALL 'UTS104R'
+     C                     PARM           P#PDAT  8        起始日
+     C                     PARM           P#MODE  1        民國年
+     C                     PARM           P#OMOD  1        向後
+     C                     PARM '0000'    P#DAYS  4        天數
+     C                     PARM           P#RDAT  8        回傳日期
+     C                     PARM           P#ERR   1        錯誤碼
+     C  N99      P#ERR     IFNE '0'
+     C                     MOVELERR,1     S#ERR1           預估起日
+     C                     SETON                     3199
+     C                     ENDIF
+     C*
+     C  N99      S#YMS     IFGT S#YME
+     C                     MOVELERR,2     S#ERR1
+     C                     SETON                     3199
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*W#PRID='02'--->ARP090S-2  畫面
+     C                     MOVE *ON       *IN74             SFLCLR
+     C                     WRITEAR090F2C
+     C                     MOVE *OFF      *IN74             SFLCLR
+     C*
+     C                     Z-ADD0         RRN2    40
+     C*
+     C                     EXSR SR2100                     讀入
+     C*
+     C                     MOVEA'00'      *IN,71
+     C*
+     C           W#PRID    DOWEQ'02'
+     C*
+     C           RRN2      IFEQ 0
+     C                     MOVE *ON       *IN72
+     C                     MOVELERR,4     S#ERR2
+     C                     ENDIF
+     C*
+     C                     WRITEAR090FH
+     C                     WRITEAR090F2M
+     C                     EXFMTAR090F2C
+     C                     MOVE *BLANK    S#ERR2
+     C*IN03
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*IN12
+     C           *IN12     IFEQ *ON
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*IN05 快速調整
+     C           *IN05     IFEQ *ON
+     C                     EXSR SR2200
+     C                     ITER                            重新載入
+     C                     ENDIF
+     C*IN10 存檔列印
+     C           *IN10     IFEQ *ON
+     C                     MOVE S#SLC1    D#SLC1
+     C                     EXSR SR2300                     依螢幕存檔
+     C                     CALL 'ARP090P4'                 過入彙總檔
+     C*
+     C                     Z-ADDS#DATS    W#DAT   80
+     C                     MOVE W#DAT     D#SDAT
+     C                     Z-ADDS#DATE    W#DAT
+     C                     MOVE W#DAT     D#EDAT
+     C                     MOVE 'X'       D#FLAG
+     C*                    CALL 'ACP241PX'                 呼叫副程式
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVE '03'      W#PRID
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C*讀入資料
+     C*檔頭
+     C           S#SLC1    IFEQ '1'
+     C                     MOVE '客戶別'S#SLC2           參考調整別
+     C                     MOVE *ON       *IN32
+     C                     ELSE
+     C                     MOVE '業務別'S#SLC2
+     C                     MOVE *OFF      *IN32
+     C                     ENDIF
+     C*
+     C                     MOVE MSG,1     S#MODE
+     C*
+     C           *LOVAL    SETLLARP090F
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RARP090F            N    40
+     C   40                LEAVE
+     C*
+     C                     Z-ADD0         S#OPT1            OP CODE
+     C                     MOVELAFCOD1    S#COD1           調整代號
+     C                     MOVELAFCOD2    S#CONM           代號名稱
+     C                     Z-ADDAFDAY1    S#DAY1           建議天數
+     C                     Z-ADDAFDAY2    S#DAY2           調整天數
+     C*
+     C                     ADD  1         RRN2
+     C                     WRITEAR090F2
+     C*
+     C                     ENDDO
+     C*
+     C           RRN2      IFGT 0                          至少一筆
+     C                     Z-ADD1         S#NBR2
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2200    BEGSR
+     C*****************************************************************
+     C*快速調整
+     C                     Z-ADD1         RRN2
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C           RRN2      CHAINAR090F2              40
+     C   40                LEAVE
+     C*
+     C           S#COD1    IFEQ *BLANK
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     Z-ADDS#DAY1    S#DAY2
+     C                     UPDATAR090F2
+     C*
+     C                     ADD  1         RRN2
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2300    BEGSR
+     C*****************************************************************
+     C*存檔列印
+     C                     Z-ADD0         RRN2
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     ADD  1         RRN2
+     C*
+     C           RRN2      CHAINAR090F2              40
+     C   40                LEAVE
+     C*
+     C           S#COD1    IFEQ *BLANK
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           S#DAY2    IFEQ 0                          未調整
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           S#COD1    CHAINRARP090F             41
+     C                     Z-ADDS#DAY2    AFDAY2
+     C                     UPDATRARP090F
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*READC
+     C                     Z-ADD1         RRN2
+     C           W#PRID    DOWEQ'03'
+     C                     READCAR090F2                  41
+     C   41                MOVE '02'      W#PRID
+     C   41                LEAVE
+     C*
+     C                     Z-ADDS#OPT1    W#OPT1  10
+     C                     Z-ADD0         S#OPT1
+     C                     UPDATAR090F2
+     C*
+     C           W#OPT1    IFEQ 2
+     C                     MOVE '04'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4000    BEGSR
+     C*****************************************************************
+     C*W#PRID='02'--->ARP090S-3  畫面
+     C                     MOVE *ON       *IN79             SFLCLR
+     C                     WRITEAR090F2C
+     C                     MOVE *OFF      *IN79             SFLCLR
+     C*
+     C                     Z-ADD0         RRN3    40
+     C*
+     C                     EXSR SR4100                     讀入
+     C*
+     C                     MOVEA'00'      *IN,77
+     C*
+     C           W#PRID    DOWEQ'04'
+     C*
+     C           RRN2      IFEQ 0
+     C                     MOVE *ON       *IN78
+     C                     MOVELERR,4     S#ERR3
+     C                     ENDIF
+     C*
+     C                     WRITEAR090FH
+     C                     WRITEAR090F3M
+     C                     EXFMTAR090F3C
+     C                     MOVE *BLANK    S#ERR3
+     C*IN03
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*IN12
+     C           *IN12     IFEQ *ON
+     C                     MOVE '03'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*IN05 快速調整
+     C           *IN05     IFEQ *ON
+     C                     EXSR SR4200
+     C                     ITER                            重新載入
+     C                     ENDIF
+     C*IN10 存檔列印
+     C           *IN10     IFEQ *ON
+     C                     EXSR SR4300                     依螢幕存檔
+     C                     ENDIF
+     C*
+     C                     MOVE '03'      W#PRID
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4100    BEGSR
+     C*****************************************************************
+     C*讀入資料
+     C                     MOVE MSG,2     S#MODE
+     C*
+     C           *LOVAL    SETLLARP090X
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RARP090X            N    40
+     C   40                LEAVE
+     C*
+     C                     CLEARAR090F3
+     C*
+     C           A1CODE    IFEQ 'SA04'
+     C                     MOVE '磅單'  S#COD2
+     C                     ELSE
+     C                     MOVE '發票'  S#COD2
+     C                     ENDIF
+     C                     MOVELA1NO      S#NO             單據號碼
+     C                     Z-ADDA1INDT    S#DATE           單據日期
+     C                     Z-ADDA1DAT1    S#DAT1           預計兌現日
+     C                     Z-ADDA1DAT2    S#DAT2           調整兌現日
+     C*
+     C                     ADD  1         RRN3
+     C                     WRITEAR090F3
+     C*
+     C                     ENDDO
+     C*
+     C           RRN3      IFGT 0                          至少一筆
+     C                     Z-ADD1         S#NBR3
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4200    BEGSR
+     C*****************************************************************
+     C*快速調整
+     C                     Z-ADD1         RRN3
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C           RRN3      CHAINAR090F3              40
+     C   40                LEAVE
+     C*
+     C                     Z-ADDS#DAT1    S#DAT2
+     C                     UPDATAR090F3
+     C*
+     C                     ADD  1         RRN3
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4300    BEGSR
+     C*****************************************************************
+     C*存檔
+     C                     Z-ADD0         RRN3
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C*
+     C                     ADD  1         RRN3
+     C           RRN3      CHAINAR090F3              40
+     C   40                LEAVE
+     C*
+     C           S#DAT2    IFEQ 0
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           S#NO      CHAINRARP090X             40
+     C                     Z-ADDS#DAT2    A1DAT2
+     C                     MOVE 'Y'       A1CODX
+     C                     UPDATRARP090X
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+**  ERR
+01-日期輸入錯誤！
+02-日期區間錯誤！
+處理中，請稍待..............
+04-無相關資料！
+**  MSG
+批次調整
+明細調整
+

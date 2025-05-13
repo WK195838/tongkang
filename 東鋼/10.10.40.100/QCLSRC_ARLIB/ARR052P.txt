@@ -1,0 +1,84 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE  99/12/01  2010AR555 S00WCJ (9912A) */
+    /*                          100/02/09  2011ARXXX S00WCJ (0002A) */
+    /*                          112/09/18  S00WCJ (1209A)           */
+    /*                           廠區P須包含I資料             */
+    /*                                                              */
+    /****************************************************************/
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&W0100)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W0101)  TYPE(*DEC)  LEN(6)
+             DCL        VAR(&W0101A) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&W0102)  TYPE(*DEC)  LEN(8) /*0002A*/
+             DCL        VAR(&W0102A) TYPE(*CHAR) LEN(8) /*0002A*/
+             DCL        VAR(&W0103)  TYPE(*DEC)  LEN(8) /*0002A*/
+             DCL        VAR(&W0103A) TYPE(*CHAR) LEN(8) /*0002A*/
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARR052RS) PARM(&IN03 &W0100 &W0101 +
+                          &W0102 &W0103)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&W0101A) VALUE(&W0101)
+             CHGVAR     VAR(&W0102A) VALUE(&W0102)
+             CHGVAR     VAR(&W0103A) VALUE(&W0103)
+             CHGDTAARA  DTAARA(*LDA (1  1)) VALUE(&W0100)
+             CHGDTAARA  DTAARA(*LDA (2  6)) VALUE(&W0101A)
+             CHGDTAARA  DTAARA(*LDA (11  8)) VALUE(&W0102A) /*0002A*/
+             CHGDTAARA  DTAARA(*LDA (21  8)) VALUE(&W0103A) /*0002A*/
+             SBMJOB     JOB(ARR052P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR052P')
+             RETURN
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (1  1)) RTNVAR(&W0100)
+             RTVDTAARA  DTAARA(*LDA (2  4)) RTNVAR(&W0101A)
+             RTVDTAARA  DTAARA(*LDA (11  8)) RTNVAR(&W0102A) /*0002A*/
+             RTVDTAARA  DTAARA(*LDA (21  8)) RTNVAR(&W0103A) /*0002A*/
+             CHGVAR     VAR(&W0101) VALUE(&W0101A)
+             CHGVAR     VAR(&W0102) VALUE(&W0102A)
+             CHGVAR     VAR(&W0103) VALUE(&W0103A)
+             OVRDBF     FILE(INVMST) TOFILE(INVMST) SHARE(*YES)
+             OVRDBF     FILE(INVDTY) TOFILE(INVDTL)
+             OVRDBF     FILE(INVDTL) TOFILE(INVDTL)
+             IF         COND(&W0100 = 'P') THEN(GOTO CMDLBL(#02))
+             OPNQRYF    FILE((INVMST)) QRYSLT('                  +
+                          INAREA *EQ "' || &W0100 || '"        & +
+                          INDECD *EQ " "                       & +
+                          ININDT *EQ %RANGE(' || &W0102A || '       +
+                                            ' || &W0103A || ')') +
+                          KEYFLD((INNO))
+             GOTO       CMDLBL(#03)
+    /*9912A  START */
+#02:  /*     OPNQRYF    FILE((INVMST)) QRYSLT('                  +
+                          INAREA *EQ %VALUES("P" "L" "M" "T" )  & +
+                          INDECD *EQ " "                       & +
+                          ININDT *EQ %RANGE(' || &W0102A || '    +
+                                            ' || &W0103A || ')') +
+                          KEYFLD((INNO))     */
+
+/*1209A*/    OPNQRYF    FILE((INVMST)) QRYSLT('                  +
+                          INAREA *EQ %VALUES("P" "I" "M" "T" "U" )  & +
+                          INDECD *EQ " "                       & +
+                          ININDT *EQ %RANGE(' || &W0102A || '    +
+                                            ' || &W0103A || ')') +
+                          KEYFLD((INNO))
+    /*9912A  END */
+ #03:        CLRPFM ARLIB/ARWF02
+             OVRDBF     FILE(ARWF02) TOFILE(ARLIB/ARWF02)
+             CALL       PGM(ARR052RC)
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+          /*     */
+             OVRDBF     FILE(ARWF02) TOFILE(ARLIB/ARWF02) SHARE(*YES)
+             OPNQRYF    FILE((ARWF02)) +
+                        KEYFLD((W2AREA) (W2PDCD) (W2ACNT))
+             OVRDBF     FILE(HIPROD) TOFILE(DALIB/HIPROD) SHARE(*YES)
+             OVRDBF     PRINT QPRINT
+             CALL       PGM(ARR052R)
+             CLOF       OPNID(ARWF02)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

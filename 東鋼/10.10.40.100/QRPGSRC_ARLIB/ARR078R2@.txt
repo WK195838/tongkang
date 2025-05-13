@@ -1,0 +1,305 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR078R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     銷貨帳款每日應收明細表－列印報表
+     H*            5.DATE-WRITTEN  88/06/11
+     H*
+     H*       AXRESV --> 帳齡區間別('1', '2', '3', '4')
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARSTTX  IP  E           K        DISK
+     FARSTRM  IF  E           K        DISK
+     FARSAID  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+8906 FARR078F IF  E           K        DISK                      A
+     FARR078T O   E             66     PRINTER
+     E*****************************************************************
+     E                    TAB1    1   5  4   TAB1R  12
+     E                    TAB2    1   4  1   TAB2R  16
+     E                    TAB3    1   5  1   TAB3R  10
+     I*****************************************************************
+     IAXREC
+     I                                              AXRVIDL3
+     I                                              AXRESVL2
+     I                                              AXORNOL1
+     I*------------------------------------------------------
+     I            DS
+     I                                        1  10 AXRESV
+     I                                        1   1 D#RESV
+     I           UDS
+     I                                      201 204 U#DAY1
+     I                                      205 208 U#DAY2
+     I                                      209 212 U#DAY3
+     I*
+     I                                      216 216 U#FLG1
+     I                                      217 217 U#FLG2
+     I                                      218 218 U#FLG3
+     I                                      219 219 U#FLG4
+     I*
+     I                                      221 221 U#STC1
+     I                                      222 222 U#STC2
+     I                                      223 223 U#STC3
+     I                                      224 224 U#STC4
+     I*
+     I                                      231 238 U#ETXD
+     I*
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*        搜尋關鍵
+     C*****************************************************************
+     C           K#AX      KLIST
+     C                     KFLD           AXTXCD
+     C                     KFLD           AXTXNO
+     C                     KFLD           AXINNO
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L3                EXSR L3CLR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CL3 99                EXSR L3SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C                     MOVE U#DAY1    R#DAY1
+     C                     MOVE U#DAY2    R#DAY2
+     C                     MOVE U#DAY3    R#DAY3
+     C                     MOVE U#ETXD    R#ETXD
+     C*
+     C                     Z-ADD1         R#DA1B
+     C           R#DAY1    SUB  1         R#DA1E
+     C                     Z-ADDR#DAY1    R#DA2B
+     C           R#DAY2    SUB  1         R#DA2E
+     C                     Z-ADDR#DAY2    R#DA3B
+     C           R#DAY3    SUB  1         R#DA3E
+     C                     Z-ADDR#DAY3    R#DA4B
+     C*
+     C                     MOVELU#FLG1    R#FLG1
+     C                     MOVELU#FLG2    R#FLG2
+     C                     MOVELU#FLG3    R#FLG3
+     C                     MOVELU#FLG4    R#FLG4
+     C*
+     C                     MOVELU#STC1    R#STC1
+     C                     MOVELU#STC2    R#STC2
+     C                     MOVELU#STC3    R#STC3
+     C                     MOVELU#STC4    R#STC4
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L3清除函式換業務
+     C*********************************
+     CSR         L3CLR     BEGSR
+     C                     MOVELAXDEPT    R#DEPT
+     C           R#DEPT    LOKUPTAB1      TAB1R          69
+     C                     MOVELTAB1R     R#DPNM
+     C*
+     C                     MOVELAXRVID    R#RVID
+     C           R#RVID    CHAINRARSAID              69
+     C   69                MOVEL*BLANK    R#RVNM
+     C  N69                MOVELSANAME    R#RVNM
+     C                     Z-ADD0         R#PGNO           頁次
+     C                     SETON                     66    首頁表頭
+     C*
+     C                     MOVEL' '       W#CURA  1        目前區間
+     C                     CLEARAR078T1T
+     CSR                   ENDSR
+     C*
+     C*********************************************
+     C*  L2清除函式換帳齡（設定區間及印出小計）
+     C*********************************************
+     CSR         L2CLR     BEGSR
+     C                     CLEARAR078T1S
+     C           D#RESV    LOKUPTAB2      TAB2R          69
+     C   69                MOVELTAB2R     R#FLGN           小計名稱
+     CSR                   ENDSR
+     C*
+     C*********************************************
+     C*  L1清除函式換訂單
+     C*********************************************
+     CSR         L1CLR     BEGSR
+     C                     CLEARAR078T1O
+     C                     Z-ADD0         W#DCNT  40
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     CLEARAR078T1D
+     C                     ADD  1         W#DCNT
+     C*
+     C           *INL1     IFEQ '1'
+     C           AXCUNO    CHAINCBCUST               69
+     C                     MOVELCBCUNM    R#CUNM           客戶名稱
+     C                     MOVELAXORNO    R#ORNO           訂單編號
+     C                     ENDIF
+     C*
+     C                     MOVELAXTXNO    R#TXNO           磅單編號
+     C                     Z-ADDAXTXDT    R#TXDT           磅單日期
+     C                     MOVELAXINNO    R#INNO           發票號碼
+     C                     MOVELAXAPNO    R#APNO           請款單號
+     C                     MOVELAXRVNO    R#RVNO           繳款單號
+     C                     Z-ADDAXRVDT    R#RVDT           繳款日期
+     C                     Z-ADDAXINAM    R#INAM           應收金額
+     C                     Z-ADDAXINDU    R#INDU           應收帳齡
+     C                     Z-ADDAXRVLD    R#RVLD           繳款兌現日
+     C                     Z-ADDAXORLD    R#ORLD           合約兌現日
+     C                     Z-ADDAXDELY    R#DELY           延誤日數
+     C*
+     C                     MOVE UDATE     W#DATE  80
+YSH  C           AXRVLD    IFEQ 0
+ .   C           AXORLD    ANDLTW#DATE
+ .   C                     MOVE AXORLD    P#PDAT  8        起始日
+ .   C                     MOVE W#DATE    P#EDAT  8        終止日
+ .   C                     MOVE '1'       P#MODE  1        國曆
+ .   C                     Z-ADD0         P#CACT  50       相距日數
+ .   C                     MOVE '0'       P#ERR   1        錯誤碼
+ .   C                     CALL 'UTS103R'
+ .   C                     PARM           P#PDAT
+ .   C                     PARM           P#EDAT
+ .   C                     PARM           P#MODE
+ .   C                     PARM           P#CACT
+ .   C                     PARM           P#ERR
+ .   C*
+ .   C                     Z-ADDP#CACT    R#DELY
+ .   C                     ENDIF
+     C*
+     C           AXSTCD    LOKUPTAB3      TAB3R          69
+     C                     MOVELTAB3R     R#STCD           應收狀態
+     C*
+     C           K#AX      CHAINAMREC                69
+     C  N69                MOVELAMRMRK    R#RMRK           說明欄
+     C*
+     C   66                ADD  1         R#PGNO
+     C   66                WRITEAR078T1H
+     C   66                SETOF                     66
+     C                     WRITEAR078T1D
+8906 C*寫入ARR078F
+ .   C                     EXSR SR1000
+     C*
+     C                     SELEC
+     C           AXSTCD    WHEQ '1'
+     C                     ADD  AXINAM    R#AMO1
+     C                     ADD  AXINAM    R#AMS1
+     C                     ADD  AXINAM    R#AMT1
+     C           AXSTCD    WHEQ '2'
+     C                     ADD  AXINAM    R#AMO2
+     C                     ADD  AXINAM    R#AMS2
+     C                     ADD  AXINAM    R#AMT2
+     C           AXSTCD    WHEQ '3'
+     C                     ADD  AXINAM    R#AMO3
+     C                     ADD  AXINAM    R#AMS3
+     C                     ADD  AXINAM    R#AMT3
+     C           AXSTCD    WHEQ '4'
+     C           AXSTCD    OREQ '*'
+     C                     ADD  AXINAM    R#AMO4
+     C                     ADD  AXINAM    R#AMS4
+     C                     ADD  AXINAM    R#AMT4
+     C                     ENDSL
+     CSR         ESDTL     ENDSR
+     C*
+     C*********************************
+     C*  L1 函式
+     C*********************************
+     CSR         L1SR      BEGSR
+     C           W#DCNT    IFGT 1                          單筆不印
+     C   66                ADD  1         R#PGNO
+     C   66                WRITEAR078T1H
+     C   66                SETOF                     66
+     C                     WRITEAR078T1O
+     C                     ENDIF
+     C*
+     C                     WRITEAR078T1X                   空一行
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2 函式
+     C*********************************
+     CSR         L2SR      BEGSR
+     C   66                ADD  1         R#PGNO
+     C   66                WRITEAR078T1H
+     C   66                SETOF                     66
+     C                     WRITEAR078T1S
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L3 函式  印出業務
+     C*********************************
+     CSR         L3SR      BEGSR
+     C   66                ADD  1         R#PGNO
+     C   66                WRITEAR078T1H
+     C   66                SETOF                     66
+     C                     WRITEAR078T1T
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式 （印出合計）
+     C*********************************
+     CSR         LRSR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     EXSR INISR
+     C                     WRITEAR078T1H
+     C                     WRITEAR078T1M
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+     C*  子函式集
+     C*****************************************************************
+     CSR         SR1000    BEGSR
+     C           AXTXNO    CHAINRARR078F             50    磅單編號
+     C                     MOVELAXCUNO    ARCUNO           客戶編號
+     C                     MOVELCBCUNM    ARCUNM           客戶名稱
+     C                     MOVELAXORNO    ARORNO           訂單編號
+     C                     MOVELAXTXNO    ARWTNO           磅單編號
+     C                     Z-ADDAXTXDT    ARWTDT           磅單日期
+     C                     MOVELAXINNO    ARIVNO           發票號碼
+     C                     MOVELAXAPNO    ARAPNO           請款單號
+     C                     MOVELAXRVNO    ARRVNO           繳款單號
+     C                     Z-ADDAXRVDT    ARRVDT           繳款日期
+     C                     Z-ADDAXINAM    ARINAM           應收金額
+     C                     Z-ADDAXINDU    ARDATE           應收帳齡
+     C                     Z-ADDAXRVLD    ARDAT1           繳款兌現日
+     C                     Z-ADDAXORLD    ARDAT2           合約兌現日
+     C                     Z-ADDR#DELY    ARDAT3           延誤日數
+     C                     MOVELR#STCD    ARSTUS           應收狀態
+     C                     MOVELAXSAID    ARSALE           業務代號
+     C   50                WRITERARR078F
+     CSR                   ENDSR
+** TAB1
+B010台北營業課
+B020桃園營業課
+B030高雄營業課
+B040台中營業課
+B050型鋼營業課
+** TAB2
+1正常應收小計：
+2超領款日小計：
+3逾期日小計：
+4催收日小計：
+** TAB3
+1未開發票
+2未請款
+3未繳款
+4未兌現
+*多筆繳款
+

@@ -1,0 +1,259 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR072R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     型鋼廠別出貨數量明細表
+     H*            5.DATE-WRITTEN  87/06/28
+     H*            6.DATE-MODIFY   92/06/24
+     H*
+     H*
+     H*    說明: 其中 TXTXDT 被映成 TXDATE 之年月部份
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     F*****************************************************************
+     FTRNDTL  IP  E           K        DISK
+     FARR072T O   E             66     PRINTER
+     E*****************************************************************
+     E                    TAB1    1   3  1   TABR1   8
+     E                    TAB2    1   8  1   TABR2  24
+     I*****************************************************************
+     ITXREC
+     I                                              TXTXDTL2
+     I                                              TXCUNOL1
+     I*------------------------------------------------------
+     I           UDS
+     I                                        1   1 U#TYPE
+     I                                       11  16 U#FRYM
+     I                                       21  26 U#TOYM
+     I                                       27  27 U#COD1
+     I                                       28  33 U#CUN1
+     I                                       34  39 U#CUN2
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I*
+     I            DS
+     I                                        1   8 TXNO
+     I                                        1   1 D#TXNO
+     I            DS
+     I                                        1   80D#YMD
+     I                                        3   60D#YYMM
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C*
+     C           U#TYPE    LOKUPTAB2      TABR2          69產品類別
+     C   69                MOVELTABR2     R#PDNM
+     C*
+     C           U#COD1    LOKUPTAB1      TABR1          69內外銷別
+     C   69                MOVELTABR1     R#COD1
+     C*
+     C           U#CUN1    IFEQ *BLANK
+     C                     MOVEL'全部'  R#CUN1
+     C                     ELSE
+     C                     MOVELU#CUN1    R#CUN1
+     C                     ENDIF
+     C*
+     C           U#CUN2    IFEQ '999999'
+     C                     MOVEL'全部'  R#CUN2
+     C                     ELSE
+     C                     MOVELU#CUN2    R#CUN2
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L2清除函式
+     C*********************************
+     CSR         L2CLR     BEGSR
+     C                     SETON                     66    首頁表頭
+     C                     Z-ADDTXDATE    D#YMD
+     C                     Z-ADDD#YYMM    R#YYMM           年月
+     C                     Z-ADD1         R#PGNO           頁次
+     C*合計暫存
+     C                     Z-ADD0         W#TQTH 100
+     C                     Z-ADD0         W#TAMH 120
+     C                     Z-ADD0         W#TQTK 100
+     C                     Z-ADD0         W#TAMK 120
+     C                     Z-ADD0         W#TQTY 120
+     C                     Z-ADD0         W#TAMT 140
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L1清除函式
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C*
+     C                     Z-ADD0         W#QTYH  80
+     C                     Z-ADD0         W#QTYK  80
+     C                     Z-ADD0         W#QTY  100
+     C                     Z-ADD0         W#AMTH 100
+     C                     Z-ADD0         W#AMTK 100
+     C                     Z-ADD0         W#AMT  120
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C*
+     C*成品大類為２或６時，不含ＢＨ
+     C           U#TYPE    IFEQ '3'
+     C           U#TYPE    OREQ '7'
+     C                     MOVELTXPDNM    W#PDNM  2
+     C           W#PDNM    IFEQ '37'
+     C           W#PDNM    OREQ '3A'
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C*成品大類為７時，只含ＢＨ
+     C           U#TYPE    IFEQ '8'
+     C                     MOVELTXPDNM    W#PDNM  2
+     C           W#PDNM    IFNE '37'
+     C           W#PDNM    ANDNE'3A'
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C                     ENDIF
+     C*內外銷別
+     C                     MOVELTXCUNO    W#CUNO  1
+     C                     SELEC
+     C           U#COD1    WHEQ '1'                        內銷
+     C           W#CUNO    ANDNE'D'
+     C                     GOTO DTLEND
+     C           U#COD1    WHEQ '2'                        外銷
+     C           W#CUNO    ANDNE'E'
+     C                     GOTO DTLEND
+     C                     ENDSL
+     C*
+     C                     SELEC
+     C           D#TXNO    WHEQ 'H'                        苗栗
+     C                     ADD  TXQTY     W#QTYH
+     C                     ADD  TXAMT     W#AMTH
+     C           D#TXNO    WHEQ 'K'                        高雄
+     C                     ADD  TXQTY     W#QTYK
+     C                     ADD  TXAMT     W#AMTK
+     C                     ENDSL
+     C                     ADD  TXQTY     W#QTY
+     C                     ADD  TXAMT     W#AMT
+     C*
+     CSR         DTLEND    ENDSR
+     C*********************************
+     C*  L1 函式  印出一筆明細
+     C*********************************
+     CSR         L1SR      BEGSR
+     C                     CLEARAR072T1D
+     C*
+     C                     MOVELTXCUNO    R#CUNO           客戶代號
+     C                     MOVELTXCUNM    R#CUNM           客戶名稱
+     C*
+     C*苗栗廠數量，金額，平均單價
+     C                     Z-ADDW#QTYH    R#QTYH
+     C                     Z-ADDW#AMTH    R#AMTH
+     C           R#AMTH    IFNE 0
+     C           R#AMTH    DIV  R#QTYH    R#PRCH    H
+     C                     ENDIF
+     C*
+     C*高雄廠數量，金額，平均單價
+     C                     Z-ADDW#QTYK    R#QTYK
+     C                     Z-ADDW#AMTK    R#AMTK
+     C           R#AMTK    IFNE 0
+     C           R#AMTK    DIV  R#QTYK    R#PRCK    H
+     C                     ENDIF
+     C*
+     C*兩廠數量，金額，平均單價
+     C                     Z-ADDW#QTY     R#QTY
+     C                     Z-ADDW#AMT     R#AMT
+     C           R#AMT     IFNE 0
+     C           R#AMT     DIV  R#QTY     R#PRC     H
+     C                     ENDIF
+     C*
+     C           R#AMT     IFNE 0
+     C   66                WRITEAR072T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR072T1D
+     C                     ENDIF
+     C*合計
+     C                     ADD  W#QTYH    W#TQTH
+     C                     ADD  W#AMTH    W#TAMH
+     C                     ADD  W#QTYK    W#TQTK
+     C                     ADD  W#AMTK    W#TAMK
+     C                     ADD  W#QTY     W#TQTY
+     C                     ADD  W#AMT     W#TAMT
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2 函式
+     C*********************************
+     CSR         L2SR      BEGSR
+     C                     CLEARAR072T1T
+     C*
+     C*苗栗廠數量，金額，平均單價合計
+     C                     Z-ADDW#TQTH    R#TQTH
+     C                     Z-ADDW#TAMH    R#TAMH
+     C           R#TAMH    IFNE 0
+     C           R#TAMH    DIV  R#TQTH    R#TPRH
+     C                     ENDIF
+     C*
+     C*高雄廠數量，金額，平均單價合計
+     C                     Z-ADDW#TQTK    R#TQTK
+     C                     Z-ADDW#TAMK    R#TAMK
+     C           R#TAMK    IFNE 0
+     C           R#TAMK    DIV  R#TQTK    R#TPRK
+     C                     ENDIF
+     C*
+     C*兩廠數量，金額，平均單價合計
+     C                     Z-ADDW#TQTY    R#TQTY
+     C                     Z-ADDW#TAMT    R#TAMT
+     C           R#TAMT    IFNE 0
+     C           R#TAMT    DIV  R#TQTY    R#TPRC
+     C                     ENDIF
+     C*
+     C   66                WRITEAR072T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR072T1T
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  LR 函式  (NOTHING)
+     C*********************************
+     CSR         LRSR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     WRITEAR072T1H
+     C                     WRITEAR072T1M
+     CSR                   ENDSR
+     C*
+** TAB1
+1內銷
+2外銷
+3內外銷
+** TAB2
+2鋼筋
+3型鋼（不含ＢＨ）
+4鋼板
+5槽鋼
+6Ｉ型鋼
+7型鋼鋼板槽鋼Ｉ型鋼
+8ＢＨ
+9型鋼鋼板槽鋼Ｉ型鋼ＢＨ
+

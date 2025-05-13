@@ -1,0 +1,604 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE003RH
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ（原作者不可考）
+     H*            4.FUNCTION     請款單維護作業
+     H*            5.DATE-WRITTEN  88/02/12
+     H*
+     H*  <說明> 本程式從原請款單維護作業 ARE003R複製再加以修改。
+     H*           本程式不考慮訂單，只考慮客戶及發票日期以方便型鋼
+     H*           之請款押匯作業。
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARE003SHCF  E                    WORKSTN
+     F                                        RRN   KSFILE SF1
+     FINVMST  UF  E           K        DISK
+     FINVMSTL1IF  E           K        DISK
+     F            INREC                             KRENAMEINREC1
+     FTRNDTLL3IF  E           K        DISK
+     FGENSEQ  UF  E           K        DISK                      A
+     E*************************************************************
+     E                    ERR     1  14 70
+     I*************************************************************
+     IAADS        DS
+     I                                        1  10 GRP
+     I                                        1   1 GRP1
+     I                                        1   1 GE1
+     I                                        2   2 GE2
+     I                                        3   3 GE3
+     I                                        4  10 GE4
+     I                                       11  16 APNOG
+     I                                       11  11 APNO1
+     I                                       12  160APNO2
+     I                                       21  260YMD
+     I                                       21  220YY
+     I                                       23  240MM
+     I                                       25  260DD
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C**************************************************************
+     C           IN2KEY    KLIST
+     C                     KFLD           INCUNO
+     C                     KFLD           INAPNO
+     C*
+     C           GEKEY     KLIST
+     C                     KFLD           GEKIND
+     C                     KFLD           GEPRIN
+     C*
+     C           TXKEY     KLIST
+     C                     KFLD           TXIVNO
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C  N90                Z-ADDUDATE     YMD
+     C  N90                MOVE '1'       SCRN    1
+     C  N90                MOVE '1'       *IN,90
+     C*
+     C           *IN03     DOUEQ'1'
+     C           SCRN      CASEQ'1'       SR#01
+     C           SCRN      CASEQ'2'       SR#02
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C*
+     C*****************************************************************
+     C*  畫面一:
+     C*****************************************************************
+     CSR         SR#01     BEGSR
+     C                     EXFMTTITLE
+     C   12                EXSR KC#01
+     C   KC                EXSR KC#01
+     C                     EXSR CK#01
+     C  N99                SELEC
+     C           CODE      WHEQ '5'
+     C                     CALL 'ARR001P'
+     C                     PARM           CUNO
+     C                     PARM           APNO
+     C                     FREE 'ARR001P'
+     C                     MOVE '1'       SCRN
+     C                     MOVE ERR,1     ERRMSG
+     C           CODE      WHEQ '6'
+     C                     CALL 'ARR001PX'
+     C                     PARM           CUNO
+     C                     PARM           APNO
+     C                     FREE 'ARR001PX'
+     C                     MOVE '1'       SCRN
+     C                     MOVE ERR,1     ERRMSG
+     C                     OTHER
+     C                     MOVE '2'       SCRN
+     C                     EXSR PR#02
+     C                     ENDSL
+     C*
+     C   99                MOVE '1'       SCRN
+     CSR         SR#01Z    ENDSR
+     C*
+     C*****************************************************************
+     C*  畫面二:
+     C*****************************************************************
+     CSR         SR#02     BEGSR
+     C           TTLAMT    IFEQ 0
+     C                     SETON                     74
+     C                     ELSE
+     C                     SETOF                     74
+     C                     ENDIF
+     C                     WRITEUND01
+     C                     EXFMTSFCTL1
+     C   KC                EXSR KC#01
+     C   KL                MOVE '1'       SCRN
+     C   KL                GOTO SR#02Z
+     C   KJ                EXSR KJ#02
+     C   KJ                GOTO SR#02Z
+     C           CODE      IFEQ '1'
+     C           CODE      OREQ '2'
+     C                     EXSR CK#02
+     C                     ELSE
+     C           CODE      IFEQ '4'
+     C                     MOVE '1'       SCRN
+     C                     ENDIF
+     C                     ENDIF
+     CSR         SR#02Z    ENDSR
+     C*
+     C*----------------------------------------
+     C*
+     C*----------------------------------------
+     CSR         KC#01     BEGSR
+     C                     SETON                     LR
+     C                     RETRN
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*
+     C*----------------------------------------
+     CSR         KJ#02     BEGSR
+     C           CODE      IFEQ '1'
+     C           CODE      OREQ '2'
+     C                     EXSR CK#02
+     C                     ENDIF
+     C  N99                EXSR FL#02
+     C  N99                MOVE '1'       SCRN
+     CSR         KJ#02Z    ENDSR
+     C*
+     C*----------------------------------------
+     C*
+     C*----------------------------------------
+     CSR         CK#01     BEGSR
+     C                     SETOF                     414299
+     C                     SETOF                     43
+     C                     MOVE *BLANK    ERRMSG
+     C                     SELEC
+     C           CODE      WHEQ ' '
+     C                     SETON                     4199
+     C                     MOVE ERR,2     ERRMSG
+     C           CODE      WHEQ '1'
+     C                     MOVE '新增'  MOD
+     C                     MOVE '0'       *IN70
+     C           CODE      WHEQ '2'
+     C                     MOVE '更正'  MOD
+     C                     MOVE '0'       *IN70
+     C           CODE      WHEQ '3'
+     C                     MOVE '作廢'  MOD
+     C                     MOVE '1'       *IN70
+     C           CODE      WHEQ '4'
+     C                     MOVE '查詢'  MOD
+     C                     MOVE '1'       *IN70
+     C           CODE      WHEQ '5'
+     C                     MOVE '列表'  MOD
+     C                     MOVE '1'       *IN70
+     C           CODE      WHEQ '6'
+     C                     MOVE '傳真'  MOD
+     C                     MOVE '1'       *IN70
+     C                     OTHER
+     C                     SETON                     4199
+     C                     MOVE ERR,3     ERRMSG
+     C                     ENDSL
+     C*
+     C           CUNO      IFEQ *BLANK
+     C                     SETON                     4299
+     C                     MOVE ERR,4     ERRMSG
+     C                     ENDIF
+     C*
+     C           CODE      IFNE '1'
+     C           APNO      IFEQ *BLANK
+     C                     SETON                     4399
+     C                     MOVE ERR,5     ERRMSG
+     C                     ENDIF
+     C                     ELSE
+     C           APNO      IFNE *BLANK
+     C                     SETON                     4399
+     C                     MOVE ERR,13    ERRMSG
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           *IN99     IFEQ '0'
+     C           CODE      ANDNE'1'
+     C                     MOVELCUNO      INCUNO
+     C                     MOVELAPNO      INAPNO
+     C           IN2KEY    CHAININVMSTL1             97
+     C           *IN97     DOWEQ'0'
+     C           INDECD    IFNE 'D'
+     C                     LEAVE
+     C                     ENDIF
+     C           IN2KEY    READEINVMSTL1                 97
+     C                     ENDDO
+     C                     SELEC
+     C           CODE      WHEQ '1'
+     C           *IN97     ANDEQ'0'
+     C                     SETON                     434299
+     C                     MOVE ERR,6     ERRMSG
+     C           CODE      WHEQ '2'
+     C           *IN97     ANDEQ'0'
+     C           INNBAL    ANDEQ0
+     C                     SETON                     4399
+     C                     MOVE ERR,10    ERRMSG
+     C           CODE      WHNE '1'
+     C           *IN97     ANDEQ'1'
+     C                     SETON                     434299
+     C                     MOVE ERR,7     ERRMSG
+     C                     ENDSL
+     C                     ENDIF
+     CSR         CK#01Z    ENDSR
+     C*
+     C*----------------------------------------
+     C*
+     C*----------------------------------------
+     CSR         PR#02     BEGSR
+     C                     SETON                     80
+     C                     WRITESFCTL1
+     C                     SETOF                     80
+     C                     Z-ADD0         RRN     30
+     C                     MOVE *BLANK    CUNM
+     C                     MOVE *BLANK    RVID
+     C                     Z-ADD0         TTLAMT
+     C**
+     C           CODE      CASEQ'1'       PR#ADD
+     C           CODE      CASEQ'2'       PR#ADD
+     C                     CAS            PR#OTH
+     C                     ENDCS
+     C*
+     C           RRN       IFEQ 0
+     C                     SETON                     99
+     C                     MOVE ERR,9     ERRMSG
+     C                     END
+     C           CODE      IFEQ '1'
+     C           *IN99     ANDEQ'1'
+     C                     MOVE *BLANK    APNO
+     C                     END
+     CSR         PR#02Z    ENDSR
+     C*
+     C*----------------------------------------
+     C*
+     C*----------------------------------------
+     CSR         PR#ADD    BEGSR
+     C           CODE      IFEQ '1'
+     C                     EXSR @GETNO
+     C                     Z-ADDUDATE     APDT
+     C                     ELSE
+     C                     Z-ADDINAPDT    APDT
+     C                     ENDIF
+     C                     SETOF                     61
+     C*
+     C           APNO      IFNE *BLANK
+     C                     MOVELAPNO      W#APNO  6
+     C                     EXSR SR1000                     讀入已請款
+     C                     ENDIF
+     C*
+     C                     MOVEL*BLANK    W#APNO  6
+     C                     EXSR SR1000                     讀入未請款
+     C                     Z-ADDRRN       S#INCT
+     C*
+     C                     SETON                     10
+     CSR         PR#ADZ    ENDSR
+     C*
+     C*----------------------------------------
+     C* 畫面二：搬入營幕變數 W#APNO
+     C*----------------------------------------
+     CSR         SR1000    BEGSR
+     C                     MOVELCUNO      INCUNO
+     C                     MOVELW#APNO    INAPNO
+     C           IN2KEY    SETLLINVMSTL1             97
+     C           *IN97     DOWEQ'0'
+     C           IN2KEY    READEINVMSTL1                 97
+     C   97                LEAVE
+     C*
+     C                     SELEC
+     C           INDECD    WHEQ 'D'
+     C                     ITER
+     C           INTYPE    WHEQ '9'                        其他類
+     C                     ITER
+     C           INNBAL    WHEQ 0                          已無餘額
+     C                     ITER
+     C                     ENDSL
+     C*
+     C                     ADD  1         RRN
+     C                     MOVE INNO      INVNO
+     C                     MOVELINORNO    S#ORNO
+     C                     Z-ADDININDT    S#INDT
+     C                     Z-ADDINAAMT    AAMT
+     C                     Z-ADDINCAMT    BAMT
+     C                     Z-ADDINBAMT    CAMT
+     C                     ADD  INDAMT    CAMT
+     C                     Z-ADDINATAX    DAMT
+     C                     ADD  INCTAX    DAMT
+     C                     ADD  INDTAX    DAMT
+     C                     Z-ADDINEAMT    EAMT
+     C                     ADD  INFAMT    EAMT
+     C                     EXSR @GET
+     C                     Z-ADDAAMT      NBAL
+     C                     ADD  BAMT      NBAL
+     C                     ADD  CAMT      NBAL
+     C                     ADD  DAMT      NBAL
+     C                     ADD  EAMT      NBAL
+     C           INAPNO    IFEQ APNO
+     C                     MOVE 'Y'       OPT
+     C                     MOVE 'Y'       OPT1
+     C                     ADD  NBAL      TTLAMT
+     C                     ELSE
+     C                     MOVE *BLANK    OPT
+     C                     MOVE *BLANK    OPT1
+     C                     ENDIF
+     C                     SETOF                     51
+     C                     WRITESF1
+     C  N61                MOVELINCUNM    CUNM
+     C  N61                MOVELINRVID    RVID
+     C  N61                SETON                     61
+     C*
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*
+     C*----------------------------------------
+     CSR         @GETNO    BEGSR
+     C                     MOVEL'03'      GEKIND
+     C                     MOVE *BLANK    GEPRIN
+     C                     MOVE *BLANK    GRP
+     C                     MOVELTXAR      GE1
+     C                     MOVELGRP       GEPRIN
+     C           GEKEY     CHAINGENSEQ              N97
+     C   97                Z-ADD0         GECUNO
+     C                     MOVELGRP1      APNO1
+     C           GECUNO    ADD  1         APNO2
+     C                     MOVELAPNOG     APNO
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*
+     C*----------------------------------------
+     CSR         PR#OTH    BEGSR
+     C                     Z-ADDINAPDT    APDT
+     C                     MOVELINCUNM    CUNM
+     C                     MOVELINRVID    RVID
+     C                     MOVELCUNO      INCUNO
+     C                     MOVELAPNO      INAPNO
+     C           IN2KEY    SETLLINVMSTL1             97
+     C           *IN97     DOWEQ'0'
+     C           IN2KEY    READEINVMSTL1                 97
+     C   97                LEAVE
+CLJ  C           INDECD    IFEQ 'D'                        避開已作廢
+     C                     ITER
+---  C                     ENDIF
+     C                     ADD  1         RRN
+     C                     MOVEL'Y'       OPT
+     C                     MOVELINNO      INVNO
+     C                     MOVELINORNO    S#ORNO
+     C                     Z-ADDININDT    S#INDT
+     C                     Z-ADDINAAMT    AAMT
+     C                     Z-ADDINCAMT    BAMT
+     C                     Z-ADDINBAMT    CAMT
+     C                     ADD  INDAMT    CAMT
+     C                     Z-ADDINATAX    DAMT
+     C                     ADD  INCTAX    DAMT
+     C                     ADD  INDTAX    DAMT
+     C                     Z-ADDINEAMT    EAMT
+     C                     ADD  INFAMT    EAMT
+     C                     EXSR @GET
+     C                     Z-ADDAAMT      NBAL
+     C                     ADD  BAMT      NBAL
+     C                     ADD  CAMT      NBAL
+     C                     ADD  DAMT      NBAL
+     C                     ADD  EAMT      NBAL
+     C                     ADD  NBAL      TTLAMT
+     C                     SETOF                     51
+     C                     WRITESF1
+     C                     ENDDO
+     C*
+     C                     Z-ADDRRN       S#INCT
+     C                     SETON                     10
+     CSR         PR#OTZ    ENDSR
+     C*
+     C**----------------------------------------***
+     C**   GET DISCOUNT AMT                     ***
+     C**----------------------------------------***
+     CSR         @GET      BEGSR
+     C                     Z-ADD0         S#XAMT           折退金額
+     C                     MOVELINNO      TXIVNO
+     C           TXKEY     SETLLTRNDTLL3             96
+     C           *IN97     DOWEQ'0'
+     C           TXIVNO    READETRNDTLL3                 96
+     C   96                LEAVE
+     C           TXFL01    IFEQ 'Y'
+     C           TXFLAG    OREQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C           INTYPE    IFEQ '2'
+     C                     SUB  TXAMT     BAMT
+     C                     SUB  TXAMT     S#XAMT
+     C                     ELSE
+     C           TXACNT    IFNE '4'
+     C                     SUB  TXAMT     BAMT
+     C                     SUB  TXAMT     S#XAMT
+     C                     ELSE
+     C                     SUB  TXAMT     CAMT
+     C                     SUB  TXAMT     S#XAMT
+     C                     ENDIF
+     C                     ENDIF
+     C                     SUB  TXTAX     DAMT
+     C                     ENDDO
+     CSR         @GETZ     ENDSR
+     C*
+     C***---------------------------------***
+     C***  CHECK INPUT DATA               ***
+     C***---------------------------------***
+     CSR         CK#02     BEGSR
+     C                     SETOF                     99
+     C                     MOVE *BLANK    ERRMSG
+     C                     Z-ADD0         TTLAMT
+     C                     MOVE *ALL'0'   P#DATE
+     C                     MOVE APDT      P#DATE
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM           FLAG1   1
+     C           FLAG1     IFNE '0'
+     C                     SETON                     99
+     C                     MOVELERR,11    ERRMSG
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         RRN
+     C                     SETOF                     97
+     C           *IN97     DOWEQ'0'
+     C                     MOVEA'0'       *IN,51
+     C                     ADD  1         RRN
+     C           RRN       CHAINSF1                  97
+     C   97                LEAVE
+     C           OPT       IFEQ *BLANK
+     C                     UPDATSF1
+     C                     ITER
+     C                     ELSE
+     C                     ADD  NBAL      TTLAMT
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C           TTLAMT    IFEQ 0
+     C                     Z-ADD1         RRN
+     C           RRN       CHAINSF1                  97
+     C  N97                SETON                     5199
+     C  N97                UPDATSF1
+     C  N97                MOVELERR,8     ERRMSG
+     C                     ENDIF
+     CSR         CK#02Z    ENDSR
+     C*
+     C*----------------------------------------
+     C*
+     C*----------------------------------------
+     CSR         FL#02     BEGSR
+     C           CODE      CASEQ'3'       DL#02
+     C           CODE      CASEQ'1'       WR#02
+     C           CODE      CASEQ'2'       UP#02
+     C                     ENDCS
+     CSR         FL#02Z    ENDSR
+     C*
+     C*----------------------------------------
+     C*
+     C*----------------------------------------
+     CSR         DL#02     BEGSR
+     C                     Z-ADD0         RRN
+     C                     SETOF                     97
+     C           *IN97     DOWEQ'0'
+     C                     ADD  1         RRN
+     C           RRN       CHAINSF1                  97
+     C   97                LEAVE
+     C*
+     C           INVNO     CHAININVMST               96
+     C  N96                MOVE *BLANK    INAPNO
+     C  N96                MOVEL'C'       INFLAG
+     C  N96                MOVELTXAR      INTXAR
+     C  N96                Z-ADDUDATE     INTXDT
+     C  N96                UPDATINREC
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*
+     C*----------------------------------------
+     CSR         WR#02     BEGSR
+     C                     CLEARGEREC
+     C                     MOVEL'03'      GEKIND
+     C                     MOVE *BLANK    GEPRIN
+     C                     MOVELTXAR      GE1
+     C                     MOVELGRP       GEPRIN
+     C           GEKEY     CHAINGENSEQ               97
+     C           GECUNO    IFEQ 99999
+     C                     Z-ADD1         GECUNO
+     C                     ELSE
+     C                     ADD  1         GECUNO
+     C                     ENDIF
+     C  N97                UPDATGEREC
+     C   97                WRITEGEREC
+     C*
+     C                     MOVELGRP1      APNO1
+     C                     Z-ADDGECUNO    APNO2
+     C                     MOVELAPNOG     APNO
+     C*
+     C                     Z-ADD0         RRN
+     C                     SETOF                     97
+     C           *IN97     DOWEQ'0'
+     C                     ADD  1         RRN
+     C           RRN       CHAINSF1                  97
+     C   97                LEAVE
+     C*
+     C           OPT       IFEQ *BLANK
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           INVNO     CHAININVMST               96
+     C  N96                MOVELAPNO      INAPNO
+     C  N96                Z-ADDAPDT      INAPDT
+     C  N96                MOVEL'C'       INFLAG
+     C  N96                MOVELTXAR      INTXAR
+     C  N96                Z-ADDUDATE     INTXDT
+     C  N96                UPDATINREC
+     C                     ENDDO
+     C*
+     C                     CALL 'ARR001P'
+     C                     PARM           CUNO
+     C                     PARM           APNO
+     C                     FREE 'ARR001P'
+     C                     MOVE '1'       SCRN
+     C                     MOVE ERR,1     ERRMSG
+     CSR         WR#02Z    ENDSR
+     C*
+     C*----------------------------------------
+     C*
+     C*----------------------------------------
+     CSR         UP#02     BEGSR
+     C                     Z-ADD0         RRN
+     C                     SETOF                     97
+     C           *IN97     DOWEQ'0'
+     C                     ADD  1         RRN
+     C           RRN       CHAINSF1                  97
+     C   97                LEAVE
+     C*
+     C           OPT       IFEQ *BLANK
+     C           OPT1      ANDEQ*BLANK
+     C                     ITER
+     C                     ENDIF
+     C*     FILE I/O
+     C           OPT       IFEQ *BLANK
+     C*     DEL
+     C           INVNO     CHAININVMST               96
+     C  N96                MOVE *BLANK    INAPNO
+     C  N96                MOVEL'C'       INFLAG
+     C  N96                MOVELTXAR      INTXAR
+     C  N96                Z-ADDUDATE     INTXDT
+     C  N96                UPDATINREC
+     C                     ELSE
+     C*     ADD
+     C           INVNO     CHAININVMST               96
+     C  N96                MOVELAPNO      INAPNO
+     C  N96                Z-ADDAPDT      INAPDT
+     C  N96                MOVEL'C'       INFLAG
+     C  N96                MOVELTXAR      INTXAR
+     C  N96                Z-ADDUDATE     INTXDT
+     C  N96                UPDATINREC
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     CSR         UP#02Z    ENDSR
+     C*****************************************************************
+** ERR
+０１－請款單列印已輸至批次處理作業。
+０２－功能代碼必須輸入．
+０３－功能代碼必須為１，２，３，４，５
+０４－客戶編號必須輸入
+０５－請款單號必須輸入
+０６－此客戶此張請款單已存在，不可再新增
+０７－此客戶此張請款單不存在．
+０８－新增或修改時，必須至少選擇一筆發票
+０９－此客戶此張請款單已收完款，或此客戶已無未繳清之發票
+１０－此張請款單已收完款，不可再更正
+１１－日期錯誤
+１２－訂單號碼必須輸入
+１３－新增時請款單號不可輸入
+１４－此張請款單非屬本廠區，不可更改，刪除或列印
+

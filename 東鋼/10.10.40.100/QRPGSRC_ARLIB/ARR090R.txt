@@ -1,0 +1,234 @@
+     H*****************************************************************
+     H*              >>     PROGRAM  INTRODUCTION  <<
+     H*
+     H*             1.PROGRAM-ID       ARR090R
+     H*             2.PROGRAM-TYPE     RPG/400
+     H*             3.AUTHOR           S02YSH
+     H*             4.FUNCTION        客戶訂單別每月應收帳款明細表
+     H*             5.DATE-WRITTEN     90/11/13
+     H*****************************************************************
+     H        1   Y                                     1
+     FINVMST  IP  E           K        DISK
+     FARR090T O   E             69     PRINTER
+     E                    YM         12  6 0
+     E                    HD         12  7
+     IINREC       01
+     I                                              INORNOL1
+     I            DS
+     I                                        1   6 W#YYMM
+     I                                        1   4 W#YY
+     I                                        5   6 W#MM
+     I           UDS
+     I                                      400 405 T#CUNO
+     I                                      406 411 T#ORNS
+     I                                      412 417 T#ORNE
+     I                                      418 4230D#YMS
+     I                                      418 4210W#YEA1
+     I                                      422 4230W#MON1
+     I                                      424 4290D#YME
+     I                                      424 4270W#YEA2
+     I                                      428 4290W#MON2
+     I                                     10011010 T#USER
+     C*****************************************************************
+     C*                    MAIN   PROGRAM
+     C*****************************************************************
+     C           *IN99     IFEQ *OFF
+     C                     EXSR INISR
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'-'   T#LIN2
+     C*
+     C*產生並計算YM,HD
+     C*計算一共有？個月
+     C           W#YEA2    IFEQ W#YEA1
+     C           W#MON2    SUB  W#MON1    W#MMT   20
+     C                     ADD  1         W#MMT
+     C                     ELSE
+     C           12        SUB  W#MON1    W#MMT
+     C                     ADD  1         W#MMT
+     C                     ADD  W#MON2    W#MMT
+     C                     ENDIF
+     C*
+     C*產生YM1 - YM12
+     C                     Z-ADD0         W#I     20
+     C*同年
+     C           W#YEA1    IFEQ W#YEA2
+     C*
+     C           W#I       DOWLTW#MMT
+     C           D#YMS     ADD  W#I       W#YMSX  60
+     C                     ADD  1         W#I
+     C                     Z-ADDW#YMSX    YM,W#I
+     C*
+     C                     MOVE W#YMSX    W#YYMM
+     C           HD,W#I    CAT  W#YY:0    HD,W#I
+     C           HD,W#I    CAT  '/':0     HD,W#I
+     C           HD,W#I    CAT  W#MM:0    HD,W#I
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDIF
+     C*不同年度
+     C                     Z-ADD1         W#M     20
+     C           W#YEA1    IFNE W#YEA2
+     C*
+     C           W#I       DOWLTW#MMT
+     C                     ADD  1         W#I
+     C           W#MON1    IFLE 12
+     C*
+     C                     Z-ADDD#YMS     YM,W#I
+     C                     MOVE D#YMS     W#YYMM
+     C           HD,W#I    CAT  W#YY:0    HD,W#I
+     C           HD,W#I    CAT  '/':0     HD,W#I
+     C           HD,W#I    CAT  W#MM:0    HD,W#I
+     C*
+     C                     ELSE
+     C           W#YEA2    MULT 100       W#YMSX
+     C                     ADD  W#M       W#YMSX
+     C                     Z-ADDW#YMSX    YM,W#I
+     C                     ADD  1         W#M
+     C*
+     C                     MOVE W#YMSX    W#YYMM
+     C           HD,W#I    CAT  W#YY:0    HD,W#I
+     C           HD,W#I    CAT  '/':0     HD,W#I
+     C           HD,W#I    CAT  W#MM:0    HD,W#I
+     C*
+     C                     ENDIF
+     C*
+     C                     ADD  1         W#MON1
+     C                     ENDDO
+     C*
+     C                     ENDIF
+     C*產生T#MON1 - T#MO12
+     C                     MOVE HD,1      T#MON1
+     C                     MOVE HD,2      T#MON2
+     C                     MOVE HD,3      T#MON3
+     C                     MOVE HD,4      T#MON4
+     C                     MOVE HD,5      T#MON5
+     C                     MOVE HD,6      T#MON6
+     C                     MOVE HD,7      T#MON7
+     C                     MOVE HD,8      T#MON8
+     C                     MOVE HD,9      T#MON9
+     C                     MOVE HD,10     T#MO10
+     C                     MOVE HD,11     T#MO11
+     C                     MOVE HD,12     T#MO12
+     C*
+     C                     MOVE *ON       *IN69            *表頭
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C*清除列印資料
+     C                     MOVE *BLANK    T#ORNO
+     C*
+     C                     Z-ADD0         T#AMT1
+     C                     Z-ADD0         T#AMT2
+     C                     Z-ADD0         T#AMT3
+     C                     Z-ADD0         T#AMT4
+     C                     Z-ADD0         T#AMT5
+     C                     Z-ADD0         T#AMT6
+     C                     Z-ADD0         T#AMT7
+     C                     Z-ADD0         T#AMT8
+     C                     Z-ADD0         T#AMT9
+     C                     Z-ADD0         T#AMTA
+     C                     Z-ADD0         T#AMTB
+     C                     Z-ADD0         T#AMTC
+     C                     Z-ADD0         T#AMTD
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*存入對應欄位
+     C                     Z-ADD1         I       20
+     C           ININDT    DIV  100       YYMM    60
+     C           YYMM      LOKUPYM,I                     50*ON->FND
+     C   50                SELEC
+     C           I         WHEQ 1
+     C                     ADD  INNBAL    T#AMT1
+     C           I         WHEQ 2
+     C                     ADD  INNBAL    T#AMT2
+     C           I         WHEQ 3
+     C                     ADD  INNBAL    T#AMT3
+     C           I         WHEQ 4
+     C                     ADD  INNBAL    T#AMT4
+     C           I         WHEQ 5
+     C                     ADD  INNBAL    T#AMT5
+     C           I         WHEQ 6
+     C                     ADD  INNBAL    T#AMT6
+     C           I         WHEQ 7
+     C                     ADD  INNBAL    T#AMT7
+     C           I         WHEQ 8
+     C                     ADD  INNBAL    T#AMT8
+     C           I         WHEQ 9
+     C                     ADD  INNBAL    T#AMT9
+     C           I         WHEQ 10
+     C                     ADD  INNBAL    T#AMTA
+     C           I         WHEQ 11
+     C                     ADD  INNBAL    T#AMTB
+     C           I         WHEQ 12
+     C                     ADD  INNBAL    T#AMTC
+     C                     ENDSL
+     C                     ADD  INNBAL    T#AMTD
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C                     MOVELINORNO    T#ORNO
+     C*
+     C                     ADD  T#AMT1    T#TAM1
+     C                     ADD  T#AMT2    T#TAM2
+     C                     ADD  T#AMT3    T#TAM3
+     C                     ADD  T#AMT4    T#TAM4
+     C                     ADD  T#AMT5    T#TAM5
+     C                     ADD  T#AMT6    T#TAM6
+     C                     ADD  T#AMT7    T#TAM7
+     C                     ADD  T#AMT8    T#TAM8
+     C                     ADD  T#AMT9    T#TAM9
+     C                     ADD  T#AMTA    T#TAMA
+     C                     ADD  T#AMTB    T#TAMB
+     C                     ADD  T#AMTC    T#TAMC
+     C                     ADD  T#AMTD    T#TAMD
+     C*
+     C           T#AMTD    IFNE 0
+     C   69                WRITEAR090TH                    *表頭
+     C                     MOVE *OFF      *IN69
+     C*
+     C                     WRITEAR090T1                    *明細
+     C*
+     C   69                WRITEAR090TH                    *表頭
+     C                     MOVE *OFF      *IN69
+     C*
+     C                     WRITEAR090T2                    *--------
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C*列印總合計
+     C*
+     C   69                WRITEAR090TH                    *表頭
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR090T3
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C*NO DATA
+     C                     EXSR INISR
+     C*
+     C                     WRITEAR090TH
+     C                     WRITEAR090T4
+     C*
+     C                     ENDSR
+

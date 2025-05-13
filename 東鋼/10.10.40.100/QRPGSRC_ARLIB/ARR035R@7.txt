@@ -1,0 +1,602 @@
+     H        1   Y                                     1                 BR003
+     FINVMST  IP  E                    DISK
+     FINVDTL  IF  E           K        DISK
+     FINVDTY  IF  E           K        DISK
+     F            IVREC                             KRENAMEIVRECY
+     FTRNDTLL2IF  E           K        DISK
+     F            TXREC                             KRENAMETXREC2
+     FTRNDTLL3IF  E           K        DISK
+     F            TXREC                             KRENAMETXREC3
+     FARR035F O   E           K        DISK
+     FQPRINT  O   F     198            PRINTER
+     E*************************************************************
+     E                    ARY1      100 23
+     E                    ARY2      100 23
+     I*************************************************************
+     IINREC
+     I                                              INNO  L1
+     IIVRECY
+     I              IVNO                            F#IVNO
+     I              IVACNT                          F#ACNT
+     I              IVITEM                          F#ITEM
+     I              IVPDCD                          F#PDCD
+     I              IVQTY                           F#QTY
+     I              IVAMT                           F#AMT
+     I              IVFL03                          F#FL03
+     I              IVACDT                          F#ACDT
+     I              IVUPRC                          F#UPRC
+     I              IVDECD                          F#DECD
+     I****
+     IAADS        DS
+     I              'も當月開立發票明細-C         CON3                       X
+     I              '表も'
+     I              '東和鋼鐵企業股份有-C         CON4                       X
+     I              '限公司'
+     IBBDS        DS
+     I                                        1  10 INNO
+     I                                        9  10 INNO2
+     I*---------------------------------------------------------------
+     I            DS
+     I                                        1  23 A#DATA
+     I                                        1   3 A#PDCD
+     I                                        4  120A#QTY
+     I                                       13  230A#AMT
+TEST I            DS
+ .   I                                        1  10 X#INNO
+ .   I                                        3  10 D#INNO
+     I           UDS
+     I                                        1   1 W0100
+     I                                        2   70W0101
+     I                                        8  130W0102
+     I                                       14  190W0103
+     I                                       20  20 D#OPT
+     I                                      951 985 COMP
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C**************************************************************
+     C  N90                EXSR INZ#01
+     C  N90                SETON                     90
+     C                     EXSR DP#01
+     CLR                   EXSR @TLR
+     C**************************************************************
+     C*** SET INITIAL
+     CSR         INZ#01    BEGSR
+ 9207C*                    MOVE *ON       *IN51            傳票
+ 9207C                     MOVE *OFF      *IN51            傳票
+     C           IVKEY     KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C           W#INVD    KLIST
+     C                     KFLD           F#IVNO
+     C                     KFLD           F#ACNT
+     C                     KFLD           F#ITEM
+     C**************************************************************
+     C                     Z-ADD0         SRL     30
+     C                     Z-ADD0         PAG     30
+     C                     Z-ADD80        LCNT    30
+     C                     Z-ADD60        TCNT    30
+     C                     MOVE *ALL'='   ALS   145
+     C                     MOVE *ALL'-'   ALQ   145
+     C                     Z-ADD0         AMT1    90
+     C           *LIKE     DEFN IVAMT     AMT2
+     C                     Z-ADD0         AMT3    90
+     C                     Z-ADD0         AMT4    90
+     C           *LIKE     DEFN AMT       AMT5
+     C                     Z-ADD0         GAMT1   90
+     C           *LIKE     DEFN IVAMT     GAMT2
+     C                     Z-ADD0         GAMT3   90
+     C                     Z-ADD0         GAMT4   90
+     C                     Z-ADD0         FAMT1  110
+     C                     Z-ADD0         DAMT1  110
+     C           *LIKE     DEFN AMT       GAMT5
+     C                     Z-ADD0         W#XAMT 110
+     C                     Z-ADD0         GAMT6  110
+     C*
+     C                     Z-ADD0         ARY1L   30
+     C                     Z-ADD0         ARY2L   30
+     C                     MOVEL*ALL'9'   ARY1             小計陣列　
+     C                     MOVEL*ALL'9'   ARY2             總計陣列
+     C           D#OPT     IFEQ '1'
+     C                     MOVE '自動'  W#OPT   6
+     C                     ENDIF
+     C           D#OPT     IFEQ '2'
+     C                     MOVE '人工'  W#OPT   6
+     C                     MOVE *ON       *IN50
+     C                     ENDIF
+     C           D#OPT     IFEQ '3'
+     C                     MOVE '全部'  W#OPT   6
+     C                     ENDIF
+8912 C                     MOVE *BLANK    W#INNO 10
+9207 C                     MOVE *BLANK    W#FLAG  1
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS                                **
+     C**----------------------------------------------**
+     CSR         @CHKCT    BEGSR
+     C           LCNT      COMP TCNT                 75  75
+     C   75                ADD  1         PAG
+     C   75                EXCPTEH#01                      表頭
+     C   75                Z-ADD9         LCNT
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     C* DETAIL PROCESS                                **
+     C**----------------------------------------------**
+     CSR         DP#01     BEGSR
+      *
+TEST C                     MOVE INNO      X#INNO
+TEST C           D#INNO    IFEQ '29637913'
+ .   C                     Z-ADD0         W#X     10
+ .   C                     ENDIF
+8912 C                     Z-ADD0         W#IVM2
+     C           INNO2     IFEQ '00'
+     C           INNO2     OREQ '50'
+     C   21                EXSR PRT#
+     C                     Z-ADD0         ARY1L            清除小計
+     C                     MOVEL*ALL'9'   ARY1
+     C                     Z-ADD0         SRL
+     C                     Z-ADD0         AMT1
+     C                     Z-ADD0         AMT2
+     C                     Z-ADD0         AMT3
+     C                     Z-ADD0         AMT4
+     C                     Z-ADD0         AMT5
+     C                     Z-ADD0         AMT6    90
+     C                     END
+     C*
+     C                     Z-ADD0         T#DAMT
+     C*二聯式預收
+     C           INKIND    IFEQ '2'                        發票聯式
+     C           INTXTP    IFEQ '1'                        課稅別
+     C*
+8912 C           INNO      IFNE W#INNO
+8912 C                     MOVELINNO      IVNO
+ .   C                     MOVEL'1'       IVACNT
+ .   C                     Z-ADD0         IVITEM
+ .   C           IVKEY     SETLLINVDTL
+ .   C                     MOVE *OFF      *IN50
+ .   C           *IN50     DOWNE'1'
+ .   C           INNO      READEINVDTL                   50
+ .   C   50                LEAVE
+     C*
+ .   C           IVACNT    IFNE '1'
+ .   C           IVACNT    ANDNE'4'
+ .   C           IVACNT    ANDNE'9'
+ .   C                     LEAVE
+ .   C                     ENDIF
+     C*
+ .   C           IVACDT    IFLT W0102                      入帳日期
+ .   C           IVACDT    ORGT W0103
+ .   C           IVAMT     ORLT 0                          金額
+ .   C                     ITER
+ .   C                     ENDIF
+     C*
+ .   C           IVAMT     DIV  1.05      W#IVM1 110H      未稅金額
+ .   C                     ADD  W#IVM1    W#IVM2 110
+ .   C                     ENDDO
+     C*
+ .   C           INAAMT    SUB  W#IVM2    INATAX           稅額
+ .   C                     SUB  INATAX    INAAMT           未稅金額
+ .   C                     MOVE INNO      W#INNO
+ .   C                     ELSE
+ .   C                     Z-ADD0         INATAX
+ .   C                     ENDIF
+ .   C*
+     C                     ELSE
+     C                     ADD  INBAMT    INAAMT
+     C                     Z-ADD0         INATAX
+     C                     ENDIF
+     C                     ENDIF
+     C*二聯式預收
+     C*
+     C                     Z-ADDINBAMT    BAMT    90
+     C                     Z-ADDINATAX    ATAX    90
+     C*  891004扣除預收貨款稅額
+8910 C*          INKIND    IFEQ '2'
+ .   C*          INTXTP    ANDEQ'1'
+ .   C*          BAMT      MULT 0.05      W#BTAX  90H
+ .   C*                    ADD  W#BTAX    ATAX
+ .   C*                    ENDIF
+     C*
+     C           INDECD    IFEQ 'D'
+     C                     MOVE 'V'       MARK    1
+     C                     ELSE
+     C                     MOVE ' '       MARK
+     C                     ADD  ATAX      PAMT3  110
+ 9211C                     ADD  BAMT      PAMT2  110       扣預收小計
+ 9202C                     Z-ADDINBAMT    AFBAMT
+     C           INTYPE    IFEQ '2'                        預收發票
+     C                     ADD  INAAMT    PAMT1  110       預收小計
+     C                     Z-ADDINAAMT    BAMT             預收金額
+     C                     ENDIF
+     C           INTYPE    IFEQ '9'
+     C                     ADD  INATAX    FAMT1  110
+     C                     ADD  INAAMT    W#XAMT
+     C                     ENDIF
+     C                     ENDIF
+     C***
+     C           INAAMT    ADD  INATAX    AMT    110
+     C                     ADD  INBAMT    AMT
+      *
+     C                     MOVELINNO      IVNO
+     C                     MOVEL'1'       IVACNT
+     C                     Z-ADD0         IVITEM
+     C                     SETOF                     3334
+     C           IVKEY     SETLLINVDTL               33
+     C           *IN33     DOWNE'1'
+     C           INNO      READEINVDTL                   33
+     C   33                LEAVE
+     C           IVACNT    IFNE '1'
+     C                     LEAVE
+     C                     ENDIF
+      *
+     C           IVACDT    IFLT W0102
+     C           IVACDT    ORGT W0103
+     C           IVAMT     ORLT 0
+     C                     ITER
+     C                     ENDIF
+9211 C*  921104扣除預收貨款稅額
+ .   C           INKIND    IFEQ '2'
+ .   C           INTXTP    ANDEQ'1'
+ .   C           INBAMT    ANDNE0
+ 9611C           INDECD    ANDNE'D'
+ .   C                     Z-ADDATAX      W#ATAX  90
+ .   C           AMT       DIV  21        ATAX      H
+ .   C           W#ATAX    SUB  ATAX      W#BAMT  90
+ .   C                     ADD  W#BAMT    BAMT
+ .   C                     ADD  W#BAMT    PAMT2
+9211 C                     ENDIF
+     C*
+8910 C           INKIND    IFEQ '2'
+ .   C           INTXTP    IFEQ '1'
+ .   C           IVAMT     DIV  1.05      IVAMT     H
+ .   C*          TOT1      SUB  IVAMT     TOT1
+ .   C*          TOT1      IFLT 2
+ .   C*                    ADD  TOT1      IVAMT
+ .   C*                    ENDIF
+ .   C                     ENDIF
+ .   C                     ENDIF
+     C*抓折扣
+     C                     MOVELIVNO      F#IVNO
+     C                     MOVEL'3'       F#ACNT
+     C                     Z-ADDIVITEM    F#ITEM
+     C           W#INVD    CHAINIVRECY               50
+     C           *IN50     IFEQ *OFF
+     C           F#FL03    ANDEQ'K'
+     C           F#ACDT    ANDEQIVACDT
+     C           F#DECD    ANDNE'D'
+     C*          IVAMT     ADD  F#AMT     IVAMT
+     C                     Z-ADDF#AMT     T#DAMT  70
+     C                     ADD  T#DAMT    AMT6             折扣小計
+     C                     ADD  T#DAMT    GAMT6            折扣總計
+     C                     ADD  T#DAMT    DAMT1
+     C                     MOVEL'X'       W#FLAG
+     C                     ELSE
+     C                     MOVEL*BLANK    W#FLAG
+     C                     ENDIF
+9108 C*加印傳票號碼START
+     C                     MOVE *BLANK    T#VUNO
+     C                     MOVE *BLANK    T#VMAR
+     C                     SETOF                     5556
+     C           INNO      SETLLTXREC2
+     C           *IN55     DOWEQ*OFF
+     C                     READ TXREC2                   55
+     C           TXIVNO    IFNE INNO
+     C                     LEAVE
+     C                     ENDIF
+     C           TXPDNM    IFNE IVPDCD
+     C                     ITER
+     C                     ENDIF
+     C                     MOVE *ON       *IN56
+     C           TXVUNO    IFNE T#VUNO
+     C           T#VUNO    IFEQ *BLANK
+     C                     MOVE TXVUNO    T#VUNO  6
+     C                     ELSE
+     C                     MOVE '*'       T#VMAR  1
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C  N56      INNO      SETLLTXREC3
+     C           *IN56     DOWEQ*OFF
+     C                     READ TXREC3                   56
+     C           TXIVNO    IFNE INNO
+     C                     LEAVE
+     C                     ENDIF
+     C           TXPDNM    IFNE IVPDCD
+     C                     ITER
+     C                     ENDIF
+     C           TXVUNO    IFNE T#VUNO
+     C           T#VUNO    IFEQ *BLANK
+     C                     MOVELTXVUNO    T#VUNO  6
+     C                     ELSE
+     C                     MOVE '*'       T#VMAR  1
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+      *
+     C                     ADD  1         LCNT
+     C                     EXSR @CHKCT
+     C   75                ADD  1         LCNT
+9004 C   75                EXSR @CHKCT
+     C                     EXCPTD#01
+9202 C                     EXSR SR1000
+     C                     SETON                     34
+      *
+     C           INDECD    IFNE 'D'
+     C                     ADD  IVQTY     AMT1
+     C                     ADD  IVAMT     AMT2
+     C                     ADD  IVQTY     GAMT1
+     C                     ADD  IVAMT     GAMT2
+     C*銷貨收入在明細時，不扣除折金額
+     C*在各品名分類小計時，需扣除折扣金額
+     C           W#FLAG    IFNE *BLANK
+     C                     ADD  F#AMT     IVAMT
+     C                     ENDIF
+     C*
+     C                     MOVEL'F'       W#FIND  1        小計
+     C           1         DO   ARY1L     K       20
+     C                     MOVELARY1,K    A#DATA
+     C           IVPDCD    IFEQ A#PDCD
+     C                     ADD  IVQTY     A#QTY
+     C                     ADD  IVAMT     A#AMT
+     C                     MOVELA#DATA    ARY1,K
+     C                     MOVEL'T'       W#FIND
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           W#FIND    IFEQ 'F'
+     C                     ADD  1         ARY1L
+     C                     Z-ADDARY1L     K
+     C                     MOVELIVPDCD    A#PDCD
+     C                     Z-ADDIVQTY     A#QTY
+     C                     Z-ADDIVAMT     A#AMT
+     C                     MOVELA#DATA    ARY1,K
+     C                     ENDIF
+     C*
+     C*
+     C                     MOVEL'F'       W#FIND  1        總計
+     C           1         DO   ARY2L     K       20
+     C                     MOVELARY2,K    A#DATA
+     C           IVPDCD    IFEQ A#PDCD
+     C                     ADD  IVQTY     A#QTY
+     C                     ADD  IVAMT     A#AMT
+     C                     MOVELA#DATA    ARY2,K
+     C                     MOVEL'T'       W#FIND
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           W#FIND    IFEQ 'F'
+     C                     ADD  1         ARY2L
+     C                     Z-ADDARY2L     K
+     C                     MOVELIVPDCD    A#PDCD
+     C                     Z-ADDIVQTY     A#QTY
+     C                     Z-ADDIVAMT     A#AMT
+     C                     MOVELA#DATA    ARY2,K
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           *IN34     IFNE '1'
+9001 C           IVACNT    IFNE '9'
+     C                     MOVE *BLANK    IVPDCD
+     C                     Z-ADD0         IVQTY
+     C                     Z-ADD0         IVUPRC
+     C                     Z-ADD0         IVAMT
+9001 C                     ELSE
+     C                     MOVE *BLANK    IVPDCD
+     C                     Z-ADD0         IVQTY
+     C                     Z-ADD0         IVUPRC
+ .   C           INKIND    IFEQ '2'
+ .   C           AMT       SUB  ATAX      IVAMT
+ .   C                     ENDIF
+9001 C                     ENDIF
+     C                     ADD  1         LCNT
+     C                     EXSR @CHKCT
+     C   75                ADD  1         LCNT
+9004 C   75                EXSR @CHKCT
+     C                     EXCPTD#01
+     C                     SETON                     34
+     C                     ENDIF
+     C                     ADD  1         LCNT
+     C                     EXCPTSPACES
+9004 C                     EXSR @CHKCT
+9004 C   75                EXSR @CHKCT
+      *
+     C           INDECD    IFNE 'D'
+     C                     ADD  BAMT      AMT3
+8910 C*                    ADD  INATAX    AMT4
+     C                     ADD  ATAX      AMT4
+     C                     ADD  AMT       AMT5
+     C                     ADD  BAMT      GAMT3
+8910 C*                    ADD  INATAX    GAMT4
+     C                     ADD  ATAX      GAMT4
+     C                     ADD  AMT       GAMT5
+     C*
+     C                     ENDIF
+      *
+     C                     ADD  1         SRL
+     C  N21                SETON                     21
+     CSR         DP#01Z    ENDSR
+     C**----------------------------------------------**
+     CSR         PRT#      BEGSR
+     C                     EXCPTT#0X
+      *
+     C                     ADD  2         LCNT
+     C                     EXSR @CHKCT
+     C   75                ADD  2         LCNT
+9004 C   75                EXSR @CHKCT
+     C                     EXCPTT#0X1
+     C*
+     C                     SORTAARY1
+     C*
+     C           1         DO   ARY1L     K
+     C                     MOVELARY1,K    A#DATA
+     C           A#AMT     IFNE 0
+     C                     ADD  1         LCNT
+     C                     EXSR @CHKCT
+     C   75                ADD  1         LCNT
+     C                     EXCPTT#01
+9004 C   75                EXSR @CHKCT
+     C                     ENDIF
+     C                     ENDDO
+      *
+     C                     ADD  1         LCNT
+     C                     EXCPTSPACES
+9004 C                     EXSR @CHKCT
+9004 C   75                EXSR @CHKCT
+     CSR                   ENDSR
+     C**----------------------------------------------**
+     CSR         @TLR      BEGSR
+     C           SRL       IFGT 0
+     C                     EXSR PRT#
+     C                     ENDIF
+     C*
+     C                     EXCPTG#0X
+     C*
+     C                     ADD  2         LCNT
+     C                     EXSR @CHKCT
+     C   75                ADD  2         LCNT
+     C                     EXCPTG#0X1
+9004 C   75                EXSR @CHKCT
+     C*
+     C                     SORTAARY2
+     C*
+     C           1         DO   ARY2L     K
+     C                     MOVELARY2,K    A#DATA
+     C           A#AMT     IFNE 0
+     C                     ADD  1         LCNT
+     C                     EXSR @CHKCT
+     C   75                ADD  1         LCNT
+     C                     EXCPTG#01
+9004 C   75                EXSR @CHKCT
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     EXCPTG#02
+     CSR                   ENDSR
+9202 C*****************************************************************
+ .   C           SR1000    BEGSR
+ .   C*****************************************************************
+ .   C                     MOVELINCUNM    AFCUNM
+ .   C                     MOVELINORNO    AFORNO
+ .   C                     WRITERAR035F
+ .   C                     CLEARRAR035F
+ .   C*
+ .   C                     ENDSR
+9202 C*****************************************************************
+     C******
+     OQPRINT  E   03           EH#01
+     O                                   17 '報表編號: AR035'
+     O                         CON4      75                                    X
+     O                                  123 '製表日期'
+     O                                  124 ':'
+     O                         UDATE Y  132
+     O        E 1              EH#01
+     O                         CON3      74                                    X
+     O                                  123 '頁　　次'
+     O                                  124 ':'
+     O                         PAG   Z  128
+     O        E 1              EH#01
+     O                                   10 '廠別：'
+     O                         W0100
+     O                                 +  6 '年月：'
+     O                         W0101        '    /  '
+     O        E 1              EH#01
+     O                                   10 '類別：'
+     O                         W#OPT
+     O        E 1              EH#01
+     O                         ALS      145
+     O        E 1              EH#01
+     O                                  141 '作'
+     O                                  145 '廠'
+     O        E 1              EH#01
+     O                                    4 '聯'
+     O                                   14 '發票號碼'
+     O                                   26 '客　　戶'
+     O                                   36 '發票日期'
+     O                                   46 '訂單號碼'
+     O                                   52 '品名'
+     O                                   62 '重量'
+     O                                   70 '單價'
+     O                                   84 '銷貨收入'
+     O                                   96 '折扣金額'
+     O                                  110 '預收金額'
+     O                                  122 '稅　額'
+     O                                  135 '應收金額'
+     O                                  141 '廢'
+     O                                  145 '區'
+     O        E 1              EH#01
+     O                         ALS      145
+     O        E 1              D#01
+     O                N34      INKIND     2
+     O                N34      INNO      15
+     O                N34      INCUNM    26
+     O                N34      ININDT    36 '    /  /  '
+     O                N34      INORNO    43
+     O                         IVPDCD    50
+     O                         IVQTY K   60
+     O                         IVUPRCK   70
+     O                         IVAMT K   84
+     O                         T#DAMTK   96
+     O                N34      BAMT  K  110
+     O                N34      ATAX  K  122
+     O                N34      AMT   K  136
+     O                         MARK     141
+     O                N34      INAREA   144
+     O                 51      T#VUNO   152
+     O                 51      T#VMAR   154
+     O        E 0              T#0X
+     O                         ALQ      145
+     O        E 1              T#0X1
+     O                                   35 '小　計:'
+     O                         AMT1  K   62
+     O                         AMT2  K   84
+     O                         AMT6  K   96
+     O                         AMT3  K  110
+     O                         AMT4  K  122
+     O                         AMT5  K  136
+     O        E 1              T#0X1
+     O        E 1              T#01
+     O                         A#PDCD    50
+     O                         A#QTY K   62
+     O                         A#AMT K   84
+     O        E 0              G#0X
+     O                         ALS      145
+     O        E 1              G#0X1
+     O                                   35 '總　計:'
+     O                         GAMT1 K   62
+     O                         GAMT2 K   84
+     O                         GAMT6 K   98
+     O                         GAMT3 K  112
+     O                         GAMT4 K  124
+     O                         GAMT5 K  138
+     O        E 1              G#0X1
+     O        E 1              G#01
+     O                         A#PDCD    50
+     O                         A#QTY K   62
+     O                         A#AMT K   84
+     O        E 1              G#02
+     O                                   48 '預收款總額：'
+     O                         PAMT1 K   84
+     O        E 1              G#02
+     O                                   48 '扣預收款總額：'
+     O                         PAMT2 K   84
+     O        E 1     N50      G#02
+     O                                   48 '稅額總額：'
+     O                         PAMT3 K   84
+     O        E 1              G#02
+     O                                   48 '非營業總額：'
+     O                         W#XAMTK   84
+     O        E 1              G#02
+     O                                   48 '非營業稅額總額：'
+     O                         FAMT1 K   84
+     O        E 1              G#02
+     O*                                  48 '進倉折扣總金額：'
+     O*                        DAMT1 K   84
+     O        E 1              SPACES
+     O*************************************************************
+

@@ -1,0 +1,224 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARP095R1
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     應收帳款承購發票自動結案 FOR匯票
+     H*          5.DATE-WRITTEN  92/03/03
+     H*          6.DATE-MODIFY
+     H*                          99/08/31  2010AR517 S00WCJ (9908A)
+     H*                         101/09/21  2012AR682 S00WCJ (0109A)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARCVMS  IP  E           K        DISK
+     FARCVDT  IF  E           K        DISK
+     FARCVDTL1IF  E           K        DISK
+     F            RARCVDT                           KRENAMERCVDT1
+     FARCVCK  UF  E           K        DISK
+     FARINVM  UF  E           K        DISK
+     F*----------------------------------------------------------------
+     IRARCVMS     01
+     I*
+     IRCVDT1
+     I              ATRCNO                          F#RCNO
+     I              ATITEM                          F#ITEM
+     I              ATAPN1                          F#APN1
+     I              ATINNO                          F#INNO
+     I              ATINDT                          F#INDT
+     I              ATAMT1                          F#AMT1
+     I              ATAMT2                          F#AMT2
+     I              ATAMT3                          F#AMT3
+     I              ATAMT4                          F#AMT4
+     I*
+     I            DS
+     I                                        1  10 ATINNO
+     I                                        1   2 D#INN1
+     I                                        3  10 D#INN2
+     C*****************************************************************
+     C*          KEY   LIST
+     C*****************************************************************
+     C*FILE==>ARCVDT
+     C           W#CVDT    KLIST
+     C                     KFLD           ATRCNO           沖銷單號
+     C                     KFLD           ATITEM           沖銷項次
+     C*FILE==>ARCVCK
+     C           W#CVCK    KLIST
+     C                     KFLD           AKRCNO           沖銷單號
+     C                     KFLD           AKRCTM           沖銷項次
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+9908AC           *DATE     SUB  19000000  U#SYSD  80
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C           ASRCNO    IFEQ 'XP1067'
+     C                     Z-ADD0         W#TMP
+     C                     ENDIF
+     C*
+     C                     MOVELASRCNO    AKRCNO            沖銷單號
+     C                     Z-ADD0         AKRCTM            沖銷項次
+     C           W#CVCK    SETLLRARCVCK
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RARCVCK                  40
+     C   40                LEAVE
+     C*
+     C           AKRCNO    IFNE ASRCNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           AKACTP    IFEQ 'C'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*如為1131 + 7142繳款，
+     C*則以1131兌現與否，判
+     C*別是否要累計7142金額
+     C*
+     C                     MOVE *BLANK    W#NTCD  1
+     C           AKACNO    IFEQ '1131'
+0109AC           AKACNO    OREQ '111001'
+     C                     MOVELAKNTCD    W#NTCD           兌現碼
+     C                     ENDIF
+     C*沖銷
+     C           AKNTTP    IFEQ 'H'                        庫存現金
+     C           AKNTTP    OREQ 'J'                        銀行存款
+     C           AKACNO    OREQ '2159'
+0109AC           AKACNO    OREQ '211301'
+     C           AKNTCD    IFEQ *BLANK                     未兌現
+9908AC           AKDUDT    ANDLEU#SYSD                     已到期
+     C                     MOVEL'Y'       AKNTCD
+     C                     UPDATRARCVCK
+     C                     EXSR SR1000
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           AKACNO    IFEQ '7111'                     運費
+     C           AKACNO    OREQ '7112'                     檢驗費
+     C           AKACNO    OREQ '7142'                     郵電費
+0109AC           AKACNO    OREQ '710101'
+0109AC           AKACNO    OREQ '710102'
+0109AC           AKACNO    OREQ '710402'
+     C                     EXSR SR2000
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#DAMT 100
+     C*
+     C                     MOVELAKRCNO    ATRCNO           沖銷單號
+     C                     Z-ADD0         ATITEM           沖銷項次
+     C           W#CVDT    SETLLRARCVDT
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ RARCVDT                  41
+     C   41                LEAVE
+     C*
+     C           ATRCNO    IFNE AKRCNO
+     C                     LEAVE
+     C                     ENDIF
+ TESTC*
+     C                     MOVE ATINNO    W#INNO  8
+     C           W#INNO    IFEQ '38878698'
+     C                     ADD  1         W#TMP   10
+     C                     ENDIF
+     C*
+     C           ATINNO    CHAINRARINVM              42
+     C  N42      AMCLOC    IFEQ *BLANK
+     C*
+     C*總繳款金額＋折退金額＋折退稅額＝發票金額
+     C           ATAMT3    SUB  AMBAMT    W#DAMT           折讓金額
+     C                     SUB  AMBTAX    W#DAMT           折讓稅額
+     C           W#DAMT    SUB  AMDAMT    W#DAMT           發票金額
+     C           W#DAMT    IFGE 0
+     C                     Z-ADDATAMT3    AMFAMT           沖銷金額
+     C                     MOVEL'Y'       AMCLOC           結案碼
+     C                     MOVEL'SYSTEM'  AMCLOM           結案人員
+9908AC                     MOVE U#SYSD    AMCLOD           結案日期
+     C                     ELSE
+     C                     ADD  ATAMT3    AMFAMT           沖銷金額
+     C                     ENDIF
+     C*
+     C                     UPDATRARINVM
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C           W#NTCD    IFEQ ' '
+     C                     GOTO EN2000
+     C                     ENDIF
+     C*
+     C                     MOVELAKRCNO    ATRCNO           沖銷單號
+     C                     Z-ADD0         ATITEM           沖銷項次
+     C           W#CVDT    SETLLRARCVDT
+     C                     MOVE *OFF      *IN43
+     C           *IN43     DOWEQ*OFF
+     C                     READ RARCVDT                  43
+     C   43                LEAVE
+     C*
+     C           ATRCNO    IFNE AKRCNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           ATINNO    CHAINRARINVM              44
+     C  N44      AMCLOC    IFEQ *BLANK
+     C*
+     C           ATAMT2    IFEQ 0                          發票餘額
+     C                     MOVEL'Y'       AMCLOC           結案碼
+     C                     MOVEL'SYSTEM'  AMCLOM           結案人員
+9908AC                     MOVE U#SYSD    AMCLOD           結案日期
+     C                     UPDATRARINVM
+     C                     ELSE
+     C                     EXSR SR2100
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           EN2000    ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AMT3 120
+     C*
+     C                     MOVE *OFF      *IN45
+     C           ATINNO    SETLLRCVDT1
+     C           *IN45     DOWEQ*OFF
+     C           ATINNO    READERCVDT1              N    45
+     C*
+     C   45                LEAVE
+     C*
+     C                     ADD  F#AMT3    W#AMT3
+     C                     ENDDO
+     C*
+     C           W#AMT3    IFNE 0
+     C           AMDAMT    IFEQ W#AMT3
+     C                     Z-ADDW#AMT3    AMFAMT           沖銷金額
+     C                     MOVEL'Y'       AMCLOC           結案碼
+     C                     MOVEL'SYSTEM'  AMCLOM           結案人員
+9908AC                     MOVE U#SYSD    AMCLOD           結案日期
+     C                     UPDATRARINVM
+     C*
+     C                     ELSE
+     C                     Z-ADDW#AMT3    AMFAMT           沖銷金額
+     C                     UPDATRARINVM
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+

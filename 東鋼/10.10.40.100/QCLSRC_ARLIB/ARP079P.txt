@@ -1,0 +1,81 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP079P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02YSH                                  */
+     /*     4.FUNCTION     現金流出入彙總預估(ARP079F -> ACACHS)  */
+     /*     5.DATE-WRITTEN  90/10/22                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)   /*執行狀態*/
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&DEVI)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&AREAS)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&AREAE)  TYPE(*CHAR) LEN(1)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+          /* SBMJOB     JOB(ARP079P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARP079P')  */
+          /* RETURN  */
+
+BATCH:
+             RTVDTAARA  DTAARA(*LDA (398 1)) RTNVAR(&AREAS)
+             IF         COND((&AREAS *EQ ' ')) THEN(DO)
+             CHGVAR     VAR(&AREAS)  VALUE(' ')
+             CHGVAR     VAR(&AREAE)  VALUE('9')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&AREAE)  VALUE(&AREAS)
+             ENDDO
+
+             CLRPFM     FILE(ARP079F)
+             MONMSG     MSGID(CPF0000)
+
+             OVRDBF     FILE(TRNDTL)   TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OVRDBF     FILE(HSCONT)   TOFILE(DALIB/HSCONT)
+             OVRDBF     FILE(ARP079F)  TOFILE(DALIB/ARP079F)
+             OPNQRYF    FILE(TRNDTL) QRYSLT('+
+                            (TXCODE *EQ "SA04") *AND +
+                            (AREA *GE "' || &AREAS || '") *AND +
+                            (AREA *LE "' || &AREAE || '") *AND +
+                            (TXIVNO *EQ "          ")') +
+                        KEYFLD((TXDATE) (TXNO)) +
+                        MAPFLD((AREA '%SST(TXNO 1 1)' *CHAR 1))
+             CALL       PGM(ARP079R1)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(INVMST)   TOFILE(DALIB/INVMST) SHARE(*YES)
+             OVRDBF     FILE(HSCONT)   TOFILE(DALIB/HSCONT)
+             OVRDBF     FILE(ARP079F)  TOFILE(DALIB/ARP079F)
+             OPNQRYF    FILE(INVMST) QRYSLT('+
+                            (AREA *GE "' || &AREAS || '") *AND +
+                            (AREA *LE "' || &AREAE || '") *AND +
+                            (INDECD *NE "D")') +
+                        KEYFLD((ININDT) (INNO)) +
+                        MAPFLD((AREA '%SST(INORNO 1 1)' *CHAR 1))
+             CALL       PGM(ARP079R2)
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+
+             RTVDTAARA  DTAARA(*LDA (397 1)) RTNVAR(&AREAS)
+             IF         COND((&AREAS *EQ 'X')) THEN(DO)
+             OVRDBF     FILE(ARP079F)  TOFILE(DALIB/ARP079F) SHARE(*YES)
+             OPNQRYF    FILE(ARP079F) +
+                        KEYFLD((WFDATE) (WFNOTP))
+             CALL       PGM(ARP079R3)
+             CLOF       OPNID(ARP079F)
+             DLTOVR     FILE(*ALL)
+             ENDDO
+
+        /*   RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&DEVI)  */
+        /*   SNDBRKMSG  MSG('<<現金流出入彙總預估(未繳款部分) +
+                        ....>>') TOMSGQ(&DEVI) +
+                        MSGTYPE(*INFO)                        */
+             ENDPGM
+

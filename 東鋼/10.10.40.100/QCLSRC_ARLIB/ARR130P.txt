@@ -1,0 +1,84 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR130P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02LBU                                  */
+     /*     4.FUNCTION     已開發票押匯狀況彙總表               */
+     /*     5.DATE-WRITTEN  96/11/14                                */
+     /*     6.UPDATE  DATE 111/11/25 S00WCJ (1111A)                 */
+     /*                     避免銷貨發票直接扣預收不須做請款單之資*/
+     /*                     料於未請款報表中產出，增加篩選發票未收*/
+     /*                     金額需>0 　                         */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN12)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&YMD1)   TYPE(*DEC)  LEN(8 0)
+             DCL        VAR(&YMDA)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&OPT)    TYPE(*CHAR) LEN(1)
+
+
+             RTVJOBA    TYPE(&INT) OUTQ(&OUTQ)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+ RDSP:
+             CHGVAR     VAR(&IN03)    VALUE('0')
+             CHGVAR     VAR(&IN12)    VALUE('0')
+             CALL       PGM(ARR130RS) PARM(&IN03 &YMD1 &OPT)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGVAR     VAR(&YMDA)        VALUE(&YMD1)
+             CHGDTAARA  DTAARA(*LDA (301 8)) VALUE(&YMDA)
+             CHGDTAARA  DTAARA(*LDA (317 1)) VALUE(&OPT)
+
+             SBMJOB     JOB(ARR130P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARR130P')
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (301 8)) RTNVAR(&YMDA)
+             RTVDTAARA  DTAARA(*LDA (317 1)) RTNVAR(&OPT)
+
+             OVRPRTF    FILE(ARR130T1) TOFILE(ARR130T1) PAGESIZE(*N 158) +
+                        CPI(12) HOLD(*YES) USRDTA('未請款')
+             OVRDBF     FILE(INVMST) TOFILE(INVMST) SHARE(*YES)
+
+    /*部門不為空白*/
+             IF         COND(&OPT  *EQ '1') THEN(DO)
+/*1111A*/    OPNQRYF    FILE(INVMST) QRYSLT('                        +
+                               (INDECD *NE "D"            )    *AND  +
+                               (INTYPE *NE "9"            )    *AND  +
+                               (INAPNO *EQ "      "       )    *AND  +
+                               (INNBAL *GT 0)                  *AND +
+                               (ORNO   *EQ "H")')                    +
+                        MAPFLD((DATE  ININDT  *CHAR  8)              +
+                               (ORNO  '%SST(INORNO 1 1)' *CHAR 1))   +
+                        KEYFLD((INRVID)(INCUNO)(INORNO))
+             CALL       PGM(ARR130R1)
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+             ENDDO
+
+             OVRPRTF    FILE(ARR130T2) TOFILE(ARR130T2) PAGESIZE(*N 158) +
+                        CPI(12) HOLD(*YES) USRDTA('已請未繳')
+             OVRDBF     FILE(INVMST) TOFILE(INVMST) SHARE(*YES)
+             OPNQRYF    FILE(INVMST) QRYSLT('                        +
+                               (INDECD *NE "D"            )    *AND  +
+                               (INTYPE *NE "9"            )    *AND  +
+                               (INAPNO *NE "      "       )    *AND  +
+                               (ORNO   *EQ "H")')                    +
+                        MAPFLD((DATE  ININDT  *CHAR  8)              +
+                               (ORNO  '%SST(INORNO 1 1)' *CHAR 1))   +
+                        KEYFLD((INRVID)(INCUNO)(INAPNO))
+             CALL       PGM(ARR130R2)
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+
+             RETURN
+             ENDPGM
+

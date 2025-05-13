@@ -1,0 +1,447 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARDSDTCVT2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION    ARDSDTCVT2折讓單鋼筋分攤改抓SRVOUR
+     H*            5.DATE-WRITTEN  105/10/22 S00WCJ
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTLLLIF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FINVDTLL4IF  E           K        DISK
+     F            IVREC                             KRENAMEIVREC4
+     FTRNDTLLBIF  E           K        DISK
+     F            TXREC                             KRENAMETRNDLB
+     FARDSDTL1UF  E           K        DISK                      A
+     FARDSDTL4IF  E           K        DISK
+     F            RARDSDT                           KRENAMEARDSD4
+0510AFARDSDTL5UF  E           K        DISK
+0510AF            RARDSDT                           KRENAMEARDSD5
+0510AFSRVOURL4IF  E           K        DISK
+0510AFARDSDTG O   E           K        DISK
+0510AF            RARDSDTG                          KRENAMETRLG
+     ITRNDLB
+     I              TXDATE                          T#DATE
+     I              TXNO                            T#TXNO
+     I              TXITEM                          T#ITEM
+     I              TXCUNO                          T#CUNO
+     I              TXCUNM                          T#CUNM
+     I              TXORNO                          T#ORNO
+     I              TXIVNO                          T#IVNO
+     I              TXPDNM                          T#PDNM
+     I              TXUPRC                          T#UPRC
+     I              TXQTY                           T#QTY
+     I              TXTAX                           T#TAX
+     I              TXAMT                           T#AMT
+     I              TXTXAR                          T#TXAR
+     I              TXRESV                          T#RESV
+     IIVREC4
+     I              IVPDCD                          V#PDCD
+     I              IVQTY                           V#QTY
+     I              IVAMT                           V#AMT
+     IARDSD4
+     I              ASRESV                          R#RESV
+     I*
+     I            DS
+     I                                        1   8 TXNO
+     I                                        1   1 D#TXN1
+     I            DS
+     I                                        1  10 TXIVNO
+     I                                        3  10 D#IVNO
+     I            DS
+     I                                        1  30 TXRESV
+     I                                        1   60ACYM
+     I            DS
+     I                                        1  30 T#RESV
+     I                                       13  14 D#TXIT
+     I            DS
+     I                                        1  10 R#RESV
+     I                                        1   1 D#DEL
+0510AI            DS
+0510AI                                        1   8 T#TXNO
+0510AI                                        1   1 D#AREA
+0510AI                                        2   3 D#PCOD
+0510AI                                        4   80D#VRNO
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10011010 D1USER
+     I                                     10011001 D#DEPT
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C*****************************************************************
+     C*          Parameter List
+     C*****************************************************************
+     C*傳入執行之日期區間
+     C*
+     C           *ENTRY    PLIST
+     C                     PARM           D#DATS  8
+     C                     PARM           D#DATE  8
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           W#PDCD
+     C*
+     C           KEY02     KLIST
+     C                     KFLD           W1KIND
+     C                     KFLD           W1TXNO
+     C                     KFLD           W1TXIT
+     C                     KFLD           TXNO
+     C                     KFLD           TXITEM
+     C*
+     C           KEY03     KLIST
+     C                     KFLD           TXNO
+     C                     KFLD           TXIVNO
+     C                     KFLD           TXPDNM
+     C                     KFLD           TXITEM
+     C*
+     C           KEY04     KLIST
+     C                     KFLD           W1KIND
+     C                     KFLD           W1TXNO
+     C                     KFLD           W1TXIT
+     C                     KFLD           W1DXNO
+0510AC*
+0510AC           KEY05     KLIST
+0510AC                     KFLD           T#ORNO
+0510AC                     KFLD           D#AREA
+0510AC                     KFLD           D#PCOD
+0510AC                     KFLD           D#VRNO
+0510AC*
+0510AC           KEY06     KLIST
+0510AC                     KFLD           TXNO
+0510AC                     KFLD           TXITEM
+     C*
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C                     MOVELD#DATS    W#DATS  80
+     C                     MOVELD#DATE    W#DATE  80
+     C           W#DATS    SETLLTXREC
+     C                     MOVEL*OFF      *IN50
+     C           *IN50     DOWEQ*OFF
+     C                     READ TXREC                    50
+     C   50                LEAVE
+     C           TXDATE    IFLT W#DATS
+     C                     LEAVE
+     C                     ENDIF
+     C           TXDATE    IFGT W#DATE
+     C                     LEAVE
+     C                     ENDIF
+     C           TXACNT    IFNE '3'
+     C                     ITER
+     C                     ENDIF
+     C           TXFL01    IFNE 'Y'
+     C                     ITER
+     C                     ENDIF
+     C*只做鋼筋折讓
+     C           D#TXN1    IFEQ 'H'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*U01324發票品名與折讓品名不符，無法分攤
+     C*U01532發票品名與折讓品名不符，無法分攤
+     C*U01488發票品名與折讓品名不符，無法分攤
+     C*K02993發票品名與折讓品名不符，無法分攤
+     C*K03006發票品名與折讓品名不符，無法分攤
+     C*K03012發票品名與折讓品名不符，無法分攤
+     C*K03023發票品名與折讓品名不符，無法分攤
+     C*K03061發票品名與折讓品名不符，無法分攤
+     C*K03078發票品名與折讓品名不符，無法分攤
+     C*K03076發票品名與折讓品名不符，無法分攤
+     C*K03081發票品名與折讓品名不符，無法分攤
+     C*M04218發票品名與折讓品名不符，無法分攤
+     C*M04219發票品名與折讓品名不符，無法分攤
+     C*P14018發票品名與折讓品名不符，無法分攤
+     C*M04231 QC60000071發票品名與折讓品名不符，無法分攤
+     C*P14163發票品名與折讓品名不符，無法分攤
+     C*P14164發票品名與折讓品名不符，無法分攤
+     C*M04305發票品名與折讓品名不符，無法分攤
+     C*P14284發票品名與折讓品名不符，無法分攤
+     C*M04385發票品名與折讓品名不符，無法分攤
+     C*P14298發票品名與折讓品名不符，無法分攤
+     C*P14429發票品名與折讓品名不符，無法分攤
+     C*P14479發票品名與折讓品名不符，無法分攤
+     C*M04454發票品名與折讓品名不符，無法分攤
+     C*P14580發票品名與折讓品名不符，無法分攤
+     C*P14636發票品名與折讓品名不符，無法分攤
+     C*
+     C*          TXNO      IFEQ 'U01324'
+     C*          TXNO      OREQ 'U01532'
+     C*          TXNO      OREQ 'U01488'
+     C*          TXNO      OREQ 'K02993'
+     C*          TXNO      OREQ 'K03006'
+     C*          TXNO      OREQ 'K03012'
+     C*          TXNO      OREQ 'K03023'
+     C*          TXNO      OREQ 'K03061'
+     C*          TXNO      OREQ 'K03078'
+     C*          TXNO      OREQ 'K03076'
+     C*          TXNO      OREQ 'K03081'
+     C*          TXNO      OREQ 'M04218'
+     C*          TXNO      OREQ 'M04219'
+     C*          TXNO      OREQ 'P14018'
+     C*          TXNO      OREQ 'M04231'
+     C*          D#IVNO    ANDEQ'60000071'
+     C*          TXNO      OREQ 'P14163'
+     C*          TXNO      OREQ 'P14164'
+     C*          TXNO      OREQ 'M04305'
+     C*          TXNO      OREQ 'P14284'
+     C*          TXNO      OREQ 'M04385'
+     C*          TXNO      OREQ 'P14298'
+     C*          TXNO      OREQ 'P14429'
+     C*          TXNO      OREQ 'P14479'
+     C*          TXNO      OREQ 'M04454'
+     C*          TXNO      OREQ 'P14580'
+     C*          TXNO      OREQ 'P14636'
+     C*                    ITER
+     C*                    ENDIF
+     C           KEY03     CHAINARDSD4               53
+     C   53                EXSR SR1000                     新增ARDSDT
+     C* N53                EXSR SR2000                     修改ARDSDT
+     C                     ENDDO
+     C                     MOVEL*ON       *INLR
+     C*
+     C***************************************************************
+     C           SR1000    BEGSR
+     C****************************************************************
+     C*
+     C*計算發票中同品項之數量
+     C*
+     C                     MOVELTXIVNO    IVNO
+     C                     MOVELTXPDNM    W#PDCD  5        記錄品名
+     C*
+     C                     Z-ADD0         W#VQTY  80
+     C           KEY01     SETLLIVREC4
+     C                     MOVEL*OFF      *IN55
+     C           *IN55     DOWEQ*OFF
+     C           KEY01     READEIVREC4                   55
+     C   55                LEAVE
+     C*
+     C           IVACNT    IFEQ '1'
+     C                     ADD  V#QTY     W#VQTY
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     Z-ADDTXAMT     W#AMTT 120H      折讓金額
+0510AC                     Z-ADDTXAMT     K#AMTT 120H      折讓金額
+     C                     Z-ADDTXTAX     W1AMTT 120H      折讓稅額
+0510AC                     Z-ADDTXTAX     K1AMTT 120H      折讓稅額
+     C*
+     C*計算折讓單價(折讓金額/發票中同品項之數量)
+     C*
+0510AC*          W#AMTT    DIV  W#VQTY    W#PRIC  53H
+     C*
+0510AC                     Z-ADD0         W#SQTY  90
+0510AC                     MOVEL'N'       W#COYN  1
+     C*
+     C           KEY01     SETLLTRNDLB
+     C                     MOVEL*OFF      *IN55
+     C           *IN55     DOWEQ*OFF
+     C           KEY01     READETRNDLB                   55
+0510AC           *IN55     IFEQ *ON
+0510AC           W#COYN    ANDEQ'N'
+0510AC                     CLEARTRLG
+0510AC                     MOVEL'D'       TGKIND
+0510AC                     MOVELTXCUNO    TGCUNO
+0510AC                     MOVELTXCUNM    TGCUNM
+0510AC                     MOVELTXORNO    TGORNO
+0510AC                     MOVELACYM      TGYYMM
+0510AC                     MOVELIVNO      TGINNO
+0510AC                     MOVELW#PDCD    TGPDNM
+0510AC                     Z-ADDTXAMT     TGDMT1
+0510AC                     Z-ADDTXTAX     TGDMT2
+0510AC                     MOVELTXNO      TGDXNO
+0510AC                     Z-ADDTXITEM    TGDXIT
+0510AC                     MOVEL'IV'      TGRESV
+0510AC                     WRITETRLG
+0510AC                     ENDIF
+     C   55                LEAVE
+     C*
+0509AC           T#QTY     IFLT 0
+0509AC           T#AMT     ORLT 0
+0509AC                     ITER
+0509AC                     ENDIF
+0510AC                     MOVEL'Y'       W#COYN
+     C*
+0510AC                     MOVEL'N'       W1COYN  1
+0510AC           KEY05     SETLLRSRVOUR
+0510AC                     MOVEL*OFF      *IN57
+0510AC           *IN57     DOWEQ*OFF
+0510AC           KEY05     READERSRVOUR                  57
+0510AC           *IN57     IFEQ *ON
+0510AC           W1COYN    ANDEQ'N'
+0510AC                     CLEARRARDSDT
+0510AC                     MOVEL'D'       ASKIND
+0510AC                     MOVELT#CUNO    ASCUNO
+0510AC                     MOVELT#CUNM    ASCUNM
+0510AC                     MOVELT#ORNO    ASORNO
+0510AC                     MOVELACYM      ASYYMM
+0510AC           TXIVNO    CHAININREC                52
+0510AC                     MOVELINKIND    ASTYPE           發票聯式
+0510AC                     MOVELINRVID    ASSALE           業務員別
+0510AC                     MOVELINAREA    ASAREA           廠區別
+0510AC                     MOVELT#IVNO    ASINNO
+0510AC                     MOVEL'3'       ASACNT
+0510AC                     Z-ADDININDT    ASINDT           發票日期
+0510AC                     MOVELT#TXNO    ASTXNO
+0510AC           D#TXIT    IFNE *BLANKS
+0510AC                     MOVELD#TXIT    ASTXIT
+0510AC                     ENDIF
+0510AC                     MOVELT#DATE    ASDATE
+0510AC                     MOVELT#PDNM    ASPDNM
+0510AC                     Z-ADDT#QTY     ASQTY1
+0510AC                     Z-ADDT#UPRC    ASPRC1
+0510AC                     Z-ADDT#AMT     ASAMT1
+0510AC                     Z-ADDT#QTY     ASQTY2
+0510AC                     ADD  ASQTY1    W#SQTY
+0510AC                     MOVELTXNO      ASDXNO
+0510AC                     MOVELTXITEM    ASDXIT
+0510AC                     MOVELD1USER    ASUPDM           異動人員
+0510AC           *DATE     SUB  19000000  ASUPDD           異動日期
+0510AC                     TIME           ASUPDT           異動時間
+0510AC                     MOVEL'1'       ASCHYN           分攤方式
+0510AC                     Z-ADDK#AMTT    ASDMT5
+0510AC                     Z-ADDK1AMTT    ASDMT6
+0510AC                     MOVEL'SR'      ASRESV
+0510AC                     WRITERARDSDT
+0510AC                     ENDIF
+0510AC   57                LEAVE
+     C*
+0510AC                     MOVEL'Y'       W1COYN
+     C                     CLEARRARDSDT
+     C*
+     C                     MOVELT#TXNO    W1TXNO  8
+     C                     Z-ADDS4VRTM    W1TXIT  20
+     C*
+     C                     Z-ADDT#QTY     W1QTY   70
+     C                     MOVELT#PDNM    W1PDNM  5
+     C                     Z-ADDT#UPRC    W1UPRC  53
+     C*
+     C*                    MOVEL'A'       ASFLAG           處理代碼
+     C                     MOVEL'D'       ASKIND           分攤類別
+     C                     MOVELT#CUNO    ASCUNO           客戶代號
+     C                     MOVELT#CUNM    ASCUNM           客戶名稱
+     C                     MOVELT#ORNO    ASORNO           訂單編號
+     C                     Z-ADDACYM      ASYYMM           處理年月
+     C           TXIVNO    CHAININREC                52
+     C                     MOVELINKIND    ASTYPE           發票聯式
+     C                     MOVELINRVID    ASSALE           業務員別
+     C                     MOVELINAREA    ASAREA           廠區別
+0510AC*                    Z-ADDW#PRIC    ASAMT4           折讓單價
+     C                     MOVELT#IVNO    ASINNO           發票號碼
+     C                     MOVEL'3'       ASACNT           發票類別
+     C*
+     C*發票日期為主檔開立日，非明細檔之入帳日
+     C*
+     C                     Z-ADDININDT    ASINDT           發票日期
+     C                     MOVELT#TXNO    ASTXNO           磅單編號
+     C                     Z-ADDW1TXIT    ASTXIT           磅單項次
+     C                     Z-ADDT#DATE    ASDATE           出貨日期
+     C                     MOVELT#PDNM    ASPDNM           品名
+0510AC                     Z-ADDS4NWGT    ASQTY1           銷貨數量
+     C                     Z-ADDT#UPRC    ASPRC1           TR銷貨單價
+     C                     Z-ADDT#AMT     ASAMT1           TR銷貨金額
+0510AC                     Z-ADDT#QTY     ASQTY2           TR銷貨數量
+0510AC                     ADD  ASQTY1    W#SQTY
+0510AC*          ASQTY1    DIV  W#VQTY    ASAMT5           分攤比例
+     C*
+     C                     MOVELTXNO      ASDXNO           折讓單號
+     C                     Z-ADDTXITEM    ASDXIT           折讓單項次
+     C                     MOVELD1USER    ASUPDM           異動人員
+     C           *DATE     SUB  19000000  ASUPDD           異動日期
+     C                     TIME           ASUPDT           異動時間
+     C                     MOVEL'1'       ASCHYN           分攤方式
+0510AC                     Z-ADDK#AMTT    ASDMT5           折讓總金額
+0510AC                     Z-ADDK1AMTT    ASDMT6           折讓總稅額
+     C                     WRITERARDSDT
+0510AC                     ENDDO
+     C*
+     C                     ENDDO
+     C*
+0510AC                     MOVEL*OFF      *IN57
+0510AC           KEY06     SETLLARDSD5
+0510AC           *IN57     DOWEQ*OFF
+0510AC           KEY06     READEARDSD5                   57
+0510AC   57                LEAVE
+0510AC           ASQTY1    DIV  W#SQTY    ASAMT5
+0510AC           ASAMT5    MULT K#AMTT    ASDMT1    H      折讓金額
+0510AC           W#AMTT    SUB  ASDMT1    W#AMTT
+0510AC           ASAMT5    MULT K1AMTT    ASDMT2    H      折讓稅額
+0510AC           W1AMTT    SUB  ASDMT2    W1AMTT
+0510AC                     UPDATARDSD5
+0510AC                     ENDDO
+0510AC*
+     C           W#AMTT    IFNE 0
+     C           W1AMTT    ORNE 0
+     C                     MOVEL'D'       W1KIND  1
+     C           W1TXIT    IFNE 0
+     C           KEY02     CHAINRARDSDT              56
+     C           W#AMTT    IFNE 0
+0510AC                     Z-ADDW#AMTT    ASDMT3
+     C           ASDMT1    ADD  W#AMTT    ASDMT1
+     C                     Z-ADD0         W#AMTT
+     C                     ENDIF
+     C*
+     C           W1AMTT    IFNE 0
+0510AC                     Z-ADDW1AMTT    ASDMT4
+     C           ASDMT2    ADD  W1AMTT    ASDMT2
+     C                     Z-ADD0         W1AMTT
+     C                     ENDIF
+     C  N56                UPDATRARDSDT
+     C                     ENDIF
+     C*
+     C           W1TXIT    IFEQ 0
+     C           KEY02     SETLLRARDSDT
+     C                     MOVEL*OFF      *IN58
+     C           *IN58     DOWEQ*OFF
+     C           KEY02     READERARDSDT                  58
+     C   58                LEAVE
+     C           ASPDNM    IFEQ W1PDNM
+     C           W#AMTT    IFNE 0
+0510AC                     Z-ADDW#AMTT    ASDMT3
+     C           ASDMT1    ADD  W#AMTT    ASDMT1
+     C                     Z-ADD0         W#AMTT
+     C                     ENDIF
+     C           W1AMTT    IFNE 0
+0510AC                     Z-ADDW1AMTT    ASDMT4
+     C           ASDMT2    ADD  W1AMTT    ASDMT2
+     C                     Z-ADD0         W1AMTT
+     C                     ENDIF
+     C                     UPDATRARDSDT
+     C                     ENDIF
+     C                     ENDDO
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C                     ENDSR
+     C****************************************************************
+     C           SR2000    BEGSR
+     C****************************************************************
+     C*
+     C                     Z-ADDTXAMT     W#AMTT 120H      折讓金額
+     C                     Z-ADDTXTAX     W1AMTT 120H      折讓稅額
+     C           KEY03     SETLLARDSD4
+     C                     MOVEL*OFF      *IN55
+     C           *IN55     DOWEQ*OFF
+     C           KEY03     READEARDSD4                   55
+     C   55                LEAVE
+     C           W#AMTT    SUB  ASDMT1    W#AMTT
+     C           W1AMTT    SUB  ASDMT2    W1AMTT
+     C                     MOVELASKIND    W1KIND
+     C                     MOVELASTXNO    W1TXNO
+     C                     MOVELASTXIT    W1TXIT
+     C                     MOVELASDXNO    W1DXNO  8
+     C                     ENDDO
+     C*
+     C           KEY04     CHAINRARDSDT              56
+     C           *IN56     IFEQ *OFF
+     C                     ADD  W#AMTT    ASDMT1
+     C                     ADD  W1AMTT    ASDMT2
+     C                     UPDATRARDSDT
+     C                     ENDIF
+     C*
+     C                     ENDSR
+

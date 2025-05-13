@@ -1,0 +1,112 @@
+     H*****************************************************************
+     H*
+     H*            >>  PROGRAM INTRODUCTION  <<
+     H*
+     H*            1.PROGRAM-ID      CNV013RD
+     H*            2.PROGRAM-TYPE    RPG
+     H*            3.AUTHOR          S02LBU
+     H*            4.FUNCTION       外銷未開發票計算統計檔
+     H*            5.DATE-WRITTEN    95/12/21
+     H*                              109/06/15 S00WCJ (0906A)
+     H*                              修正出貨金額以繳款金額帶入之BUG
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E                    DISK
+     FSARVINX IF  E           K        DISK
+     FARSTAT  UF  E           K        DISK                      A
+     F*****************************************************************
+     ITXREC
+     I                                              TXVUNOL1
+     I*----------------------------------------------------------------
+     I            DS
+     I                                        1   9 TXORNO
+     I                                        1   6 D#TXOR
+     I*
+     I           UDS
+     I                                        1   60YMD
+     I                                        1   40YM
+     I                                        5   60DD
+     C*****************************************************************
+     C*          KEY       LIST
+     C*****************************************************************
+     C           ARKEY     KLIST
+     C                     KFLD           ARORNO
+     C*
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C   L1                EXSR D#L1
+     C                     EXSR D#PR
+     CL1N97                EXSR T#L1
+     C*****************************************************************
+     CSR         D#L1      BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         AAMT   110
+     C                     Z-ADD0         AQTY   110
+     C                     MOVEL*BLANK    W#ORNO 10
+     C                     MOVELD#TXOR    ARORNO
+     C*
+     C           ARKEY     CHAINARSTAT               97
+CLJB C           *IN97     IFEQ '1'
+     C                     CLEARARREC
+     C                     MOVEL'A'       ARFLAG
+     C                     MOVELTXCUNO    ARCUNO
+     C                     MOVELTXCUNM    ARCUNM
+     C                     MOVELD#TXOR    ARORNO
+     C                     WRITEARREC
+     C           ARKEY     CHAINARSTAT               97
+CLJE C                     ENDIF
+     C*
+     C                     MOVELD#TXOR    W#ORNO
+     C           W#ORNO    CHAINSARVINX              70
+     C  N70                Z-ADDSIINXA    W#INXA 110
+     C  N70                Z-ADDSIINAM    W#INAM 110
+     C   70                Z-ADD0         W#INXA
+     C   70                Z-ADD0         W#INAM
+     C*
+     CSR         D#L1Z     ENDSR
+     C*****************************************************************
+     CSR         D#PR      BEGSR
+     C*****************************************************************
+     C                     ADD  TXAMT     AAMT
+     C                     ADD  TXQTY     AQTY
+     C*
+     CSR         D#PRZ     ENDSR
+     C*****************************************************************
+     CSR         T#L1      BEGSR
+     C*****************************************************************
+     C           AAMT      IFEQ 0
+     C                     GOTO T#L1Z
+     C                     ENDIF
+     C*
+     C                     ADD  AQTY      ARAQTY
+0906AC* N70                Z-ADDW#INAM    ARAAMT           出貨金額
+0906AC*  70                ADD  AAMT      ARAAMT
+0906AC                     ADD  AAMT      ARAAMT           出貨金額
+     C                     Z-ADD0         ARNBAL
+     C           ARAAMT    SUB  W#INXA    ARNBAL           貨款餘額
+     C                     Z-ADDARNBAL    AROAMT           未開發票額
+     C                     Z-SUBW#INXA    ARIAMT           繳貨款額
+     C*
+     C*出貨金額如小於繳款金額，則表示該
+     C*訂單之應收貨款額及未開發票額為零
+     C*
+     C           ARNBAL    IFLT 0
+     C                     Z-ADD0         ARNBAL
+     C                     Z-ADD0         AROAMT
+     C                     ENDIF
+     C*
+     C           ARNBAL    IFEQ 0
+     C                     MOVEL'Y'       ARFL01
+     C                     MOVEL'Y'       ARFL02
+     C                     ELSE
+     C                     MOVEL' '       ARFL01
+     C                     MOVEL' '       ARFL02
+     C                     ENDIF
+     C*
+     C                     UPDATARREC
+     C*
+     CSR         T#L1Z     ENDSR
+     C*****************************************************************
+

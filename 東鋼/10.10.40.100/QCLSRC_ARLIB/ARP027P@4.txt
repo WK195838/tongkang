@@ -1,0 +1,87 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE  98/12/31 2009AR406 S00WCJ (9812A)  */
+    /*                          103/03/17 2014AR810 S00WCJ (0303A)  */
+    /*                           T03下線                          */
+    /*                          112/03/03 2023AR00006 S00WCJ (1203A)*/
+    /*                           新增大業廠                       */
+    /*                                                              */
+    /****************************************************************/
+
+        /*  ＝＝＝＜台北　預收貨款CPRBAL傳輸程式＞＝＝＝   */
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ARA2) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&LOC) TYPE(*CHAR) LEN(1)
+             DCLF       FILE(ARP027S) RCDFMT(TITLE)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&LOC)
+             RTVJOBA    TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+             CHGVAR     VAR(&AREA1) VALUE(&LOC)
+ START:      SNDRCVF    RCDFMT(TITLE)
+             CHGVAR     VAR(&ERRMSG) VALUE('                      ')
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             IF         COND(&ORNO *EQ '     ') THEN(DO)
+             CHGVAR     VAR(&ERRMSG) VALUE('訂單號碼不可空白')
+                        GOTO START
+                        ENDDO
+             IF         COND(&AREA2 *EQ ' ') THEN(DO)
+             CHGVAR     VAR(&ERRMSG) VALUE('欲送廠區不可空白')
+                        GOTO START
+                        ENDDO
+             ELSE IF    COND(&AREA2 *EQ &LOC) THEN(DO)
+             CHGVAR     VAR(&ERRMSG) VALUE('欲送廠區不可為原廠區')
+                        GOTO START
+                        ENDDO
+             CHGDTAARA  DTAARA(*LDA (1 1)) VALUE(&AREA1)
+             CHGDTAARA  DTAARA(*LDA (2 1)) VALUE(&AREA2)
+             CHGDTAARA  DTAARA(*LDA (3 6)) VALUE(&ORNO)
+             SBMJOB     JOB(ARP027P) JOBD(ARJOBD) JOBQ(QSYS/QCTL) +
+                          RQSDTA('CALL ARLIB/ARP027P')
+      /*     SNDPGMMSG  +
+                          MSG('發票主檔傳輸已送入批次作業執行中..+
+                          .') TOPGMQ(*EXT)      */
+             GOTO       CMDLBL(ENDCLPGM)
+ BATCH:      RTVDTAARA  DTAARA(*LDA (2 1)) RTNVAR(&ARA2)
+        /*  　　  ORNO --> ARLIB/BALF   (TEMP-FILE) */
+        /*  建立　DDMF & DTAARA ............................ */
+             DLTF       FILE(QTEMP/DDMP)
+             MONMSG     MSGID(CPF0000)
+ /*0303A     IF         COND(&ARA2 *EQ 'T') THEN(DO)       */
+ /*0303A     CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMP)        */
+ /*0303A     ENDDO                     */
+    /*9812A START*/
+             IF         COND(&ARA2 *EQ 'U') THEN(DO)
+             CRTDUPOBJ  OBJ(U01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMP)
+             ENDDO
+    /*9812A END */
+             ELSE IF    COND(&ARA2 *EQ 'K') THEN(DO)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMP)
+             ENDDO
+             ELSE IF    COND(&ARA2 *EQ 'H') THEN(DO)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMP)
+             ENDDO
+/*1203A*/    ELSE IF    COND(&ARA2 *EQ 'N') THEN(DO)
+/*1203A*/    CRTDUPOBJ  OBJ(N01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMP)
+ /*1203A*/   ENDDO
+             ELSE IF    COND(&ARA2 *EQ 'P') THEN(DO)
+             CRTDUPOBJ  OBJ(TPDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMP)
+             ENDDO
+ STEP1:
+        /*  各廠區抓  ARLIB/CPRBAL    ................ */
+             CHGDDMF    FILE(QTEMP/DDMP) RMTFILE(ARLIB/BALFT) +
+                          LVLCHK(*NO)
+             OVRDBF     FILE(BALFT) TOFILE(QTEMP/DDMP)
+             MONMSG     MSGID(CPF0000)
+             CALL       PGM(ARLIB/ARP027RA)
+             SBMRMTCMD  CMD('call arlib/arp027PA') +
+                          DDMFILE(QTEMP/DDMP)
+             DLTOVR     FILE(*ALL)
+ ENDCLPGM:   ENDPGM
+

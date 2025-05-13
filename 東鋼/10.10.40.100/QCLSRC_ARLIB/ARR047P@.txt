@@ -1,0 +1,68 @@
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DATE1)  TYPE(*DEC)  LEN(6)
+             DCL        VAR(&DATE1A) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DATE2)  TYPE(*DEC)  LEN(6)
+             DCL        VAR(&DATE2A) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&TXAR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&PRE)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&BCUNO)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&ECUNO)  TYPE(*CHAR) LEN(6)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL     PGM(ARR047RS) PARM(&IN03 &DATE1 &DATE2 &BCUNO &ECUNO &PRE)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&DATE1A) VALUE(&DATE1)
+             CHGVAR     VAR(&DATE2A) VALUE(&DATE2)
+             CHGDTAARA  DTAARA(*LDA (1 6)) VALUE(&DATE1A)
+             CHGDTAARA  DTAARA(*LDA (7 6)) VALUE(&DATE2A)
+             CHGDTAARA  DTAARA(*LDA (13 6)) VALUE(&BCUNO)
+             CHGDTAARA  DTAARA(*LDA (19 6)) VALUE(&ECUNO)
+             CHGDTAARA  DTAARA(*LDA (25 1)) VALUE(' ')
+             CHGDTAARA  DTAARA(*LDA (26 1)) VALUE(&PRE)
+             SBMJOB     JOB(ARR047P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR047P')
+             RETURN
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (1 6))    RTNVAR(&DATE1A)
+             RTVDTAARA  DTAARA(*LDA (7 6))    RTNVAR(&DATE2A)
+             RTVDTAARA  DTAARA(*LDA (13 6))   RTNVAR(&BCUNO)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&TXAR)
+             RTVDTAARA  DTAARA(*LDA (19 6))   RTNVAR(&ECUNO)
+             RTVDTAARA  DTAARA(*LDA (26 1))   RTNVAR(&PRE)
+             CHGVAR     VAR(&DATE1) VALUE(&DATE1A)
+             CHGVAR     VAR(&DATE2) VALUE(&DATE2A)
+             OVRDBF     FILE(RCVDTL) TOFILE(RCVDTL) SHARE(*YES)
+             IF         COND(&PRE *EQ "Y") THEN(DO)
+             OPNQRYF    FILE((RCVDTL)) QRYSLT('                +
+                          RVDATE = %RANGE(' || &DATE1A || '    +
+                                          ' || &DATE2A || ') & +
+                          RVCUNO = %RANGE("' || &BCUNO || '"    +
+                                          "' || &ECUNO || '") & +
+                          RVFLAG *NE "D"                     & +
+                          RVTYPE *NE "3"                     & +
+                          RVDECD *EQ " "                     & +
+                          RVACNO *EQ "1131"')                  +
+                          KEYFLD((RVCUNO)(RVNO))
+             ENDDO
+             IF         COND(&PRE *NE "Y") THEN(DO)
+             OPNQRYF    FILE((RCVDTL)) QRYSLT('                +
+                          RVDATE = %RANGE(' || &DATE1A || '    +
+                                          ' || &DATE2A || ') & +
+                          RVCUNO = %RANGE("' || &BCUNO || '"    +
+                                          "' || &ECUNO || '") & +
+                          RVFLAG *NE "D"                     & +
+                          RVUSTP *NE "A2"                    & +
+                          RVTYPE *NE "3"                     & +
+                          RVDECD *EQ " "                     & +
+                          RVACNO *EQ "1131"')                  +
+                          KEYFLD((RVCUNO)(RVNO))
+             ENDDO
+             OVRPRTF    FILE(QPRINT) COPIES(1) USRDTA('²¼´Á¤ÀªR')
+             CALL       PGM(ARR047R)
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

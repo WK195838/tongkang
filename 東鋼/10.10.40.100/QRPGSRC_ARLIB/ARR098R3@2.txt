@@ -1,0 +1,136 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR098R3
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     自製出貨分析表　　
+     H*            5.DATE-WRITTEN  91/09/30
+     H*            6.DATE-MODIFY
+     H*
+     H*            *將銷貨彙總表減去外購成品出貨明細表,辨識碼=3
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FWTMASPL4IF  E           K        DISK
+     FARR098FYIF  E           K        DISK
+     F            RAR098F1                          KRENAMERAR098FY
+     FARR098F1UF  E           K        DISK                      A
+     ITXREC
+     I                                              TXPDNML1
+     IRAR098FY
+     I              F1AREA                          F#AREA
+     I              F1CODE                          F#CODE
+     I              F1PDNM                          F#PDNM
+     I              F1TXNO                          F#TXNO
+     I              F1CUNO                          F#CUNO
+     I              F1CUNM                          F#CUNM
+     I              F1ORNO                          F#ORNO
+     I              F1QTY4                          F#QTY4
+     I              F1AMT4                          F#AMT4
+     I              F1QTY2                          F#QTY2
+     I              F1AMT2                          F#AMT2
+     I              F1AMT3                          F#AMT3
+     I              F1QTY                           F#QTY
+     I              F1AMT                           F#AMT
+     I            DS
+     I                                        1   8 TXNO
+     I                                        1   1 W6AREA
+     I                                        2   3 W6VNO1
+     I                                        4   80W6VNO2
+     I           UDS
+     I                                      400 400 D#AREA
+     I                                      401 4060T#DATS
+     I                                      407 4120T#DATE
+     I                                      413 415 T#PDNS
+     I                                      416 418 T#PDNE
+     I                                      419 419 D#KFLD
+     I                                      420 420 D#PRTF
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     SETON                       99
+     C*
+     C           K#MASP    KLIST
+     C                     KFLD           W6ENTD
+     C                     KFLD           W6AREA
+     C                     KFLD           W6VNO1
+     C                     KFLD           W6VNO2
+     C*
+     C           K#F1      KLIST
+     C                     KFLD           F1CODE
+     C                     KFLD           F1PDNM
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#QTY            *出貨數量
+     C                     Z-ADD0         W#AMT            *出貨金額
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     Z-ADDTXDATE    W6ENTD
+     C           K#MASP    CHAINRWTMASP             N40
+     C  N40      W6TRCD    IFEQ '1E'
+     C           W6WTNO    ANDNE'G'
+     C           W6WTNO    ANDNE'F'
+     C                     ADD  TXQTY     W#QTY   90       數量
+     C                     ADD  TXAMT     W#AMT  110       金額
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C                     MOVELTXPDNM    F1PDNM           品名
+     C                     MOVEL'1'       F1CODE
+     C           K#F1      CHAINRAR098F1             41
+     C  N41                MOVEL'3'       F1CODE           辨別碼
+     C  N41      F1QTY4    SUB  W#QTY     F1QTY4           數量
+     C  N41      F1AMT4    SUB  W#AMT     F1AMT4           收入
+     C  N41      F1QTY     SUB  W#QTY     F1QTY            銷貨淨數量
+     C  N41      F1AMT     SUB  W#AMT     F1AMT            銷貨淨收入
+     C  N41                WRITERAR098F1
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C*處理當日未出貨的狀況
+     C                     MOVE *OFF      *IN42
+     C           *LOVAL    SETLLRAR098FY
+     C           *IN42     DOWEQ*OFF
+     C                     READ RAR098FY                 42
+     C   42                LEAVE
+     C*
+     C           F#CODE    IFEQ '1'
+     C                     MOVELF#PDNM    F1PDNM           品名
+     C                     MOVEL'3'       F1CODE           辨別碼
+     C                     Z-ADDF#QTY4    F1QTY4           數量
+     C                     Z-ADDF#AMT4    F1AMT4           收入
+     C                     Z-ADDF#QTY     F1QTY            銷貨淨數量
+     C                     Z-ADDF#AMT     F1AMT            銷貨淨收入
+     C                     Z-ADDF#QTY2    F1QTY2
+     C                     Z-ADDF#AMT2    F1AMT2
+     C                     Z-ADDF#AMT3    F1AMT3
+     C*
+     C                     WRITERAR098F1
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+

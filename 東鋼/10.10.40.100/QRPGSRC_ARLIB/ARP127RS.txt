@@ -1,0 +1,148 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP127RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     加工代開傳票還原（畫面）
+     H*            5.DATE-WRITTEN  107/03/22 2018AR1144
+     H*            6.UPDATE  DATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARP127S CF  E                    WORKSTN
+     FARALOG  O   E           K        DISK
+     E*************************************************************
+0212AE                    T#ERR   1   6 70
+     I*************************************************************
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I            DS
+     I                                        1  140W#SYST
+     I                                        1   60D#ST
+     I                                        7  100D#SY
+     I                                       11  140D#SMD
+0212AI            DS
+0212AI                                        1   80W#DATE
+0212AI                                        1   40W#YY
+     C**************************************************************
+     C*   程式參數接收區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1        結束旗標
+9008 C                     PARM           P#DATX  8        輸入日期
+     C                     PARM           P#ENDD  2        止日
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+9909AC           *DATE     SUB  19000000  U#SYSD  80
+9008 C                     MOVE P#DATX    W#DATX  80       已代開日
+     C*
+     C           1         DOWEQ1
+     C                     WRITEAR127F1M
+     C                     EXFMTAR127F1
+     C*
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     EXSR SR1000                     檢核
+     C           W#RTNV    IFEQ 'T'
+     C                     EXSR SR2000                     存登錄
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     SETON                     LR
+     C************************************
+     C*  核核
+     C************************************
+     CSR         SR1000    BEGSR
+     C*
+     C                     MOVEL'F'       W#RTNV  1
+     C                     MOVE *ALL'0'   P#PDAT
+     C                     MOVE S#DATE    P#PDAT
+     C                     CALL 'UTS102R'
+     C                     PARM           P#PDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM '0'       P#FLAG  1
+     C           P#FLAG    IFNE '0'
+     C                     MOVELT#ERR,1   S#MSG1           日期錯誤
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C                     Z-ADDS#DATE    W#DATE
+     C           W#YY      IFLT 100
+     C                     MOVELT#ERR,6   S#MSG1
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C           S#DATE    IFGT U#SYSD
+     C                     MOVELT#ERR,2   S#MSG1           大於系統日
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C           S#DATE    IFGT W#DATX
+     C                     MOVELT#ERR,3   S#MSG1           尚未代開
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C                     MOVELS#DATE    P#YYMM  6
+     C                     MOVEL*BLANK    P#CODE  1
+     C                     CALL 'ACP101R'
+     C                     PARM           P#YYMM
+     C                     PARM           P#CODE
+     C                     FREE 'ACP101R'
+     C*
+     C           P#CODE    IFEQ '1'
+     C                     MOVELT#ERR,5   S#MSG1           已關帳
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C           S#CGCA    IFEQ *BLANK
+     C                     MOVELT#ERR,4   S#MSG1           輸入原因
+     C                     GOTO ES1000
+     C                     ENDIF
+     C*
+     C                     MOVEL'T'       W#RTNV
+     C*
+     CSR         ES1000    ENDSR
+     C************************************
+     C*  存檔登錄及設定傳回值
+     C************************************
+     CSR         SR2000    BEGSR
+     C                     MOVE S#DATE    P#DATX           傳回清日
+     C           S#ENDD    IFEQ 0
+     C                     MOVE '31'      P#ENDD           未輸至月底
+     C                     ELSE
+     C                     MOVE S#ENDD    P#ENDD
+     C                     ENDIF
+     C                     MOVEL'0'       P#IN03
+     C*
+     C                     CLEARRARALOG
+     C                     Z-ADDU#SYSD    AGDATE           日期
+     C                     TIME           W#SYST
+     C                     Z-ADDD#ST      AGTIME           時間
+     C                     MOVELU#USID    AGURID           使用者
+     C                     MOVEL'AIH'     AGTRID           異動代號
+     C                     MOVELS#DATE    AGRENO           相關號碼
+     C                     MOVELS#CGCA    AGCGCA           修改原因
+     C                     WRITERARALOG
+     CSR                   ENDSR
+     C*
+     C**************************************************************
+** T#ERR
+０１日期錯誤．
+０２日期不可大於系統日期
+０３該日期會計帳尚未代開，無法還原
+０４異動原因必須輸入
+０５關帳日期已過，請與相關人員聯絡！
+０６日期輸入錯誤(不可小於100年)
+

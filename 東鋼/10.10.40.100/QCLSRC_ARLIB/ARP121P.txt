@@ -1,0 +1,120 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP121P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCJ                                  */
+     /*     4.FUNCTION     獎勵金製票代開                       */
+     /*     5.DATE-WRITTEN  101/02/20 2012AR641                     */
+     /*     6.UPDATE  DATE                                          */
+     /*                                                             */
+     /***************************************************************/
+
+             PGM
+             DCL        VAR(&P#YYMM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&P#DATE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&P#CODE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&ACYM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&YM)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&Y)    TYPE(*CHAR) LEN(4)
+             DCL        VAR(&M)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DATE1) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATE2) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&WSID)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&FNAME) TYPE(*CHAR) LEN(10)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&WSID)
+             RTVJOBA    CYMDDATE(&DATE1)
+
+
+             CHGVAR     VAR(&DATE2) VALUE('0' *CAT &DATE1)
+             CHGVAR     VAR(&ACYM)  VALUE(%SST(&DATE2 1 6))
+
+    /*讀取台北獎勵金製票檔*/
+
+             DLTF       FILE(QTEMP/TPDDM)
+             MONMSG     MSGID(CPF0000)
+
+             CRTDUPOBJ  OBJ(TPDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)  NEWOBJ(TPDDM)
+             CHGDDMF    FILE(QTEMP/TPDDM) RMTFILE(*NONSTD +
+                        'DALIB/ARRDTLL1') LVLCHK(*NO)
+             OVRDBF     FILE(ARRDTLL1)  TOFILE(QTEMP/TPDDM)
+
+             CHGVAR     VAR(&FNAME) +
+                        VALUE('GL' || &AREA || 'R')
+             OVRDBF     FILE(GLTRAN) TOFILE(ACLIBN/&FNAME) SHARE(*YES)
+             OVRDBF     FILE(ACCTRL) TOFILE(ACLIBN/ACCTRL) SHARE(*YES)
+
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+  DISPLY:    CALL       PGM(ARP121RS) PARM(&IN03 &YM &ACYM)
+
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGDTAARA  DTAARA(*LDA (1 6)) VALUE(&YM)
+             CHGDTAARA  DTAARA(*LDA (7 2)) VALUE('01')
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&P#YYMM)
+             RTVDTAARA  DTAARA(*LDA (1 8)) RTNVAR(&P#DATE)
+
+       /*    CALL    PGM(ACP101R) PARM(&P#YYMM &P#CODE)  */
+             IF         COND(&P#CODE *EQ '1') THEN(DO)
+             SNDBRKMSG  MSG('關帳日期已過，請與相關人員聯絡！') +
+                          TOMSGQ(&WSID)
+             GOTO       CMDLBL(DISPLY)
+             ENDDO
+
+             SBMJOB     JOB(ARP120P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARP120P')
+             SNDBRKMSG  MSG('<<獎勵金製票代開作業+
+                         已開始處理,請稍待.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             RETURN
+
+BATCH:
+
+             RTVDTAARA  DTAARA(*LDA (1    6)) RTNVAR(&YM)
+             RTVDTAARA  DTAARA(*LDA (1    4)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (5    2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+
+             CHGVAR     VAR(&FNAME) +
+                        VALUE('GL' || &AREA || 'R')
+
+    /*讀取台北獎勵金製票檔*/
+             DLTF       FILE(QTEMP/TPDDM)
+             MONMSG     MSGID(CPF0000)
+
+             CRTDUPOBJ  OBJ(TPDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)  NEWOBJ(TPDDM)
+             CHGDDMF    FILE(QTEMP/TPDDM) RMTFILE(*NONSTD +
+                        'DALIB/ARRDTLL1') LVLCHK(*NO)
+
+             OVRDBF     FILE(GLTRAN) TOFILE(ACLIBN/&FNAME) SHARE(*YES)
+
+             OVRPRTF    FILE(ARP121T) TOFILE(ARP121T) PAGESIZE(*N +
+                          132) CPI(10) HOLD(*YES) USRDTA('獎勵金代')
+
+             OVRDBF     FILE(ARRDTLL1)  TOFILE(QTEMP/TPDDM) SHARE(*YES)
+             OPNQRYF    FILE(ARRDTLL1) OPTION(*ALL) +
+                        QRYSLT('TLAREA *EQ "' || &AREA || '" *AND +
+                                YM     *EQ "' || &YM || '"')    +
+                        MAPFLD((YM  TLYYMM  *CHAR 6)) +
+                        KEYFLD((TLAREA) (TLYYMM) (TLKIND) (TLPDNM))
+
+  /*   CPYFRMQRYF     FROMOPNID(ARRDTLL1) TOFILE(S00WCJ/ARR1) +
+            MBROPT(*REPLACE) CRTFILE(*YES)    */
+
+             CALL       PGM(ARP121R)    /*製票代開及列表*/
+             CLOF       OPNID(ARRDTLL1)
+
+             DLTOVR     *ALL
+  ENDCL:     ENDPGM
+

@@ -1,0 +1,589 @@
+     H*****************************************************************
+     H*
+     H*            1.PROGRAM-ID    ARE059R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     折讓單發票整批轉出作業
+     H*            5.DATE-WRITTEN  103/04/17
+     H*            6.UPDATE
+     H*****************************************************************
+     H            Y
+     FARE059S CF  E                    WORKSTN
+     F                                        RRN   KSFILE MP01F2
+     FTRNDTLLCIF  E           K        DISK
+     E                    TAB1    5   5  1 0 TAB2   10   *維護名稱
+     E                    TAB3    6   6  1   TAB4    6   *地區名稱
+     E                    SCR     3   3 10               *螢幕代號
+     E                    ERR     1  10 70               *錯誤訊息
+     I           UDS
+     I                                      951 985 S#COMP
+     I                                     10001010 W#USER
+     I                                     10111020 S#DEVN
+     I                                     10211021 U#LOC
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*
+     C*FILE => ARSAID KEY01=業務員代號
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           S#RVID
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C*SR0000 => Initialize Screen Number
+     C*SR1000 => Screen Number = '01' Process
+     C*SR2000 => Screen Number = '02' Process
+     C*SR3000 => Screen Number = '02' Process Read Subfile Screen
+     C*SR4000 => Screen Number = '03' Process
+     C*SR5000 => Screen Number = '04' Process
+     C*
+     C                     EXSR SR0000
+     C           PRCID     DOUEQ'00'
+     C           PRCID     CASEQ'01'      SR1000
+     C           PRCID     CASEQ'02'      SR2000
+     C           PRCID     CASEQ'03'      SR3000
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*
+     C*Initialize Screen Number
+     C*
+     C*
+     C*讀取廠區名稱
+     C*
+     C                     MOVE U#LOC     S#AREA
+     C           S#AREA    LOKUPTAB3      TAB4           55*EQ
+     C  N55                MOVE *ALL'*'   S#ARNM
+     C   55                MOVE TAB4      S#ARNM
+     C*
+     C                     MOVE '02'      PRCID   2
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*
+     C*Screen Number = '02' Process
+     C*
+     C                     MOVEASCR,2     S#SCRN
+     C                     MOVE *BLANK    S#ERR
+     C                     EXSR #LOCAT                     *定起點
+     C*
+     C*====================
+     C           PRCID     DOWEQ'02'
+     C*
+     C*Check Write Subfile Record Found ?
+     C*
+     C                     MOVE *OFF      *IN72            *SFLDSP ON
+     C           RRN       IFEQ *ZEROS
+     C                     MOVEAERR,2     S#ERR
+     C                     MOVE *ON       *IN72            *SFLDSP OFF
+     C                     ENDIF
+     C*
+     C                     WRITEHEAD
+     C                     WRITEMP01F2MG
+     C                     EXFMTMP01F2CL
+     C                     MOVE *BLANK    S#ERR
+     C*
+     C*PF3=Exit
+     C*
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*PF12=Cancel
+     C*
+     C           *IN12     IFEQ *ON
+     C                     MOVE '00'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*PF6= Add Record
+     C*
+     C           *IN06     IFEQ *ON                        *PF6=ADD
+     C                     MOVE 1         W#OPT
+     C                     SETOF                     62
+     C                     EXSR SR3100
+     C                     MOVE '04'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C* PA1 =次頁
+     C*
+     C           *IN91     IFEQ *ON
+     C           TOTRRN    ANDNE*ZERO
+     C                     Z-ADDTOTRRN    RRN
+     C                     Z-ADDLSTPNT    POINT
+     C  N50                EXSR #READ
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*Enter=Check Screen Filed
+     C*
+     C                     MOVE '03'      PRCID
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           #LOCAT    BEGSR
+     C*****************************************************************
+     C*
+     C*Clear Subfile Screen => MP03F2
+     C*
+     C                     MOVE *ON       *IN73            *SFLCLR
+     C                     WRITEMP01F2CL
+     C                     MOVE *OFF      *IN73            *SFLCLR
+     C                     CLEARMP01F2
+     C                     Z-ADD*ZEROS    RRN     40
+     C                     Z-SUB11        POINT
+     C*--------------------
+     C                     MOVELS#NAM     S#RVID
+     C           KEY01     SETLLRARSAID
+     C* Read data into subfile
+     C                     EXSR #READ
+     C                     ENDSR
+     C*****************************************************************
+     C           #READ     BEGSR
+     C*****************************************************************
+     C*
+     C*Read File MTRSPU Write Subfile Screen
+     C*
+     C                     Z-ADD*ZERO     W#CNT   20
+     C           W#CNT     DOWLT12
+     C                     READ RARSAID             N    50*EOF
+     C   50                LEAVE
+     C*
+     C           SAACD     IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*==
+     C           SADEPT    CHAINRPYDEPA              98
+     C  N98                MOVELP2DPNM    S#DENM
+     C   98                MOVEL*ALL'*'   S#DENM
+     C*
+     C           SALOCA    LOKUPTAB3      TAB4           55*EQ
+     C  N55                MOVE *ALL'*'   S#LONM
+     C   55                MOVE TAB4      S#LONM
+     C*==
+     C                     ADD  1         RRN
+     C                     ADD  1         W#CNT
+     C                     MOVELSARVID    S#RVID
+     C                     MOVELSANAME    S#NAME
+     C                     MOVELSALOCA    S#LOCA
+     C                     MOVELSAWKNO    S#WKNO
+     C                     MOVELSADEPT    S#DEPT
+     C                     MOVELSAUSID    S#USID
+     C                     WRITEMP01F2
+     C                     ENDDO
+     C*
+     C           W#CNT     IFGT *ZERO                      *至少一筆
+     C                     ADD  12        POINT
+     C                     Z-ADDRRN       TOTRRN  40
+     C                     Z-ADDPOINT     LSTPNT  40
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*
+     C*Screen Number = '02' Process Read Subfile Screen
+     C*
+     C           PRCID     DOWEQ'03'
+     C                     READCMP01F2                 5353*ER*EOF
+     C   53                MOVE '02'      PRCID
+     C   53                LEAVE
+     C*
+     C*If S#OPT = " " Iter
+     C*
+     C           S#OPT     IFEQ *ZEROS
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE S#OPT     W#OPT   10
+     C                     MOVE *ZEROS    S#OPT
+     C                     UPDATMP01F2
+     C*
+     C                     Z-ADDRRN       POINT
+     C                     EXSR SR3200
+     C                     MOVE '05'      PRCID
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3100    BEGSR
+     C*****************************************************************
+     C*
+     C*1=Add 2=Change 3=Copy 4=Delete 5=Display
+     C*
+     C*Initialize Subfile Screen => MP01F3
+     C*
+     C                     MOVE *ON       *IN83            *SFLINZ
+     C                     WRITEMP01F3CL
+     C                     MOVE *OFF      *IN83            *SFLINZ
+     C                     Z-ADD*ZEROS    RRN1    40
+     C*
+     C*If W#OPT = 1 Add Record Initialize Screen => MP01F3CL
+     C*
+     C           W#OPT     IFEQ 1
+     C                     MOVE S#AREA    W#AREA  1
+     C                     MOVE S#ARNM    W#ARNM  6
+     C                     CLEARMP01F3CL
+     C                     MOVE W#AREA    S#AREA
+     C                     MOVE W#ARNM    S#ARNM
+     C                     ENDIF
+     C*
+     C*判定維護種類
+     C*
+     C           W#OPT     LOKUPTAB1      TAB2           55*EQ
+     C  N55                MOVE *ALL'*'   S#MODE
+     C   55                MOVE TAB2      S#MODE
+     C*
+     C*Read File MTRSPU Record Write Subfile Screen
+     C*
+     C           RRN1      DOWNE99
+     C                     MOVE *OFF      *IN80            *SFLNXTCHG
+     C                     MOVE *OFF      *IN45
+     C                     CLEARMP01F3
+     C                     ADD  1         RRN1
+     C                     Z-ADDRRN1      S#RSEQ
+     C*--------------------
+     C                     WRITEMP01F3
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3200    BEGSR
+     C*****************************************************************
+     C*
+     C*1=Add 2=Change 3=Copy 4=Delete 5=Display
+     C*
+     C                     MOVEA'000'     *IN,60
+     C                     SELEC
+     C           W#OPT     WHEQ 2
+     C                     MOVE *ON       *IN60
+     C           W#OPT     WHEQ 4
+     C                     MOVEA'11'      *IN,61           *61-62
+     C                     ENDSL
+     C*
+     C*判定維護種類
+     C*
+     C           W#OPT     LOKUPTAB1      TAB2           55*EQ
+     C  N55                MOVE *ALL'*'   S#MODE
+     C   55                MOVE TAB2      S#MODE
+     C*
+     C*Read File ARSAID Record Write  Screen
+     C*
+     C           KEY01     CHAINRARSAID              55    *NR
+     C*--------------------
+     C           *IN55     IFEQ *OFF
+     C                     MOVELSARVID    D#RVID
+     C                     MOVELSANAME    D#NAME
+     C                     MOVELSALOCA    D#LOCA
+     C                     MOVELSAWKNO    D#WKNO
+     C                     MOVELSADEPT    D#DEPT
+     C                     MOVELSAUSID    D#USID
+     C*==
+     C           SADEPT    CHAINRPYDEPA              98
+     C  N98                MOVELP2DPNM    D#DENM
+     C   98                MOVEL*ALL'*'   D#DENM
+     C*
+     C           S#LOCA    LOKUPTAB3      TAB4           98*EQ
+     C  N98                MOVE *ALL'*'   D#LONM
+     C   98                MOVE TAB4      D#LONM
+     C*--------------------
+     C                     ENDIF
+     C                     WRITEMP01F4
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4000    BEGSR
+     C*****************************************************************
+     C*
+     C*Read Subfile Screen Number = '03'
+     C*
+     C                     MOVEASCR,3     S#SCRN
+     C           PRCID     DOWEQ'04'
+     C                     WRITEHEAD
+     C                     WRITEMP01F3MG
+     C                     EXFMTMP01F3CL
+     C                     MOVE *BLANK    S#ERR
+     C                     MOVEA'00000'   *IN,40           - *IN40-44
+     C*
+     C*PF3=Exit
+     C*
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*PF12=Cancel
+     C*
+     C           *IN12     IFEQ *ON
+     C                     MOVE '02'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*Enter = Check Screen Option 5= Display Pass
+     C*
+     C*
+     C                     EXSR SR4100
+     C           SAVFLG    COMP 'N'                      55*EQ
+     C   55                ITER
+     C*
+     C*PF10=Save File
+     C*
+     C           *IN10     IFEQ *ON
+     C*
+     C*Read Subfile Screen Record Write File => AXTRPE
+     C*
+     C                     EXSR SR4200
+     C                     EXSR SR3100
+     C                     MOVE '04'      PRCID
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4100    BEGSR
+     C*****************************************************************
+     C*
+     C*Check Screen Filed 1=Add 2=Change 3=Copy 4=Delete 5=Display
+     C*
+     C*
+     C*Check Subfile Screen Filed
+     C*
+     C                     EXSR SR4110
+     C*
+     C           KEY01     CHAINRARSAID              55
+     C  N55                MOVE *ON       *IN40
+     C  N55                MOVEAERR,1     S#ERR
+     C*
+     C*
+     C*存檔確認用
+     C*
+     C           S#ERR     COMP *BLANK                   55*EQ
+     C  N55                MOVE 'N'       SAVFLG  1        *存檔用
+     C   55                MOVE 'Y'       SAVFLG
+     C   55                SELEC
+     C           W#OPT     WHEQ 1
+     C                     MOVEAERR,4     S#ERR
+     C           W#OPT     WHEQ 2
+     C                     MOVEAERR,5     S#ERR
+     C           W#OPT     WHEQ 3
+     C                     MOVEAERR,6     S#ERR
+     C           W#OPT     WHEQ 4
+     C                     MOVEAERR,7     S#ERR
+     C                     ENDSL
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4110    BEGSR
+     C*****************************************************************
+     C*
+     C*Check Subfile Screen Filed
+     C*
+     C                     MOVE *OFF      *IN99
+     C                     MOVE *OFF      *IN53
+     C           *IN53     DOWEQ*OFF
+     C                     READCMP01F3                 5353*ER*EOF
+     C   53                LEAVE
+     C                     MOVEA'00000'   *IN,40
+     C                     MOVEA'0'       *IN,46
+     C           S#RVID    IFEQ *BLANK
+     C                     MOVE *ON       *IN80            *SFLNXTCHG
+     C                     Z-ADDS#RSEQ    W#RSEQ  20
+     C                     CLEARMP01F3
+     C                     Z-ADDW#RSEQ    S#RSEQ
+     C                     ELSE
+     C                     MOVE *ON       *IN80            *SFLNXTCHG
+     C*
+     C           S#LOCA    LOKUPTAB3      TAB4           98*EQ
+     C   98                MOVE TAB4      S#LONM
+     C  N98                MOVEAERR,8     S#ERR
+     C  N98                MOVEL*BLANK    S#LONM
+     C  N98                MOVE *ON       *IN42
+     C  N98                MOVE *ON       *IN99
+     C*
+     C*Read File PYDEPA 　　
+     C*
+     C           S#DEPT    CHAINRPYDEPA              98
+     C  N98                MOVELP2DPNM    S#DENM
+     C   98                MOVE *ALL'*'   S#DENM
+     C   98                MOVEAERR,9     S#ERR
+     C   98                MOVE *ON       *IN44
+     C   98                MOVE *ON       *IN99
+     C                     ENDIF
+     C                     UPDATMP01F3
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4200    BEGSR
+     C*****************************************************************
+     C*
+     C*Read Subfile Screen Record Write File => MTRSPU
+     C*
+     C                     MOVE *OFF      *IN56
+     C           *IN56     DOWEQ*OFF
+     C                     READCMP01F3                   56*EOF SFL
+     C   56                LEAVE
+     C*
+     C*1=Add
+     C                     CLEARRARSAID                    --清除資料
+     C                     MOVELW#USER    SAUPDR
+9908AC*                    MOVELUDATE     SAUPDD
+9908AC           *DATE     SUB  19000000  SAUPDD
+     C                     TIME           SAUPDT
+     C                     MOVELS#RVID    SARVID
+     C                     MOVELS#NAME    SANAME
+     C                     MOVELS#LOCA    SALOCA
+     C                     MOVELS#WKNO    SAWKNO
+     C                     MOVELS#DEPT    SADEPT
+     C                     MOVELS#USID    SAUSID
+     C                     WRITERARSAID
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR5000    BEGSR
+     C*****************************************************************
+     C*
+     C*Read Subfile Screen Number = '04'
+     C*
+     C                     MOVEASCR,3     S#SCRN
+     C           PRCID     DOWEQ'05'
+     C                     WRITEHEAD
+     C                     WRITEMP01F3MG
+     C                     EXFMTMP01F4
+     C                     MOVE *BLANK    S#ERR
+     C                     MOVEA'0000'    *IN,51           - *IN51-54
+     C*
+     C*PF3=Exit
+     C*
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*PF12=Cancel
+     C*
+     C           *IN12     IFEQ *ON
+     C                     MOVE '02'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*Enter = Check Screen Option 5= Display Pass
+     C*
+     C*
+     C                     EXSR SR5100
+     C           SAVFLG    COMP 'N'                      55*EQ
+     C   55                ITER
+     C*
+     C*PF10=Save File
+     C*
+     C           *IN10     IFEQ *ON
+     C*
+     C*Read Subfile Screen Record Write File => ARSAID
+     C*
+     C                     EXSR SR5200
+     C                     MOVE '03'      PRCID
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR5100    BEGSR
+     C*****************************************************************
+     C*
+     C*Check Screen Filed 1=Add 2=Change 3=Copy 4=Delete 5=Display
+     C*
+     C           W#OPT     IFEQ 2
+     C*
+     C*Check Subfile Screen Filed
+     C*
+     C                     EXSR SR5110
+     C                     ENDIF
+     C*
+     C*存檔確認用
+     C*
+     C           S#ERR     COMP *BLANK                   55*EQ
+     C  N55                MOVE 'N'       SAVFLG  1        *存檔用
+     C   55                MOVE 'Y'       SAVFLG
+     C   55                SELEC
+     C           W#OPT     WHEQ 1
+     C                     MOVEAERR,4     S#ERR
+     C           W#OPT     WHEQ 2
+     C                     MOVEAERR,5     S#ERR
+     C           W#OPT     WHEQ 3
+     C                     MOVEAERR,6     S#ERR
+     C           W#OPT     WHEQ 4
+     C                     MOVEAERR,7     S#ERR
+     C                     ENDSL
+     C                     ENDSR
+     C*****************************************************************
+     C           SR5110    BEGSR
+     C*****************************************************************
+     C*
+     C*Check Screen Filed
+     C*
+     C                     MOVE *OFF      *IN99
+     C*
+     C           KEY01     CHAINRARSAID              55
+     C   55                MOVE *ON       *IN99
+     C   55                MOVEAERR,2     S#ERR
+     C*
+     C           D#LOCA    LOKUPTAB3      TAB4           98*EQ
+     C   98                MOVE TAB4      D#LONM
+     C  N98                MOVEL*BLANK    D#LONM
+     C  N98                MOVEAERR,8     S#ERR
+     C  N98                MOVE *ON       *IN52
+     C  N98                MOVE *ON       *IN99
+     C*
+     C*Read File PYDEPT 　　
+     C*
+     C           D#DEPT    CHAINRPYDEPA              98
+     C  N98                MOVELP2DPNM    D#DENM
+     C   98                MOVE *ALL'*'   D#DENM
+     C   98                MOVEAERR,9     S#ERR
+     C   98                MOVE *ON       *IN54
+     C   98                MOVE *ON       *IN99
+     C*                    UPDATMP01F4
+     C                     ENDSR
+     C*****************************************************************
+     C           SR5200    BEGSR
+     C*****************************************************************
+     C*
+     C*2=Change  4=Delete 5=Display
+     C*
+     C           W#OPT     IFEQ 2
+     C                     MOVELW#USER    SAUPDR
+9908AC*                    MOVELUDATE     SAUPDD
+9908AC           *DATE     SUB  19000000  SAUPDD
+     C                     TIME           SAUPDT
+     C                     MOVELD#NAME    SANAME
+     C                     MOVELD#LOCA    SALOCA
+     C                     MOVELD#WKNO    SAWKNO
+     C                     MOVELD#DEPT    SADEPT
+     C                     MOVELD#USID    SAUSID
+     C                     UPDATRARSAID
+     C                     ELSE
+     C           W#OPT     IFEQ 4
+     C                     DELETRARSAID
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDSR
+**  TAB1 TAB2
+1新　　增2修　　改3複　　製4刪　　除5查　　詢
+**  TAB3 TAB4
+P台北T桃園M台中K高雄H苗栗L林口
+**  SCR
+ARE026S-1 ARE026S-2 ARE026S-3
+**  ERR
+01-資料已存在！
+02-資料不存在！
+03-欄位不可空白！
+04-請按＜ＰＦ１０＞確認新增。
+05-請按＜ＰＦ１０＞確認修改。
+06-請按＜ＰＦ１０＞確認複製。
+07-請按＜ＰＦ１０＞確認刪除。
+08-工作廠區輸入錯誤！
+09-部門代號輸入錯誤！
+

@@ -1,0 +1,247 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP033R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     預收貨款餘額更新作業
+     H*            5.DATE-WRITTEN  88/01/30
+     H*            6.UPDATE  DATE  98/12/23 2009AR402 S00WCJ (9812A)
+     H*                            99/04/30 2010AR468 S00WCJ (9904A)
+     H*                            99/08/26 2010AR517 S00WCJ (9908A)
+     H*
+     H*  <說明> 本作業利用每晚批次之CNV013P1內之統計已開發票
+     H*           所統計之預收餘額（但其未考慮繳款兌現問題），並
+     H*           檢核預收發票之兌現額度（若超過備份日期而無法查
+     H*           到者視同已兌現）；同時
+     H*           與採財會資料彙總之CCP011P所統計之CPRBAL
+     H*           的內容相比較，採兩者餘額較小者。
+     H*
+     H*           原AFCBAL之內容為CPRBAL內金額不為零者。
+     H*            911231  判斷該繳款書是否有A2(預收貨款)
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FAFCBAL  UP  E           K        DISK
+     FARSTAT  IF  E           K        DISK
+     FRCVDTL  IF  E           K        DISK
+     FINVMSTL2IF  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     I**************************************************************
+     IBKDTA      UDS                             36
+     I                                        1   80U#BKDT
+     C**************************************************************
+     C*   檔案搜尋欄位組合
+     C**************************************************************
+     C           K#IV      KLIST                           發票明細
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+9908AC           *DATE     SUB  19000000  U#SYSD  80
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C                     EXSR DTLSR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*================================================================
+     C*  初始函式
+     C*================================================================
+     CSR         INISR     BEGSR
+     C           *NAMVAR   DEFN ARBACKUP  BKDTA  36
+     C           *LOCK     IN   BKDTA
+     C                     UNLCKBKDTA
+     CSR                   ENDSR
+     C*
+     C*================================================================
+     C*   DETAIL TIME 函式
+     C*================================================================
+     CSR         DTLSR     BEGSR
+TEST C*
+ .   C           AFORNO    IFEQ 'K03197'
+ .   C                     Z-ADD0         W#TEST  10
+ .   C                     ENDIF
+ .   C*
+     C                     Z-ADDAFNBAL    W#ZBAL 110       財會餘額
+     C           AFORNO    CHAINARREC                69
+     C           *IN69     IFEQ '1'
+     C                     GOTO ESDTL
+     C                     ENDIF
+     C*
+     C*
+     C                     Z-ADDARHAMT    AFFAMT           預收金額
+     C                     Z-ADDARHTAX    AFXAMT           預收稅額
+     C*
+     C                     EXSR SR1000
+     C                     Z-ADDW#NAMT    AFNAMT           兌現金額
+     C*
+     C                     Z-SUBARBAMT    AFEAMT           扣預收
+     C                     Z-SUBAREAMT    AFGAMT           退預回
+     C                     Z-ADDARGAMT    AFHAMT           扣預沖回
+     C                     Z-ADDARLAMT    AFSAMT           轉出金額
+9908AC                     Z-ADDU#SYSD    AFCHDT           日期
+     C*
+     C*
+     C           AFNAMT    SUB  AFEAMT    AFNBAL
+     C                     ADD  AFHAMT    AFNBAL
+     C                     SUB  AFGAMT    AFNBAL
+9812AC*
+9812AC*退預回可分二個部份，一個為實際收預收款後退回，另一個部份為有開
+9812AC*預收發票，但後來客戶要求將預收發票之金額減少，這部份客戶並未
+9812AC*真正有繳款，所以不能扣除兌現金額。P05642即為第二部份。
+9812AC*
+9812AC           AFCUNO    IFEQ 'DP040'
+9812AC           AFORNO    ANDEQ'P05642'
+9904AC           AFCUNO    OREQ 'DP753'
+9904AC           AFORNO    ANDEQ'P05820'
+9812AC                     ADD  AFGAMT    AFNBAL
+9812AC                     ENDIF
+9812AC*
+     C*
+     C           W#ZBAL    IFGT AFNBAL                     採營業
+     C                     MOVE W#ZBAL    AFRESV
+     C                     MOVEL'#'       AFRESV
+     C                     ENDIF
+     C*
+     C           W#ZBAL    IFLT AFNBAL                     採財會
+     C                     MOVE AFNBAL    AFRESV
+     C                     MOVEL'$'       AFRESV
+     C                     Z-ADDW#ZBAL    AFNBAL
+     C                     ENDIF
+     C*
+     C                     UPDATAFREC
+     CSR         ESDTL     ENDSR
+     C*
+     C*================================================================
+     C*  LR 函式
+     C*================================================================
+     CSR         LRSR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*================================================================
+     C*  查無資料函式
+     C*================================================================
+     CSR         MSGSR     BEGSR
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+     C*  子函式集
+     C*****************************************************************
+     C*================================================================
+     C* 獲得該訂單之預收兌現金額（合計每張預收發票）
+     C*================================================================
+     CSR         SR1000    BEGSR
+     C                     Z-ADD0         W#NAMT 110
+     C*
+     C           AFORNO    CHAININREC                69
+     C           *IN69     DOWEQ'0'
+     C           INTYPE    IFEQ '2'                        預收
+     C           INDECD    ANDNE'D'                        未作廢
+     C                     EXSR SR2000
+     C           W#6AMT    IFGE INAAMT                     出貨為上限
+9605 C           INORNO    OREQ 'P04774'
+     C                     ADD  INAAMT    W#NAMT
+     C                     ELSE
+     C                     ADD  W#6AMT    W#NAMT           已兌現部分
+     C                     ENDIF
+     C                     ENDIF
+     C           AFORNO    READEINREC                    69
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  計算一張預收發票之兌現金額（合計每筆繳款明細）
+     C*----------------------------------------
+     CSR         SR2000    BEGSR
+     C                     Z-ADD0         W#6AMT 110       兌現金額
+     C*
+     C                     MOVELINNO      IVNO
+     C                     MOVEL'6'       IVACNT
+     C           K#IV      CHAINIVREC                69
+     C           *IN69     DOWEQ'0'
+     C*
+     C           IVDECD    IFNE 'D'
+     C                     MOVELIVAPNO    W#RVNO  6
+     C                     EXSR SR3000                     已兌現比率
+     C                     Z-SUBIVAMT     W#XAMT 110
+     C           W#XAMT    MULT W#6RAT    W#XAMT    H
+     C                     ADD  W#XAMT    W#6AMT           合計兌現
+     C                     ENDIF
+     C*
+     C           K#IV      READEIVREC                    69
+     C                     ENDDO
+     CSR         ES2000    ENDSR
+     C*
+     C*----------------------------------------
+     C*  計算繳款書之兌現比率
+     C*----------------------------------------
+     CSR         SR3000    BEGSR
+     C                     Z-ADD0         W#6RAT  75
+     C                     Z-ADD0         W#XAMT 110       兌現金額
+     C                     Z-ADD0         W#YAMT 110       整張金額
+ 9112C*判斷該繳款書是否有A2
+ 9112C                     EXSR SR3100
+     C*
+     C           W#RVNO    CHAINRVREC                69
+     C           *IN69     DOWEQ'0'                        RVREC LOOPB
+     C*
+ 9112C           W#A2      IFEQ 'Y'                        有預收貨款
+ 9112C           RVUSTP    IFEQ 'A2'
+ 9112C                     EXSR SR3200
+ 9112C                     ENDIF
+ 9112C                     ELSE
+ 9112C                     EXSR SR3200
+ 9112C                     ENDIF
+     C*
+     C           W#RVNO    READERVREC                    69
+     C                     ENDDO                           RVREC LOOPE
+     C*
+     C           W#YAMT    IFNE 0
+     C           W#XAMT    DIV  W#YAMT    W#6RAT    H
+     C                     ELSE
+     C                     Z-ADD1         W#6RAT           找不到繳款
+     C                     ENDIF                           視同已兌現
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         SR3100    BEGSR
+     C**************************************************************
+     C                     MOVE *BLANK    W#A2    1         A2旗標
+     C*
+     C           W#RVNO    CHAINRVREC                69
+     C           *IN69     DOWEQ'0'                        RVREC LOOPB
+     C*
+     C           RVACTP    IFEQ 'D'                        借方
+     C           RVUSTP    ANDEQ'A2'                       預收
+     C                     MOVE 'Y'       W#A2
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           W#RVNO    READERVREC                    69
+     C                     ENDDO                           RVREC LOOPE
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         SR3200    BEGSR
+     C**************************************************************
+     C           RVACTP    IFEQ 'D'                        借方
+     C                     ADD  RVRAMT    W#YAMT
+     C           RVNTTP    IFGE 'A'                        有期限類
+     C           RVNTTP    ANDLE'E'
+     C           RVNTTP    OREQ 'I'
+     C           RVNTCD    IFEQ '1'                        已兌現
+     C                     ADD  RVRAMT    W#XAMT
+     C                     ENDIF
+     C                     ELSE                            即期類
+     C                     ADD  RVRAMT    W#XAMT
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           RVACTP    IFEQ 'C'                        貸方
+     C                     SUB  RVRAMT    W#YAMT
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+

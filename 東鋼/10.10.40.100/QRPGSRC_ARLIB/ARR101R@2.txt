@@ -1,0 +1,294 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR101R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     應收帳款承購(E-FACTORING)發票異常檢核表
+     H*          5.DATE-WRITTEN  91/10/21
+     H*          6.DATE-MODIFY   91/11/11 BY S02CSF
+     H*                          91/11/25 BY S02CSF
+     H*                          91/11/28 BY S02CSF
+     H*                          92/11/26 BY S02CSF
+     H*
+     H*         Ｂ：計算已承購未請款之逾期天數
+     H*         Ｃ：計算已請款未繳款之逾期天數
+     H*         Ｄ：計算已開請款單未承購之逾期天數
+     H*****************************************************************
+     H        1   Y                                     1
+     FARINVM  IP  E           K        DISK
+     FARCVDTL1IF  E           K        DISK
+     FARCVCK  IF  E           K        DISK
+1128 FARCVMS  IF  E           K        DISK
+9211 FINVMST  IF  E           K        DISK
+     FARR101F O   E           K        DISK
+     IRARINVM     01
+     I           UDS
+     I                                      300 3020S#DAT1
+     I                                      303 3050S#DAT3
+     I            DS
+     I                                        1  10 AMINNO
+     I                                        1   2 D#INN1
+     I                                        3  10 D#INN2
+     C*****************************************************************
+     C*          KET  LIST
+     C*****************************************************************
+     C*FILE==>ARCVDTL1
+     C           W#CVDT    KLIST
+     C                     KFLD           ATINNO
+     C                     KFLD           ATRCNO
+     C                     KFLD           ATITEM
+     C*FILE==>ARCVCK
+     C           W#CVCK    KLIST
+     C                     KFLD           AKRCNO
+     C                     KFLD           AKRCTM
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C           D#INN1    IFEQ 'XW'
+     C           D#INN2    ANDEQ'49422500'
+     C                     Z-ADD0         W#TMP   10
+     C                     ENDIF
+     C*
+     C                     CLEARRAR101F
+     C                     MOVE *BLANK    W#NTTP  1
+     C                     MOVE *BLANK    W#NTTA  1
+     C                     MOVE *BLANK    W#RCNO  6
+     C                     Z-ADD0         W#DUDE  80
+     C                     MOVEA'00'      *IN,50
+     C                     MOVE *BLANK    W#NTCD  1
+     C                     MOVE *BLANK    W#NTCA  1
+     C*如果請款單號有值，請款日期＝０，則跳過不計
+     C*
+     C           AMAPN2    IFNE *BLANK
+     C           AMAPD2    ANDEQ0
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C*
+     C*-------------------------------------
+     C*計算Ｄ：已開請款單未承購之逾期天數-
+     C*即發票日期與ＤＡＴＥ間的天數      -
+     C*-------------------------------------
+     C*
+ 9201C                     SELEC
+ 9201C           AMDLC1    WHEQ *BLANK                     承購下載碼
+     C                     MOVE AMINDT    W#APD1  8        發票日期
+     C                     MOVE W#APD1    P#PDAT
+     C                     MOVE UDATE     W#DATE  8         UDATE
+     C                     MOVE W#DATE    P#RDAT
+     C                     Z-ADDS#DAT3    P#DIF   50
+     C*
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT  8        起始日期
+     C                     PARM           P#RDAT  8        終止日期
+     C                     PARM '1'       P#MODE  1        民國年
+     C                     PARM           P#DIF   50       相距天數
+     C                     PARM           P#ERR   1        錯誤碼
+     C*
+     C           P#DIF     IFGE S#DAT3
+     C                     Z-ADDP#DIF     AFDATS           天數
+     C                     MOVEL'D'       AFCODE           異常狀況
+     C                     ELSE
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C*----------------------------------
+     C*計算Ｂ：已承購未請款之逾期天數 -
+     C*即承購日期與ＵＤＡＴＥ間的天數 -
+     C*----------------------------------
+     C*請款單號與請款日期皆為空白
+     C*
+ 9201C           AMAPN2    WHEQ *BLANK                     請款單號
+     C           AMAPD2    ANDEQ0                          請款日期
+     C*
+     C                     MOVE AMAPD1    W#APD1  8        承購日期
+     C                     MOVE W#APD1    P#PDAT
+     C                     MOVE UDATE     W#DATE  8         UDATE
+     C                     MOVE W#DATE    P#RDAT
+     C                     Z-ADDS#DAT1    P#DIF   50
+     C*
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT  8        起始日期
+     C                     PARM           P#RDAT  8        終止日期
+     C                     PARM '1'       P#MODE  1        民國年
+     C                     PARM           P#DIF   50       相距天數
+     C                     PARM           P#ERR   1        錯誤碼
+     C*
+     C           P#DIF     IFGE S#DAT1
+     C                     Z-ADDP#DIF     AFDATS           天數
+     C                     MOVEL'B'       AFCODE           異常狀況
+     C                     ELSE
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C*
+     C*----------------------------------
+     C*計算Ｃ：已請款未繳款之逾期天數 -
+     C*即請款日期與ＵＤＡＴＥ間的天數 -
+     C*----------------------------------
+     C*請款單號有值，且已沖銷金額不等於發票金額
+     C           AMAPN2    WHNE *BLANK                     請款單號
+ 9201C           AMFAMT    ANDNEAMDAMT                     已沖銷金額
+     C*
+     C                     MOVE AMAPD2    W#APD2  8        請款日期
+     C                     MOVE W#APD2    P#PDAT
+     C                     MOVE UDATE     W#DATE  8         UDATE
+     C                     MOVE W#DATE    P#RDAT
+     C                     Z-ADDS#DAT1    P#DIF   50
+     C*
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT  8        起始日期
+     C                     PARM           P#RDAT  8        終止日期
+     C                     PARM '1'       P#MODE  1        民國年
+     C                     PARM           P#DIF   50       相距天數
+     C                     PARM           P#ERR   1        錯誤碼
+     C*
+     C           P#DIF     IFGE S#DAT1
+     C                     Z-ADDP#DIF     AFDATS           天數
+     C                     MOVEL'C'       AFCODE           異常狀況
+     C                     ELSE
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C*
+     C                     ENDSL
+     C*
+     C                     Z-ADDAMDUDT    AFDUDT           預計兌現日
+     C                     MOVELAMCUNO    AFCUNO           客戶代號
+     C                     MOVELAMCUNM    AFCUNM           客戶名稱
+     C                     MOVELAMORNO    AFORNO           訂單號碼
+     C                     MOVELAMINNO    AFINNO           發票號碼
+     C           AMINNO    CHAININREC                45
+     C  N45                MOVELINRVID    AFRVID           業務員別
+     C                     MOVELAMINDT    AFINDT           發票日期
+     C                     MOVELAMAPN1    AFAPN1           承購單號
+     C                     MOVELAMAPN2    AFAPN2           請款單號
+     C                     Z-ADDAMAPD2    AFAPD2           請款日期
+     C                     Z-ADDAMDAMT    AFDAMT           發票金額
+     C           AMBAMT    ADD  AMBTAX    AFBAMT           折讓金額
+     C                     Z-ADDAMFAMT    AFFAMT           繳款金額
+     C           AFDAMT    SUB  AFFAMT    AFABAL           未繳金額
+     C           AFABAL    ADD  AFBAMT    AFABAL
+     C                     EXSR SR1000                     找繳款
+     C*
+     C           W#NTTA    IFNE *BLANK
+     C                     MOVELW#NTTA    AFNTTP
+     C                     ENDIF
+     C           W#DUDE    IFNE 0
+     C                     Z-ADDW#DUDE    AFDUDE
+     C                     ENDIF
+     C           W#RCNO    IFNE *BLANK
+     C                     MOVELW#RCNO    AFRCNO
+     C                     ENDIF
+     C           W#NTTA    IFNE *BLANK
+     C           AFNTCD    ANDEQ'Y N'
+     C                     MOVEL'Y+N'     AFNTCD
+     C                     ENDIF
+     C*
+     C                     WRITERAR101F
+     C*
+     C           DTLEND    ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*用AMINNO去SETLL ARCVDTL1,找到該繳款單號
+     C*
+     C                     MOVELAMINNO    ATINNO           發票號碼
+     C                     MOVEL*BLANK    ATRCNO           繳款單號
+     C                     Z-ADD0         ATITEM           繳款項次
+     C           W#CVDT    SETLLRARCVDT
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RARCVDT                  40
+     C   40                LEAVE
+     C*
+     C           ATINNO    IFNE AMINNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           ATRCNO    CHAINRARCVMS              80    繳款單號
+     C  N80                MOVELASFL01    AFFL01           營業確認碼
+     C  N80                EXSR SR1100
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*若該沖銷單號存在ARCVDTL1,則用繳款單號去SETLL ARCVCK,
+     C*找到票款別，兌現日，兌現碼
+     C*
+     C                     MOVELATRCNO    AKRCNO           繳款單號
+     C                     Z-ADD0         AKRCTM           繳款項次
+     C           W#CVCK    SETLLRARCVCK
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ RARCVCK                  41
+     C   41                LEAVE
+     C*
+     C           AKRCNO    IFNE ATRCNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           AKACNO    IFEQ '7142'
+     C           AKACNO    OREQ '7111'
+     C           AKACNO    OREQ '7112'
+     C           AKACNO    OREQ '8246'
+     C*          AKACTP    OREQ 'C'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*判斷款項別為"J" OR "A" OR "J+A"
+     C*
+     C           AKNTTP    IFEQ 'A'
+     C           AKNTCD    ANDEQ*BLANK
+     C                     MOVELAKNTTP    W#NTTA
+     C                     Z-ADDAKDUDT    W#DUDE
+     C                     MOVELAKRCNO    W#RCNO
+     C                     MOVELAKNTCD    W#NTCA
+     C                     ENDIF
+     C*
+     C           W#NTTP    IFEQ *BLANK
+     C                     MOVELAKNTTP    W#NTTP
+     C                     ELSE
+     C           W#NTTP    IFNE AKNTTP
+     C                     MOVE *ON       *IN50
+     C*                    LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C*判斷兌現碼為"Y" OR "N" OR "Y+N"
+     C*
+     C           W#NTCD    IFEQ *BLANK
+     C           AFDUDT    ANDEQ0
+     C                     MOVELAKNTCD    W#NTCD
+     C                     ELSE
+     C           W#NTCD    IFNE AKNTCD
+     C                     MOVE *ON       *IN51
+     C*                    LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     Z-ADDAKDUDT    AFDUDE           兌現日
+     C                     MOVELATRCNO    AFRCNO
+     C*
+     C                     ENDDO
+     C*
+     C  N50                MOVELW#NTTP    AFNTTP
+     C   50                MOVEL'A+J'     AFNTTP
+     C*
+     C           *IN51     IFEQ *OFF
+     C           W#NTCD    ANDEQ*BLANK
+     C           AFRCNO    ANDNE*BLANK
+     C                     MOVE 'N'       AFNTCD
+     C                     ELSE
+     C                     MOVELW#NTCD    AFNTCD
+     C                     ENDIF
+     C*
+     C   51                MOVEL'Y+N'     AFNTCD
+     C*
+     C                     ENDSR
+

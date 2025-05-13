@@ -1,0 +1,2162 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE037RN
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     新版營業繳款輸入程式（外銷專用）
+     H*            5.DATE-WRITTEN  91/05/08
+     H*            6.DATE-UPDATE   92/02/18 BY JONATHAN
+     H*                            92/03/30 BY S02CSF
+     H*                            94/06/23 BY S02CSF  新增會計課目7142
+     H*                            98/03/25 2009AR280 S00WCJ (9803A)
+     H*                            98/04/27 2009AR294 S00WCJ (9804A)
+     H*                            配合CI擴檔將原讀取HSCINV中之單
+     H*                            價與匯率，改為單價讀取SAMAST中
+     H*                             S1ADDL後6碼，整數4位小數2位
+     H*                            匯率則讀取螢幕上USER所輸入之報關
+     H*                            匯率。
+     H*                            98/05/05 2009AR304 S00WCJ (9805A)
+     H*                            99/08/24 2010AR517 S00WCJ (9908A)
+     H*                           101/09/19 2012AR682 S00WCJ (0109A)
+     H*                           102/03/21 2013AR738 S00WCJ (0203A)
+     H*                           102/05/31 S00WCJ (0205A)
+     H*                            沖銷磅單筆數改為800筆
+     H*                           102/06/04 S00WCJ (0206A)
+     H*                            修改被除數為0當掉
+     H*                           102/06/18 2013AR752 S00WCJ (0206B)
+     H*                            訂單X00163 & X00166依高雄磅單金
+     H*                            額沖銷
+     H*                           102/11/08 2013AR781 S00WCJ (0211A)
+     H*                            訂單X00174依高雄磅單金額沖銷
+     H*                           102/12/27 S00WCJ (0212A)
+     H*                            增加輸入210801，訂單X00173依高
+     H*                            雄磅單金額沖銷
+     H*                           103/01/23 S00WCJ (0301A)
+     H*                            訂單X00177依高雄磅單金額沖銷
+     H*                           103/07/10 S00WCJ (0307A)
+     H*                            若為依磅單金額沖銷之訂單，單價為
+     H*                             0時，直接搬數量
+     H*                           103/09/15 2014AR870 S00WCJ (0309A)
+     H*                             訂單X00188依磅單金額沖銷
+     H*                           104/01/29 2015AR906 S00WCJ (0401A)
+     H*                            訂單X00197依磅單金額沖銷
+     H*                           104/06/16 2015AR935 S00WCJ (0406A)
+     H*                            繳款改為直接依磅單金額沖銷
+     H*                           105/03/31 S00WCJ (0503A)
+     H*                            排除1030101以前之磅單資料
+     H*                           105/06/22 S00WCJ (0506A)
+     H*                            讀SAVORL3時加上磅單項次，以讀到
+     H*                            更精準之資料
+     H*                           107/05/29 2018AR1169  S00WCJ (0705A)
+     H*                            設定帳號B01LLF僅可使用查詢功能
+     H*                           107/11/08 S00WCJ (0711A)
+     H*                            設定帳號D00LCC.H293.D00CHH僅可使
+     H*                            用查詢功能
+     H*                           109/06/19 S00WCJ (0906A)
+     H*                            修正磅單未完全沖銷帶入錯誤沖銷金額
+     H*                            之BUG
+     H*                           111/12/23 S00WCJ (1112A)
+     H*                            排除1110101前資料
+     H*
+     H*
+     H* 說明：本程式由外銷業務輸入繳款資料至SARCVF，經過修改、
+     H*       沖銷等動作，在進行確認後，便可印出報表交由財會；而
+     H*       財會人員在審核無誤後，便進行過入RCVDTL的動作。
+     H*        2159 視同1114
+     H*        7142 視同7119
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+9512 FARE037STCF  E                    WORKSTN
+     F                                        RRN1  KSFILE AR037F1
+     F                                        RRN2  KSFILE AR037F2
+     F                                        RRN3  KSFILE AR037F3
+     F                                        RRN5  KSFILE AR037F5
+     FCBCUST  IF  E           K        DISK
+0406AF*HSCINV  IF  E           K        DISK
+     FGENSEQ  UF  E           K        DISK
+     FSARCVF  UF  E           K        DISK                      A
+     FSARCVFL4IF  E           K        DISK
+     F            SRREC                             KRENAMESRRECL
+     FSARVIN  UF  E           K        DISK                      A
+     F*SARVINL1IF  E           K        DISK
+     F*            SIREC                             KRENAMESIRECL
+     FSARVOR  UF  E           K        DISK                      A
+     FSARVORL1IF  E           K        DISK
+     F            SOREC                             KRENAMESORECL1
+     FSARVORL2IF  E           K        DISK
+     F            SOREC                             KRENAMESORECL2
+     FSARVORL3IF  E           K        DISK
+     F            SOREC                             KRENAMESORECL3
+     FTRNDTL  IF  E           K        DISK
+     FTRNDTLL4IF  E           K        DISK
+     F            TXREC                             KRENAMETXRECL4
+     FLLCMSTL3IF  E           K        DISK
+9804AFSAMAST  IF  E           K        DISK
+9804AFARCINVL1IF  E           K        DISK
+     E*****************************************************************
+0109AE                    ARY        20 30                檢核重複
+0705AE                    ERR     1  18 70                錯誤訊息
+     E*----------------------------------------------------------------
+     ISORECL1
+     I              SORVNO                          W1RVNO
+     I              SOSTNO                          W1STNO
+     I              SONOXA                          W1NOXA
+     I              SOSTIT                          W1STIT
+     I*
+     ISORECL2
+     I              SORVNO                          W2RVNO
+     I              SOSTNO                          W2STNO
+     I              SONOXA                          W2NOXA
+     I              SOSTIT                          W2STIT
+     I*
+     ISORECL3
+     I              SOCODE                          W3CODE
+     I              SOQTY                           W3QTY
+     I*
+     I            DS
+     I                                        1   6 SRRVNO
+     I                                        1   1 D#RVNO
+     I            DS
+     I                                        1   6 D#RVNX
+     I                                        1   1 D#RVN1
+     I                                        2   6 D#RVN2
+     I            DS
+0109AI                                        1  30 D#ARY
+     I                                        1   1 D#ACTP
+0109AI                                        2   7 D#ACNO
+0109AI                                        8  192D#RAMT
+0109AI                                       20  274D#EXC2
+0109AI                                       28  30 D#CURY
+     I            DS
+     I                                        1   9 TXORNO
+     I                                        1   6 D#ORNO
+9804AI                                        1   1 D#OREA
+9804AI                                        2   60D#TXOR
+     I                                        7   90D#OITM
+     I            DS
+     I                                        1  10 TXIVNO
+     I                                        1   1 D#IVN1
+     I            DS
+     I                                        1   2 W#OEOF
+     I                                        1   1 D#OE
+     I                                        2   2 D#OF
+     I            DS
+9701 I                                        1   8 TXNO
+     I                                        1   1 D#AREA
+9804AI            DS
+9804AI                                        1   6 S#ORNO
+9804AI                                        1   1 D#ORN1
+9804AI                                        2   60D#ORN2
+9804AI            DS
+9804AI                                        1   6 D#CUNO
+9804AI                                        1   1 S1KIND
+9804AI                                        2   2 S1CUN1
+9804AI                                        3   5 S1CUN2
+9804AI                                        6   6 S1CD01
+9804AI            DS
+9804AI                                        1  10 S1ADDL
+9804AI                                        5  102D#PRIC
+     I           UDS
+     I                                      300 300 D#INDI
+     I                                      951 985 S#COMP
+     I                                     10111020 S#DEVI
+     I                                     10011010 U#USID
+     I                                     10011003 U#USDP
+     I                                     10011001 U#USTP
+     I                                     10211021 U#AREA
+0109AIIFRS       UDS                             50
+0109AI                                        1   80D#IFRS
+     C*****************************************************************
+     C*        KEY   LIST
+     C*****************************************************************
+     C*FILE -> SARCVFL4
+     C           K#SAR4    KLIST
+     C                     KFLD           SRCUNO
+     C                     KFLD           SRRVDT
+     C                     KFLD           SRRVNO
+     C                     KFLD           SRITEM
+     C*FILE -> SARCVF
+     C           K#SARC    KLIST
+     C                     KFLD           SRRVNO
+     C                     KFLD           SRITEM
+     C*FILE -> SARVIN
+     C           K#RVIN    KLIST
+     C                     KFLD           SIRVNO
+     C                     KFLD           SIITEM
+     C*FILE -> GENSEQ
+     C           K#NSEQ    KLIST
+     C                     KFLD           GEKIND
+     C                     KFLD           GEPRIN
+     C*FILE -> TRNDTLL4
+     C*          K#TRL4    KLIST
+     C*                    KFLD           TXORN5
+     C*FILE -> HSCINV
+0406AC*          K#CINV    KLIST
+0406AC*                    KFLD           C1ORNO
+0406AC*                    KFLD           C1OSEQ
+0406AC*                    KFLD           C1OITM
+     C*FILE -> SARVOR
+     C           K#RVOR    KLIST
+     C                     KFLD           SORVNO           繳款編號
+     C                     KFLD           SOITEM           項次
+     C*FILE -> SARVORL2
+     C           K#SOL2    KLIST
+     C                     KFLD           K#STNO  8        磅單編號
+     C                     KFLD           K#ORNO 10        ＣＩ訂單
+0506AC           K#SL2A    KLIST
+0506AC                     KFLD           K#STNO  8        磅單編號
+0506AC                     KFLD           K1ORNO 10        ＣＩ訂單
+     C*FILE -> SARVORL3
+     C           K#SOL3    KLIST
+     C                     KFLD           K3ORNO 10        ＣＩ訂單
+     C                     KFLD           K3STNO  8        磅單編號
+0506AC                     KFLD           K3STIT  40       磅單項次
+     C*FILE -> TRNDTL
+     C           K#TRND    KLIST
+     C                     KFLD           K#CODE  4        單據代號
+     C                     KFLD           K#STNO  8        磅單編號
+9804AC*FILE -> SAMAST
+9804AC           K#MAST    KLIST
+9804AC                     KFLD           D#ORN1           地區別
+9804AC                     KFLD           D#ORN2           訂單號碼
+9804AC*0406A     K#MAS1    KLIST
+9804AC*0406A               KFLD           W#OREA           地區別
+9804AC*0406A               KFLD           W#TXOR           訂單號碼
+9804AC*0406A               KFLD           W#OITM           項目
+     C*****************************************************************
+     C*        MAIN  PROGRAM
+     C*****************************************************************
+0109AC           *DATE     SUB  19000000  U#SYSD  80
+0109AC           *NAMVAR   DEFN ARIFRSCTL IFRS
+0109AC           U#SYSD    IFLT D#IFRS
+0109AC                     MOVEL*ON       *IN78
+0109AC                     ELSE
+0109AC                     MOVEL*OFF      *IN78
+0109AC                     ENDIF
+0109AC                     UNLCKIFRS
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000           畫面二
+     C           W#PRID    CASEQ'03'      SR3000           READC
+     C           W#PRID    CASEQ'04'      SR4000           畫面三
+     C           W#PRID    CASEQ'05'      SR5000           畫面五
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C                     MOVE '01'      W#PRID  2
+     C                     MOVE *OFF      *IN99
+     C                     MOVEL''      W#OEOF
+     C*部門限定
+     C                     SELEC
+     C           U#USTP    WHEQ 'S'                        系統工程部
+     C                     MOVEL'*'       W#HEAD  1
+     C*
+     C           U#USTP    WHEQ 'B'                        營業部
+     C           U#USTP    OREQ 'J'                        鄭梅蘭
+0711AC           U#USTP    OREQ 'D'                        稽核室
+0711AC           U#USID    OREQ 'H293'
+     C                     SELEC
+     C           U#USDP    WHEQ 'B01'
+     C           U#USDP    OREQ 'J00'
+9805AC           U#USDP    OREQ 'B00'
+0711AC           U#USID    OREQ 'D00LCC'
+0711AC           U#USID    OREQ 'H293'
+0711AC           U#USID    OREQ 'D00CHH'
+     C                     MOVEL'P'       W#HEAD           台北
+     C           U#USDP    WHEQ 'B02'
+     C                     MOVEL'T'       W#HEAD           桃園
+     C           U#USDP    WHEQ 'B03'
+     C                     MOVEL'K'       W#HEAD           高雄
+     C           U#USDP    WHEQ 'B04'
+     C                     MOVEL'M'       W#HEAD           台中
+     C           U#USDP    WHEQ 'B05'
+     C                     MOVEL'H'       W#HEAD           苗栗
+     C                     ENDSL
+     C*
+     C                     OTHER                           其他
+     C*
+     C           U#USDP    IFEQ 'TYB'                      桃園
+     C                     MOVEL'T'       W#HEAD
+     C                     ELSE                            結束
+     C                     MOVEL'00'      W#PRID
+     C                     ENDIF
+     C*
+     C                     ENDSL
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->ARE037SC-1畫面
+     C           *IN99     IFEQ *OFF                        無錯誤
+     C                     Z-ADD0         RRN1    40
+     C                     Z-SUB12        S#NBR1            SFLRCDNBR
+     C*
+     C                     MOVE *ON       *IN73             SFLCLR
+     C                     WRITEAR037F1C
+     C                     MOVE *OFF      *IN73
+     C*
+     C                     MOVE *ON       *IN30             DSTATR(PC)
+     C*
+     C                     MOVE S#KEY1    SRCUNO           客戶代號
+     C                     MOVE *HIVAL    SRRVDT           日期
+     C                     MOVE *HIVAL    SRRVNO           繳款單號
+     C                     Z-ADD0         SRITEM           項次
+     C           K#SAR4    SETLLSRRECL
+     C                     EXSR SR1100                     讀入
+     C                     ENDIF                            IN99
+     C*迴圈開始
+     C           W#PRID    DOWEQ'01'
+     C*
+     C           RRN1      IFEQ 0
+     C                     MOVE *ON       *IN72             SFLDSP OFF
+     C                     MOVELERR,1     S#ERR1
+     C*
+     C           S#KEY1    IFEQ *BLANK
+     C                     MOVE *OFF      *IN32             DSPATR(RI)
+     C                     ELSE
+     C                     MOVE *ON       *IN32
+     C                     ENDIF
+     C*
+     C                     ELSE
+     C                     MOVE *OFF      *IN72
+     C                     ENDIF
+     C*
+     C           W#CNT     IFGE 13
+     C                     MOVE *ON       *IN74             SFLEND OFF
+     C                     ELSE
+     C                     MOVE *OFF      *IN74
+     C                     ENDIF
+     C*
+     C                     WRITEAR037F1M
+     C                     EXFMTAR037F1C
+     C*
+     C                     MOVE *BLANK    S#ERR1
+     C*IN03 IN12
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     ITER
+     C                     ENDIF
+     C*新增
+     C           *IN06     IFEQ *ON
+0705AC           U#USID    ANDNE'B01LLF'
+0711AC           U#USID    ANDNE'D00LCC'
+0711AC           U#USID    ANDNE'H293'
+0711AC           U#USID    ANDNE'D00CHH'
+     C                     Z-ADD1         W#OPT   10        OPT暫存值
+     C                     MOVE '03'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           *IN91     IFEQ *ON
+     C  N90                EXSR SR1100
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE '02'      W#PRID
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*讀入AR037F1資料
+     C                     Z-ADD0         W#CNT   20
+     C           W#CNT     DOWLE12
+     C                     READ SRRECL                   90
+     C   90                LEAVE
+     C*
+     C*
+     C           W#HEAD    IFNE '*'                        依部門過濾
+     C           W#HEAD    ANDNED#RVNO                     只給看自己
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           SRITEM    IFNE 1                          首項即可
+     C           SRMKTP    ORNE '1'                        外銷
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     CLEARAR037F1
+     C*
+     C                     Z-ADDSRRVDT    S#RVDT           繳款日期
+     C                     MOVELSRRVNO    S#RVNO           繳款單號
+     C                     MOVELSRCUNO    S#CUNO           客戶編號
+     C                     Z-ADDSRNAMT    S#NAMT           繳款金額
+     C                     Z-ADDSRXAMT    S#XAMT           沖銷金額
+     C                     MOVELSRFL01    S#FL01           已確認碼
+     C                     MOVELSRFL02    S#FL02           已過入碼
+     C                     MOVELSRFL03    S#FL03           已列印碼
+     C*
+     C           S#CUNO    CHAINCBCUST               69    客戶名稱
+     C           *IN69     IFEQ '1'
+     C                     MOVEL*BLANK    S#CUNM
+     C                     ELSE
+     C                     MOVELCBCUNM    S#CUNM
+     C                     ENDIF
+     C*
+     C                     ADD  1         W#CNT
+     C                     ADD  1         RRN1
+     C*
+     C                     WRITEAR037F1
+     C*
+     C                     ENDDO
+     C*
+     C           W#CNT     IFGE 1
+     C                     ADD  13        S#NBR1            SFLRCDNBR
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*READ C AR037F1
+     C                     MOVE *OFF      *IN99
+     C*                    Z-ADD1         RRN1
+     C           W#PRID    DOWEQ'02'
+     C                     READCAR037F1                  90
+     C   90                MOVE '01'      W#PRID
+     C   90                LEAVE
+     C*
+     C           S#OPT1    IFEQ 0
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           S#OPT1    IFNE 5                          查詢
+     C                     EXSR SR2100                     檢核
+     C                     ENDIF
+     C*有錯
+     C           *IN99     IFEQ *ON
+     C                     MOVE *ON       *IN31             DSPATR(RI)
+     C                     UPDATAR037F1
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C                     ELSE
+     C*沒錯
+     C                     MOVE S#CUNO    S#KEY1
+     C                     Z-ADDS#OPT1    W#OPT
+     C                     Z-ADD0         S#OPT1
+     C                     UPDATAR037F1
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           W#OPT     WHEQ 3                          試算
+     C                     EXSR SR2400
+     C                     MOVELERR,16    S#ERR1
+     C                     MOVE '01'      W#PRID
+     C           W#OPT     WHEQ 4                          刪除
+     C                     EXSR SR2200
+     C           W#OPT     WHEQ 6                          沖銷
+     C                     MOVE '04'      W#PRID
+     C           W#OPT     WHEQ 8                          確認
+     C           W#OPT     OREQ 9                          確認還原
+     C                     EXSR SR2300
+     C                     OTHER
+     C                     MOVE '03'      W#PRID
+     C                     ENDSL
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+0705AC           U#USID    IFEQ 'B01LLF'
+0705AC           S#OPT1    ANDNE5
+0711AC           U#USID    OREQ 'D00LCC'
+0711AC           S#OPT1    ANDNE5
+0711AC           U#USID    OREQ 'H293'
+0711AC           S#OPT1    ANDNE5
+0711AC           U#USID    OREQ 'D00CHH'
+0711AC           S#OPT1    ANDNE5
+0705AC                     MOVELERR,18    S#ERR1
+0705AC                     MOVEL*ON       *IN99
+0705AC   99                Z-ADDRRN1      S#NBR1
+0705AC                     GOTO END210
+0705AC                     ENDIF
+0705AC*
+     C*
+     C           S#FL02    IFNE *BLANK
+     C                     MOVELERR,2     S#ERR1
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C*
+     C  N99      S#OPT1    IFNE 9                          確認還原
+     C           S#FL01    ANDNE*BLANK                     已確認
+     C                     MOVELERR,3     S#ERR1
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C*
+     C  N99      S#OPT1    IFEQ 9                          確認還原
+     C           S#FL01    ANDEQ*BLANK                     已確認
+     C                     MOVELERR,4     S#ERR1
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C*
+     C  N99      S#OPT1    IFEQ 8                          確認
+     C           S#NAMT    IFNE S#XAMT
+     C                     MOVELERR,13    S#ERR1
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C   99                Z-ADDRRN1      S#NBR1
+     C*
+     C           END210    ENDSR
+     C*****************************************************************
+     C           SR2200    BEGSR
+     C*****************************************************************
+     C*刪除主檔
+     C                     MOVE S#RVNO    SRRVNO
+     C                     Z-ADD0         SRITEM
+     C           K#SARC    SETLLSRREC
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C                     READ SRREC                    90
+     C   90                LEAVE
+     C           SRRVNO    IFNE S#RVNO                     繳款單號
+     C                     LEAVE
+     C                     ENDIF
+     C                     DELETSRREC
+     C                     ENDDO
+     C*刪除明細
+     C                     MOVE S#RVNO    SIRVNO
+     C                     Z-ADD0         SIITEM
+     C           K#RVIN    SETLLSIREC
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C                     READ SIREC                    90
+     C   90                LEAVE
+     C           SIRVNO    IFNE S#RVNO                     繳款單號
+     C                     LEAVE
+     C                     ENDIF
+     C                     DELETSIREC
+     C                     ENDDO
+     C*刪除磅單明細
+     C                     MOVE S#RVNO    SORVNO
+     C                     Z-ADD0         SOITEM
+     C           K#RVOR    SETLLSOREC
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C                     READ SOREC                    90
+     C   90                LEAVE
+     C           SORVNO    IFNE S#RVNO                     繳款單號
+     C                     LEAVE
+     C                     ENDIF
+     C                     DELETSOREC
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2300    BEGSR
+     C*****************************************************************
+     C*確認或還原
+     C                     MOVE S#RVNO    SRRVNO
+     C                     Z-ADD0         SRITEM
+     C           K#SARC    SETLLSRREC
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C                     READ SRREC                    90
+     C   90                LEAVE
+     C           SRRVNO    IFNE S#RVNO                     繳款單號
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           W#OPT     IFEQ 8                          確認
+     C                     MOVE 'Y'       SRFL01
+     C                     ELSE                            還原
+     C                     MOVE *BLANK    SRFL01
+     C                     MOVE *BLANK    SRFL03           列印碼
+     C                     ENDIF
+     C*
+9908AC*                    MOVE UDATE     SRCFDT           確認日期
+9908AC           *DATE     SUB  19000000  SRCFDT           確認日期
+     C                     MOVE U#USID    SRCFUS           確認人員
+     C*
+     C                     UPDATSRREC
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2400    BEGSR
+     C*****************************************************************
+     C*確認時先進行兌換損失與奇零尾數的調整
+     C*再進行發票金額的轉換
+     C*然後計算繳款金額與沖銷金額的關係
+     C*此動作只進行一次,如果計算錯誤則以手動修改之
+     C                     MOVE *OFF      *IN97            計算燈號
+     C                     MOVE *ALL'9'   ARY              初始陣列
+     C*先將主檔內容紀錄於ARY中
+     C                     EXSR SR2410
+     C*由ARY將資訊讀出並做整理
+     C  N97                EXSR SR2420
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2410    BEGSR
+     C*****************************************************************
+     C                     MOVE S#RVNO    SRRVNO
+     C                     Z-ADD0         SRITEM
+     C           K#SARC    SETLLSRREC
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C                     READ SRREC                    90
+     C*
+     C           *IN90     IFEQ *ON
+     C           SRRVNO    ORNE S#RVNO                     繳款單號
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     Z-ADDSRITEM    W#ITEM  20       最後一項
+     C*先將主檔內容紀錄於ARY中
+     C                     MOVE SRACTP    D#ACTP           借貸別
+0109AC                     MOVELSRACNO    D#ACNO           會計科目
+     C                     Z-ADDSRRAMT    D#RAMT           收款金額
+     C                     Z-ADDSREXC2    D#EXC2           銀行匯率
+     C                     MOVE SRCURY    D#CURY           幣別
+     C                     Z-ADDSRITEM    I       20        INDEX
+     C                     MOVE D#ARY     ARY,I
+     C*紀錄SR2420所需資訊
+     C                     Z-ADDSREXC1    W#EXC1  84       財會匯率
+     C                     Z-ADDSREXC3    W#EXC3  84       報關匯率
+     C*有以下三種科目則代表已經試算,不做第二次試算
+     C           SRACNO    IFEQ '8212'                     兌換損失
+     C           SRACNO    OREQ '8112'                     兌換收益
+     C           SRACNO    OREQ '8246'                     奇零尾差
+0109AC           SRACNO    OREQ '820201'
+0109AC           SRACNO    OREQ '810201'
+0109AC           SRACNO    OREQ '821204'
+     C                     MOVE *ON       *IN97
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2420    BEGSR
+     C*****************************************************************
+     C*初始各計算值
+9202 C                     Z-ADD0         W#2159 120       暫收其他
+9202 C                     Z-ADD0         W#1138 120       暫收其他
+     C                     Z-ADD0         W#1114 120       外幣存款
+9203 C                     Z-ADD0         W#1111 120       庫存現金
+     C                     Z-ADD0         W#7119 120       出口費用
+9406 C                     Z-ADD0         W#7142 120       郵電費用
+     C                     Z-ADD0         W#8211 120       出押息
+     C                     Z-ADD0         W#AMTX 122       美金總額
+0212AC                     Z-ADD0         W#2122 120       應付帳款
+     C*由ARY將資訊讀出並做整理
+     C                     SORTAARY
+     C           1         DO   20        I
+     C                     MOVE ARY,I     D#ARY
+     C*
+     C           D#ACTP    IFEQ '9'                        初始項次
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     SELEC
+9203 C           D#ACNO    WHEQ '1111'                     庫存現金
+0109AC           D#ACNO    OREQ '110101'
+9203 C           D#CURY    IFEQ 'USD'
+9203 C           D#RAMT    MULT W#EXC1    W#AMT  120H      台幣
+9203 C                     ADD  W#AMT     W#1111
+9203 C                     ADD  D#RAMT    W#AMTX
+9203 C                     ELSE
+9203 C                     ADD  D#RAMT    W#AMTX
+9203 C                     ENDIF
+0212AC           D#ACNO    WHEQ '210801'                   應付帳款
+0212AC           D#CURY    IFEQ 'USD'
+0212AC           D#RAMT    MULT W#EXC1    W#AMT  120H
+0212AC                     ADD  W#AMT     W#2122
+0212AC                     ADD  D#RAMT    W#AMTX
+0212AC                     ELSE
+0212AC                     ADD  D#RAMT    W#AMTX
+0212AC                     ADD  D#RAMT    W#2122
+0212AC                     ENDIF
+     C           D#ACNO    WHEQ '1114'                     外幣存款
+0109AC           D#ACNO    OREQ '110104'
+     C           D#RAMT    MULT W#EXC1    W#AMT  120H      台幣
+     C                     ADD  W#AMT     W#1114
+     C                     ADD  D#RAMT    W#AMTX
+9202 C           D#ACNO    WHEQ '2159'                     外幣存款
+0109AC           D#ACNO    OREQ '211301'
+     C           D#CURY    IFNE 'NTD'
+9202 C           D#RAMT    MULT W#EXC1    W#AMT  120H      台幣
+     C                     ELSE
+     C                     Z-ADDD#RAMT    W#AMT
+     C           D#RAMT    DIV  W#EXC1    D#RAMT
+     C                     ENDIF
+9406 C           D#ACTP    IFEQ 'C'
+9406 C           W#AMT     MULT -1        W#AMT
+9406 C           D#RAMT    MULT -1        D#RAMT
+9406 C                     ENDIF
+9202 C                     ADD  W#AMT     W#2159
+9202 C                     ADD  D#RAMT    W#AMTX
+9202 C           D#ACNO    WHEQ '1138'                     外幣存款
+0109AC           D#ACNO    OREQ '111202'
+9202 C           D#RAMT    MULT W#EXC1    W#AMT  120H      台幣
+9202 C                     ADD  W#AMT     W#1138
+9202 C                     ADD  D#RAMT    W#AMTX
+     C*出口費用如為台幣,須先依銀行匯率轉成美金,再依財會匯率轉成台
+     C*幣;如為美金則直接以財會匯率轉換
+     C           D#ACNO    WHEQ '7119'                     出口費用
+0109AC           D#ACNO    OREQ '710109'
+     C           D#CURY    IFEQ 'NTD'                      台幣
+     C           D#CURY    OREQ *BLANK                     台幣
+     C           D#RAMT    DIV  D#EXC2    W#AMT1 133H
+     C                     ADD  W#AMT1    W#AMTX
+     C           W#AMT1    MULT W#EXC1    W#AMT     H
+     C                     ADD  W#AMT     W#7119
+     C                     ELSE
+     C           D#RAMT    MULT W#EXC1    W#AMT     H
+     C                     ADD  W#AMT     W#7119
+     C                     ADD  D#RAMT    W#AMTX
+     C                     ENDIF
+     C*
+     C*郵電費用如為台幣,須先依銀行匯率轉成美金,再依財會匯率轉成台
+     C*幣;如為美金則直接以財會匯率轉換
+     C           D#ACNO    WHEQ '7142'                     郵電費用
+0109AC           D#ACNO    OREQ '710402'
+     C           D#CURY    IFEQ 'NTD'                      台幣
+     C           D#CURY    OREQ *BLANK                     台幣
+     C           D#RAMT    DIV  D#EXC2    W#AMT1 133H
+     C                     ADD  W#AMT1    W#AMTX
+     C           W#AMT1    MULT W#EXC1    W#AMT     H
+     C                     ADD  W#AMT     W#7142
+     C                     ELSE
+     C           D#RAMT    MULT W#EXC1    W#AMT     H
+     C                     ADD  W#AMT     W#7142
+     C                     ADD  D#RAMT    W#AMTX
+     C                     ENDIF
+     C*計算方式同上
+     C           D#ACNO    WHEQ '8211'                     出押息
+0109AC           D#ACNO    OREQ '820101'
+     C           D#CURY    IFEQ 'NTD'                      台幣
+     C           D#CURY    OREQ *BLANK                     台幣
+     C           D#RAMT    DIV  D#EXC2    W#AMT1    H
+     C                     ADD  W#AMT1    W#AMTX
+     C           W#AMT1    MULT W#EXC1    W#AMT     H
+     C                     ADD  W#AMT     W#8211
+     C                     ELSE
+     C           D#RAMT    MULT W#EXC1    W#AMT     H
+     C                     ADD  W#AMT     W#8211
+     C                     ADD  D#RAMT    W#AMTX
+     C                     ENDIF
+     C*
+     C                     ENDSL
+     C*
+     C                     ENDDO
+     C*寫入8212(兌換損失)或8112(兌換收益),與8246(奇零尾差)
+     C                     EXSR SR2421
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2421    BEGSR
+     C*****************************************************************
+     C*初始各項值
+     C                     Z-ADD0         W#8212 120       損失暫存
+     C                     Z-ADD0         W#8112 120       收益暫存
+     C                     Z-ADD0         W#8246 120       尾數暫存
+     C                     Z-ADD0         W#CONT  30       須寫入筆數
+     C                     Z-ADD0         W#CONX  30       已寫入筆數
+     C*若財會匯率大於報關匯率則為收益,反之則為損失
+     C           W#EXC1    IFGE W#EXC3
+     C           W#EXC1    SUB  W#EXC3    W#EXCG  84
+     C           W#AMTX    MULT W#EXCG    W#8112    H
+     C                     ELSE
+     C           W#EXC3    SUB  W#EXC1    W#EXCG
+     C           W#AMTX    MULT W#EXCG    W#8212    H
+     C                     ENDIF
+     C*計算奇零尾差,以台幣表達(公式如下)
+     C*沖銷總額=繳款總額
+9202 C*繳款總額=1114+7119+8211+8212-8112+8246+2159+1138+7142+2122
+     C* => 8246=沖銷總額-(1114+7119+8211+8212-8112+2159+1138+7142)
+     C           S#XAMT    SUB  W#1114    W#8246
+     C                     SUB  W#1111    W#8246
+     C                     SUB  W#7119    W#8246
+     C                     SUB  W#8211    W#8246
+     C                     SUB  W#8212    W#8246
+     C                     ADD  W#8112    W#8246
+9202 C                     SUB  W#2159    W#8246
+9202 C                     SUB  W#1138    W#8246
+9406 C                     SUB  W#7142    W#8246
+0212AC                     SUB  W#2122    W#8246
+     C*計算須寫入筆數
+     C           W#8112    IFNE 0
+     C                     ADD  1         W#CONT
+     C                     ENDIF
+     C           W#8212    IFNE 0
+     C                     ADD  1         W#CONT
+     C                     ENDIF
+     C           W#8246    IFNE 0
+     C                     ADD  1         W#CONT
+     C                     ENDIF
+     C*先更新此繳款書的繳款金額然後再寫入
+     C                     MOVE S#RVNO    SRRVNO
+     C                     Z-ADD0         SRITEM
+     C           K#SARC    SETLLSRREC
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C                     READ SRREC                    90
+     C*
+     C           *IN90     IFEQ *ON
+     C           SRRVNO    ORNE S#RVNO                     繳款單號
+     C                     LEAVE
+     C                     ENDIF
+     C                     Z-ADDSRXAMT    SRNAMT
+     C                     UPDATSRREC
+     C*寫入新項次
+     C           SRITEM    IFEQ W#ITEM                     已到最末筆
+     C                     MOVE *BLANK    SRUSTP           款項別
+     C                     MOVE *BLANK    SRNTTP           票據別
+     C                     MOVE *BLANK    SRPBID           付款銀行
+     C                     MOVE *BLANK    SRPANO           付款帳號
+     C                     MOVE *BLANK    SRPLAC           付款地
+     C                     MOVE *BLANK    SRNTNO           票據號碼
+     C                     MOVE *BLANK    SRSBID           存入銀行
+     C                     MOVE *BLANK    SRSANO           存入帳號
+     C                     Z-ADD0         SRDUDT           到期日
+     C                     MOVE *BLANK    SRRLNO           相關號碼
+     C                     MOVEL*BLANK    SRRESV           保留碼
+     C                     MOVE '1'       SRMKTP           外銷
+     C                     MOVEL'NTD'     SRCURY           幣別
+     C                     Z-ADDS#EXC1    SREXC1           財會匯率
+     C                     Z-ADD0         SREXC2           銀行匯率
+     C                     Z-ADDS#EXC3    SREXC3           報關匯率
+     C*
+     C           W#8112    IFNE 0                          兌換收益
+     C                     ADD  1         W#ITEM
+     C                     Z-ADDW#ITEM    SRITEM           項次
+     C                     MOVEL'C'       SRACTP           借貸別
+0109AC   78                MOVEL'8112'    SRACNO           會計科目
+0109AC  N78                MOVEL'810201'  SRACNO
+     C                     Z-ADDW#8112    SRRAMT           繳款金額
+     C                     WRITESRREC
+     C                     ADD  1         W#CONX           已寫入筆數
+     C                     ENDIF
+     C*
+     C           W#8212    IFNE 0                          兌換損失
+     C                     ADD  1         W#ITEM
+     C                     Z-ADDW#ITEM    SRITEM           項次
+     C                     MOVEL'D'       SRACTP           借貸別
+0109AC   78                MOVEL'8212'    SRACNO           會計科目
+0109AC  N78                MOVEL'820201'  SRACNO
+     C                     Z-ADDW#8212    SRRAMT           繳款金額
+     C                     WRITESRREC
+     C                     ADD  1         W#CONX           已寫入筆數
+     C                     ENDIF
+     C*
+     C           W#8246    IFNE 0                          奇零尾數
+     C                     ADD  1         W#ITEM
+     C                     Z-ADDW#ITEM    SRITEM           項次
+     C           W#8246    IFGT 0
+     C                     MOVEL'D'       SRACTP           借貸別
+0109AC   78                MOVEL'8246'    SRACNO           會計科目
+0109AC  N78                MOVEL'821204'  SRACNO
+     C                     Z-ADDW#8246    SRRAMT           繳款金額
+     C                     ELSE
+     C                     MOVEL'C'       SRACTP           借貸別
+0109AC   78                MOVEL'8246'    SRACNO           會計科目
+0109AC  N78                MOVEL'821204'  SRACNO
+     C                     Z-SUBW#8246    SRRAMT           繳款金額
+     C                     ENDIF
+     C                     WRITESRREC
+     C                     ADD  1         W#CONX           已寫入筆數
+     C                     ENDIF
+     C*
+     C                     ENDIF                            W#ITEM
+     C*
+     C           W#CONT    IFEQ W#CONX
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->ARE037SC-2畫面
+     C           W#FLAG    IFEQ ' '
+     C                     Z-ADD0         RRN2    40
+     C*
+     C                     MOVE *ON       *IN73             SFLCLR
+     C                     WRITEAR037F2C
+     C                     MOVE *OFF      *IN73
+     C*
+     C           W#OPT     IFEQ 5                          查詢
+     C                     MOVE *ON       *IN33
+     C                     ELSE
+     C                     MOVE *OFF      *IN33
+     C                     ENDIF
+     C*
+     C                     MOVE *OFF      *IN61             PROTECT
+     C*
+     C                     SELEC
+     C           W#OPT     WHEQ 1
+     C                     MOVE '新增'  S#SF2T
+     C           W#OPT     WHEQ 2
+     C                     MOVE '修改'  S#SF2T
+     C           W#OPT     WHEQ 5
+     C                     MOVE '查詢'  S#SF2T
+     C                     ENDSL
+     C*
+     C           W#OPT     IFNE 1                          新增
+     C                     EXSR SR3100                     讀入檔頭
+     C                     ELSE
+     C                     MOVE *BLANK    S#RVNO           繳款單號
+     C                     MOVE *BLANK    S#DPNO           部門別
+     C                     MOVE *BLANK    S#RVID           收款業務
+     C                     MOVE *BLANK    S#CUNO           客戶編號
+     C                     Z-ADD0         S#RVDT           繳款日期
+     C                     Z-ADD0         S#NAMT           繳款總額
+     C                     Z-ADD0         S#XAMT           沖銷總額
+     C                     Z-ADD0         S#EXC1           財會匯率
+     C                     Z-ADD0         S#EXC3           報關匯率
+     C                     ENDIF
+     C*
+     C                     Z-ADD1         S#NBR2            SFLRCDNBR
+     C                     EXSR SR3200                     初始SFL
+     C                     ENDIF
+     C*迴圈開始
+     C  N33                MOVE *ON       *IN34            DSPATR(PC)
+     C           W#PRID    DOWEQ'03'
+     C*
+     C           RRN2      IFEQ 0
+     C                     MOVE *ON       *IN72             SFLDSP OFF
+     C                     MOVELERR,1     S#ERR1
+     C                     ELSE
+     C                     MOVE *OFF      *IN72
+     C                     ENDIF
+     C*
+     C                     MOVE *OFF      *IN74
+     C                     WRITEAR037F2M
+     C                     EXFMTAR037F2C
+     C*
+     C                     SETOF                     3499
+     C                     MOVEA'00000'   *IN,53           DSPATR(PC)
+     C                     MOVE *OFF      *IN62
+     C                     MOVE *OFF      *IN64
+     C                     MOVE *BLANK    S#ERR2
+     C                     MOVE *BLANK    W#FLAG
+     C*
+     C           S#CRN2    IFNE 0
+     C                     Z-ADDS#CRN2    S#NBR2           記錄位置
+     C                     ENDIF
+     C*IN03
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*IN12
+     C           *IN12     IFEQ *ON
+     C           RRN1      IFNE 0
+     C                     MOVE '02'      W#PRID
+     C                     ELSE
+     C                     MOVE '01'      W#PRID
+     C                     MOVE *OFF      *IN99            畫面一INI
+     C                     ENDIF
+     C                     LEAVE
+     C                     ENDIF
+     C*說明
+     C           *IN01     IFEQ *ON
+     C           S#CRN2    IFNE 0
+     C                     Z-ADDS#CRN2    RRN2
+     C           RRN2      CHAINAR037F2              38
+     C           S#NTTP    IFEQ 'J'
+     C           W#OPT     ANDNE5
+     C                     EXSR SR5100
+     C                     MOVEL'05'      W#PRID
+     C                     GOTO EN3000
+     C                     ENDIF
+0109AC   78                EXFMTAR037F2W
+0109AC  N78                EXFMTAR037F4W
+     C                     ITER
+     C                     ENDIF
+     C                     ENDIF
+     C*檢核
+     C  N33                EXSR SR3300
+     C*存檔
+     C  N33N99   *IN10     IFEQ *ON
+     C                     EXSR SR3400
+     C                     MOVE '04'      W#PRID           沖銷畫面
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C   33                MOVE '04'      W#PRID
+     C                     ENDDO
+     C*
+     C           EN3000    ENDSR
+     C*****************************************************************
+     C           SR3100    BEGSR
+     C*****************************************************************
+     C*讀入檔頭
+     C                     MOVE S#RVNO    SRRVNO
+     C                     Z-ADD1         SRITEM
+     C           K#SARC    CHAINSRREC                90
+     C                     MOVELSRRVNO    S#RVNO           繳款單號
+     C                     MOVELSRDPNO    S#DPNO           部門別
+     C                     MOVELSRRVID    S#RVID           收款業務
+     C                     MOVELSRCUNO    S#CUNO           客戶編號
+     C                     Z-ADDSRRVDT    S#RVDT           繳款日期
+     C                     Z-ADDSRNAMT    S#NAMT           繳款總額
+     C                     Z-ADDSRXAMT    S#XAMT           沖銷總額
+     C                     Z-ADDSREXC1    S#EXC1           財會匯率
+     C                     Z-ADDSREXC3    S#EXC3           報關匯率
+     C*
+9710 C           S#EXC3    IFEQ 1
+ .   C                     MOVEL'1'       S#TYPE           台幣報關
+ .   C                     ELSE
+ .   C                     MOVEL'2'       S#TYPE           外幣報關
+ .   C                     ENDIF
+9710 C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3200    BEGSR
+     C*****************************************************************
+     C*讀入明細
+     C           RRN2      DOWLE19
+     C                     ADD  1         RRN2
+     C                     MOVE S#RVNO    SRRVNO
+     C                     Z-ADDRRN2      SRITEM
+     C           K#SARC    CHAINSRREC                90
+     C                     Z-ADDRRN2      S#SFI2
+     C           *IN90     IFEQ *OFF                       有資料
+     C                     MOVELSRACTP    S#ACTP           借貸別
+     C                     MOVELSRUSTP    S#USTP           款項別
+     C                     MOVELSRNTTP    S#NTTP           票據別
+     C                     MOVELSRACNO    S#ACNO           會計科目
+     C                     MOVELSRPBID    S#PBID           付款銀行
+     C                     MOVELSRNTNO    S#NTNO           票據號碼
+     C                     Z-ADDSRRAMT    S#RAMT           收款金額
+     C                     MOVELSRRLNO    S#RLNO           相關號碼
+     C                     MOVELSRSANO    S#SANO           存入帳號
+     C                     Z-ADDSRDUDT    S#DUDT           到期日
+     C           SRCURY    IFEQ *BLANK
+     C                     MOVE 'NTD'     S#CURY
+     C                     ELSE
+     C                     MOVELSRCURY    S#CURY           幣別
+     C                     ENDIF
+     C                     Z-ADDSREXC2    S#EXC2           銀行匯率
+     C                     ELSE
+     C                     MOVE *BLANK    S#ACTP           借貸別
+     C                     MOVE *BLANK    S#USTP           款項別
+     C                     MOVE *BLANK    S#NTTP           票據別
+     C                     MOVE *BLANK    S#ACNO           會計科目
+     C                     MOVE *BLANK    S#PBID           付款銀行
+     C                     MOVE *BLANK    S#NTNO           票據號碼
+     C                     Z-ADD0         S#RAMT           收款金額
+     C                     MOVE *BLANK    S#RLNO           相關號碼
+     C                     MOVE *BLANK    S#SANO           存入帳號
+     C                     Z-ADD0         S#DUDT           到期日
+     C                     MOVE *BLANK    S#CURY           幣別
+     C                     Z-ADD0         S#EXC2           銀行匯率
+     C                     ENDIF
+     C  N33
+     CORN90                WRITEAR037F2
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3300    BEGSR
+     C*****************************************************************
+     C*清空繳款金額,於SR3320重新合計
+     C                     Z-ADD0         S#NAMT           繳款金額
+     C*檢核檔頭
+     C           S#CUNO    IFEQ *BLANK                     客戶編號
+     C                     SETON                     345399
+     C                     MOVELERR,6     S#ERR2
+     C                     ENDIF
+     C*
+     C           S#CUNO    CHAINCBREC               N90
+     C  N99 90             SETON                     345399
+     C  N99 90             MOVELERR,6     S#ERR2
+     C  N99N90             MOVELCBCUNM    S#CUNM
+     C*
+     C                     MOVE S#RVDT    P#DATE           繳款日期
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM           P#ERR   1
+     C  N99      P#ERR     IFNE '0'
+     C                     SETON                     5499
+     C                     MOVELERR,6     S#ERR2
+     C                     ENDIF
+     C*
+     C  N99      S#EXC3    IFEQ 0                          報關匯率
+     C                     SETON                     6299
+     C                     MOVELERR,6     S#ERR2
+     C                     ENDIF
+     C*
+     C  N99      S#DPNO    IFEQ *BLANK                     部門別
+     C                     SETON                     5599
+     C                     MOVELERR,6     S#ERR2
+     C                     ENDIF
+     C*
+     C  N99      S#RVID    IFEQ *BLANK                     業務員
+     C                     SETON                     5699
+     C                     MOVELERR,6     S#ERR2
+     C                     ENDIF
+     C*
+9710 C  N99      S#TYPE    IFNE '1'
+ .   C           S#TYPE    ANDNE'2'
+ .   C                     SETON                     6499
+ .   C                     MOVELERR,6     S#ERR2
+9710 C                     ENDIF
+     C*
+     C  N99      S#EXC1    IFEQ 0                          財會匯率
+9710 C           S#TYPE    ANDNE'1'
+     C                     SETON                     5799
+     C                     MOVELERR,6     S#ERR2
+     C                     ENDIF
+     C*檢核SFL
+     C                     Z-ADD0         W#CONT
+     C                     MOVE *OFF      *IN98            錯誤判斷
+     C  N99      W#CONT    DOWLERRN2
+     C                     ADD  1         W#CONT
+     C           W#CONT    CHAINAR037F2              90
+     C   90                LEAVE
+     C*當借貸別為空白時,自動清空所有欄位
+     C*而不為空白時才進行檢核
+     C           S#ACTP    IFEQ *BLANK                     借貸別
+     C                     MOVE *BLANK    S#ACTP           借貸別
+     C                     MOVE *BLANK    S#USTP           款項別
+     C                     MOVE *BLANK    S#NTTP           票據別
+     C                     MOVE *BLANK    S#ACNO           會計科目
+     C                     MOVE *BLANK    S#PBID           付款銀行
+     C                     MOVE *BLANK    S#NTNO           票據號碼
+     C                     Z-ADD0         S#RAMT           收款金額
+     C                     MOVE *BLANK    S#RLNO           相關號碼
+     C                     MOVE *BLANK    S#SANO           存入帳號
+     C                     Z-ADD0         S#DUDT           到期日
+     C                     MOVE *BLANK    S#CURY           幣別
+     C                     Z-ADD0         S#EXC2           銀行匯率
+     C                     MOVEA'00000000'*IN,41
+     C                     MOVEA'0000'    *IN,49
+     C                     ELSE
+     C                     EXSR SR3310                     明細檢核
+     C                     EXSR SR3320                     計算繳款額
+     C                     ENDIF
+     C*
+     C                     UPDATAR037F2
+     C                     ENDDO
+     C*
+     C  N99 98             MOVE ERR,6     S#ERR2
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3310    BEGSR
+     C*****************************************************************
+     C*檢核SFL
+     C           S#USTP    IFNE 'A1'                       款項別
+     C           S#USTP    ANDNE'A2'
+     C           S#USTP    ANDNE'A3'
+     C           S#USTP    ANDNE'A4'
+     C           S#USTP    ANDNE'A5'
+     C           S#USTP    ANDNE'Z5'
+     C           S#USTP    ANDNE*BLANK
+     C                     SETON                     4298
+     C                     ENDIF
+     C*
+     C           S#NTTP    IFNE 'A'                        票款別
+     C           S#NTTP    ANDNE'B'
+     C           S#NTTP    ANDNE'C'
+     C           S#NTTP    ANDNE'D'
+     C           S#NTTP    ANDNE'E'
+     C           S#NTTP    ANDNE'F'
+     C           S#NTTP    ANDNE'G'
+     C           S#NTTP    ANDNE'H'
+     C           S#NTTP    ANDNE'I'
+     C           S#NTTP    ANDNE'J'
+     C           S#NTTP    ANDNE*BLANK
+     C                     SETON                     4398
+     C                     ENDIF
+     C*
+ 9203C           S#ACNO    IFNE '1111'                     會計科目
+     C           S#ACNO    ANDNE'1114'
+     C           S#ACNO    ANDNE'7119'
+     C           S#ACNO    ANDNE'8212'
+     C           S#ACNO    ANDNE'8211'
+     C           S#ACNO    ANDNE'8112'
+     C           S#ACNO    ANDNE'8246'
+ 9203C           S#ACNO    ANDNE'2159'
+ 9204C           S#ACNO    ANDNE'1138'
+ 9406C           S#ACNO    ANDNE'7142'
+0109AC           S#ACNO    ANDNE'110101'                    1111
+0109AC           S#ACNO    ANDNE'110104'                    1114
+0109AC           S#ACNO    ANDNE'710109'                    7119
+0109AC           S#ACNO    ANDNE'820201'                    8212
+0109AC           S#ACNO    ANDNE'820101'                    8211
+0109AC           S#ACNO    ANDNE'810201'                    8112
+0109AC           S#ACNO    ANDNE'821204'                    8246
+0109AC           S#ACNO    ANDNE'211301'                    2159
+0109AC           S#ACNO    ANDNE'111202'                    1138
+0109AC           S#ACNO    ANDNE'710402'                    7142
+0212AC           S#ACNO    ANDNE'210801'
+0212AC           S#ACNO    ANDNE'111101'
+     C                     SETON                     4498
+     C                     ENDIF
+     C*
+     C           S#ACNO    IFEQ '8212'
+     C           S#ACTP    ANDNE'D'
+0109AC           S#ACNO    OREQ '820201'
+0109AC           S#ACTP    ANDNE'D'
+     C                     SETON                     414498
+     C                     ENDIF
+     C*
+     C           S#ACNO    IFEQ '8112'
+     C           S#ACTP    ANDNE'C'
+0109AC           S#ACNO    OREQ '810201'
+0109AC           S#ACTP    ANDNE'C'
+     C                     SETON                     414498
+     C                     ENDIF
+     C*
+     C           S#NTNO    IFNE *BLANK                     票據號碼
+     C           S#DUDT    ANDEQ0                          到期日
+     C                     SETON                     4798
+     C                     ENDIF
+     C*
+     C           S#DUDT    IFNE 0                          到期日
+     C                     MOVE S#DUDT    P#DATE           繳款日期
+     C                     CALL 'UTS102R'
+     C                     PARM           P#DATE  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LY    1
+     C                     PARM           P#ERR   1
+     C           P#ERR     IFNE '0'
+     C                     SETON                     4798
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           S#CURY    IFNE *BLANK                     幣別
+     C           S#CURY    ANDNE'NTD'
+     C           S#CURY    ANDNE'USD'
+9706 C           S#CURY    ANDNE'EUR'
+     C                     SETON                     5098
+     C                     ENDIF
+     C*
+     C           S#ACNO    IFEQ '1114'                     幣別
+     C           S#CURY    ANDNE'USD'
+9706 C           S#CURY    ANDNE'EUR'
+0109AC           S#ACNO    OREQ '110104'
+0109AC           S#CURY    ANDNE'USD'
+0109AC           S#CURY    ANDNE'EUR'
+     C                     SETON                     5098
+     C                     ENDIF
+     C*
+     C           S#RAMT    IFEQ 0                          金額
+     C                     SETON                     5198
+     C                     ENDIF
+     C*
+     C           S#EXC2    IFEQ 0                          銀行匯率
+9710 C           S#CURY    ANDNE'NTD'
+     C                     SETON                     5298
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3320    BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#TMNA 120
+     C*
+     C           S#CURY    IFEQ 'NTD'                      台幣繳款
+     C           S#CURY    OREQ *BLANK                     台幣繳款
+     C*
+     C           S#ACTP    IFEQ 'D'                        借方
+     C                     Z-ADDS#RAMT    W#TMNA
+     C                     ELSE                            貸方
+     C                     Z-SUBS#RAMT    W#TMNA
+     C                     ENDIF
+     C*
+     C                     ELSE                            外幣繳款
+     C*
+     C           S#RAMT    MULT S#EXC1    W#TMNB 120H      幣值轉換
+     C           S#ACTP    IFEQ 'D'                        借方
+     C                     Z-ADDW#TMNB    W#TMNA
+     C                     ELSE                            貸方
+     C                     Z-SUBW#TMNB    W#TMNA
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C                     ADD  W#TMNA    S#NAMT           合計繳款額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3400    BEGSR
+     C*****************************************************************
+     C*如為新增時,必須取得新的繳款單號
+     C           W#OPT     IFEQ 1                          新增
+     C                     MOVEL'04'      GEKIND
+     C                     MOVEL'P'       GEPRIN
+     C*
+     C           K#NSEQ    CHAINGEREC                90
+     C                     Z-ADDGECUNO    W#GENO  50
+     C           W#GENO    IFEQ 99999
+     C                     Z-ADD1         W#GENO
+     C                     ELSE
+     C                     ADD  1         W#GENO
+     C                     ENDIF
+     C*
+     C                     MOVELGEPRIN    D#RVN1           設繳款單號
+     C                     MOVE W#GENO    D#RVN2
+     C                     MOVE D#RVNX    S#RVNO
+     C*
+     C                     Z-ADDW#GENO    GECUNO
+TEST C                     UPDATGEREC
+     C                     ENDIF
+     C*
+     C*先將原有之所有資訊刪除(SARCVF)
+     C*
+     C                     MOVE S#RVNO    SRRVNO           繳款單號
+     C                     Z-ADD0         SRITEM           繳款項次
+     C           K#SARC    SETLLSRREC
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C                     READ SRREC                    90
+     C   90                LEAVE
+     C*
+     C           SRRVNO    IFNE S#RVNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     DELETSRREC
+     C                     ENDDO
+     C*
+     C*
+     C*計算明細檔之沖銷總額
+     C                     Z-ADD0         S#XAMT
+     C*
+     C                     MOVE S#RVNO    SIRVNO
+     C                     Z-ADD0         SIITEM
+     C           K#RVIN    SETLLSIREC
+     C                     MOVE *OFF      *IN95
+     C           *IN95     DOWEQ*OFF                       有資料
+     C                     READ SIREC                    95
+     C*
+     C           *IN95     IFEQ *ON
+     C           S#RVNO    ORNE SIRVNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ADD  SIINXA    S#XAMT           沖銷金額
+     C                     ENDDO
+     C*存檔
+     C                     Z-ADD0         W#CONT
+     C                     Z-ADD0         SRITEM           繳款項次
+     C           W#CONT    DOWLE19
+     C                     ADD  1         W#CONT
+     C           W#CONT    CHAINAR037F2              90
+     C   90                LEAVE
+     C*
+     C           S#ACTP    IFEQ *BLANK                     借貸別
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     EXSR SR3410                      MOVE DATA
+     C*
+     C           K#SARC    CHAINSRREC                90
+     C   90                WRITESRREC
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3410    BEGSR
+     C*****************************************************************
+     C* MOVE DATA
+     C                     MOVELS#RVNO    SRRVNO           繳款編號
+     C                     Z-ADDS#NAMT    SRNAMT           合計金額
+     C                     Z-ADDS#RVDT    SRRVDT           繳款日
+     C                     MOVELS#CUNO    SRCUNO           客戶編號
+     C                     MOVELS#DPNO    SRDPNO           部門別
+     C                     MOVELS#RVID    SRRVID           收款業務
+     C                     Z-ADDS#XAMT    SRXAMT           沖銷總額
+     C                     MOVE *BLANK    SRFL01
+     C                     MOVE *BLANK    SRFL02
+     C                     MOVE *BLANK    SRFL03
+     C*
+     C                     ADD  1         SRITEM           項次
+     C                     MOVELS#ACTP    SRACTP           借貸別
+     C                     MOVELS#ACNO    SRACNO           會計科目
+     C                     MOVELS#USTP    SRUSTP           款項別
+     C                     MOVELS#NTTP    SRNTTP           票據別
+     C                     MOVELS#PBID    SRPBID           付款銀行
+     C                     MOVE *BLANK    SRPANO           付款帳號
+     C                     MOVE *BLANK    SRPLAC           付款地
+     C                     MOVELS#NTNO    SRNTNO           票據號碼
+     C                     Z-ADDS#RAMT    SRRAMT           收款金額
+     C                     MOVEL*BLANK    SRSBID           存入銀行
+     C                     MOVELS#SANO    SRSANO           存入帳號
+     C                     Z-ADDS#DUDT    SRDUDT           到期日
+     C                     MOVELS#RLNO    SRRLNO           相關號碼
+     C                     MOVEL*BLANK    SRRESV           保留碼
+     C                     MOVE '1'       SRMKTP           外銷
+     C                     MOVELS#CURY    SRCURY           幣別
+     C                     Z-ADDS#EXC1    SREXC1           財會匯率
+     C                     Z-ADDS#EXC2    SREXC2           銀行匯率
+     C                     Z-ADDS#EXC3    SREXC3           報關匯率
+     C*
+9908AC*                    Z-ADDUDATE     SRTXDT           登錄日期
+9908AC           *DATE     SUB  19000000  SRTXDT           登錄日期
+     C                     MOVELU#USID    SRTXUS           登錄人員
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->ARE037SC-3畫面
+     C*
+     C                     Z-ADD0         RRN3    40
+     C                     Z-ADD1         S#NBR3            SFLRCDNBR
+     C*
+     C                     MOVE *ON       *IN73             SFLCLR
+     C                     WRITEAR037F3C
+     C                     MOVE *OFF      *IN73
+     C*
+     C           W#OPT     IFEQ 5                          查詢
+     C                     MOVE *ON       *IN33
+     C                     MOVEL'查詢'  S#SF2T
+     C                     ELSE
+     C                     MOVE *OFF      *IN33
+     C                     MOVEL'沖銷'  S#SF2T
+     C                     ENDIF
+     C*
+     C                     MOVE *ON       *IN61             PROTECT
+     C*
+     C                     EXSR SR3100                     讀入檔頭
+     C*
+     C                     EXSR SR4100                     初始SFL
+     C*
+     C*迴圈開始
+     C           W#PRID    DOWEQ'04'
+     C*
+0011AC   33      RRN3      IFEQ 0
+0011AC                     MOVE *ON       *IN72
+0011AC                     MOVELERR,1     S#ERR3
+0011AC                     ENDIF
+     C*
+     C                     WRITEAR037F3M
+     C                     EXFMTAR037F3C
+     C*
+     C                     SETOF                     3499
+     C                     MOVE *BLANK    S#ERR3
+     C*IN03
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*IN12
+     C           *IN12     IFEQ *ON
+     C                     MOVE '03'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*載入
+     C*
+     C  N33      *IN09     IFEQ *ON
+     C                     EXSR SR4200
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*檢核
+     C*
+     C  N33                EXSR SR4300
+     C*
+     C*存檔
+     C*
+     C  N33N99   *IN10     IFEQ *ON
+     C                     EXSR SR4400
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C   33                MOVE '03'      W#PRID
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4100    BEGSR
+     C*****************************************************************
+     C*讀入明細
+     C                     Z-ADD0         W#RRN3
+0011AC                     MOVEL*BLANKS   W#SHOW
+     C*
+0205AC*          RRN3      DOWLE699
+0205AC           RRN3      DOWLE799
+     C                     ADD  1         RRN3
+     C*
+     C                     MOVE S#RVNO    SORVNO
+     C                     Z-ADDRRN3      SOITEM
+     C           K#RVOR    CHAINSOREC                95
+0011AC   33 95   W#SHOW    IFNE 'Y'
+0011AC                     Z-ADD0         RRN3
+0011AC                     GOTO END410
+0011AC                     ENDIF
+     C                     Z-ADDRRN3      S#SFI3
+     C*
+     C           *IN95     IFEQ *OFF                       有資料
+     C                     MOVELSOSTNO    S#STNO           磅單號碼
+     C                     MOVELSOORNO    S#INOR           訂單號碼
+     C                     MOVELSOCODE    S#CODE           全部沖銷
+     C                     Z-ADDSONOXA    S#INXA           沖銷金額
+     C                     Z-ADDSONOXA    S#HNXA           原沖銷金額
+     C                     Z-ADDSONOAM    S#INAM           磅單金額
+     C                     Z-ADDSONOBA    S#INBA           磅單餘額
+     C                     Z-ADDSOSTIT    S#STIT           項次
+0011AC                     MOVEL'Y'       W#SHOW  1
+     C                     Z-ADD0         S#INRA           未過已沖
+     C*
+     C           S#STNO    CHAINSORECL1              90
+     C           *IN90     DOWEQ*OFF
+     C           W1RVNO    IFNE S#RVNO
+     C           W1STNO    ANDEQS#STNO
+     C           W1STIT    ANDEQS#STIT
+     C                     ADD  W1NOXA    S#INRA           未過已沖
+     C                     ENDIF
+     C           S#STNO    READESORECL1                  90
+     C                     ENDDO
+     C*
+     C                     Z-ADDRRN3      W#RRN3  40       最後一筆
+     C*
+     C                     ELSE
+     C                     Z-ADD0         S#INXA           沖銷金額
+     C                     Z-ADD0         S#HNXA           沖銷金額
+     C                     Z-ADD0         S#INAM           磅單金額
+     C                     Z-ADD0         S#INBA           磅單餘額
+     C                     Z-ADD0         S#STIT           項次
+     C                     MOVEL*BLANK    S#STNO           磅單號碼
+     C                     MOVEL*BLANK    S#INOR           訂單號碼
+     C                     MOVEL*BLANK    S#CODE           全部沖銷
+     C                     Z-ADD0         S#INRA           未過已沖
+     C                     ENDIF
+     C*
+     C  N33
+     CORN95                WRITEAR037F3
+     C                     ENDDO
+     C*
+0011AC           END410    ENDSR
+     C*****************************************************************
+     C           SR4200    BEGSR
+     C*****************************************************************
+     C*載入明細
+     C*
+     C                     MOVE 'Y'       W#LOOP  1
+     C                     CLEARAR037F3W
+     C*
+     C           W#LOOP    DOWEQ'Y'
+     C                     EXFMTAR037F3W
+     C                     MOVE *BLANK    S#ERRW
+     C                     MOVE *OFF      *IN60
+     C*
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     EXSR SR4210                     檢核
+     C*
+     C  N60                EXSR SR4220                     載入
+     C  N60                MOVE 'N'       W#LOOP
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4210    BEGSR
+     C*****************************************************************
+     C*檢核
+     C*
+9804AC*          S#ORNO    CHAINRHSCINV              90
+9804AC           K#MAST    CHAINRSAMAST              90
+     C*
+     C*訂單號碼
+     C*
+     C           *IN90     IFEQ *ON
+9804AC*          C1ORNO    ORNE S#ORNO
+     C                     MOVELERR,7     S#ERRW
+     C                     MOVE *ON       *IN60
+     C                     ENDIF
+     C*
+     C*客戶代號
+     C*
+9804AC* N60      C1OCUS    IFNE S#CUNO
+9804AC  N60      D#CUNO    IFNE S#CUNO
+     C                     MOVELERR,8     S#ERRW
+     C                     MOVE *ON       *IN60
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4220    BEGSR
+     C*****************************************************************
+     C*載入
+     C                     Z-ADD0         RRN3
+     C*
+     C                     MOVE *OFF      *IN90
+     C           S#ORNO    SETLLTXRECL4
+     C           *IN90     DOWEQ*OFF
+     C           S#ORNO    READETXRECL4                  90
+     C*
+     C           *IN90     IFEQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           TXFLAG    IFEQ 'D'
+     C           TXORN5    ORNE S#ORNO
+     C           D#IVN1    ORNE '#'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVELD#ORNO    K3ORNO           訂單編號
+     C                     MOVELTXNO      K3STNO           磅單編號
+0506AC                     Z-ADDTXITEM    K3STIT           磅單項次
+     C                     MOVEL*OFF      *IN40
+     C           K#SOL3    CHAINSORECL3              40
+     C           *IN40     IFEQ *OFF
+     C           W3CODE    ANDEQ'Y'
+     C                     ITER
+     C                     ENDIF
+     C*
+0205AC*          RRN3      IFEQ 700                        最多70筆
+0205AC           RRN3      IFEQ 800                        最多70筆
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ADD  1         RRN3
+     C           RRN3      CHAINAR037F3              77
+     C*
+     C  N40      W3CODE    IFEQ 'N'
+     C           TXQTY     SUB  W3QTY     TXQTY
+     C                     ENDIF
+     C*
+     C                     MOVELTXNO      S#STNO           磅單號碼
+     C                     MOVELTXORNO    S#INOR           訂單號碼
+     C                     MOVELTXPDNM    S#PDNM           品名
+     C                     Z-ADDTXITEM    S#STIT           訂單項次
+0307AC                     Z-ADDTXQTY     S#QTY            數量
+     C*
+     C           S#STNO    IFNE *BLANK
+     C                     MOVEL'Y'       S#CODE           全部沖銷
+     C                     ELSE
+     C                     MOVEL*BLANK    S#CODE
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         W#USAT 133
+     C                     Z-ADD0         W#NOXA 110
+     C*
+0406AC*          S#EXC3    IFEQ 1                          台幣報關
+0406AC*                    Z-ADDTXUPRC    S#UPRC
+0406AC*          TXQTY     MULT TXUPRC    S#INAM    H      磅單金額
+0406AC*                    ELSE
+     C*
+0406AC*                    MOVELD#ORNO    C1ORNO           訂單編號
+0406AC*                    Z-ADD1         C1OSEQ           訂單流水號
+0406AC*                    Z-ADDD#OITM    C1OITM           訂單項次
+0309AC*
+0309AC*由於X00188有二筆明細，但USER反應此報單只有一個項次
+0309AC*所以HSCINV中只會有一個項次，但訂單有二筆，造成第二筆
+0309AC*訂單對不到HSCINV中之資料，無法以磅單中之資料直接沖銷
+0309AC*將X00188寫入程式做特殊判斷。
+0309AC*
+0309AC*0406A     D#ORNO    IFEQ 'X00188'
+0401AC*0406A     D#ORNO    OREQ 'X00197'
+0309AC*0406A               Z-ADD1         C1OITM
+0309AC*0406A               ENDIF
+0309AC*
+0406AC*          K#CINV    CHAINRHSCINV              40
+     C*
+9804AC*                    SELEC
+0406AC* N40                SELEC
+0406AC*          C1ORNO    WHEQ 'H10001'
+0406AC*          C1ORNO    OREQ 'H10002'
+0406AC*          C1ORNO    OREQ 'H10003'
+0406AC*          C1ORNO    OREQ 'H10005'
+0406AC*          C1ORNO    OREQ 'H10006'
+0406AC*          D#AREA    IFEQ 'K'
+0406AC*          C1UPRC    MULT C1RRAT    S#UPRC    H
+0406AC*                    ELSE
+0406AC*          C1UPRC    MULT C1TRAT    S#UPRC    H
+0406AC*                    ENDIF
+0406AC*          S#UPRC    MULT TXQTY     S#INAM    H      磅單金額
+     C*
+0406AC*          C1ORNO    WHEQ 'X00087'
+0406AC*          C1ORNO    OREQ 'X00088'
+0406AC*          C1ORNO    OREQ 'X00089'
+0406AC*          C1ORNO    OREQ 'X00161'
+0406AC*          C1ORNO    OREQ 'X00163'
+0406AC*          C1ORNO    OREQ 'X00166'
+0406AC*          C1ORNO    OREQ 'X00174'
+0406AC*          C1ORNO    OREQ 'X00173'
+0406AC*          C1ORNO    OREQ 'X00177'
+0406AC*          C1ORNO    OREQ 'X00188'
+0406AC*          C1ORNO    OREQ 'X00197'
+     C                     Z-ADDTXUPRC    S#UPRC
+     C                     Z-ADDTXAMT     S#INAM           磅單金額
+     C*
+9804AC*                    OTHER
+9804AC*          C1UPRC    MULT C1TRAT    S#UPRC    H
+9804AC*          S#UPRC    MULT TXQTY     S#INAM    H      磅單金額
+0406AC*                    ENDSL
+9804AC*
+9804AC*0406A               MOVELD#OREA    W#OREA  1        地區別
+9804AC*0406A               Z-ADDD#TXOR    W#TXOR  50       訂單號碼
+9804AC*0406A               Z-ADDD#OITM    W#OITM  30       項目
+9804AC*0406A     K#MAS1    CHAINRSAMAST              40
+9804AC*0406A     *IN40     IFEQ *OFF
+0203AC*0406A     C1ORNO    ANDNE'X00161'
+0206BC*0406A     C1ORNO    ANDNE'X00163'
+0206BC*0406A     C1ORNO    ANDNE'X00166'
+0211AC*0406A     C1ORNO    ANDNE'X00174'
+0212AC*0406A     C1ORNO    ANDNE'X00173'
+0301AC*0406A     C1ORNO    ANDNE'X00177'
+0309AC*0406A     C1ORNO    ANDNE'X00188'
+0401AC*0406A     C1ORNO    ANDNE'X00197'
+9804AC*0406A     D#PRIC    DIV  1000      W#PRIC  65       美金單價以公斤計
+9804AC*0406A     W#PRIC    MULT S#EXC3    S#UPRC    H
+9804AC*0406A     S#UPRC    MULT TXQTY     S#INAM    H      磅單金額
+9804AC*0406A               ENDIF
+9804AC*
+9710 C*0406A               ENDIF
+     C*
+     C                     MOVELTXORNO    K#ORNO
+0506AC                     MOVELD#ORNO    K1ORNO
+     C                     MOVELTXNO      K#STNO
+     C           K#SOL2    CHAINSORECL2              40
+0506AC   40                MOVEL*ON       *IN68
+0506AC  N40                MOVEL*OFF      *IN68
+0506AC   40      K#SL2A    CHAINSORECL2              40
+     C           *IN40     DOWEQ'0'
+     C           W2RVNO    IFNE S#RVNO
+     C           W2STNO    ANDEQS#STNO
+     C           W2STIT    ANDEQS#STIT
+     C                     ADD  W2NOXA    W#NOXA           沖銷金額累
+     C                     ENDIF
+0506AC  N68      K#SOL2    READESORECL2                  40
+0506AC   68      K#SL2A    READESORECL2                  40
+     C                     ENDDO
+     C*
+     C           S#INAM    SUB  W#NOXA    S#INBA           磅單餘額
+     C*
+     C           S#STNO    CHAINSORECL1              91
+     C           *IN91     DOWEQ'0'
+     C           W1RVNO    IFNE S#RVNO
+     C           W1STNO    ANDEQS#STNO
+     C           W1STIT    ANDEQS#STIT
+     C                     ADD  W1NOXA    S#INRA           未過已沖
+     C                     ENDIF
+     C           S#STNO    READESORECL1                  91
+     C                     ENDDO
+     C*
+0906AC*          S#INAM    SUB  S#INRA    S#INXA           沖銷金額
+0906AC           S#INBA    SUB  S#INRA    S#INXA           沖銷金額
+     C                     Z-ADDS#INXA    S#HNXA           原沖銷金額
+     C                     ADD  S#INXA    S#XAMT           總沖銷金額
+     C*
+     C  N77                UPDATAR037F3
+     C                     Z-ADDRRN3      W#RRN3
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4300    BEGSR
+     C*****************************************************************
+     C*先計算沖銷總額
+     C*
+     C                     Z-ADD0         S#XAMT           沖銷總額
+     C                     Z-ADD0         W#CONT
+     C*
+0205AC*          W#CONT    DOWLE699
+0205AC           W#CONT    DOWLE799
+     C                     ADD  1         W#CONT
+     C*
+     C           W#CONT    CHAINAR037F3              90
+     C   90                LEAVE
+     C*
+     C           S#STNO    IFEQ *BLANK                     磅單號碼
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     ADD  S#INXA    S#XAMT
+     C                     ENDDO
+     C*AR037F3的檢核
+     C                     MOVE *BLANK    W#ORNO  6
+     C                     MOVE *OFF      *IN98
+     C*
+     C                     Z-ADD0         W#CONT
+0205AC*          W#CONT    DOWLE699
+0205AC           W#CONT    DOWLE799
+     C                     ADD  1         W#CONT
+     C*
+     C           W#CONT    CHAINAR037F3              90
+     C   90                LEAVE
+     C*
+     C           S#STNO    IFEQ *BLANK                     磅單號碼
+     C                     Z-ADD0         S#INXA           沖銷金額
+     C                     Z-ADD0         S#INAM           磅單金額
+     C                     Z-ADD0         S#INBA           磅單餘額
+     C*                    Z-ADD0         S#QTY            數量
+     C                     MOVEL*BLANK    S#PDNM           品名
+     C                     MOVEL*BLANK    S#INOR           訂單號碼
+     C                     Z-ADD0         S#INRA           未過已沖
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*僅紀錄一次訂單號碼
+     C  N98                MOVELS#INOR    W#ORNO
+     C  N98                MOVE *ON       *IN98
+     C*
+     C*以此訂單號碼檢核報關匯率
+0406AC*                    MOVE W#ORNO    C1ORNO
+0406AC*                    Z-ADD0         C1OSEQ
+0406AC*                    Z-ADD0         C1CITM
+9804AC*          K#CINV    SETLLRHSCINV
+9804AC*                    READ RHSCINV                  90
+9804AC*          *IN90     IFNE *OFF
+9804AC*          C1TRAT    ORNE S#EXC3
+0212AC           D#ORNO    IFNE 'X00173'
+9804AC           D#ORNO    SETLLRARCINV
+9804AC                     MOVEL*OFF      *IN90
+9804AC                     MOVEL*BLANKS   W#CHK
+9804AC           *IN90     DOWEQ*OFF
+9804AC           D#ORNO    READERARCINV                  90
+9804AC   90                LEAVE
+9804AC           S#EXC3    IFEQ R1TRAT
+9804AC                     MOVEL'Y'       W#CHK   1
+9804AC                     LEAVE
+9804AC                     ENDIF
+9804AC                     ENDDO
+9804AC           W#CHK     IFNE 'Y'
+     C                     MOVELERR,15    S#ERR3
+     C                     SETON                     5899
+     C                     ENDIF
+0212AC                     ENDIF
+     C*
+     C*磅單錯誤
+     C                     MOVEL'SA04'    K#CODE           單據代號
+     C                     MOVELS#STNO    K#STNO           磅單編號
+     C  N99      K#TRND    SETLLTXREC
+     C           *IN99     DOWEQ*OFF
+     C           K#TRND    READETXREC                    90
+     C           *IN90     IFEQ *ON
+     C                     MOVELERR,9     S#ERR3
+     C                     SETON                     5899
+     C                     ELSE
+     C*
+0503AC*          TXDATE    IFLT 960101
+0503AC*          TXDATE    IFLT 1030101
+1112AC           TXDATE    IFLT 1110101
+     C                     ITER
+     C                     ENDIF
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C*客戶不同
+     C  N99      TXCUNO    IFNE S#CUNO
+     C                     MOVELERR,10    S#ERR3
+     C                     SETON                     5899
+     C                     ENDIF
+     C*
+     C*訂單不同
+     C                     MOVELTXORNO    W#ORN1  6
+     C  N99      W#ORNO    IFNE W#ORN1
+     C                     MOVELERR,11    S#ERR3
+     C                     SETON                     5899
+     C                     ENDIF
+     C*
+     C*沖銷金額大於發票餘額
+     C* N99      S#INXA    IFGT S#INBA
+     C*                    MOVELERR,12    S#ERR3
+     C*                    SETON                     5999
+     C*                    ENDIF
+     C*
+     C                     Z-ADD0         W#INXA 110
+     C*
+     C  N99                SELEC
+     C           S#CODE    WHEQ *BLANK
+     C           S#STNO    ANDNE*BLANK
+     C                     MOVELERR,17    S#ERR3
+     C                     SETON                     6399
+     C*
+     C           S#CODE    WHEQ 'Y'
+     C           S#INXA    SUB  S#HNXA    W#INXA
+     C           W#INXA    IFGT 60
+     C                     MOVELERR,12    S#ERR3
+     C                     SETON                     5999
+     C                     ENDIF
+     C*
+     C           S#CODE    WHEQ 'N'
+     C           S#INXA    ANDGTS#INBA
+     C                     MOVELERR,12    S#ERR3
+     C                     SETON                     5999
+     C                     ENDSL
+     C*
+     C  N99                SETOF                     585963無錯誤
+     C*
+     C                     UPDATAR037F3
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4400    BEGSR
+     C*****************************************************************
+     C*先將原有之所有資訊刪除
+     C*
+     C                     MOVE S#RVNO    SIRVNO           繳款單號
+     C                     Z-ADD0         SIITEM           繳款項次
+     C           K#RVIN    SETLLSIREC
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C                     READ SIREC                    90
+     C   90                LEAVE
+     C*
+     C           SIRVNO    IFNE S#RVNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     DELETSIREC
+     C                     ENDDO
+     C* (DELETE SARVOR)
+     C                     MOVE S#RVNO    SORVNO           繳款單號
+     C                     Z-ADD0         SOITEM           繳款項次
+     C           K#RVOR    SETLLSOREC
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C                     READ SOREC                    90
+     C   90                LEAVE
+     C*
+     C           SORVNO    IFNE S#RVNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     DELETSOREC
+     C                     ENDDO
+     C*
+     C                     Z-ADD0         WOINAM 110
+     C                     Z-ADD0         WONOXA 110
+     C                     Z-ADD0         WONOBA 110
+     C*
+     C*存檔(WRITE SRVROR)
+     C                     Z-ADD0         W#CONT
+     C                     Z-ADD0         SOITEM           繳款項次
+0205AC*          W#CONT    DOWLE699
+0205AC           W#CONT    DOWLE799
+     C                     ADD  1         W#CONT
+     C           W#CONT    CHAINAR037F3              90
+     C   90                LEAVE
+     C*
+     C           S#STNO    IFEQ *BLANK                     借貸別
+     C           S#INXA    OREQ 0
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE S#RVNO    SORVNO           繳款編號
+     C                     ADD  1         SOITEM           繳款項次
+     C           K#RVOR    CHAINSOREC                90
+     C*
+     C                     EXSR SR4410                      MOVE DATA
+     C   90                WRITESOREC
+     C*
+     C                     ENDDO
+     C*
+     C*存檔(WRITE SRVRIN)
+     C           WOINAM    IFNE 0
+     C                     Z-ADD0         W#CONT
+     C                     Z-ADD0         SIITEM           繳款項次
+     C*
+     C                     MOVE S#RVNO    SIRVNO
+     C                     ADD  1         SIITEM
+     C           K#RVIN    CHAINSIREC                90
+     C*
+     C                     EXSR SR4420
+     C   90                WRITESIREC
+     C                     ENDIF
+     C*
+     C*更新SARCVF沖銷金額合計
+     C*
+     C                     MOVE S#RVNO    SRRVNO           繳款單號
+     C                     Z-ADD0         SRITEM           繳款項次
+     C           K#SARC    SETLLSRREC
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C                     READ SRREC                    90
+     C   90                LEAVE
+     C*
+     C           SRRVNO    IFNE S#RVNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     Z-ADDS#XAMT    SRXAMT
+     C                     UPDATSRREC
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4410    BEGSR
+     C*****************************************************************
+     C                     MOVELS#ORNO    SOORNO           訂單編號
+     C                     MOVELS#STNO    SOSTNO           磅單編號
+     C                     Z-ADDS#STIT    SOSTIT           磅單項次
+     C                     Z-ADDS#INXA    SONOXA           沖銷金額
+     C                     MOVELS#PDNM    SOPDNM           品名代號
+     C                     MOVELS#CODE    SOCODE           全部沖銷
+     C                     MOVEL*BLANK    SIFL02           過入碼
+0206AC           S#UPRC    IFNE 0
+     C           S#INXA    DIV  S#UPRC    SOQTY     H      數量
+0206AC                     ELSE
+0307AC           S#ORNO    IFEQ 'X00177'
+0309AC           S#ORNO    OREQ 'X00188'
+0401AC           S#ORNO    OREQ 'X00197'
+0307AC                     Z-ADDS#QTY     SOQTY
+0307AC                     ELSE
+0206AC                     Z-ADD0         SOQTY
+0307AC                     ENDIF
+0206AC                     ENDIF
+     C*
+     C           S#CODE    IFEQ 'Y'
+     C                     Z-ADDS#INXA    SONOAM           磅單金額
+     C                     Z-ADDS#INXA    SONOBA           磅單餘額
+     C                     ELSE
+     C                     Z-ADDS#INAM    SONOAM           磅單金額
+     C                     Z-ADDS#INBA    SONOBA           磅單餘額
+     C                     ENDIF
+     C*
+     C                     ADD  SONOAM    WOINAM
+     C                     ADD  SONOXA    WONOXA
+     C                     ADD  SONOBA    WONOBA
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4420    BEGSR
+     C*****************************************************************
+     C                     MOVEL*BLANK    SIINNO
+     C                     MOVELS#ORNO    SIINNO           發票號碼
+     C                     Z-ADDWOINAM    SIINAM           訂單金額
+     C                     Z-ADDWONOBA    SIINBA           訂單餘額
+     C                     Z-ADDWONOXA    SIINXA           沖銷金額
+     C                     MOVE *BLANK    SIFL02           過入碼
+     C*
+     C                     MOVE *ON       *IN35
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR5000    BEGSR
+     C*****************************************************************
+     C*選擇信用狀載入
+     C*
+     C           S#SFN5    IFEQ 0
+     C                     MOVE *ON       *IN72
+     C                     ELSE
+     C                     MOVE *OFF      *IN72
+     C                     ENDIF
+     C*
+     C                     MOVE *OFF      *IN74
+     C                     WRITEAR037F5C
+     C                     WRITEAR037F5M
+     C                     EXFMTAR037F5C                   螢幕輸入
+     C*
+     C           S#CRN5    IFNE 0
+     C                     Z-ADDS#CRN5    S#NBR5           記錄位置
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           *IN03     WHEQ '1'
+     C                     MOVEL'00'      W#PRID
+     C           *IN12     WHEQ '1'
+     C                     MOVEL'03'      W#PRID
+     C                     OTHER
+     C                     EXSR SR5200
+     C                     ENDSL
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR5100    BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN73
+     C                     WRITEAR037F5C
+     C                     MOVE *OFF      *IN73
+     C*
+     C                     Z-ADD0         S#SFN5
+     C                     Z-ADD0         RRN5    40
+     C*
+     C           S#CUNO    SETGTLLCMSTL3
+     C           1         DOWEQ1
+     C                     READPLLCMSTL3                 38
+     C*
+     C           *IN38     IFEQ '1'
+     C           S#CUNO    ORNE LLCUNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+9908AC           *DATE     SUB  19000000  U#DATE  80
+9908AC*          LLENDT    IFLT UDATE
+9908AC           LLENDT    IFLT U#DATE
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     ADD  1         S#SFN5
+     C                     ADD  1         RRN5
+     C                     CLEARAR037F5
+     C                     MOVELLLNO      S#LLNO           信用狀
+     C                     MOVELLLBANK    S#BANK           銀行
+     C                     Z-ADDLLENDT    S#ENDT           到期日
+     C                     WRITEAR037F5
+     C                     ENDDO
+     C*
+     C                     Z-ADD1         S#NBR5
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR5200    BEGSR
+     C*****************************************************************
+     C           S#CRN5    IFNE 0
+     C                     Z-ADDS#CRN5    RRN5
+     C*
+     C           RRN5      CHAINAR037F5              38
+     C           RRN2      CHAINAR037F2              38
+     C                     MOVELS#LLNO    S#NTNO
+     C                     MOVELS#BANK    S#PBID
+     C                     MOVE D#OF      S#PBID
+     C                     UPDATAR037F2
+     C                     MOVEL'X'       W#FLAG  1
+     C                     ENDIF
+     C*
+     C                     MOVEL'03'      W#PRID
+     C*
+     C                     ENDSR
+     C*****************************************************************
+**  ERR
+01-無任何資料！
+02-該繳款書已過入財會,如需異動請通知財會還原之！
+03-該繳款書已確認,如需異動請還原之！
+04-該繳款書尚未確認,無法還原！
+05-資料存檔完畢！
+06-欄位輸入錯誤！
+07-無此訂單！
+08-客戶不同！
+09-發票號碼不存在！
+10-客戶代號不同！
+11-訂單號碼不同！
+12-沖銷金額不得大於磅單餘額！
+13-繳款總額與沖銷總額不平,請修改或試算後再行確認！
+14-試算完成！
+15-報關匯率錯誤!
+16-試算完畢,若結果無誤請逕行確認！
+17-沖銷選項必須輸入！
+18-僅可使用查詢功能!
+

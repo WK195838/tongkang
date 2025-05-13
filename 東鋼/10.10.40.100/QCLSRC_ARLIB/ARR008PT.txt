@@ -1,0 +1,91 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR008P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02LBU                                    */
+        /*        4.FUNCTION      外銷應收帳款明細表                       */
+        /*        5.DATE-WRITTEN   96/01/26                                  */
+        /*        6.DATE-MODIFY                                              */
+        /*                                                                   */
+        /*********************************************************************/
+            PGM
+            DCLF       FILE(ARR008ST)
+            DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+            DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+            DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+            DCL        VAR(&W#CUNS) TYPE(*CHAR) LEN(6)
+            DCL        VAR(&W#CUNE) TYPE(*CHAR) LEN(6)
+            DCL        VAR(&W#DPNS) TYPE(*CHAR) LEN(4)
+            DCL        VAR(&W#DPNE) TYPE(*CHAR) LEN(4)
+            DCL        VAR(&W#DATE) TYPE(*CHAR) LEN(8)
+            DCL        VAR(&W#BLK)  TYPE(*CHAR) LEN(70)
+
+            RTVJOBA    OUTQ(&OUTQ)  TYPE(&INT)
+            RTVDTAARA  DTAARA(*LDA (1011 10))   RTNVAR(&S#DEVN)
+            IF         COND(&INT *EQ '1') THEN(DO)
+
+ START:     SNDRCVF
+            CHGVAR     VAR(&IN41)      VALUE('0')
+            CHGVAR     VAR(&IN42)      VALUE('0')
+            CHGVAR     VAR(&IN43)      VALUE('0')
+            CHGVAR     VAR(&S#ERR)     VALUE(&W#BLK)
+
+            IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+  /* CHECH  客戶代號 */
+            IF         COND(&S#CUNS *GT &S#CUNE) THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('客戶範圍輸入錯誤')
+            CHGVAR     VAR(&IN41)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+
+            CHGVAR     VAR(&W#CUNS)  VALUE(&S#CUNS)
+            IF         COND(&S#CUNE *EQ '      ') THEN(DO)
+            CHGVAR     VAR(&W#CUNE)  VALUE('999999')
+            ENDDO
+
+            CHGVAR     VAR(&W#DPNS)  VALUE(&S#DPNO)
+            CHGVAR     VAR(&W#DPNE)  VALUE(&S#DPNO)
+
+            IF         COND(&S#DPNO *EQ '    ') THEN(DO)
+            CHGVAR     VAR(&W#DPNS)  VALUE('    ')
+            CHGVAR     VAR(&W#DPNE)  VALUE('9999')
+            ENDDO
+
+            CHGDTAARA  DTAARA(*LDA (301 6)) VALUE(&W#CUNS)
+            CHGDTAARA  DTAARA(*LDA (307 6)) VALUE(&W#CUNE)
+            CHGDTAARA  DTAARA(*LDA (313 4)) VALUE(&W#DPNS)
+            CHGDTAARA  DTAARA(*LDA (317 6)) VALUE(&W#DPNE)
+
+            SBMJOB     JOB(ARR008PT) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                         RQSDTA('CALL ARR008PT')
+            RETURN
+            ENDDO
+
+ BATCH:
+            RTVDTAARA  DTAARA(*LDA (301 6))  RTNVAR(&W#CUNS)
+            RTVDTAARA  DTAARA(*LDA (307 6))  RTNVAR(&W#CUNE)
+            RTVDTAARA  DTAARA(*LDA (313 4))  RTNVAR(&W#DPNS)
+            RTVDTAARA  DTAARA(*LDA (317 4))  RTNVAR(&W#DPNE)
+
+            CHGVAR     VAR(&W#DATE)  VALUE('00960101')
+
+            OVRPRTF    FILE(ARR008TS) TOFILE(ARR008TS) PAGESIZE(*N 198) +
+                       CPI(15) HOLD(*YES) USRDTA('外銷應收')
+            OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+            OPNQRYF    FILE(TRNDTL)                                 +
+                       QRYSLT('TXFL02  *EQ "Y"               *AND   +
+                               %SST(TXIVNO 1  1) *EQ "#"     *AND   +
+                               %SST(TXCUNO 1  1) *EQ "E"     *AND   +
+                               TXACDT  *GE ' || &W#DATE || ' *AND   +
+                         (TXCODE = "SA04" *OR TXCODE = "AR05")')    +
+                       KEYFLD((TXCUNO) (TXVUNO) (TXNO))             +
+                       MAPFLD((TXVUNO '%SST(TXORNO 1 6)'))
+            CALL       PGM(ARR008RT)
+            CLOF       OPNID(TRNDTL)
+            DLTOVR     FILE(*ALL)
+
+            ENDPGM
+

@@ -1,0 +1,62 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP078P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02YSH                                  */
+     /*     4.FUNCTION     電子商務介面-預收貨款(ARPRPY)        */
+     /*     5.DATE-WRITTEN  90/10/03                                */
+     /*     6.UPDATE  DATE 100/01/11  2011ARXXX  S00WCJ (0001A)     */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)   /*執行狀態*/
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&DEVI)  TYPE(*CHAR) LEN(10)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+     /*      SBMJOB     JOB(ARP078P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARP078P')    */
+     /*      RETURN   */
+
+BATCH:
+             CLRPFM     FILE(ARPRPY)
+             MONMSG     MSGID(CPF0000)
+
+             OVRDBF     FILE(INVMST)   TOFILE(DALIB/INVMST) SHARE(*YES)
+             OVRDBF     FILE(INVDTLL1) TOFILE(DALIB/INVDTLL1)
+             OVRDBF     FILE(RCVDTL)   TOFILE(DALIB/RCVDTL)
+             OVRDBF     FILE(CBCUST)   TOFILE(DALIB/CBCUST)
+             OVRDBF     FILE(ARPRPY)   TOFILE(DALIB/ARPRPY)
+             OVRDBF     FILE(ARPRPY)   TOFILE(DALIB/ARPRPY)
+             OVRDBF     FILE(ARFNDS)   TOFILE(DALIB/ARFNDS)
+    /*0001A  OPNQRYF    FILE(INVMST) QRYSLT('+
+                            (INTYPE *EQ "2") *AND +
+                            (DATE *GE "890101") *AND +
+                            (INDECD *NE "D")') +
+                        KEYFLD((INORNO)) +
+                        MAPFLD((DEC ININDT *CHAR 8 ) +
+                               (DATE '%SST(DEC 3 6)' *CHAR 6)) */
+
+             OPNQRYF    FILE(INVMST) QRYSLT('+
+                            (INTYPE *EQ "2") *AND +
+                            (DATE *GE "00890101") *AND +
+                            (INDECD *NE "D")') +
+                        KEYFLD((INORNO)) +
+                        MAPFLD((DATE ININDT *CHAR 8 )) /*0001A*/
+             CALL       PGM(ARP078R)
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&DEVI)
+
+             IF         COND(&DEVI *NE '          ') THEN(DO)
+             SNDBRKMSG  MSG('<<電子商務介面檔-預收貨款處理完畢+
+                        ....>>') TOMSGQ(&DEVI) +
+                        MSGTYPE(*INFO)
+             ENDDO
+             ENDPGM
+

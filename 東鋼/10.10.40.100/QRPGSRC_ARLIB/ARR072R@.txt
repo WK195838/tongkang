@@ -1,0 +1,167 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR072R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     型鋼廠別出貨數量明細表
+     H*            5.DATE-WRITTEN  87/06/28
+     H*
+     H*
+     H*    說明: 其中 TXTXDT 被映成 TXDATE 之年月部份
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     F*****************************************************************
+     FTRNDTL  IP  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FARR072T O   E             66     PRINTER
+     E*****************************************************************
+     E                    TAB1    1   8  2   TABR1  12
+     E                    TAB2    1   4  1   TABR2  10
+     I*****************************************************************
+     ITXREC
+     I                                              TXTXDTL2
+     I                                              TXCUNOL1
+     I*------------------------------------------------------
+     I           UDS
+     I                                        1   1 U#TYPE
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I*
+     I            DS
+     I                                        1   8 TXNO
+     I                                        1   1 D#TXNO
+     I            DS
+     I                                        1   8 W#YMD
+     I                                        1   4 R#YY
+     I                                        5   6 R#MM
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C           U#TYPE    LOKUPTAB2      TABR2          69
+     C   69                MOVELTABR2     R#TPNM
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2清除函式
+     C*********************************
+     CSR         L2CLR     BEGSR
+     C                     SETON                     66    首頁表頭
+     C                     MOVE TXDATE    W#YMD
+     C                     Z-ADD1         R#PGNO           頁次
+     C*
+     C                     Z-ADD0         W#TQTH 120
+     C                     Z-ADD0         W#TQTK 120
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     MOVEL*BLANK    W#CUTP 12
+     C           TXCUNO    CHAINCBCUST               69
+     C           *IN69     IFEQ '0'
+     C           CBTYPE    LOKUPTAB1      TABR1          69
+     C      69             MOVELTABR1     W#CUTP
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         W#QTYH 120
+     C                     Z-ADD0         W#QTYK 120
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     SELEC
+     C           D#TXNO    WHEQ 'H'
+     C                     ADD  TXQTY     W#QTYH
+     C           D#TXNO    WHEQ 'K'
+     C                     ADD  TXQTY     W#QTYK
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  印出一筆明細
+     C*********************************
+     CSR         L1SR      BEGSR
+     C                     CLEARAR072T1D
+     C                     MOVELTXCUNO    R#CUNO
+     C                     MOVELTXCUNM    R#CUNM
+     C                     MOVELW#CUTP    R#CUTP
+     C                     Z-ADDW#QTYH    R#QTYH
+     C                     Z-ADDW#QTYK    R#QTYK
+     C           R#QTYH    ADD  R#QTYK    R#QTYP
+     C*
+     C           *IN66     IFEQ '1'
+     C                     WRITEAR072T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C*
+     C                     WRITEAR072T1D
+     C*
+     C                     ADD  W#QTYH    W#TQTH           合計
+     C                     ADD  W#QTYK    W#TQTK
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2 函式
+     C*********************************
+     CSR         L2SR      BEGSR
+     C           *IN66     IFEQ '1'
+     C                     WRITEAR072T1H
+     C                     SETOF                     66
+     C                     ENDIF
+     C*
+     C                     CLEARAR072T1T
+     C                     Z-ADDW#TQTH    R#TQTH           合計
+     C                     Z-ADDW#TQTK    R#TQTK
+     C           R#TQTH    ADD  R#TQTK    R#TQTP
+     C                     WRITEAR072T1T
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  (NOTHING)
+     C*********************************
+     CSR         LRSR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     WRITEAR072T1H
+     C                     WRITEAR072T1M
+     CSR                   ENDSR
+     C*
+** TAB1
+01營造業
+02建設業
+03鋼構業
+04鋼鐵加工業
+05貿易商
+06公家機關
+07軍　方
+08其　他
+** TAB2
+2鋼筋
+3型鋼
+4鋼板
+7型鋼鋼板
+

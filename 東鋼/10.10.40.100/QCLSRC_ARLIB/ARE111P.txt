@@ -1,0 +1,55 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARE111P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCJ                                  */
+     /*     4.FUNCTION     更換請款單業務員作業                   */
+     /*     5.DATE-WRITTEN  112/10/26                               */
+     /*     6.UPDATE  DATE                                          */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)  TYPE(*LGL)  LEN(1)
+             DCL        VAR(&S#APNO)  TYPE(*CHAR) LEN(7)
+             DCL        VAR(&S#SALE)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&S#CHSA)  TYPE(*CHAR) LEN(1)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+
+
+ DISPLY:     CALL       PGM(ARE111RS) PARM(&IN03 &S#APNO &S#SALE +
+                            &S#CHSA)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+
+
+ BATCH:
+
+    /*以DDMF的方式讀取U廠之資料*/
+
+             DLTF       FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(U01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMU)
+             CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(*NONSTD +
+                          'DALIB/TRNDTLLB') LVLCHK(*NO)
+
+             OVRDBF     FILE(TRNDTLLB) TOFILE(QTEMP/DDMU)
+
+             OVRDBF     FILE(INVMST) TOFILE(INVMST) SHARE(*YES)
+             OPNQRYF    FILE(INVMST) OPTION(*ALL) QRYSLT(' +
+                           (INAPNO *EQ "' || &S#APNO || '")') +
+                           KEYFLD((INAPNO))
+
+             CALL       PGM(ARE111R)  PARM(&S#SALE &S#CHSA)
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+
+             GOTO       CMDLBL(DISPLY)
+
+             ENDPGM
+

@@ -1,0 +1,52 @@
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&YMD)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&YMD)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&VRNOF) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&Y)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&M)    TYPE(*CHAR) LEN(2)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARP018RS) PARM(&IN03 &YMD)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGDTAARA  DTAARA(*LDA (1 6)) VALUE(&YMD)
+             SBMJOB     JOB(ARP041P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARP041P')
+             RETURN
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (1    6)) RTNVAR(&YMD)
+             RTVDTAARA  DTAARA(*LDA (1    2)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (3    2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+            /*  DELETE AC       */
+             OVRDBF     FILE(ACTRAN) TOFILE(ARLIB/A1) +
+                          MBR('VR' || &M) LVLCHK(*NO) +
+                          SHARE(*YES)
+             OPNQRYF    FILE((ACTRAN)) OPTION(*ALL) QRYSLT('   +
+                          ACYMD  *EQ   ' || &YMD || '          +
+                          *AND  ACVRNO *GE   +
+                          "H000"                  *AND  ACVRNO +
+                          *LE   "H999"') KEYFLD((ACVRNO) (ACITEM))
+             CALL       PGM(ARLIB/ARP041RC)
+             DLTOVR     FILE(*ALL)
+            /*  TRNSFER RECV    */
+             OVRDBF     FILE(ACTRAN) TOFILE(ARLIB/A1) +
+                          MBR('VR' || &M) LVLCHK(*NO)
+
+             OVRDBF     FILE(RCVDTLL1) TOFILE(RCVDTLL1) SHARE(*YES)
+             OPNQRYF    FILE((RCVDTLL1))     QRYSLT('   +
+                          RVDATE *EQ   ' || &YMD || '          +
+                    *AND  RVTYPE *EQ   %VALUES("1" "2")        +
+                    *AND  %SST(RVNO 1 1) *EQ  "' || &AREA || '" +
+                    *AND  RVDECD *NE  "D"')                    +
+                          KEYFLD((RVNO)(RVITEM))
+             /* 3/25 ADD */
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 158) +
+                          CPI(12)
+             CALL       PGM(ARLIB/ARP041R)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

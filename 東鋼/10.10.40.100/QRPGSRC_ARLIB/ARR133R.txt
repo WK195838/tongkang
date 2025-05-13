@@ -1,0 +1,187 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR133R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     外銷出口報單核對明細表
+     H*          5.DATE-WRITTEN  97/02/20
+     H*          6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR133F IP  E           K        DISK
+     FARR133T O   E             66     PRINTER
+     E*****************************************************************
+     IRAR133F
+     I                                              W1CUNOL2
+     I                                              W1ORNOL1
+     I*
+     I           UDS
+     I                                     10011010 U#USID
+     C*****************************************************************
+     C*          KEY       LIST
+     C*****************************************************************
+     C           K#INVD    KLIST
+     C                     KFLD           K#IVNO 10        發票號碼
+     C                     KFLD           K#ACNT  1        類別
+     C*
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C  N90                EXSR INZ#01
+     C  N90                SETON                     90
+     C   L2                EXSR DL#L2
+     C   L1                EXSR DL#L1
+     C                     EXSR DP#01
+     CL1 90                EXSR TL#L1
+     CL2 90                EXSR TL#L2
+     CLR 90                EXSR TL#LR
+     CLRN90                EXSR MSGSR
+     C*
+     C*****************************************************************
+     CSR         INZ#01    BEGSR
+     C*****************************************************************
+     C                     MOVEL*ON       *IN66
+     C                     Z-ADD0         W#TAT1 110       預收金額
+     C                     Z-ADD0         W#TAT2 110       已兌現金額
+     C                     Z-ADD0         W#TAT3 110       預折讓金額
+     C                     Z-ADD0         W#TAT4 110       扣預收金額
+     C                     Z-ADD0         W#TAT5 110       轉退票金額
+     C                     Z-ADD0         W#TAT6 110       已兌現餘額
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         DL#L2     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#SAT1 110       預收金額
+     C                     Z-ADD0         W#SAT2 110       已兌現金額
+     C                     Z-ADD0         W#SAT3 110       預折讓金額
+     C                     Z-ADD0         W#SAT4 110       扣預收金額
+     C                     Z-ADD0         W#SAT5 110       轉退票金額
+     C                     Z-ADD0         W#SAT6 110       已兌現餘額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         DL#L1     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AMT1 110       預收金額
+     C                     Z-ADD0         W#AMT2 110       已兌現金額
+     C                     Z-ADD0         W#AMT3 110       預折讓金額
+     C                     Z-ADD0         W#AMT4 110       扣預收金額
+     C                     Z-ADD0         W#AMT5 110       轉退票金額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         DP#01     BEGSR
+     C*****************************************************************
+     C                     ADD  W1AMT1    W#AMT1           預收金額
+     C                     ADD  W1AMT2    W#AMT2           已兌現金額
+     C                     ADD  W1AMT3    W#AMT3           預折讓金額
+     C                     ADD  W1AMT4    W#AMT4           扣預收金額
+     C                     ADD  W1AMT5    W#AMT5           轉退票金額
+     C*
+     CSR         ENDTSR    ENDSR
+     C*****************************************************************
+     CSR         TL#L1     BEGSR
+     C*****************************************************************
+     C           W#AMT1    IFEQ 0
+     C                     GOTO ENL1SR
+     C                     ENDIF
+     C*
+     C                     MOVELW1CUNO    T#CUNO           客戶代號
+     C                     MOVELW1CUNM    T#CUNM           客戶簡稱
+     C                     MOVELW1ORNO    T#ORNO           訂單號碼
+     C                     Z-ADDW#AMT1    T#AMT1           預收金額
+     C                     Z-ADDW#AMT2    T#AMT2           已兌現金額
+     C                     Z-ADDW#AMT3    T#AMT3           預折讓金額
+     C                     Z-ADDW#AMT4    T#AMT4           扣預收金額
+     C                     Z-ADDW#AMT5    T#AMT5           轉退票金額
+     C*
+     C                     Z-ADD0         W#AMT  110
+     C*
+     C*          T#AMT5    IFNE 0
+     C*          T#AMT2    IFEQ T#AMT5
+     C*                    Z-ADD0         T#AMT6           已兌現餘額
+     C*                    ELSE
+     C*          W#AMT2    SUB  W#AMT4    W#AMT
+     C*          W#AMT     SUB  W#AMT5    T#AMT6           已兌現餘額
+     C*                    ENDIF
+     C*
+     C*                    ELSE
+     C*          W#AMT2    SUB  W#AMT3    W#AMT
+     C*          W#AMT     SUB  W#AMT4    T#AMT6           已兌現餘額
+     C*                    ENDIF
+     C*
+     C           T#AMT2    SUB  T#AMT4    W#AMT            實用金額
+     C           W#AMT     SUB  T#AMT5    T#AMT6           已兌現金額
+     C*
+     C   66                WRITEAR133T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR133T1D
+     C*
+     C                     ADD  T#AMT1    W#SAT1           預收金額
+     C                     ADD  T#AMT2    W#SAT2           已兌現金額
+     C                     ADD  T#AMT3    W#SAT3           預折讓金額
+     C                     ADD  T#AMT4    W#SAT4           扣預收金額
+     C                     ADD  T#AMT5    W#SAT5           轉退票金額
+     C                     ADD  T#AMT6    W#SAT6           已兌現餘額
+     C*
+     CSR         ENL1SR    ENDSR
+     C*****************************************************************
+     CSR         TL#L2     BEGSR
+     C*****************************************************************
+     C           W#SAT1    IFEQ 0
+     C                     GOTO ENL2SR
+     C                     ENDIF
+     C*
+     C                     Z-ADDW#SAT1    T#SAT1           預收金額
+     C                     Z-ADDW#SAT2    T#SAT2           已兌現金額
+     C                     Z-ADDW#SAT3    T#SAT3           預折讓金額
+     C                     Z-ADDW#SAT4    T#SAT4           扣預收金額
+     C                     Z-ADDW#SAT5    T#SAT5           轉退票金額
+     C                     Z-ADDW#SAT6    T#SAT6           已兌現餘額
+     C*
+     C   66                WRITEAR133T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR133T1S
+     C*
+     C                     ADD  T#SAT1    W#TAT1           預收金額
+     C                     ADD  T#SAT2    W#TAT2           未兌現金額
+     C                     ADD  T#SAT3    W#TAT3           已兌現金額
+     C                     ADD  T#SAT4    W#TAT4           退預收金額
+     C                     ADD  T#SAT5    W#TAT5           扣預收金額
+     C                     ADD  T#SAT6    W#TAT6           已兌現餘額
+     C*
+     CSR         ENL2SR    ENDSR
+     C*****************************************************************
+     CSR         TL#LR     BEGSR
+     C*****************************************************************
+     C           W#TAT1    IFEQ 0
+     C                     GOTO ENLRSR
+     C                     ENDIF
+     C*
+     C                     Z-ADDW#TAT1    T#TAT1           預收金額
+     C                     Z-ADDW#TAT2    T#TAT2           未兌現金額
+     C                     Z-ADDW#TAT3    T#TAT3           已兌現金額
+     C                     Z-ADDW#TAT4    T#TAT4           退預收金額
+     C                     Z-ADDW#TAT5    T#TAT5           扣預收金額
+     C                     Z-ADDW#TAT6    T#TAT6           已兌現餘額
+     C*
+     C   66                WRITEAR133T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR133T1T
+     C*
+     CSR         ENLRSR    ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INZ#01
+     C*
+     C   66                WRITEAR133T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR133T1M
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+

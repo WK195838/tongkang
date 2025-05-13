@@ -1,0 +1,226 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR130R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     已開發票押匯狀況彙總表
+     H*          5.DATE-WRITTEN  96/11/14
+     H*          6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  IP  E           K        DISK
+     FTRNDTLL2IF  E           K        DISK
+     FARR130T1O   E             66     PRINTER
+     E*****************************************************************
+     IINREC
+     I                                              INRVIDL2
+     I                                              INCUNOL1
+     I*
+     I            DS
+     I                                        1  10 INNO
+     I                                        1   2 D#INN1
+     I                                        3  10 D#INN2
+     I*
+     I           UDS
+     I                                      301 3080D#DATE
+     I                                      317 317 D#OPT
+     C*****************************************************************
+     C*          KEY       LIST
+     C*****************************************************************
+     C           K#INVD    KLIST
+     C                     KFLD           K#IVNO 10        發票號碼
+     C                     KFLD           K#ACNT  1        類別
+     C*
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C  N90                EXSR INZ#01
+     C  N90                SETON                     90
+     C   L2                EXSR DL#L2
+     C   L1                EXSR DL#L1
+     C                     EXSR DP#01
+     CL1 90                EXSR TL#L1
+     CL2 90                EXSR TL#L2
+     CLR 90                EXSR TL#LR
+     CLRN90                EXSR MSGSR
+     C*
+     C*****************************************************************
+     CSR         INZ#01    BEGSR
+     C*****************************************************************
+     C                     CLEARAR130T1T
+     C                     MOVELD#DATE    T#DATE           截止日期
+     C                     MOVEL*ON       *IN66
+     C*
+     C           D#OPT     IFEQ '1'
+     C                     MOVEL'型鋼'  T#DPNM
+     C                     ELSE
+     C                     MOVEL'鋼筋'  T#DPNM
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         W#TQTY 110       數量合計
+     C                     Z-ADD0         W#TAMT 110       金額合計
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         DL#L2     BEGSR
+     C*****************************************************************
+     C                     CLEARAR130T2T
+     C                     MOVEL*ON       *IN66
+     C*
+     C                     Z-ADD0         W#RQTY 110       業務數量
+     C                     Z-ADD0         W#RAMT 110       業務金額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         DL#L1     BEGSR
+     C*****************************************************************
+     C                     CLEARAR130T1T
+     C*
+     C                     Z-ADD0         W#CQTY 110       客戶數量
+     C                     Z-ADD0         W#CAMT 110       客戶金額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         DP#01     BEGSR
+     C*****************************************************************
+     C           D#INN1    IFEQ 'XX'
+     C           D#INN2    ANDEQ'29637726'
+     C                     MOVEL'X'       W#TEST  1
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         W#NAMT 110
+     C                     ADD  INAAMT    W#NAMT
+     C                     ADD  INATAX    W#NAMT
+     C                     ADD  INBAMT    W#NAMT
+     C                     ADD  INCAMT    W#NAMT
+     C                     ADD  INCTAX    W#NAMT
+     C                     ADD  INDAMT    W#NAMT
+     C                     ADD  INDTAX    W#NAMT
+     C*
+     C           W#NAMT    IFEQ 0
+     C                     GOTO ENDPSR
+     C                     ENDIF
+     C*
+     C                     CLEARAR130T1D
+     C*
+     C                     SELEC
+     C           INAPDT    WHEQ 0
+     C           ININDT    ANDLED#DATE
+     C                     EXSR SR1100
+     C           INAPDT    WHNE 0
+     C           INAPDT    ANDGTD#DATE
+     C                     EXSR SR1100
+     C                     ENDSL
+     C*
+     CSR         ENDPSR    ENDSR
+     C*****************************************************************
+     CSR         SR1100    BEGSR
+     C*****************************************************************
+     C           INRCDT    IFNE 0
+     C           INRCDT    ANDLTD#DATE
+     C                     GOTO EN1100
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         W#QTY  110
+     C                     MOVEL*OFF      *IN40
+     C*
+     C           INNO      SETLLTRNDTLL2
+     C           *IN40     DOWEQ*OFF
+     C           INNO      READETRNDTLL2                 40
+     C*
+     C   40                LEAVE
+     C*
+     C           TXFLAG    IFEQ 'D'
+     C           TXCODE    ORNE 'SA04'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     ADD  TXQTY     W#QTY            數量
+     C                     ENDDO
+     C*
+     C           W#QTY     IFEQ 0
+     C                     GOTO EN1100
+     C                     ENDIF
+     C*
+     C                     MOVELINCUNO    T#CUNO           客戶代號
+     C                     MOVELINCUNM    T#CUNM           客戶簡稱
+     C                     MOVELINORNO    T#ORNO           訂單編號
+     C                     MOVELINNO      T#IVNO           發票號碼
+     C                     Z-ADDININDT    T#INDT           發票日期
+     C                     Z-ADDW#QTY     T#QTY     H      數量
+     C                     Z-ADDW#NAMT    T#AMT            金額
+     C*
+     C   66                WRITEAR130T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR130T1D
+     C*
+     C                     ADD  T#QTY     W#CQTY           客戶數量
+     C                     ADD  T#AMT     W#CAMT           客戶金額
+     C*
+     CSR         EN1100    ENDSR
+     C*****************************************************************
+     CSR         TL#L1     BEGSR
+     C*****************************************************************
+     C           W#CQTY    IFEQ 0
+     C                     GOTO ENL1SR
+     C                     ENDIF
+     C*
+     C                     Z-ADDW#CAMT    T#CAMT           客戶數量
+     C                     Z-ADDW#CQTY    T#CQTY           客戶金額
+     C*
+     C   66                WRITEAR130T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR130T1T
+     C*業務小計
+     C                     ADD  T#CAMT    W#RAMT           業務數量
+     C                     ADD  T#CQTY    W#RQTY           業務小計
+     C*
+     CSR         ENL1SR    ENDSR
+     C*****************************************************************
+     CSR         TL#L2     BEGSR
+     C*****************************************************************
+     C           W#RAMT    IFEQ 0
+     C                     GOTO ENL2SR
+     C                     ENDIF
+     C*
+     C                     MOVELINRVID    T#RVID           業務
+     C                     Z-ADDW#RAMT    T#RAMT           業務金額
+     C                     Z-ADDW#RQTY    T#RQTY           業務數量
+     C*
+     C   66                WRITEAR130T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR130T2T
+     C*總合計
+     C                     ADD  T#RAMT    W#TAMT           金額合計
+     C                     ADD  T#RQTY    W#TQTY           數量合計
+     C*
+     CSR         ENL2SR    ENDSR
+     C*****************************************************************
+     CSR         TL#LR     BEGSR
+     C*****************************************************************
+     C           W#TAMT    IFEQ 0
+     C                     GOTO ENLRSR
+     C                     ENDIF
+     C*
+     C                     Z-ADDW#TAMT    T#TAMT           金額合計
+     C                     Z-ADDW#TQTY    T#TQTY           數量合計
+     C*
+     C   66                WRITEAR130T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR130T3T
+     C*
+     CSR         ENLRSR    ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INZ#01
+     C*
+     C   66                WRITEAR130T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR130T1M
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+

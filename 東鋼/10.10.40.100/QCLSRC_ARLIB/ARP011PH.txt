@@ -1,0 +1,65 @@
+             PGM
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)  TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DATE)  TYPE(*DEC)  LEN(6)
+             DCL        VAR(&DATEA) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DATEB) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DATEX) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&AREA)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&Y)     TYPE(*CHAR) LEN(2)
+             DCL        VAR(&M)     TYPE(*CHAR) LEN(2)
+             DCL        VAR(&YM)    TYPE(*CHAR) LEN(4)
+             DCL        VAR(&DTARA) TYPE(*CHAR) LEN(11)
+
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&DTARA) VALUE('ACCTLDTA2' *CAT &AREA)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+
+             IF         COND(&INT *EQ '1') THEN(DO)
+             RTVDTAARA  DTAARA(DALIB/&DTARA (7 6)) RTNVAR(&DATEB)
+ DISPLY:     CALL       PGM(ARP011RS) PARM(&IN03 &DATE &AREA &DATEB)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&DATEA) VALUE(&DATE)
+             CHGDTAARA  DTAARA(*LDA (1 6)) VALUE(&DATEA)
+             CHGDTAARA  DTAARA(*LDA (7 1)) VALUE(&AREA)
+             SBMJOB     JOB(ARP011PH) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                        RQSDTA('CALL ARP011PH')
+             RETURN
+             ENDDO
+
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&DATEA)
+             RTVDTAARA  DTAARA(*LDA (1 2)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (3 2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (1 4)) RTNVAR(&YM)
+             RTVDTAARA  DTAARA(*LDA (7 1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&DATEX) VALUE(&YM *CAT '01')
+
+             CPYF       FROMFILE(TRNDTL) TOFILE(QTEMP/TXTEMP) +
+                          MBROPT(*ADD) CRTFILE(*YES) INCREL((*IF +
+                          TXVUNO *EQ '       ') (*AND TXCODE *EQ +
+                          'SA04') (*AND TXACNT *LE '3') (*AND +
+                          TXFLAG *NE 'D') (*AND TXACDT *LE &DATEA) +
+                          (*AND TXACDT *GE &DATEX) +
+                          (*AND TXTXAR *EQ &AREA))
+             OVRDBF     FILE(TRNDTLUP) TOFILE(TRNDTL)
+             OVRDBF     FILE(TRNDTL) TOFILE(QTEMP/TXTEMP) SHARE(*YES)
+             OPNQRYF    FILE((TRNDTL))                     +
+                        QRYSLT('%SST(TXPDNM 1 1) *EQ "3"') +
+                        KEYFLD((TXACDT) (TXIVNO)           +
+                               (TXCUNO) (TXUPRC) (TXPDNM)) +
+                        MAPFLD((TXIVNO '%SST(TXORNO 1 5)'))
+
+             OVRDBF     FILE(ACTRAN) TOFILE(DALIB/('AC' || &AREA || +
+                          'R' || &Y)) MBR('VR' || &M) LVLCHK(*NO)
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 156) +
+                          CPI(12) COPIES(2) HOLD(*YES)
+
+             CALL       PGM(ARP011RH)
+
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+             DLTF       FILE(QTEMP/TXTEMP)
+             CHGDTAARA  DTAARA(DALIB/&DTARA (7 6)) VALUE(&DATEA)
+             ENDPGM
+

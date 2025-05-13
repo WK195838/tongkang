@@ -1,0 +1,151 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR122P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02CSF                                    */
+        /*        4.FUNCTION      未開立發票明細表－即時                   */
+        /*        5.DATE-WRITTEN   94/08/18                                  */
+        /*        6.DATE-MODIFY   101/10/30  S00WCJ (0110A)                  */
+        /*                         增加廠區                                */
+        /*                        101/11/29  2012AR703 S00WCJ (0111A)        */
+        /*                         增加廠區J                               */
+        /*                        101/12/05  2012AR705 S00WCJ (0112A)        */
+        /*                         增加廠區N                               */
+        /*                                                                   */
+        /*********************************************************************/
+             PGM
+             DCL      VAR(&TYPE)   TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#IN03) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#YMS)  TYPE(*CHAR) LEN(6) /*銷貨年月起*/
+             DCL      VAR(&P#YME)  TYPE(*CHAR) LEN(6) /*銷貨年月止*/
+             DCL      VAR(&P#AREA) TYPE(*CHAR) LEN(1) /*銷貨廠區*/
+             DCL      VAR(&W#ARES) TYPE(*CHAR) LEN(1) /*銷貨廠區起*/
+             DCL      VAR(&W#AREE) TYPE(*CHAR) LEN(1) /*銷貨廠區止*/
+             DCL      VAR(&P#DEPT) TYPE(*CHAR) LEN(4) /*營業部門*/
+             DCL      VAR(&P#SAID) TYPE(*CHAR) LEN(2) /*業務代號*/
+             DCL      VAR(&P#RVIS) TYPE(*CHAR) LEN(1) /*業務代號起*/
+             DCL      VAR(&P#RVIE) TYPE(*CHAR) LEN(1) /*業務代號止*/
+             DCL      VAR(&P#ORNO) TYPE(*CHAR) LEN(6) /*訂單編號*/
+             DCL      VAR(&W#ORNS) TYPE(*CHAR) LEN(6) /*訂單編號起*/
+             DCL      VAR(&W#ORNE) TYPE(*CHAR) LEN(6) /*訂單編號止*/
+             DCL      VAR(&P#KIND) TYPE(*CHAR) LEN(1) /*發票開立方式*/
+             DCL      VAR(&S#DEVN) TYPE(*CHAR) LEN(10)
+             DCL      VAR(&S#USER) TYPE(*CHAR) LEN(10)
+
+             RTVJOBA  JOB(&S#DEVN) USER(&S#USER) TYPE(&TYPE)
+             IF       COND(&TYPE *EQ '0') THEN(GOTO BATCH)
+
+             CALL     PGM(ARR122RS) PARM(&P#IN03)
+             IF       COND(&P#IN03 *EQ '1') THEN(RETURN)
+
+             SBMJOB     CMD(CALL PGM(ARR122P)) JOB(ARR122P) +
+                        JOBD(ARJOBD)
+             SNDBRKMSG  MSG('<<未開立發票明細表－即時已開始處理+
+                         ,請稍待.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             RETURN
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (300  6)) RTNVAR(&P#YMS)
+             RTVDTAARA  DTAARA(*LDA (306  6)) RTNVAR(&P#YME)
+             RTVDTAARA  DTAARA(*LDA (312  1)) RTNVAR(&P#AREA)
+             RTVDTAARA  DTAARA(*LDA (313  4)) RTNVAR(&P#DEPT)
+             RTVDTAARA  DTAARA(*LDA (317  2)) RTNVAR(&P#SAID)
+             RTVDTAARA  DTAARA(*LDA (319  1)) RTNVAR(&P#RVIS)
+             RTVDTAARA  DTAARA(*LDA (320  1)) RTNVAR(&P#RVIE)
+             RTVDTAARA  DTAARA(*LDA (321  6)) RTNVAR(&P#ORNO)
+             RTVDTAARA  DTAARA(*LDA (327  1)) RTNVAR(&P#KIND)
+
+     /*銷貨年月起值*/
+             IF         COND(&P#YMS  *EQ ' ')  THEN(DO)
+             CHGVAR     VAR(&P#YMS)    VALUE(' ')
+             ENDDO
+
+     /*銷貨廠區值*/
+             IF         COND(&P#AREA *EQ ' ')  THEN(DO)
+             CHGVAR     VAR(&W#ARES)   VALUE(' ')
+             CHGVAR     VAR(&W#AREE)   VALUE('9')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&W#ARES)   VALUE(&P#AREA)
+             CHGVAR     VAR(&W#AREE)   VALUE(&P#AREA)
+             ENDDO
+
+     /*訂單編號值*/
+             IF         COND(&P#ORNO *EQ '      ')  THEN(DO)
+             CHGVAR     VAR(&W#ORNS)   VALUE('      ')
+             CHGVAR     VAR(&W#ORNE)   VALUE('999999')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&W#ORNS)   VALUE(&P#ORNO)
+             CHGVAR     VAR(&W#ORNE)   VALUE(&P#ORNO)
+             ENDDO
+
+             OVRPRTF    FILE(ARR122T) TOFILE(ARR122T) PAGESIZE(*N 198)  +
+                        CPI(15) HOLD(*YES)  USRDTA('未開發票')
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+ /*0110A*/ IF    COND(&P#AREA *NE "U") THEN(DO)
+             OPNQRYF    FILE((TRNDTL)) QRYSLT('                    +
+                        ((TXCODE *EQ "SA04")                 *OR   +
+                         (TXCODE *EQ "AR05"))                 *AND +
+                        (TXFLAG *NE "D")                      *AND +
+                        (((DAT1   *GE "' || &P#YMS  || '")   *AND  +
+                          (DAT1   *LE "' || &P#YME  || '")) *OR    +
+                         ((ACD1   *GE "' || &P#YMS  || '")   *AND  +
+                          (ACD1   *LE "' || &P#YME  || '")))  *AND +
+                        ((TXIVNO *EQ "          ")           *OR   +
+                         (IVNO   *EQ "*"         ))           *AND +
+                        (TXFL01 *GE "' || &W#ARES || '")      *AND +
+                        (TXFL01 *LE "' || &W#AREE || '")      *AND +
+                        (TXPCNO *GE "' || &W#ORNS || '")      *AND +
+                        (TXPCNO *LE "' || &W#ORNE || '")      *AND +
+                        (SALE   *GE "' || &P#RVIS || '")      *AND +
+                        (SALE   *LE "' || &P#RVIE || '")')         +
+                        MAPFLD((DATE   TXDATE             *CHAR 8) +
+                               (DAT1   '%SST(DATE   1 6)' *CHAR 8) +
+                               (ACDT   TXACDT             *CHAR 8) +
+                               (ACD1   '%SST(ACDT   1 6)' *CHAR 8) +
+                               (IVNO   '%SST(TXIVNO 1 1)' *CHAR 1) +
+                               (SALE   '%SST(TXSALE 1 1)' *CHAR 1) +
+                               (TXFL01 '%SST(TXNO   1 1)' )        +
+                               (TXPCNO '%SST(TXORNO 1 6)' ))       +
+                        KEYFLD((TXSALE) (TXCUNO) (TXPCNO) (TXFL01) (TXNO))
+ /*0110A*/   ENDDO
+
+ /*0110A*/ IF     COND(&P#AREA  *EQ "U")  THEN(DO)
+ /*0112A*/   OPNQRYF    FILE((TRNDTL)) QRYSLT('                    +
+                        ((TXCODE *EQ "SA04")                 *OR   +
+                         (TXCODE *EQ "AR05"))                 *AND +
+                        (TXFLAG *NE "D")                      *AND +
+                        (((DAT1   *GE "' || &P#YMS  || '")   *AND  +
+                          (DAT1   *LE "' || &P#YME  || '")) *OR    +
+                         ((ACD1   *GE "' || &P#YMS  || '")   *AND  +
+                          (ACD1   *LE "' || &P#YME  || '")))  *AND +
+                        ((TXIVNO *EQ "          ")           *OR   +
+                         (IVNO   *EQ "*"         ))           *AND +
+                        ((TXFL01 *EQ "U") *OR (TXFL01 *EQ "R") *OR +
+                         (TXFL01 *EQ "J") *OR (TXFL01 *EQ "N") *OR +
+                        (TXFL01 *EQ "D") *OR (TXFL01 *EQ "X")) *AND +
+                        (TXPCNO *GE "' || &W#ORNS || '")      *AND +
+                        (TXPCNO *LE "' || &W#ORNE || '")      *AND +
+                        (SALE   *GE "' || &P#RVIS || '")      *AND +
+                        (SALE   *LE "' || &P#RVIE || '")')         +
+                        MAPFLD((DATE   TXDATE             *CHAR 8) +
+                               (DAT1   '%SST(DATE   1 6)' *CHAR 8) +
+                               (ACDT   TXACDT             *CHAR 8) +
+                               (ACD1   '%SST(ACDT   1 6)' *CHAR 8) +
+                               (IVNO   '%SST(TXIVNO 1 1)' *CHAR 1) +
+                               (SALE   '%SST(TXSALE 1 1)' *CHAR 1) +
+                               (TXFL01 '%SST(TXNO   1 1)' )        +
+                               (TXPCNO '%SST(TXORNO 1 6)' ))       +
+                        KEYFLD((TXSALE) (TXCUNO) (TXPCNO) (TXFL01) (TXNO))
+/*0110A*/ ENDDO
+             CALL       PGM(ARR122R)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             SNDBRKMSG  MSG('<<未開立發票明細表－即時已完成+
+                        ,請列印.........>>') +
+                      TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             ENDPGM
+

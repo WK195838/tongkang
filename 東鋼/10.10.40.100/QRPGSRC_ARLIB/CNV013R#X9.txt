@@ -1,0 +1,534 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    CNV013R#X
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ  （原作者不可考）
+     H*            4.FUNCTION     應收授信合計已開發票各項金額
+     H*            5.DATE-WRITTEN  88/02/12
+     H*            6.UPDATE DATE  103/11/11 2014AR884 S00WCJ (0311A)
+     H*                            訂單K04808餘額轉至K04809
+     H*                            轉入424889
+     H*                           108/01/11 S00WCJ (0801A)
+     H*                            客戶DP6291，發票PN55896267.
+     H*                             PN55896269.PN55896266.PN55896265.
+     H*                             QU55896257預收貨發票皆未做繳款單
+     H*                            而是直接由DP629其他預收貨款轉入
+     H*                            列為特殊狀況處理
+     H*                           108/11/19 S00WCJ (0811A)
+     H*                            客戶DK960，發票GG04775922預收
+     H*                            貨款發票未做繳款而是由其他預收貨款
+     H*                            轉入，並開立折讓列為特殊狀況處理
+     H*                           109/03/06 S00WCJ (0903A)
+     H*                            客戶DP505，發票WW93949689預收
+     H*                            貨款未繳款直接做折讓，造成金額計算
+     H*                            錯誤
+     H*                           110/03/24 2021AR00011 S00WCJ (1003A)
+     H*                            訂單P10723預收金額790089轉入
+     H*                            訂單P10941；訂單P10868預收金額
+     H*                             2576000轉入訂單P10942；訂單
+     H*                             P10869預收金額1104000轉入訂單
+     H*                             P10943
+     H*                           110/06/15 2021AR00023 S00WCJ(1006A)
+     H*                            由於訂單P10723須開立折讓單，故將
+     H*                            訂單P10941之預收金額再轉389036
+     H*                            回訂單P10273，以開立金額為389036
+     H*                            之折讓單
+     H*
+     H*****************************************************************
+     H* 說明: IVACNO 為訂單編號
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVDTL  IP  E                    DISK
+     FINVMST  IF  E           K        DISK
+     FSAMAST  IF  E           K        DISK
+     FARSTAT  UF  E           K        DISK                      A
+CLJB FINVDTL01IF  E           K        DISK                      A
+     F            IVREC                             KRENAMEIVREC01
+CLJE FCNV013T O   E             66     PRINTER
+     IIVREC
+     I                                              IVACNOL2
+     I                                              IVNO  L1
+     IAADS        DS
+     I                                        1   9 IVORNO
+     I                                        1   1 ORNO1
+     I                                        2   6 ORNO21
+     I                                        7   90ORNO3
+     I                                       11  16 COCUNO
+     I                                       11  11 S1KIND
+     I                                       12  12 S1CUN1
+     I                                       13  15 S1CUN2
+     I                                       16  16 BK05
+     I           UDS
+     I                                        1   60YMD
+     C*----------------------------------------------------
+     C           SAKEY     KLIST
+     C                     KFLD           ORNO1
+     C                     KFLD           ORNO2   50
+     C                     KFLD           ORNO3
+     C           ARKEY     KLIST
+     C                     KFLD           ARORNO
+CLJB C* -----------------------------------------------
+     C  N99                EXSR D#INIT
+     C  N99                SETON                     99
+CLJE C* -----------------------------------------------
+     C   L2                EXSR D#L2
+     C   L1                EXSR D#L1
+     C*
+     C     N97             EXSR D#PR
+     C*
+     CL2                   EXSR T#L2
+CLJ  CLR 99                EXSR T#LR
+     C****
+     C****
+     C****
+CLJB C*************************************************
+     CSR         D#INIT    BEGSR
+     C           K#IV      KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*
+     C                     SETON                     66
+     C                     Z-ADD0         W#RCNT  40
+     C                     Z-ADD0         W#TAMT 130
+     CSR                   ENDSR
+     C*****
+     C*****
+     CSR         T#LR      BEGSR
+     C           W#RCNT    IFNE 0                          有資料才印
+     C                     CLEARCNV013TT
+     C                     Z-ADDW#RCNT    R#RCNT
+     C                     Z-ADDW#TAMT    R#TAMT
+     C                     WRITECNV013TT
+     C                     ENDIF
+     CSR                   ENDSR
+CLJE C*************************************************
+     C****
+     CSR         D#L2      BEGSR
+     C                     Z-ADD0         AQTY   110
+     C                     Z-ADD0         AAMT   110
+     C                     Z-ADD0         ATAX   110
+     C                     Z-ADD0         BAMT   110
+     C                     Z-ADD0         BTAX   110
+     C                     Z-ADD0         CAMT   110
+     C                     Z-ADD0         CTAX   110
+     C                     Z-ADD0         DAMT   110
+     C                     Z-ADD0         DTAX   110
+     C                     Z-ADD0         EAMT   110
+     C                     Z-ADD0         ETAX   110
+     C                     Z-ADD0         FAMT   110
+     C                     Z-ADD0         FTAX   110
+     C                     Z-ADD0         GAMT   110
+     C                     Z-ADD0         GTAX   110
+     C                     Z-ADD0         HAMT   110
+     C                     Z-ADD0         HTAX   110
+     C                     Z-ADD0         IAMT   110
+     C                     Z-ADD0         JAMT   110
+     C                     Z-ADD0         KAMT   110
+     C                     Z-ADD0         LAMT   110
+     C                     Z-ADD0         NBAL   110
+     C                     Z-ADD0         PBAL   110
+     C                     Z-ADD0         CNT     20
+     C                     TESTN          ORNO21     55
+     C   55                MOVELORNO21    ORNO2
+     C  N55                Z-ADD0         ORNO2
+     C                     Z-ADD1         ORNO3
+     C           SAKEY     CHAINSAMAST               96
+     C  N96                MOVELS1CD01    BK05
+     CSR         D#L2Z     ENDSR
+     C****
+     CSR         D#L1      BEGSR
+     C           IVNO      CHAININVMST               97
+     C   96N97             MOVELINCUNM    S1CUNO
+     C   96N97             MOVELINCUNO    COCUNO
+CLJB C*  ---------------------------------------
+     C           *IN97     IFEQ '1'
+     C           *IN66     IFEQ '1'                        表頭
+     C                     WRITECNV013TH
+     C                     SETOF                     66    不印表頭
+     C                     ENDIF
+     C*
+     C                     CLEARCNV013TD
+     C                     MOVELIVACNO    R#ORNO
+     C                     MOVELIVNO      R#IVNO
+     C                     MOVELIVACNT    R#IVAC
+     C                     Z-ADDIVITEM    R#IVIT
+     C                     Z-ADDIVACDT    R#IVAD
+     C                     Z-ADDIVAMT     R#IVAM
+     C                     MOVELIVTXAR    R#IVAR
+     C                     Z-ADDIVTXDT    R#IVDT
+     C                     MOVELIVDECD    R#IVDE
+     C                     Z-ADDIVDEDT    R#IVDD
+     C                     WRITECNV013TD
+     C                     ADD  1         W#RCNT
+     C                     ADD  IVAMT     W#TAMT
+     C           K#IV      CHAINIVREC01              65
+     C   65                WRITEIVREC01
+     C                     ENDIF                            ENDOF97
+CLJE C*  ---------------------------------------
+     CSR         D#L1Z     ENDSR
+     C****
+     CSR         D#PR      BEGSR
+     C* S02YSH DEBUG 911017
+     C                     MOVELIVNO      W#INN1  2
+     C                     MOVE IVNO      W#INN2  8
+     C           W#INN1    IFEQ 'YA'
+     C           W#INN2    ANDEQ'03102886'
+     C                     Z-ADD0         W#TEST  10
+     C                     ENDIF
+     C           W#INN1    IFEQ 'YA'
+     C           W#INN2    ANDEQ'03103031'
+     C                     Z-ADD0         W#TEST  10
+     C                     ENDIF
+     C*  DEBUG  END
+9707 C*
+ .   C           INORNO    IFEQ 'P05224'
+ .   C                     Z-ADD0         W#TEST
+ .   C                     ENDIF
+9707 C*
+     C           INDECD    IFNE ' '
+     C           INTYPE    OREQ '9'
+CLJ  C           IVDECD    OREQ 'D'
+CSF  C           INORNO    OREQ 'P03978'
+CSF  C           INORNO    OREQ 'P03979'
+     C                     GOTO D#PRZ
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           IVACNT    WHEQ '1'
+     C                     EXSR C1#RTN
+     C           IVACNT    WHEQ '2'
+     C                     ADD  IVAMT     DAMT
+     C           IVACNT    WHEQ '3'
+     C                     ADD  IVAMT     FAMT
+     C           IVACNT    WHEQ '4'
+     C                     EXSR C4#RTN
+     C           IVACNT    WHEQ '5'
+     C                     EXSR C5#RTN
+     C           IVACNT    WHEQ '6'
+     C                     EXSR C6#RTN
+     C           IVACNT    WHEQ '7'
+     C                     EXSR C7#RTN
+CLJ  C           IVACNT    WHEQ '8'                        加工組立
+CLJ  C                     ADD  IVAMT     AAMT             有金額無量
+     C                     ENDSL
+     C***
+     CSR         D#PRZ     ENDSR
+     C****
+     CSR         C1#RTN    BEGSR
+     C                     ADD  IVQTY     AQTY
+     C                     SELEC
+     C           IVFL03    WHEQ 'A'
+     C                     ADD  IVAMT     AAMT
+     C           IVFL03    WHEQ 'B'
+     C                     ADD  IVAMT     CAMT
+     C           IVFL03    WHEQ 'C'
+     C                     ADD  IVAMT     DAMT
+     C                     ENDSL
+     CSR                   ENDSR
+     C****
+     CSR         C4#RTN    BEGSR
+     C           INKIND    IFEQ '2'
+     C           IVAMT     DIV  1.05      WIVAMT 110
+     C           IVAMT     SUB  WIVAMT    WTAX   110
+     C                     ELSE
+     C                     Z-ADDIVAMT     WIVAMT
+     C                     ENDIF
+     C                     SELEC
+     C           IVFL03    WHEQ 'E'
+     C                     ADD  WIVAMT    BAMT
+     C           INKIND    IFEQ '2'
+     C                     ADD  WTAX      BTAX
+     C                     ENDIF
+     C           IVFL03    WHEQ 'F'
+9106 C                     MOVELINNO      W#INN1  2
+9106 C                     MOVE INNO      W#INN2  8
+9106 C           W#INN1    IFNE 'HJ'
+9106 C           W#INN2    ORNE '27873823'
+     C                     ADD  WIVAMT    HAMT
+     C           INKIND    IFEQ '2'
+     C                     ADD  WTAX      HTAX
+     C                     ENDIF
+9106 C                     ENDIF
+     C           IVFL03    WHEQ 'G'
+     C*為避免因作業失誤,以全額折讓代替發票作廢,導致AFCBAL中退預
+     C*回金額虛增,故加此判斷(即發票無繳款紀錄下,針對該發票所做
+     C*預收折讓不列入退預回統計) 特例: HJ27873823排除之
+0801AC*特例:PN55896267.PN55896269.PN55896266.PN55896265.QU55896257
+0811AC*特例：GG04775922
+0903AC*特例:WW93949689
+0801AC*
+     C                     MOVELINNO      W#INN1  2
+     C                     MOVE INNO      W#INN2  8
+9101 C           INRCNO    IFNE *BLANK
+9403 C*                    ADD  WIVAMT    EAMT
+9403 C                     ADD  IVAMT     EAMT
+9403 C*          INKIND    IFEQ '2'
+9403 C*                    ADD  WTAX      ETAX
+9403 C*                    ENDIF
+9101 C                     ENDIF
+9106 C*          W#INN1    IFEQ 'HJ'
+     C*          W#INN2    ANDEQ'27873823'
+     C*                    ADD  WIVAMT    EAMT
+     C*          INKIND    IFEQ '2'
+     C*                    ADD  WTAX      ETAX
+     C*                    ENDIF
+9106 C*                    ENDIF
+0801AC           INCUNO    IFEQ 'DP6291'
+0903AC           INCUNO    OREQ 'DP505'
+0801AC           W#INN1    IFEQ 'PN'
+0801AC           W#INN2    ANDEQ'55896267'
+0801AC           W#INN1    OREQ 'PN'
+0801AC           W#INN2    ANDEQ'55896269'
+0801AC           W#INN1    OREQ 'PN'
+0801AC           W#INN2    ANDEQ'55896266'
+0801AC           W#INN1    OREQ 'PN'
+0801AC           W#INN2    ANDEQ'55896265'
+0801AC           W#INN1    OREQ 'QU'
+0801AC           W#INN2    ANDEQ'55896257'
+0811AC           W#INN1    OREQ 'GG'
+0811AC           W#INN2    ANDEQ'04775922'
+0903AC           W#INN1    OREQ 'WW'
+0903AC           W#INN2    ANDEQ'93949689'
+0801AC                     ADD  IVAMT     EAMT
+0801AC                     ENDIF
+0801AC                     ENDIF
+     C*
+     C           IVFL03    WHEQ 'H'
+     C                     ADD  WIVAMT    GAMT
+     C           INKIND    IFEQ '2'
+     C                     ADD  WTAX      GTAX
+     C                     ENDIF
+     C                     ENDSL
+     CSR                   ENDSR
+     C****
+     CSR         C5#RTN    BEGSR
+     C                     SELEC
+     C           IVFL03    WHEQ 'A'
+     C                     ADD  IVAMT     ATAX
+     C           IVFL03    WHEQ 'B'
+     C                     ADD  IVAMT     CTAX
+     C           IVFL03    WHEQ 'C'
+     C                     ADD  IVAMT     DTAX
+     C           IVFL03    WHEQ 'D'
+     C                     ADD  IVAMT     FTAX
+     C           IVFL03    WHEQ 'F'
+     C                     ADD  IVAMT     HTAX
+     C           IVFL03    WHEQ 'G'
+     C                     ADD  IVAMT     ETAX
+     C           IVFL03    WHEQ 'H'
+     C                     ADD  IVAMT     GTAX
+     C                     ENDSL
+     CSR                   ENDSR
+     C****
+     CSR         C6#RTN    BEGSR
+     C                     SELEC
+     C           INTYPE    WHEQ '1'
+     C           INTYPE    OREQ '3'
+     C                     ADD  IVAMT     IAMT
+     C           INTYPE    WHEQ '2'
+     C                     ADD  IVAMT     JAMT
+     C                     ENDSL
+     CSR                   ENDSR
+     C****
+     CSR         C7#RTN    BEGSR
+     C                     SELEC
+     C           INTYPE    WHEQ '1'
+     C           INTYPE    OREQ '3'
+     C                     ADD  IVAMT     KAMT
+     C           INTYPE    WHEQ '2'
+     C                     ADD  IVAMT     LAMT
+     C                     ENDSL
+     CSR                   ENDSR
+     C****
+     C****
+     CSR         T#L2      BEGSR
+     C                     MOVELIVACNO    ARORNO
+     C           ARKEY     CHAINARSTAT               96
+     C  N96                EXSR UP#AR
+     C   96                EXSR WR#AR
+     C****
+     CSR         T#L2Z     ENDSR
+     C*****
+     CSR         WR#AR     BEGSR
+     C                     CLEARARREC
+     C                     MOVEL'A'       ARFLAG
+     C                     MOVELCOCUNO    ARCUNO
+     C                     MOVELS1CUNO    ARCUNM
+     C                     MOVELIVACNO    ARORNO
+     C                     Z-ADDAQTY      ARAQTY
+     C                     Z-ADDAAMT      ARAAMT
+     C                     Z-ADDATAX      ARATAX
+     C                     Z-ADDBAMT      ARBAMT
+CLJ  C                     ADD  BTAX      ARBAMT           扣預收稅額
+     C                     Z-ADDCAMT      ARCAMT           計入扣預收
+     C                     Z-ADDCTAX      ARCTAX
+     C                     Z-ADDDAMT      ARDAMT
+     C                     Z-ADDDTAX      ARDTAX
+     C                     Z-ADDEAMT      AREAMT
+     C                     Z-ADDETAX      ARETAX
+     C                     Z-ADDFAMT      ARFAMT
+     C                     Z-ADDFTAX      ARFTAX
+     C                     Z-ADDGAMT      ARGAMT
+     C                     Z-ADDGTAX      ARGTAX
+     C                     Z-ADDHAMT      ARHAMT
+     C                     Z-ADDHTAX      ARHTAX
+     C                     Z-ADDIAMT      ARIAMT
+     C                     Z-ADDJAMT      ARJAMT
+     C                     Z-ADDKAMT      ARKAMT
+     C                     Z-ADDLAMT      ARLAMT
+     C                     Z-ADDARAAMT    ARNBAL
+     C                     ADD  ARATAX    ARNBAL
+     C                     ADD  ARBAMT    ARNBAL
+     C                     ADD  ARCAMT    ARNBAL
+     C                     ADD  ARCTAX    ARNBAL
+     C                     ADD  ARDAMT    ARNBAL
+     C                     ADD  ARDTAX    ARNBAL
+     C                     ADD  ARFAMT    ARNBAL
+     C                     ADD  ARFTAX    ARNBAL
+     C                     ADD  ARGAMT    ARNBAL
+     C                     ADD  ARGTAX    ARNBAL
+     C                     ADD  ARIAMT    ARNBAL
+     C                     ADD  ARKAMT    ARNBAL
+     C                     ADD  ARHAMT    ARNBAL
+     C                     ADD  ARHTAX    ARNBAL
+     C                     ADD  ARJAMT    ARNBAL
+     C                     ADD  AREAMT    ARNBAL
+     C                     ADD  ARETAX    ARNBAL
+     C                     ADD  ARLAMT    ARNBAL
+     C***  4/29 UPDATE BY JEFF
+     C                     Z-ADDARHAMT    ARPBAL
+     C                     ADD  AREAMT    ARPBAL
+     C                     ADD  ARBAMT    ARPBAL
+     C                     ADD  ARGAMT    ARPBAL
+     C*
+0311AC*訂單K04808轉424889至K04890
+     C*
+0311AC           ARORNO    IFEQ 'K04809'
+0311AC                     ADD  424889    ARMAMT
+0311AC                     ENDIF
+1003AC*
+1003AC*訂單P10723轉790089至P10941
+1003AC*訂單P10868轉2576000至P10942
+1003AC*訂單P10869轉1104000至P10943
+1006AC*訂單P10941轉389036至P10723
+1003AC*
+1003AC                     SELEC
+1003AC           ARORNO    WHEQ 'P10941'
+1003AC                     Z-ADD790089    ARMAMT
+1006AC                     SUB  389036    ARMAMT
+1003AC           ARORNO    WHEQ 'P10942'
+1003AC                     Z-ADD2576000   ARMAMT
+1003AC           ARORNO    WHEQ 'P10943'
+1003AC                     Z-ADD1104000   ARMAMT
+1003AC                     ENDSL
+1003AC*
+     C                     ADD  ARMAMT    ARPBAL
+0311AC           ARORNO    IFEQ 'K04808'
+0311AC                     SUB  424889    ARPBAL
+0311AC                     ENDIF
+1003AC                     SELEC
+1003AC           ARORNO    WHEQ 'P10723'
+1003AC                     SUB  790089    ARPBAL
+1006AC                     ADD  389036    ARPBAL
+1003AC           ARORNO    WHEQ 'P10868'
+1003AC                     SUB  2576000   ARPBAL
+1003AC           ARORNO    WHEQ 'P10869'
+1003AC                     SUB  1104000   ARPBAL
+1003AC                     ENDSL
+1003AC*
+     C           ARNBAL    IFEQ 0
+     C                     MOVE 'Y'       ARFL01
+     C                     ENDIF
+     C           ARPBAL    IFEQ 0
+     C                     MOVE 'Y'       ARFL02
+     C                     ENDIF
+     C                     WRITEARREC
+     CSR         WR#ARZ    ENDSR
+     C****
+     CSR         UP#AR     BEGSR
+     C                     MOVEL'C'       ARFLAG
+     C                     MOVELCOCUNO    ARCUNO
+     C                     MOVELS1CUNO    ARCUNM
+     C                     ADD  AQTY      ARAQTY
+     C                     ADD  AAMT      ARAAMT
+     C                     ADD  ATAX      ARATAX
+     C                     ADD  BAMT      ARBAMT
+CLJ  C                     ADD  BTAX      ARBAMT           扣預收稅額
+     C                     ADD  CAMT      ARCAMT           計入扣預收
+     C                     ADD  CTAX      ARCTAX
+     C                     ADD  DAMT      ARDAMT
+     C                     ADD  DTAX      ARDTAX
+     C                     ADD  EAMT      AREAMT
+     C                     ADD  ETAX      ARETAX
+     C                     ADD  FAMT      ARFAMT
+     C                     ADD  FTAX      ARFTAX
+     C                     ADD  GAMT      ARGAMT
+     C                     ADD  GTAX      ARGTAX
+     C                     ADD  HAMT      ARHAMT
+     C                     ADD  HTAX      ARHTAX
+     C                     ADD  IAMT      ARIAMT
+     C                     ADD  JAMT      ARJAMT
+     C                     ADD  KAMT      ARKAMT
+     C                     ADD  LAMT      ARLAMT
+     C                     Z-ADDARAAMT    ARNBAL
+     C                     ADD  ARATAX    ARNBAL
+     C                     ADD  ARBAMT    ARNBAL
+     C                     ADD  ARCAMT    ARNBAL
+     C                     ADD  ARCTAX    ARNBAL
+     C                     ADD  ARDAMT    ARNBAL
+     C                     ADD  ARDTAX    ARNBAL
+     C                     ADD  ARFAMT    ARNBAL
+     C                     ADD  ARFTAX    ARNBAL
+     C                     ADD  ARGAMT    ARNBAL
+     C                     ADD  ARGTAX    ARNBAL
+     C                     ADD  ARIAMT    ARNBAL
+     C                     ADD  ARKAMT    ARNBAL
+     C                     ADD  ARHAMT    ARNBAL
+     C                     ADD  ARHTAX    ARNBAL
+     C                     ADD  ARJAMT    ARNBAL
+     C                     ADD  AREAMT    ARNBAL
+     C                     ADD  ARETAX    ARNBAL
+     C                     ADD  ARLAMT    ARNBAL
+     C                     Z-ADDARHAMT    ARPBAL
+     C                     ADD  AREAMT    ARPBAL
+     C                     ADD  ARBAMT    ARPBAL
+     C                     ADD  ARGAMT    ARPBAL
+0311AC           ARORNO    IFEQ 'K04809'
+0311AC                     ADD  424889    ARMAMT
+0311AC                     ENDIF
+1003AC                     SELEC
+1003AC           ARORNO    WHEQ 'P10941'
+1003AC                     ADD  790089    ARMAMT
+1006AC                     SUB  389036    ARMAMT
+1003AC           ARORNO    WHEQ 'P10942'
+1003AC                     ADD  2576000   ARMAMT
+1003AC           ARORNO    WHEQ 'P10943'
+1003AC                     ADD  1104000   ARMAMT
+1003AC                     ENDSL
+     C                     ADD  ARMAMT    ARPBAL
+0311AC           ARORNO    IFEQ 'K04808'
+0311AC                     SUB  424889    ARPBAL
+0311AC                     ENDIF
+1003AC                     SELEC
+1003AC           ARORNO    WHEQ 'P10723'
+1003AC                     SUB  790089    ARPBAL
+1006AC                     ADD  389036    ARPBAL
+1003AC           ARORNO    WHEQ 'P10868'
+1003AC                     SUB  2576000   ARPBAL
+1003AC           ARORNO    WHEQ 'P10869'
+1003AC                     SUB  1104000   ARPBAL
+1003AC                     ENDSL
+     C*
+     C           ARNBAL    IFEQ 0
+     C                     MOVE 'Y'       ARFL01
+     C                     ENDIF
+     C           ARPBAL    IFEQ 0
+     C                     MOVE 'Y'       ARFL02
+     C                     ENDIF
+     C                     UPDATARREC
+     CSR         UP#ARZ    ENDSR
+

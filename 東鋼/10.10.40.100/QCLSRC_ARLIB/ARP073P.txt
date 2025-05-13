@@ -1,0 +1,56 @@
+     /****************************************************************/
+     /*                                                              */
+     /*               >>   PROGRAM INTRODUCTION   <<                 */
+     /*                                                              */
+     /*            1.PROGRAM-NAME  ARP073P                           */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S02HYS                            */
+     /*            4.FUNCTION     外銷訂單處理　　　　　           */
+     /*            5.DATE-WRITTEN  89/05/11                          */
+     /*            6.DATE-MODIFY   89/05/11                          */
+     /*                                                              */
+     /****************************************************************/
+             PGM
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&P#ORNO) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&P#ORN1) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DSPID) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TYPE)  TYPE(*CHAR) LEN(1)
+             RTVJOBA    JOB(&DSPID) OUTQ(&OUTQ) TYPE(&TYPE)
+             IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+             OVRDBF     FILE(HSMAST) TOFILE(DALIB/HSMAST)
+             CALL       PGM(ARP073RS) PARM(&P#ORNO &P#ORN1 &IN03)
+             DLTOVR     FILE(*ALL)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGDTAARA  DTAARA(*LDA (501 5))  VALUE(&P#ORNO)
+             CHGDTAARA  DTAARA(*LDA (506 5))  VALUE(&P#ORN1)
+             CHGDTAARA  DTAARA(*LDA (519 10)) VALUE(&DSPID)
+             SBMJOB     CMD(CALL PGM(ARLIB/ARP073P)) JOB(ARP073P) +
+                        JOBD(ARJOBD) OUTQ(&OUTQ)
+          SNDBRKMSG  MSG('<<已送至佇列中處理，請稍候.>>')             +
+                                 TOMSGQ(&DSPID) +
+                        MSGTYPE(*INFO)
+             RETURN
+
+
+    BATCH:
+             RTVDTAARA  DTAARA(*LDA (501 5))  RTNVAR(&P#ORNO)
+             RTVDTAARA  DTAARA(*LDA (506 5))  RTNVAR(&P#ORN1)
+             RTVDTAARA  DTAARA(*LDA (519 10)) RTNVAR(&DSPID)
+             OVRDBF     FILE(HSMAST) TOFILE(HSMAST)
+          OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE(TRNDTL) +
+                        OPTION(*ALL) QRYSLT('+
+                        (ORNO *GE "' || &P#ORNO || '") *AND +
+                        (ORNO *LE "' || &P#ORNO || '")') +
+                        MAPFLD((ORNO '%SST(TXORNO 1 5)' *CHAR 5))
+             CALL       PGM(ARLIB/ARP073R)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+
+             ENDPGM
+

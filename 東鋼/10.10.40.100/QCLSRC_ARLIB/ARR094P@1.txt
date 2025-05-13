@@ -1,0 +1,127 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR094P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02YSH                                  */
+     /*     4.FUNCTION     進倉履約折讓呈核表列印                 */
+     /*     5.DATE-WRITTEN  91/02/20                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCLF       FILE(ARLIB/ARR094S)
+     /*宣告變數*/
+             DCL        VAR(&TYPE)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&YYMM)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&YMS)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&CONT)  TYPE(*CHAR) LEN(3)
+             DCL        VAR(&ARES)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&AREE)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&PROS)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&PROE)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&CUNS)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&CUNE)  TYPE(*CHAR) LEN(6)
+
+             RTVJOBA    TYPE(&TYPE)
+             IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+             RTVDTAARA  DTAARA(*LDA (1001 10)) RTNVAR(&S#USER)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+
+             RTVDTAARA  DTAARA(DISCNTDTA (1 6)) RTNVAR(&YYMM)
+             RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&YYMM)
+             CHGVAR     VAR(&YMS)     VALUE('00' || %SST(&YYMM 1 4))
+             CHGVAR     VAR(&S#YM2)   VALUE(&YMS)
+
+    /*       CHGVAR     VAR(&S#PRO1)  VALUE('3')   */
+
+     START:  SNDRCVF
+             CHGVAR     VAR(&S#ERR1)  VALUE(' ')
+             IF         COND((&IN03 *EQ '1') *OR (&IN12 *EQ '1')) +
+                        THEN(RETURN)
+
+             IF   COND(&S#SAL1 *EQ '  ') THEN(DO)
+                  CHGVAR   VAR(&S#ERR1) VALUE(+
+                  '業務員代號不得空白!')
+                  GOTO   CMDLBL(START)
+             ENDDO
+
+             CHGVAR   VAR(&YMS)   VALUE(&S#YM2)
+             CHGVAR   VAR(&CONT)  VALUE(&S#CONT)
+
+             CHGDTAARA  DTAARA(*LDA (301 6)) VALUE(&YMS)
+             CHGDTAARA  DTAARA(*LDA (307 2)) VALUE(&S#SAL1)
+             CHGDTAARA  DTAARA(*LDA (309 1)) VALUE(&S#PRO1)
+             CHGDTAARA  DTAARA(*LDA (310 6)) VALUE(&S#CUN1)
+             CHGDTAARA  DTAARA(*LDA (316 1)) VALUE(&S#AREA)
+             CHGDTAARA  DTAARA(*LDA (317 3)) VALUE(&CONT)
+             SBMJOB     CMD(CALL PGM(ARR094P)) JOB(ARR094P) +
+                        JOBD(ARJOBD)
+             SNDBRKMSG  MSG('<<進倉履約折讓呈核表開始處理，請稍候.>>')    +
+                                 TOMSGQ(&S#DEVI) +
+                        MSGTYPE(*INFO)
+             RETURN      /*INTERACTIVE JOB */
+   BATCH:
+             RTVDTAARA  DTAARA(*LDA (301 6)) RTNVAR(&YMS)
+             RTVDTAARA  DTAARA(*LDA (307 2)) RTNVAR(&S#SAL1)
+             RTVDTAARA  DTAARA(*LDA (309 1)) RTNVAR(&S#PRO1)
+             RTVDTAARA  DTAARA(*LDA (310 6)) RTNVAR(&S#CUN1)
+             RTVDTAARA  DTAARA(*LDA (316 1)) RTNVAR(&S#AREA)
+             RTVDTAARA  DTAARA(*LDA (317 3)) RTNVAR(&CONT)
+
+             IF   COND(&S#AREA *EQ ' ') THEN(DO)
+                  CHGVAR   VAR(&ARES)   VALUE(' ')
+                  CHGVAR   VAR(&AREE)   VALUE('9')
+             ENDDO
+             ELSE (DO)
+                  CHGVAR   VAR(&ARES)   VALUE(&S#AREA)
+                  CHGVAR   VAR(&AREE)   VALUE(&S#AREA)
+             ENDDO
+
+             IF   COND(&S#PRO1 *EQ ' ') THEN(DO)
+                  CHGVAR   VAR(&PROS)   VALUE(' ')
+                  CHGVAR   VAR(&PROE)   VALUE('9')
+             ENDDO
+             ELSE (DO)
+                  CHGVAR   VAR(&PROS)   VALUE(&S#PRO1)
+                  CHGVAR   VAR(&PROE)   VALUE(&S#PRO1)
+             ENDDO
+
+             IF   COND(&S#CUN1 *EQ '      ') THEN(DO)
+                  CHGVAR   VAR(&CUNS)   VALUE('      ')
+                  CHGVAR   VAR(&CUNE)   VALUE('999999')
+             ENDDO
+             ELSE (DO)
+                  CHGVAR   VAR(&CUNS)   VALUE(&S#CUN1)
+                  CHGVAR   VAR(&CUNE)   VALUE(&S#CUN1)
+             ENDDO
+
+             OVRDBF     FILE(DISMST)  TOFILE(DALIB/DISMST)  SHARE(*YES)
+             OVRPRTF    FILE(ARR094T) TOFILE(ARR094T) PAGESIZE(*N +
+                          132) CPI(10) HOLD(*YES) USRDTA('進倉呈核')
+             OPNQRYF    FILE(DISMST)  QRYSLT('+
+                        (YYMM *EQ "' || &YMS || '") *AND +
+                        (CONX *EQ "' || &CONT || '") *AND +
+                        (DMSALE *EQ "' || &S#SAL1 || '") *AND +
+                        (DMAREA *GE "' || &ARES || '") *AND +
+                        (DMAREA *LE "' || &AREE || '") *AND +
+                        (DMCUNO *GE "' || &CUNS || '") *AND +
+                        (DMCUNO *LE "' || &CUNE || '") *AND +
+                        (DMPROD *GE "' || &PROS || '") *AND +
+                        (DMPROD *LE "' || &PROE || '")') +
+                        MAPFLD((CHAR1 DMYYMM *CHAR 6) +
+                               (CONX DMCONT *CHAR 3) +
+                               (YYMM '%SST(CHAR1 1 6)' *CHAR 6)) +
+                        KEYFLD((DMCUNO) (DMAREA) (DMORNO))
+             CALL       PGM(ARR094R)
+             CLOF       OPNID(DISMST)
+             DLTOVR     FILE(*ALL)
+
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+             SNDBRKMSG  MSG('<<進倉履約折讓呈核表處理完畢，請列印.>>')    +
+                                 TOMSGQ(&S#DEVI) +
+                        MSGTYPE(*INFO)
+
+ ENDCLPGM:   ENDPGM
+

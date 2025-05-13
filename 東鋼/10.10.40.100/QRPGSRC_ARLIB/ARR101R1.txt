@@ -1,0 +1,143 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR101R1
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     應收帳款承購(E-FACTORING)發票異常檢核表
+     H*          5.DATE-WRITTEN  91/10/21
+     H*          6.DATE-MODIFY
+     H*                          99/09/03  2010AR517  S00WCJ (9909A)
+     H*
+     H*         Ａ：計算已開發票未承購之逾期天數
+     H*****************************************************************
+     H        1   Y                                     1
+     FINVMST  IP  E           K        DISK
+     FARCUDT  IF  E           K        DISK
+     FARINVM  IF  E           K        DISK
+     FARR101F O   E           K        DISK
+     IINREC       01
+     I           UDS
+     I                                      303 3050S#DAT3
+     I            DS
+     I                                        1  10 D#INNO
+     I                                        1   2 D#INN1
+     I                                        3  10 D#INN2
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+9909AC           *DATE     SUB  19000000  U#SYSD  80
+     C   01                EXSR DTLSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*A排除未做承購就已繳款之發票
+     C*  B排除大陸工程兩張發票
+     C*  C排除華熊營造訂單編號非T01977
+     C                     MOVELINNO      D#INNO
+     C                     SELEC
+     C           D#INN1    WHEQ 'PA'                       A
+     C           D#INN2    ANDEQ'87872713'
+     C                     GOTO DTLEND
+     C           D#INN1    WHEQ 'MC'                       A
+     C           D#INN2    ANDEQ'28202154'
+     C                     GOTO DTLEND
+     C           D#INN1    WHEQ 'GK'                       A
+     C           D#INN2    ANDEQ'27873563'
+     C                     GOTO DTLEND
+     C           D#INN1    WHEQ 'JG'                       A
+     C           D#INN2    ANDEQ'27878254'
+     C                     GOTO DTLEND
+     C           D#INN1    WHEQ 'XW'                       A
+     C           D#INN2    ANDEQ'49422500'
+     C                     GOTO DTLEND
+     C           D#INN1    WHEQ 'MC'                       B
+     C           D#INN2    ANDEQ'28200629'
+     C                     GOTO DTLEND
+     C           D#INN1    WHEQ 'MC'                       B
+     C           D#INN2    ANDEQ'28200832'
+     C                     GOTO DTLEND
+     C                     ENDSL
+     C*
+     C           INCUNO    IFEQ 'DP032'
+     C           INORNO    IFNE 'T01997'
+     C           INORNO    ANDNE'T02060'
+     C           INORNO    ANDNE'M01488'
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVELINCUNO    W#CUNO
+     C           W#CUNO    IFEQ 'DP055'
+     C           INORNO    IFNE 'P03892'
+     C           INORNO    ANDNE'K03408'
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C* 1.先判斷該客戶是否辦理承購
+     C* 2.若該客戶已辦理承購，再判斷該筆發票是否已做承購
+     C* 3.若該筆發票未做承購，則判斷逾期天數
+     C*
+     C                     MOVELINCUNO    W#CUNO  5
+     C                     MOVELW#CUNO    ACCUNO
+     C           ACCUNO    CHAINRARCUDT              40
+     C*排除太平洋建設
+     C  N40      ACCUNO    IFEQ 'DM001'
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C*
+     C           *IN40     IFEQ *OFF
+     C           ININDT    ANDGEACDAT1                     承購起日
+     C           ININDT    ANDLEACDAT2                     承購止日
+     C           INNO      CHAINRARINVM              41
+     C*
+     C           *IN41     IFEQ *ON
+     C*
+     C*------------------------------------
+     C*計算Ａ：已開發票未承購之逾期天數 -
+     C*即發票日期與ＵＤＡＴＥ間的天數   -
+     C*------------------------------------
+     C*
+     C                     MOVE ININDT    W#APD1  8        發票日期
+     C                     MOVE W#APD1    P#PDAT
+9909AC                     MOVE U#SYSD    W#DATE  8         UDATE
+     C                     MOVE W#DATE    P#RDAT
+     C                     Z-ADDS#DAT3    P#DIF   50
+     C*
+     C                     CALL 'UTS103R'
+     C                     PARM           P#PDAT  8        起始日期
+     C                     PARM           P#RDAT  8        終止日期
+     C                     PARM '1'       P#MODE  1        民國年
+     C                     PARM           P#DIF   50       相距天數
+     C                     PARM           P#ERR   1        錯誤碼
+     C*
+     C           P#DIF     IFGE S#DAT3
+     C                     Z-ADDP#DIF     AFDATS           天數
+     C                     MOVEL'A'       AFCODE           異常狀況
+     C*
+     C*                    Z-ADDAMDUDT    AFDUDT           預計兌現日
+     C                     MOVELW#CUNO    AFCUNO           客戶代號
+     C                     MOVELINCUNM    AFCUNM           客戶名稱
+     C                     MOVELINORNO    AFORNO           訂單號碼
+     C                     MOVELINNO      AFINNO           發票號碼
+9211 C                     MOVELINRVID    AFRVID           業務員別
+     C                     MOVELININDT    AFINDT           發票日期
+     C                     MOVELINAPNO    AFAPN2           請款單號
+     C                     Z-ADDINAPDT    AFAPD2           請款日期
+     C                     Z-ADDINAAMT    AFDAMT           發票金額
+     C                     ADD  INATAX    AFDAMT           發票金額
+1128 C                     Z-ADD0         AFFAMT           繳款金額
+1128 C                     MOVEL*BLANK    AFRCNO           繳款單號
+1202 C           AFDAMT    SUB  AFFAMT    AFABAL           未繳金額
+     C*
+     C                     WRITERAR101F
+     C*
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           DTLEND    ENDSR
+     C*****************************************************************
+

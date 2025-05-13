@@ -1,0 +1,270 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARE008RB
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION      帳款更正磅單調整副程式
+     H*            5.DATE-WRITTEN  108/12/27  2019AR00079
+     H*                            109/07/02  S00WCJ (0907A)
+     H*                             修正金額未四捨五入之BUG
+     H*
+     H*****************************************************************
+     H            Y
+     FARE008SBCF  E                    WORKSTN
+     F                                        RRN   KSFILE AR08F2
+     FTRNDTL  IF  E           K        DISK
+     FARE008F UF  E           K        DISK                      A
+     FSAMAST  IF  E           K        DISK
+     E                    ERR     1   7 22
+     I*
+     I            DS
+     I                                        1  30 TXRESV
+     I                                       10  10 D#TXRV
+     I                                       13  14 D#VRTM
+     I                                       19  21 D#PDS1
+     I*
+     I            DS
+     I                                        1   9 S1ORN1
+     I                                        1   1 D1ORN1
+     I                                        2   6 D1ORN2
+     I                                        7   9 D1ORN3
+     I            DS
+     I                                        1   9 S2ORN1
+     I                                        1   1 D#ORN1
+     I                                        2   60D#ORN2
+     I                                        7   90D#ORN3
+     C*****************************************************************
+     C*          Parameter List
+     C*****************************************************************
+     C*I:P#TKCD
+     C           *ENTRY    PLIST
+     C                     PARM           P#TXNO  8
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           TXCODE
+     C                     KFLD           S#TXNO
+     C*
+     C           KEY02     KLIST
+     C                     KFLD           D#ORN1
+     C                     KFLD           D#ORN2
+     C                     KFLD           D#ORN3
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C*SR0000 => Initialize Screen Number
+     C*SR1000 => Screen Number = '01' Process
+     C*SR2000 => Screen Number = '01' Process Subfile
+     C*
+     C           *DATE     SUB  19000000  U#SYSD  80
+     C                     EXSR SR0000
+     C           PRCID     DOUEQ'00'
+     C           PRCID     CASEQ'01'      SR1000
+     C           PRCID     CASEQ'02'      SR2000
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*
+     C*Initialize Screen Number
+     C*
+     C                     CLEARAR08F2CL
+     C                     MOVEL'Y'       UPDSCR
+     C                     MOVELP#TXNO    S#TXNO
+     C                     MOVEL'SA04'    TXCODE
+     C           KEY01     CHAINTRNDTL              N59
+     C  N59                MOVELTXCUNM    S#CUNM
+     C   59                MOVEL*BLANKS   S#CUNM
+     C  N59                MOVELTXCUNO    S#CUNO
+     C   59                MOVEL*BLANKS   S#CUNO
+     C*
+     C                     MOVE '01'      PRCID   2
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C*Screen Number = '01' Process
+     C*
+     C           UPDSCR    IFEQ 'Y'
+     C                     EXSR SR1100
+     C                     ENDIF
+     C           PRCID     DOWEQ'01'
+     C*
+     C*Check Write Subfile Record Found ?
+     C*
+     C           RRN       COMP *ZEROS                   72*SFLDSP OFF
+     C   72      S#ERR     IFEQ *BLANKS
+     C                     MOVELERR,2     S#ERR
+     C                     ENDIF
+     C*
+     C                     WRITEAR08F2MG
+     C                     EXFMTAR08F2CL
+     C                     MOVEL*BLANKS   S#ERR
+     C*
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVEL'00'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           S#TXNO    SETLLRAR008F
+     C                     MOVEL*OFF      *IN56
+     C           *IN56     DOWEQ*OFF
+     C           S#TXNO    READERAR008F                  56
+     C   56                LEAVE
+     C                     DELETRAR008F
+     C                     ENDDO
+     C*
+     C                     MOVE '02'      PRCID
+     C*
+     C                     ENDDO
+     C           END100    ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*
+     C*Initialize Subfile Screen => WB03F2
+     C*
+     C                     MOVE *BLANKS   UPDSCR  1
+     C                     MOVEA'111'     *IN,71           *SFLCLR
+     C                     WRITEAR08F2CL
+     C                     MOVEA'000'     *IN,71           *SFLCLR
+     C                     Z-ADD*ZEROS    RRN     40
+     C*
+     C           KEY01     SETLLTRNDTL
+     C                     MOVE *OFF      *IN52
+     C           *IN52     DOWEQ*OFF
+     C           KEY01     READETRNDTL              N    52*EOF
+     C   52                LEAVE
+     C*
+     C                     CLEARAR08F2
+     C*
+     C           TXFLAG    IFEQ 'D'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVEL*ON       *IN88
+     C                     MOVEL*BLANKS   S#OPT
+     C                     Z-ADDTXITEM    S#ITEM
+     C                     MOVELTXPDNM    S#PDNM
+     C                     Z-ADDTXQTY     S#QTY
+     C                     Z-ADDTXUPRC    S#PRC
+     C                     Z-ADDTXAMT     S#AMT
+     C                     MOVELTXORNO    S#ORNO
+     C                     MOVELD#VRTM    S#VRTM
+     C                     MOVELD#PDS1    S#PDS1
+     C                     MOVELTXIVNO    S#IVNO
+     C*
+     C                     ADD  1         RRN
+     C                     WRITEAR08F2
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*
+     C*Screen Number = '01' Process Read Subfile Screen
+     C*
+     C           PRCID     DOWEQ'02'
+     C                     READCAR08F2                 5353*ER*EOF
+     C   53                MOVE '00'      PRCID
+     C   53                LEAVE
+     C*
+     C*If S#OPT = " " Iter
+     C*
+     C           S#OPT     IFEQ *BLANKS
+     C           S1ORN1    ANDEQ*BLANKS
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     EXSR SR2100
+     C*
+     C                     MOVELS#OPT     W#OPT   1
+     C  N99      W#OPT     IFEQ 'Y'
+     C                     EXSR SR2200
+     C                     MOVEL*BLANKS   W#OPT
+     C                     ENDIF
+     C  N99      S1ORN1    IFNE *BLANKS
+     C                     EXSR SR2200
+     C                     ENDIF
+     C*
+     C                     MOVEL*ON       *IN88
+     C                     UPDATAR08F2
+     C           S#ERR     IFNE *BLANKS
+     C                     MOVE '01'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C*
+     C           S1ORN1    IFNE *BLANKS
+     C           D1ORN2    IFEQ *BLANKS
+     C                     MOVEL*ALL'0'   D1ORN2
+     C                     ENDIF
+     C           D1ORN3    IFEQ *BLANKS
+     C                     MOVEL*ALL'0'   D1ORN3
+     C                     ENDIF
+     C                     MOVELS1ORN1    S2ORN1
+     C*
+     C           KEY02     CHAINSAMAST              N58
+     C   58                MOVELERR,2     S#ERR
+     C   58                SETON                     3499
+     C  N58      S1PDNO    IFNE S#PDNM
+     C                     MOVELERR,1     S#ERR
+     C                     SETON                     3499
+     C                     ENDIF
+     C  N58N99             Z-ADDS1UPRC    W#UPRC  75
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2200    BEGSR
+     C*****************************************************************
+     C*
+     C                     CLEARRAR008F
+     C*
+     C                     MOVELS#TXNO    F1TXNO
+     C                     MOVEL'1'       F1ACNT
+     C                     MOVELS#PDNM    F1PDNM
+     C                     Z-ADDS#QTY     F1QTY
+     C           W#OPT     IFEQ 'Y'
+     C                     Z-ADDS#ITEM    F1ITEM
+     C                     MULT -1        F1QTY
+     C                     Z-ADDS#PRC     F1PRC
+     C                     MOVELS#ORNO    F1ORNO
+     C           S#IVNO    IFEQ *BLANKS
+     C                     MOVEL'@'       F1IVNO
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           S1ORN1    IFNE *BLANKS
+     C                     Z-ADD99        F1ITEM
+     C                     Z-ADDW#UPRC    F1PRC
+     C                     MOVELS1ORN1    F1ORNO
+     C                     ENDIF
+     C           S1ORN1    IFNE *BLANKS
+     C           W#OPT     ANDEQ'Y'
+     C                     Z-ADDS#ITEM    F1ITEM
+     C                     Z-ADDS#PRC     F1PRC
+     C                     MOVELS#ORNO    F1ORNO
+     C                     ENDIF
+0907AC*          F1QTY     MULT F1PRC     F1AMT
+0907AC           F1QTY     MULT F1PRC     F1AMT     H
+     C                     MOVELS#CUNO    F1CUNO
+     C                     MOVELS#CUNM    F1CUNM
+     C                     MOVELS#VRTM    F1VRTM
+     C                     MOVELS#PDS1    F1PDS1
+     C                     Z-ADDU#SYSD    F1DATE
+     C                     WRITERAR008F
+     C                     ENDSR
+**  ERR
+01品名代號不存在
+02資料不存在
+

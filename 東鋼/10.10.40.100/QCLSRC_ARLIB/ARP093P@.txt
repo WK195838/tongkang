@@ -1,0 +1,129 @@
+    /*****************************************************************/
+    /*                                                               */
+    /*               >>   PROGRAM INTRODUCTION   <<                  */
+    /*                                                               */
+    /*            1.PROGRAM-ID    ARP093P                            */
+    /*            2.PROGRAM-TYPE  CLP                                */
+    /*            3.AUTHOR        S02LYW                             */
+    /*            4.FUNCTION     轉暫收手切傳票傳輸                */
+    /*            5.DATE-WRITTEN  91/10/04                           */
+    /*                                                               */
+    /*****************************************************************/
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ARA)  TYPE(*CHAR) LEN(3)
+             DCL        VAR(&ARA2) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&CNT1) TYPE(*DEC)  LEN(1 0)
+
+             RTVJOBA    TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+ START:
+             SBMJOB     JOB(ARP093P) JOBD(ARJOBD) JOBQ(QCTL) +
+                          RQSDTA('CALL ARLIB/ARP093P')
+             SNDBRKMSG  MSG('轉暫收手切傳票傳輸執行中  ...') +
+                          TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             GOTO       CMDLBL(ENDCLPGM)
+
+ BATCH:
+             CRTDTAARA  DTAARA(QTEMP/ARA) TYPE(*CHAR) LEN(3) +
+                          VALUE('111')
+
+ STEP1:       /*  台北　抓　桃園  DALIB/AR2159T............ */
+
+             RTVDTAARA  DTAARA(QTEMP/ARA (1 1)) RTNVAR(&ARA2)
+             IF         COND(&ARA2 *EQ '0') THEN(GOTO CMDLBL(STEP2))
+
+             DLTF       FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMT)
+
+             SBMRMTCMD  CMD('CALL ARLIB/ARP093PA') DDMFILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO CMDLBL(STEP2))
+
+             CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(ARLIB/AR2159TX) +
+                          LVLCHK(*NO)
+             CPYF       FROMFILE(QTEMP/DDMT) TOFILE(ARLIB/AR2159TX) +
+                          MBROPT(*REPLACE) INCREL((*IF ARTRFL *EQ ' +
+                          ')) FMTOPT(*MAP *DROP)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO CMDLBL(STEP2))
+
+             OVRDBF     FILE(AR2159T)  TOFILE(DALIB/AR2159T)
+             CHGDTAARA  DTAARA(*LDA (301 1)) VALUE('T')
+             CALL       PGM(ARLIB/ARP093R)
+             DLTOVR     FILE(*ALL)
+
+             CHGDTAARA  DTAARA(QTEMP/ARA (1 1)) VALUE('0')
+
+ STEP2:       /*  台北　抓　苗栗  DALIB/AR2159T............ */
+
+             RTVDTAARA  DTAARA(QTEMP/ARA (2 1)) RTNVAR(&ARA2)
+             IF         COND(&ARA2 *EQ '0') THEN(GOTO CMDLBL(STEP3))
+
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMH)
+
+             SBMRMTCMD  CMD('CALL ARLIB/ARP093PA') DDMFILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO CMDLBL(STEP3))
+
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(ARLIB/AR2159TX) +
+                          LVLCHK(*NO)
+             CPYF       FROMFILE(QTEMP/DDMH) TOFILE(ARLIB/AR2159TX) +
+                          MBROPT(*REPLACE) INCREL((*IF ARTRFL *EQ ' +
+                          ')) FMTOPT(*MAP *DROP)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO CMDLBL(STEP3))
+
+             OVRDBF     FILE(AR2159T)  TOFILE(DALIB/AR2159T)
+             CHGDTAARA  DTAARA(*LDA (301 1)) VALUE('H')
+             CALL       PGM(ARLIB/ARP093R)
+             DLTOVR     FILE(*ALL)
+
+             CHGDTAARA  DTAARA(QTEMP/ARA (2 1)) VALUE('0')
+
+ STEP3:       /*  台北　抓　高雄  DALIB/AR2159T............ */
+
+             RTVDTAARA  DTAARA(QTEMP/ARA (3 1)) RTNVAR(&ARA2)
+             IF         COND(&ARA2 *EQ '0') THEN(GOTO CMDLBL(LOOP))
+
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMK)
+
+             SBMRMTCMD  CMD('CALL ARLIB/ARP093PA') DDMFILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO CMDLBL(LOOP))
+
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(ARLIB/AR2159TX) +
+                          LVLCHK(*NO)
+             CPYF       FROMFILE(QTEMP/DDMK) TOFILE(ARLIB/AR2159TX) +
+                          MBROPT(*REPLACE) INCREL((*IF ARTRFL *EQ ' +
+                          ')) FMTOPT(*MAP *DROP)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO CMDLBL(LOOP))
+
+             OVRDBF     FILE(AR2159T)  TOFILE(DALIB/AR2159T)
+             CHGDTAARA  DTAARA(*LDA (301 1)) VALUE('K')
+             CALL       PGM(ARLIB/ARP093R)
+             DLTOVR     FILE(*ALL)
+
+             CHGDTAARA  DTAARA(QTEMP/ARA (3 1)) VALUE('0')
+
+ LOOP:
+             RTVDTAARA  DTAARA(QTEMP/ARA (1 2)) RTNVAR(&ARA)
+             IF         COND(&ARA *NE '00') THEN(CHGVAR VAR(&CNT1) +
+                          VALUE(&CNT1 + 1))
+             IF         COND(&CNT1 *GT 2) THEN(GOTO CMDLBL(ENDCLPGM))
+             ELSE       DO
+                        IF         COND(&ARA *NE '00') THEN(DO)
+                                   DLYJOB   DLY(60)
+                                   GOTO     CMDLBL(STEP1)
+                                   ENDDO
+                        ENDDO
+
+ ENDCLPGM:
+             /*整理AR2159之金額*/
+             CALL       PGM(ARP093RA)
+          ENDPGM
+

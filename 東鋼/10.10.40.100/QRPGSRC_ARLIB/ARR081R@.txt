@@ -1,0 +1,144 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR081R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     信用狀押匯提示明細表
+     H*            5.DATE-WRITTEN  88/12/03
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FSARCVF  IP  E           K        DISK
+     FLLCMST  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FARR081T O   E             66     PRINTER
+     F*****************************************************************
+     E                    ARY1     1000 21
+     I*****************************************************************
+     ISRREC
+     I                                              SRPBIDL2
+     I                                              SRCUNOL1
+     I*------------------------------------------------------
+     I           UDS
+     I                                        1   80R#RVDT
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1  21 A#DATA
+     I                                        1  10 A@LLNO
+     I                                       11  210A@LAMT
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C                     Z-ADD0         ARY1L   40
+     C                     SETON                     66
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2清除函式換開狀銀行
+     C*********************************
+     CSR         L2CLR     BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式換客戶
+     C*********************************
+     CSR         L1CLR     BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     MOVEL'F'       W#RTNV
+     C*
+     C           1         DO   ARY1L     I       40
+     C                     MOVELARY1,I    A#DATA
+     C           SRNTNO    IFEQ A@LLNO
+     C                     MOVEL'T'       W#RTNV  1
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           W#RTNV    IFEQ 'F'
+     C                     ADD  1         ARY1L
+     C                     Z-ADDARY1L     I
+     C                     MOVELSRNTNO    A@LLNO
+     C                     Z-ADD0         A@LAMT
+     C           SRNTNO    CHAINLLREC                69
+     C  N69                Z-ADDLLBAMT    A@LAMT
+     C                     MOVELA#DATA    ARY1,I
+     C                     ENDIF
+     C*
+     C*
+     C                     CLEARAR081T1D
+     C                     MOVELSRCUNO    R#CUNO
+     C           R#CUNO    CHAINCBCUST               69
+     C  N69                MOVELCBCUNM    R#CUNM
+     C                     MOVELSRNTNO    R#LLNO
+     C                     Z-ADDSRRAMT    R#RAMT
+     C                     MOVELSRPBID    R#PBID
+     C           SRFL02    IFNE 'Y'                        未過財會
+     C                     SUB  R#RAMT    A@LAMT           可用餘額
+     C                     ENDIF
+     C                     Z-ADDA@LAMT    R#LAMT
+     C           SRNTNO    CHAINLLREC                69
+     C  N69                Z-ADDLLENDT    R#LEDT           到期日
+     C*
+     C   66                WRITEAR081T1H
+     C   66                SETOF                     66
+     C                     WRITEAR081T1D
+     C*
+     C                     MOVELA#DATA    ARY1,I           存回陣列
+     C                     ADD  R#RAMT    R#TRNA           合計
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  更換客戶
+     C*********************************
+     CSR         L1SR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2 函式 換開狀銀行
+     C*********************************
+     CSR         L2SR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  （合計）
+     C*********************************
+     CSR         LRSR      BEGSR
+     C   66                WRITEAR081T1H
+     C   66                SETOF                     66
+     C                     WRITEAR081T1T
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     WRITEAR081T1H
+     C                     WRITEAR081T1M
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+     C*  子函式集
+     C*****************************************************************
+

@@ -1,0 +1,231 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR108R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     銷貨調整單開立發票明細表
+     H*          5.DATE-WRITTEN  92/02/21
+     H*          6.DATE-MODIFY   95/04/12
+     H*                          99/09/16 2010HS184  S00WCJ (9909A)
+     H*                         100/08/16 2011AR622  S00WCJ (0008A)
+     H*                          增加重量欄位及加總計算
+     H*                         104/10/08 2015AR953  S00WCJ (0409A)
+     H*                           產品代碼3碼擴5碼
+     H*                         108/08/21  2019AR00057 S00WCJ (0808A)
+     H*                          配合磅單過至項次修改
+     H*
+     H*           說明：新增發票小計及各品名小計950412
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FTRNDTL  IP  E           K        DISK
+     FHIPROD  IF  E           K        DISK
+     FARR108T O   E             66     PRINTER
+     E*****************************************************************
+0409AE                    ARY1       36 25
+     E*****************************************************************
+     ITXREC
+     I                                              TXNO  L1
+     I                                              TXIVNOL1
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10111020 S#DEVN
+     I                                      300 307 S#DAT1
+     I                                      308 315 S#DAT2
+     I                                      316 316 S#AREA
+     I            DS
+     I                                        1  16 D#TEXT
+     I                                        1   3 D#PDNM
+     I                                        4  16 D#CHIN
+     I            DS
+0409AI                                        1  25 D#ARY1
+0409AI                                        1   5 D#PDNO
+0409AI                                        6  170D#AMT
+0409AI                                       18  250D#QTY
+9909AI            DS
+0409AI                                        1  30 TXRESV
+0409AI                                        1   5 D#PDN1
+0808AI                                       13  14 D#VRTM
+0808AI                                       19  21 D#PDS1
+     C*****************************************************************
+     C*          KEY   LIST
+     C*****************************************************************
+     C*FILE==>HIPROD
+     C*
+     C           W#PROD    KLIST
+     C                     KFLD           F4NAME
+     C                     KFLD           F4STND
+     C*
+     C*****************************************************************
+     C*         主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN66
+     C*
+     C                     MOVEL*ALL'='   T#LIN1
+     C                     MOVEL*ALL'='   T#LIN2
+     C                     MOVEL*ALL'-'   T#LIN3
+     C*
+     C                     MOVEA*ALL'9'   ARY1
+     C                     Z-ADD0         I       40
+     C                     Z-ADD0         W#AMT3 120
+0008AC                     Z-ADD0         W#QTY3  80
+     C*調整單開立區間
+     C                     MOVELS#DAT1    T#DAT1
+     C                     MOVELS#DAT2    T#DAT2
+     C*調整單開立廠區
+     C                     SELEC
+     C           S#AREA    WHEQ 'P'
+     C                     MOVEL'台北'  T#AREA
+     C           S#AREA    WHEQ 'M'
+     C                     MOVEL'台中'  T#AREA
+     C           S#AREA    WHEQ 'T'
+     C                     MOVEL'桃園'  T#AREA
+     C           S#AREA    WHEQ 'K'
+     C                     MOVEL'高雄'  T#AREA
+     C           S#AREA    WHEQ 'H'
+     C                     MOVEL'苗栗'  T#AREA
+     C                     ENDSL
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#AMT1 120       *發票小計
+0008AC                     Z-ADD0         W#QTY1  80
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR108T1D
+     C*
+     C                     Z-ADDTXDATE    T#DATE           開立日期
+     C                     MOVELTXCUNO    T#CUNO           客戶代號
+     C                     MOVELTXCUNM    T#CUNM           客戶名稱
+     C                     MOVELTXORNO    T#ORNO           訂單編號
+     C                     MOVELTXPCNO    T#PCNO           磅單編號
+     C                     MOVELTXIVNO    T#IVNO           發票號碼
+     C                     MOVELTXNO      T#NO             調整單號
+     C                     Z-ADDTXAMT     T#AMT            金額
+9909AC                     MOVELD#PDN1    T#PDN1
+0008AC                     Z-ADDTXQTY     T#QTY
+0808AC                     MOVELD#VRTM    T#VRTM           磅次
+0808AC                     MOVELD#PDS1    T#PDS1           徑度
+     C*
+     C                     MOVELTXPDNM    F4NAME
+     C                     MOVEL'*'       F4STND
+     C           W#PROD    CHAINRHIPROD              40
+     C*
+     C           *IN40     IFEQ *OFF
+     C                     MOVE *BLANK    D#TEXT
+     C                     MOVELTXPDNM    D#PDNM
+     C                     MOVELF4CHIN    D#CHIN
+     C                     MOVELD#TEXT    T#TEXT           說明
+     C                     ENDIF
+     C*
+     C                     Z-ADD1         I
+     C*
+     C                     SORTAARY1
+     C           1         DO   36        I
+     C                     MOVE ARY1,I    D#ARY1
+     C           TXPDNM    IFEQ D#PDNO
+     C                     ADD  TXAMT     D#AMT
+0008AC                     ADD  TXQTY     D#QTY
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C                     ELSE
+     C*
+0409AC           D#PDNO    IFEQ '99999'
+     C                     CLEARARY1,I
+     C                     Z-ADDTXAMT     D#AMT
+0008AC                     Z-ADDTXQTY     D#QTY
+     C                     MOVELTXPDNM    D#PDNO
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C   66                WRITEAR108T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR108T1D
+     C*小計
+     C                     ADD  T#AMT     W#AMT1           發票小計
+0008AC                     ADD  T#QTY     W#QTY1
+     C*總計
+     C                     ADD  T#AMT     T#AMTT
+0008AC                     ADD  T#QTY     T#QTYT
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C                     Z-ADDW#AMT1    T#AMT1           發票小計
+0008AC                     Z-ADDW#QTY1    T#QTY1
+     C*
+     C   66                WRITEAR108T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR108T1S
+     C                     WRITEAR108T1L
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C   66                WRITEAR108T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR108T1T
+     C*
+     C                     Z-ADD1         I
+     C*
+     C                     SORTAARY1
+     C           1         DO   36        I
+     C                     MOVE ARY1,I    D#ARY1
+     C*
+0409AC           D#PDNO    IFNE '99999'
+     C           D#AMT     ANDNE0
+     C                     MOVELD#PDNO    T#PDNO
+     C                     Z-ADDD#AMT     T#AMT2
+0008AC                     Z-ADDD#QTY     T#QTY2
+     C                     ADD  D#AMT     W#AMT3           品名合計
+0008AC                     ADD  D#QTY     W#QTY3
+     C*
+0409AC                     MOVELT#PDNO    F4NAME
+0409AC           F4NAME    CHAINHIPROD               40
+     C  N40                MOVELF4CHIN    T#PDNM           中文品名
+     C   40                MOVEL'不明'  T#PDNM
+     C                     WRITEAR108T2S
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     Z-ADDW#AMT3    T#AMT3           品名合計
+0008AC                     Z-ADDW#QTY3    T#QTY3
+     C                     WRITEAR108T2T
+     C                     WRITEAR108T1Y
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*
+     C   66                WRITEAR108T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR108T1M
+     C*
+     C                     ENDSR
+     C*****************************************************************
+

@@ -1,0 +1,183 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR116R3
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     請款別出貨及發票明細表─ＦＯＲ型鋼（出表）
+     H*            5.DATE-WRITTEN  94/09/16
+     H*            6.DATE-MODIFY
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR116F IP  E           K        DISK
+     FHIPROD  IF  E           K        DISK
+     FARR116T3O   E             69     PRINTER
+     E*****************************************************************
+     IRAR116F
+     I                                              A6ORNOL2
+     I                                              A6VRNOL1
+     I            DS
+     I                                        1   5 A6SPE1
+     I                                        1   40D#SPE1
+     I            DS
+     I                                        1   5 A6SPE2
+     I                                        1   40D#SPE2
+9506 I            DS
+ .   I                                        1   2 OEOF
+ .   I                                        2   2 OF
+ .   I            DS
+ .   I                                        1  10 T#PDNM
+9506 I                                       10  10 T#PDNB
+     I           UDS
+     I                                     10011010 U#USID
+     I                                      328 333 T#RCNO
+     C*****************************************************************
+     C*          KET  LIST
+     C*****************************************************************
+     C*FILE==>HIPROD(產品規格基本資料檔)
+     C           K#PROD    KLIST
+     C                     KFLD           F4NAME           產品類別
+     C                     KFLD           F4STND           規範別
+     I*****************************************************************
+     C  N99                EXSR INISR
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN69
+     C*
+     C                     MOVEL*ALL'='   T#LIN1
+     C                     MOVEL*ALL'='   T#LIN2
+9506 C                     MOVE ''      OEOF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR116T1T
+     C                     MOVE *ON       *IN69
+     C*
+     C                     MOVELA6CUNO    T#CUNO           客戶代號
+     C                     MOVELA6CUNM    T#CUNM           客戶名稱
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR116T1S
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR116T1D
+     C*
+     C                     MOVELA6ORNO    T#ORNO           訂單號碼
+     C                     MOVELA6INNO    T#INNO           發票號碼
+     C                     Z-ADDA6ORTM    T#ORTM           訂單項次
+     C                     MOVELA6CTNO    T#CTNO           工程編號
+     C                     MOVELA6CTNM    T#CTNM           工程名稱
+     C                     Z-ADDA6DATE    T#DATE           裝車日期
+     C                     MOVELA6VRNO    T#VRNO           磅單編號
+     C                     MOVELA6VRTM    T#VRTM           磅單項次
+     C                     MOVELA6STND    T#STND           規範別
+     C                     MOVELA6QULT    T#QULT           鋼種
+     C                     MOVELA6PDNM    F4NAME
+     C                     MOVEL'*'       F4STND
+     C           K#PROD    CHAINRHIPROD              40
+     C  N40                MOVELF4CHIN    T#PDNM
+     C*
+9506 C  N40      T#PDNB    IFNE ' '
+ .   C                     MOVE OF        T#PDNB
+ .   C                     ENDIF
+9506 C*
+     C                     Z-ADDD#SPE1    T#SPE1            H/T/D
+     C           A6SPE2    IFEQ *BLANK
+     C           A6SPE2    OREQ '00000'
+     C                     MOVE *ON       *IN53
+     C                     ELSE
+     C                     MOVE *OFF      *IN53
+     C                     ENDIF
+     C                     Z-ADDD#SPE2    T#SPE2            B/W
+     C           A6SPE3    IFEQ *BLANK
+     C           A6SPE3    OREQ '000  '
+     C                     MOVE *ON       *IN51
+     C                     ELSE
+     C                     MOVE *OFF      *IN51
+     C                     ENDIF
+     C                     MOVE A6SPE3    T#SPE3            T1
+     C           A6SPE4    IFEQ *BLANK
+     C           A6SPE4    OREQ '000  '
+     C                     MOVE *ON       *IN52
+     C                     ELSE
+     C                     MOVE *OFF      *IN52
+     C                     ENDIF
+     C                     MOVE A6SPE4    T#SPE4            T2
+     C                     Z-ADDA6SPE5    T#SPE5           長度
+     C                     Z-ADDA6PNUM    T#PNUM           支數
+     C                     Z-ADDA6WGHT    T#QTY            重量
+     C                     Z-ADDA6UPRC    T#UPRC           單價
+     C                     Z-ADDA6AMT     T#AMT            金額
+     C                     MOVELA6PLE1    T#PLE1           交貨地點
+     C                     MOVELA6NOTE    T#NOTE           備註
+     C*
+     C   69                WRITEAR116T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR116T1D
+     C*品名小計
+     C                     ADD  T#QTY     T#QTYS
+     C                     ADD  T#AMT     T#AMTS
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR116T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR116T1S
+     C*發票合計
+     C                     ADD  T#QTYS    T#QTYT
+     C                     ADD  T#AMTS    T#AMTT
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L2SR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR116T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR116T1T
+     C*發票合計
+     C                     ADD  T#QTYT    T#QTYA
+     C                     ADD  T#AMTT    T#AMTA
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR116T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR116T1A
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*
+     C   69                WRITEAR116T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR116T1M
+     C*
+     C                     ENDSR
+

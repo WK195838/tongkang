@@ -1,0 +1,53 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR121P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02CSF                                    */
+        /*        4.FUNCTION      客戶別押匯明細表                         */
+        /*        5.DATE-WRITTEN   94/08/08                                  */
+        /*        6.DATE-MODIFY                                              */
+        /*                                                                   */
+        /*********************************************************************/
+             PGM
+             DCL      VAR(&TYPE)   TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#IN03) TYPE(*CHAR) LEN(1)
+             DCL      VAR(&P#TXN1) TYPE(*CHAR) LEN(6)
+             DCL      VAR(&P#TXN2) TYPE(*CHAR) LEN(6)
+             DCL      VAR(&S#DEVN) TYPE(*CHAR) LEN(10)
+             DCL      VAR(&S#USER) TYPE(*CHAR) LEN(10)
+
+             RTVJOBA  JOB(&S#DEVN) USER(&S#USER) TYPE(&TYPE)
+             IF       COND(&TYPE *EQ '0') THEN(GOTO BATCH)
+
+             CALL     PGM(ARR121RS) PARM(&P#IN03)
+             IF       COND(&P#IN03 *EQ '1') THEN(RETURN)
+
+/*           SBMJOB     CMD(CALL PGM(ARR121P)) JOB(ARR121P) +
+                        JOBD(ARJOBD)   */
+             SNDBRKMSG  MSG('<<客戶別押匯明細表已開始處理+
+                         ,請稍待.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+/*           RETURN    */
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (300  6)) RTNVAR(&P#TXN1)
+             RTVDTAARA  DTAARA(*LDA (306  6)) RTNVAR(&P#TXN2)
+
+             OVRPRTF    FILE(ARR121T) TOFILE(ARR121T) PAGESIZE(*N 198)  +
+                        CPI(15) HOLD(*YES)  USRDTA('押匯明細')
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE((TRNDTL)) QRYSLT(' +
+                        (TXCODE *EQ "AR06")                   *AND +
+                        (TXFLAG *NE "D")                      *AND +
+                        (TXNO   *GE "' || &P#TXN1 || '")      *AND +
+                        (TXNO   *LE "' || &P#TXN2 || '")')         +
+                        KEYFLD((TXCUNO) (TXORNO) (TXNO))
+             CALL       PGM(ARR121R)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             SNDBRKMSG  MSG('<<客戶別押匯明細表已處理完成+
+                        ,請列印.........>>') +
+                      TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             ENDPGM
+

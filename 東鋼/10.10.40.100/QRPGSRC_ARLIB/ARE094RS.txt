@@ -1,0 +1,129 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE094RS
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LBU
+     H*            4.FUNCTION     應收票據代開傳票後更正作業（畫面）
+     H*            5.DATE-WRITTEN  95/07/27
+     H*            6.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARE094S CF  E                    WORKSTN
+     FSARCVF  IF  E           K        DISK
+     E*************************************************************
+     E                    ERR     1  16 70
+     I*************************************************************
+     I           UDS
+     I                                      301 308 D#RVDT
+     I                                      309 314 D#RVNO
+     I                                     10111020 S#DEVN
+     I                                     10011010 S#USER
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C                     EXSR SR0000                     初始程式
+     C*
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C           SR0000    BEGSR
+     C**************************************************************
+     C                     MOVEL'01'      W#PRID  2        畫面一
+     C*
+     C                     MOVELS#USER    W#USER  1
+     C           W#USER    IFEQ 'F'
+     C                     MOVE *ON       *IN32
+     C                     ELSE
+     C                     MOVE *OFF      *IN32
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C**************************************************************
+     C           SR1000    BEGSR
+     C**************************************************************
+     C*W#PRID='01'-->畫面一
+     C*
+     C           W#PRID    DOWEQ'01'
+     C                     EXFMTAR094F1                    螢幕輸入
+     C                     MOVEL*BLANK    S#ERR
+     C                     MOVE *OFF      *IN99
+     C*
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03           回前畫面
+     C                     MOVEL'00'      W#PRID           結束
+     C                     LEAVE
+     C                     ENDIF
+     C*檢核
+     C                     EXSR SR1100                     檢核
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     C           SR1100    BEGSR
+     C**************************************************************
+     C                     MOVEA'00'      *IN,30
+     C*
+     C*檢核繳款日期是否正確
+     C*
+     C           S#RVDT    IFEQ 0
+     C                     MOVELERR,1     S#ERR
+     C                     SETON                     3099  必須輸入
+     C                     GOTO CHKEND
+     C                     ELSE
+     C                     MOVE S#RVDT    W#RVDT  8
+     C                     MOVE W#RVDT    P#PDAT
+     C                     CALL 'UTS102R'
+     C                     PARM           P#PDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LEAP  1
+     C                     PARM           P#ERR   1
+     C           P#ERR     IFNE '0'
+     C                     MOVELERR,2     S#ERR            輸入錯誤
+     C                     SETON                     3099
+     C                     GOTO CHKEND
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C*檢核繳款編號是否正確
+     C*
+     C           S#RVNO    IFEQ *BLANK
+     C                     MOVELERR,3     S#ERR
+     C                     SETON                     3199
+     C                     GOTO CHKEND
+     C                     ELSE
+     C                     MOVE *OFF      *IN50
+     C           S#RVNO    CHAINSARCVF               50
+     C           *IN50     IFEQ *ON
+     C                     MOVELERR,4     S#ERR
+     C                     SETON                     3199
+     C                     GOTO CHKEND
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99                MOVE S#RVDT    D#RVDT
+     C  N99                MOVELS#RVNO    D#RVNO
+     C  N99                MOVEL'00'      W#PRID           成功
+     C*
+     C           CHKEND    ENDSR
+     C*****************************************************************
+** ERR
+０１－繳款日期必須輸入！
+０２－繳款日期輸入錯誤！
+０３－繳款編號必須輸入！
+０４－輸入之繳款編號不存在！
+

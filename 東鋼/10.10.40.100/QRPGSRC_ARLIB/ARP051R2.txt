@@ -1,0 +1,130 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP051R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     日期客戶別磅單重量差異分析（出貨）
+     H*            5.DATE-WRITTEN  86/04/26
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FARP051F UF  E           K        DISK                      A
+     FARP051FOIF  E           K        DISK
+     F*****************************************************************
+     ITXREC
+     I                                              TXCUNOL3
+     I                                              TXRESVL2
+     I                                              TXNO  L1
+     I*------------------------------------------------------
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1   8 W#TXNO
+     I                                        1   1 D#AREA
+     I                                        4   8 D#WTNO
+     I                                        7   8 D#TXL2
+     I            DS
+     I                                        1   6 W#WTNO
+     I                                        1   1 X#AREA
+     I                                        2   6 X#WTNO
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L3                EXSR L3CLR
+     C   L1 33             EXSR L1CLR
+     C      33             EXSR DTLSR
+     CL1 99 33             EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C                     Z-ADD0         W#WT04 120       銷貨重量
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L3清除函式
+     C*********************************
+     CSR         L3CLR     BEGSR
+     C           TXCUNO    CHAINWXREC                69
+     C           *IN69     IFEQ '0'
+     C                     SETON                     33
+     C                     ELSE
+     C                     SETOF                     33
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     Z-ADD0         W#WT04
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     ADD  TXQTY     W#WT04
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  存檔
+     C*********************************
+     CSR         L1SR      BEGSR
+     C                     MOVELTXNO      W#TXNO
+     C           D#TXL2    IFEQ '  '
+     C                     MOVELTXNO      F#WTNO  8
+     C                     ELSE
+     C                     MOVELD#AREA    X#AREA
+     C                     MOVELD#WTNO    X#WTNO           MAKE W#WTNO
+     C                     MOVELW#WTNO    F#WTNO
+     C                     ENDIF
+     C                     MOVELTXCUNO    W#CUNO  6
+9008 C                     MOVELTXRESV    W#ORNO  6
+     C*
+     C           K#WD      KLIST
+     C                     KFLD           W#CUNO
+     C                     KFLD           W#ORNO
+     C                     KFLD           F#WTNO
+     C*
+     C           K#WD      CHAINWDREC                69
+     C           *IN69     IFEQ '0'
+     C                     Z-ADDW#WT04    WDSA04
+     C                     UPDATWDREC
+     C                     ELSE
+     C                     CLEARWDREC
+     C                     MOVELW#CUNO    WDCUNO
+     C                     MOVELW#ORNO    WDORNO
+     C                     MOVELF#WTNO    WDWTNO
+     C                     Z-ADDW#WT04    WDSA04
+     C                     WRITEWDREC
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  印核覆
+     C*********************************
+     CSR         LRSR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C*                    WRITEAR051T1H
+     C*                    WRITEAR051T1M
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  子函式集
+     C*********************************
+

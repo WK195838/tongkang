@@ -1,0 +1,115 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR104P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02CSF                                    */
+        /*        4.FUNCTION      應收帳款承購(E-FACTORING)發票作廢檢核表*/
+        /*        5.DATE-WRITTEN   92/01/13                                  */
+        /*        6.DATE-MODIFY                                              */
+        /*                                                                   */
+        /*********************************************************************/
+            PGM
+            DCLF       FILE(ARR104S)
+            DCL        VAR(&CUN1)   TYPE(*CHAR) LEN(5)
+            DCL        VAR(&CUN2)   TYPE(*CHAR) LEN(5)
+            DCL        VAR(&TYPE)   TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&S#DEVN) TYPE(*CHAR)  LEN(10)
+            DCL        VAR(&S#USER) TYPE(*CHAR)  LEN(10)
+            DCL        VAR(&W#INDT) TYPE(*CHAR) LEN(8)  /*發票日期暫存*/
+            DCL        VAR(&P#PDAT) TYPE(*CHAR) LEN(8)  /*輸入日期*/
+            DCL        VAR(&W#FLAG) TYPE(*CHAR) LEN(1)
+            DCL        VAR(&P#MODE) TYPE(*CHAR) LEN(1)  /*年份別*/
+            DCL        VAR(&P#MTL)  TYPE(*CHAR) LEN(24) /*月日數*/
+            DCL        VAR(&P#LEAP) TYPE(*CHAR) LEN(1)  /*閏年碼*/
+
+            RTVJOBA    JOB(&S#DEVN) USER(&S#USER) +
+                       TYPE(&TYPE)
+
+            IF         COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+ START:     SNDRCVF
+
+            CHGVAR     VAR(&IN30)      VALUE('0')
+            CHGVAR     VAR(&S#ERR)     VALUE(*BLANK)
+
+            IF         COND(&IN03 *EQ '1') THEN(RETURN)
+            IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+  /*  CHECK 客戶代號*/
+            IF         COND(&S#CUNO *EQ '     ') THEN(DO)
+            CHGVAR     VAR(&CUN1)     VALUE('     ')
+            CHGVAR     VAR(&CUN2)     VALUE('99999')
+            ENDDO
+            ELSE (DO)
+            CHGVAR     VAR(&CUN1)     VALUE(&S#CUNO)
+            CHGVAR     VAR(&CUN2)     VALUE(&S#CUNO)
+            ENDDO
+
+  /*  CHECK 發票日期*/
+            IF         COND(&S#INDT *EQ '      ') THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('請輸入發票日期')
+            CHGVAR     VAR(&IN30)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+            CHGDTAARA  DTAARA(*LDA (400 2))   VALUE('  ')
+            CHGDTAARA  DTAARA(*LDA (402 6))   VALUE(&S#INDT)
+            RTVDTAARA  DTAARA(*LDA (400 8))   RTNVAR(&W#INDT)
+            CHGVAR     VAR(&P#PDAT)    VALUE(&W#INDT)
+            CHGVAR     VAR(&P#MODE)    VALUE('1')
+            CALL       PGM(UTS102R)    PARM(&P#PDAT &P#MODE +
+                                            &P#MTL  &P#LEAP &W#FLAG)
+            IF         COND(&W#FLAG *NE '0') THEN(DO)
+            CHGVAR     VAR(&IN30)      VALUE('1')
+            CHGVAR     VAR(&S#ERR)     VALUE('發票日期錯誤！')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+
+            CHGDTAARA   DTAARA(*LDA  (300  6))  VALUE(&S#INDT)
+            CHGDTAARA   DTAARA(*LDA  (306  5))  VALUE(&CUN1)
+            CHGDTAARA   DTAARA(*LDA  (311  5))  VALUE(&CUN2)
+
+            SBMJOB     CMD(CALL PGM(ARR104P)) JOB(ARR104P) +
+                       JOBD(ARJOBD)
+            SNDBRKMSG  MSG('<<應收帳款承購(E-FACTORING)發票作廢檢+
+                         表已開始處理,請稍待.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+            RETURN
+
+ BATCH:
+          RTVDTAARA   DTAARA(*LDA (300 6))  RTNVAR(&S#INDT)
+          RTVDTAARA   DTAARA(*LDA (306 5))  RTNVAR(&CUN1)
+          RTVDTAARA   DTAARA(*LDA (311 5))  RTNVAR(&CUN2)
+
+
+   /* 開始處理 */
+            CLRPFM     ARR104F
+            OVRDBF     FILE(ARINVM) TOFILE(ARINVM) SHARE(*YES)
+            OPNQRYF    FILE(ARINVM) QRYSLT('+
+                       (AMCUNO *GE "' || &CUN1 || '") *AND +
+                       (AMCUNO *LE "' || &CUN2 || '") *AND +
+                       (IND1   *GE "' || &S#INDT || '")') +
+                       KEYFLD((AMCUNO) (AMORNO)) +
+                       MAPFLD((INDT   AMINDT  *CHAR 8) +
+                              (IND1   '%SST(INDT 3 6)' *CHAR 6))
+            CALL       PGM(ARR104R)
+            CLOF       OPNID(ARINVM)
+            DLTOVR     FILE(*ALL)
+
+            OVRPRTF    FILE(ARR104T) TOFILE(ARR104T) +
+                       PAGESIZE(*N 198) +
+                       CPI(15) HOLD(*YES)  USRDTA('承購發票')
+            OVRDBF     FILE(ARR104F) TOFILE(ARR104F) SHARE(*YES)
+            OPNQRYF    FILE(ARR104F)  +
+                       KEYFLD((AFBKID) (AFCUNO))
+            CALL       PGM(ARR104R1)
+            CLOF       OPNID(ARR104F)
+            DLTOVR     FILE(*ALL)
+
+            SNDBRKMSG  MSG('<<應收帳款承購(E-FACTORING)發票作廢檢核+
+                         表已處理完成,請列印.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+            ENDPGM
+

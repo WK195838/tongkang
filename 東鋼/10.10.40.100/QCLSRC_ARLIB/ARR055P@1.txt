@@ -1,0 +1,105 @@
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DATE1)  TYPE(*DEC)  LEN(6)
+             DCL        VAR(&DATE1A) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DATE2)  TYPE(*DEC)  LEN(6)
+             DCL        VAR(&DATE2A) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&W#TYPE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#RCV1) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#RCV2) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#CUN1) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&W#CUN2) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&W#ORNO) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&W#SQLS) TYPE(*CHAR) LEN(500)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARR055RS) PARM(&IN03 &DATE1 &DATE2)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&DATE1A) VALUE(&DATE1)
+             CHGVAR     VAR(&DATE2A) VALUE(&DATE2)
+             CHGDTAARA  DTAARA(*LDA (2 6)) VALUE(&DATE1A)
+             CHGDTAARA  DTAARA(*LDA (8 6)) VALUE(&DATE2A)
+             SBMJOB     JOB(ARR055P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR055P')
+             RETURN
+             ENDDO
+
+
+  BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 1))    RTNVAR(&W#TYPE)
+             RTVDTAARA  DTAARA(*LDA (2 6))    RTNVAR(&DATE1A)
+             RTVDTAARA  DTAARA(*LDA (8 6))    RTNVAR(&DATE2A)
+             RTVDTAARA  DTAARA(*LDA (21 1))   RTNVAR(&W#RCV1)
+             RTVDTAARA  DTAARA(*LDA (22 1))   RTNVAR(&W#RCV2)
+             RTVDTAARA  DTAARA(*LDA (31 6))   RTNVAR(&W#CUN1)
+             RTVDTAARA  DTAARA(*LDA (37 6))   RTNVAR(&W#CUN2)
+             RTVDTAARA  DTAARA(*LDA (43 6))   RTNVAR(&W#ORNO)
+             CHGVAR     VAR(&DATE1) VALUE(&DATE1A)
+             CHGVAR     VAR(&DATE2) VALUE(&DATE2A)
+
+             CHGVAR     VAR(&W#SQLS) VALUE(' ')
+             IF         COND(&W#RCV1 *NE ' ') THEN(DO)
+                 IF     COND(&W#RCV2 *NE ' ') THEN(+
+                 CHGVAR VAR(&W#SQLS) VALUE('RVRVID *GE "' || &W#RCV1 +
+                        || '" *AND RVRVID *LE "' || &W#RCV2 || '"'))
+                 ELSE   CMD(+
+                 CHGVAR VAR(&W#SQLS) VALUE('RVRVID *EQ "' || &W#RCV1 +
+                        || '"'))
+             ENDDO
+
+             IF         COND(&W#CUN1 *NE ' ') THEN(DO)
+                 IF     COND(&W#RCV1 *NE ' ') THEN(+
+                 CHGVAR VAR(&W#SQLS) VALUE(&W#SQLS *BCAT '*AND'))
+                 IF     COND(&W#CUN2 *NE ' ') THEN(+
+                 CHGVAR VAR(&W#SQLS) VALUE(&W#SQLS *BCAT +
+                        'RVCUNO *GE "' || &W#CUN1 +
+                        || '" *AND RVCUNO *LE "' || &W#CUN2 || '"'))
+                 ELSE   CMD(+
+                 CHGVAR VAR(&W#SQLS) VALUE(&W#SQLS *BCAT +
+                 'RVCUNO *EQ "' || &W#CUN1 || '"'))
+             ENDDO
+
+             IF         COND(&W#SQLS *NE ' ') THEN(+
+                 CHGVAR VAR(&W#SQLS) VALUE(&W#SQLS *BCAT '*AND'))
+
+             CHGVAR     VAR(&W#SQLS) VALUE(&W#SQLS *BCAT +
+                         'RVDATE = %RANGE(' || &DATE1A ||      +
+                                        ' ' || &DATE2A || ') & +
+                          RVFLAG *NE "D"                     & +
+                          RVTYPE *NE "3"                     & +
+                          RVDECD *EQ " "')
+
+
+             OVRDBF     FILE(RCVDTL) TOFILE(RCVDTL) SHARE(*YES)
+
+             IF         COND(&W#TYPE *EQ '1') THEN(DO)
+             OPNQRYF    FILE(RCVDTL) +
+                        QRYSLT(&W#SQLS) +
+                        KEYFLD((RVDPNO)(RVDATE)(RVNO))
+             OVRPRTF    FILE(QPRINT) COPIES(1)
+             CALL       PGM(ARR055R1) PARM(&DATE1 &DATE2)
+             ENDDO
+
+             IF         COND(&W#TYPE *EQ '2') THEN(DO)
+             OPNQRYF    FILE(RCVDTL) +
+                        QRYSLT(&W#SQLS) +
+                        KEYFLD((RVDPNO)(RVRVID)(RVDATE))
+             OVRPRTF    FILE(QPRINT) COPIES(1)
+             CALL       PGM(ARR055R2) PARM(&DATE1 &DATE2)
+             ENDDO
+
+             IF         COND(&W#TYPE *EQ '3') THEN(DO)
+             OPNQRYF    FILE(RCVDTL) +
+                        QRYSLT(&W#SQLS) +
+                        KEYFLD((RVDPNO)(RVCUNO)(RVDATE))
+             OVRPRTF    FILE(QPRINT) COPIES(1)
+             CALL       PGM(ARR055R3) PARM(&DATE1 &DATE2)
+             ENDDO
+
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

@@ -1,0 +1,94 @@
+    /*****************************************************************/
+    /*                                                               */
+    /*        >>  PROGRAM INTRODUCTION  <<                           */
+    /*                                                               */
+    /*        1.PROGRAM-ID      ARP902P                              */
+    /*        2.PROGRAM-TYPE    CLP                                  */
+    /*        3.AUTHOR          S02LBU                               */
+    /*        4.DATE-WRITTEN    97/11/21                             */
+    /*                                                               */
+    /*         說明：本程式主要針對系統百年之日期檔案做修改        */
+    /*                (1)銷貨明細檔之折讓部份(TRNDTL之AR06)      */
+    /*                    A入帳日期(TXACDT)為999999 -> 99999999  */
+    /*                    B TXRESV原本為前四碼置放年月改為六碼     */
+    /*                      EX:9701 -> 009701                        */
+    /*                (2)發票明細檔                                */
+    /*                    A入帳日期(IVACDT)為999999 -> 99999999  */
+    /*                    B IVRESV原本為前四碼置放年月改為五碼     */
+    /*                      EX:9701 -> 09701                         */
+    /*                (3)進倉履約折讓紀錄明細檔(台北)            */
+    /*                    A入帳日期(DSTXDT)為999999 -> 99999999  */
+    /*                                                               */
+    /*****************************************************************/
+           PGM
+           DCL        VAR(&W#AREA) TYPE(*CHAR) LEN(1)
+
+           RTVDTAARA  DTAARA(*LDA (1021  1))   RTNVAR(&W#AREA)
+
+    /* 1、修正銷貨明細檔中折讓資料之入帳日期為999999 -> 99999999 */
+           OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+           OPNQRYF    FILE(TRNDTL) OPTION(*ALL) QRYSLT('         +
+                          (TXCODE *EQ "AR06")               *AND +
+                          (ACDT   *EQ "999999")')                +
+                      KEYFLD((*FILE))                            +
+                      MAPFLD((DATE  TXACDT *CHAR 8)              +
+                             (ACDT  '%SST(DATE   3 6)' *CHAR 6))
+           CALL       PGM(ARP902R1)
+           CLOF       OPNID(TRNDTL)
+           DLTOVR     FILE(*ALL)
+
+
+    /* 2、修正銷貨明細檔中折讓資料之四碼入帳保留年月為六碼*/
+           OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+           OPNQRYF    FILE(TRNDTL) OPTION(*ALL) QRYSLT('         +
+                          (TXCODE *EQ "AR06")               *AND +
+                          (YYMM   *GE "7001")               *AND +
+                          (YYMM   *LE "9711")')                  +
+                      KEYFLD((*FILE))                            +
+                      MAPFLD((YYMM  '%SST(TXRESV 1 4)' *CHAR 4))
+           CALL       PGM(ARP902R2)
+           CLOF       OPNID(TRNDTL)
+           DLTOVR     FILE(*ALL)
+
+
+    /* 3、修正發票明細檔中入帳日期為999999 -> 99999999 */
+           OVRDBF     FILE(INVDTL) TOFILE(DALIB/INVDTL) SHARE(*YES)
+           OPNQRYF    FILE(INVDTL) OPTION(*ALL) QRYSLT('         +
+                          (ACDT   *EQ "999999")')                +
+                      KEYFLD((*FILE))                            +
+                      MAPFLD((DATE  IVACDT *CHAR 8)              +
+                             (ACDT  '%SST(DATE   3 6)' *CHAR 6))
+           CALL       PGM(ARP902R3)
+           CLOF       OPNID(INVDTL)
+           DLTOVR     FILE(*ALL)
+
+
+    /* 4、修正發票明細檔中四碼入帳保留年月為五碼*/
+           OVRDBF     FILE(INVDTL) TOFILE(DALIB/INVDTL) SHARE(*YES)
+           OPNQRYF    FILE(INVDTL) OPTION(*ALL) QRYSLT('         +
+                          (YYMM   *GE "7001")               *AND +
+                          (YYMM   *LE "9711")               *AND +
+                          (MM     *NE "  ")')                    +
+                      KEYFLD((*FILE))                            +
+                      MAPFLD((YYMM  '%SST(IVRESV 1 4)' *CHAR 4)  +
+                             (MM    '%SST(IVRESV 3 2)' *CHAR 2))
+           CALL       PGM(ARP902R4)
+           CLOF       OPNID(INVDTL)
+           DLTOVR     FILE(*ALL)
+
+
+    /* 5、修正進倉明細檔中入帳日期為999999 -> 99999999 (台北) */
+           IF         COND(&W#AREA *EQ 'P') THEN(DO)
+           OVRDBF     FILE(DISDTL) TOFILE(DALIB/DISDTL) SHARE(*YES)
+           OPNQRYF    FILE(DISDTL) OPTION(*ALL) QRYSLT('         +
+                          (TXDT   *EQ "999999")')                +
+                      KEYFLD((*FILE))                            +
+                      MAPFLD((DATE  DSTXDT *CHAR 8)              +
+                             (TXDT  '%SST(DATE   3 6)' *CHAR 6))
+           CALL       PGM(ARP902R5)
+           CLOF       OPNID(DISDTL)
+           DLTOVR     FILE(*ALL)
+           ENDDO
+
+           ENDPGM
+

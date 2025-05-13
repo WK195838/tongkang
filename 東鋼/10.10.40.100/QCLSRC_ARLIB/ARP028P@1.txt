@@ -1,0 +1,214 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP028P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     發票轉出記錄傳輸作業                   */
+     /*     5.DATE-WRITTEN  88/07/30                                */
+     /*     6.UPDATE  DATE  98/12/31 2009AR406 S00WCJ (9812A)       */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&USER)  TYPE(*CHAR) LEN(10)
+    /*9812A*/DCL        VAR(&FLAG1) TYPE(*CHAR) LEN(4) VALUE('XXXX')
+    /*9812A*/DCL        VAR(&FLAG2) TYPE(*CHAR) LEN(4) VALUE('XXXX')
+
+
+             RTVJOBA    TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+             SBMJOB     JOB(ARP028P) JOBD(ARJOBD) JOBQ(QSYS/QCTL) +
+                        RQSDTA('CALL ARLIB/ARP028P')
+             RETURN
+
+
+ BATCH:
+        /*  台北  INVTFR--> ARLIB/INVTFRP  (TEMP-FILE) */
+             CALL       PGM(ARLIB/ARP028PA)  PARM('P')
+             MONMSG     MSGID(CPF0000)
+
+        /*  建立　DDMF  */
+             DLTF       FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(TYDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMT)
+    /*9812A START */
+             DLTF       FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(U01DDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(DDMU)
+    /*9812A  END */
+
+             DLTF       FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(KSDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMK)
+
+             DLTF       FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CRTDUPOBJ  OBJ(MLDDM) FROMLIB(QGPL) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(DDMH)
+
+
+ STEP1:        /*  台北　抓　桃園  ARLIB/INVTFRT  */
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP028PA) PARM(''T'')') +
+                        DDMFILE(QTEMP/DDMT)
+    /*9812A*/MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP11)
+
+             CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(ARLIB/INVTFRT)  +
+                        LVLCHK(*NO)
+             OVRDBF     FILE(INVTFRX) TOFILE(QTEMP/DDMT)
+             OVRDBF     FILE(INVTFRP) TOFILE(ARLIB/INVTFRP)
+             OVRDBF     FILE(INVTFR)  TOFILE(DALIB/INVTFR)
+             CALL       PGM(ARLIB/ARP028RC)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             DLTOVR     FILE(*ALL)
+    /*9812A*/GOTO       CMDLBL(STEP11)
+             ENDDO
+
+             DLTOVR     FILE(*ALL)
+             CLRPFM     FILE(QTEMP/DDMT)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(%SST(&FLAG1 1 1)) VALUE(' ')
+
+    /*9812A START */
+ STEP11:        /*  台北　抓　新桃  ARLIB/INVTFRT  */
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP028PA) PARM(''U'')') +
+                        DDMFILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP2)
+
+             CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(ARLIB/INVTFRU)  +
+                        LVLCHK(*NO)
+             OVRDBF     FILE(INVTFRX) TOFILE(QTEMP/DDMU)
+             OVRDBF     FILE(INVTFRP) TOFILE(ARLIB/INVTFRP)
+             OVRDBF     FILE(INVTFR)  TOFILE(DALIB/INVTFR)
+             CALL       PGM(ARLIB/ARP028RC)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             DLTOVR     FILE(*ALL)
+             GOTO       CMDLBL(STEP2)
+             ENDDO
+
+             DLTOVR     FILE(*ALL)
+             CLRPFM     FILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(%SST(&FLAG1 4 1)) VALUE(' ')
+    /*9812A  END */
+
+ STEP2:        /*  台北　抓　苗栗  ARLIB/INVTFRH  */
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP028PA) PARM(''H'')') +
+                        DDMFILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP3)
+
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(ARLIB/INVTFRH)  +
+                        LVLCHK(*NO)
+             OVRDBF     FILE(INVTFRX) TOFILE(QTEMP/DDMH)
+             OVRDBF     FILE(INVTFRP) TOFILE(ARLIB/INVTFRP)
+             OVRDBF     FILE(INVTFR)  TOFILE(DALIB/INVTFR)
+             CALL       PGM(ARLIB/ARP028RC)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             DLTOVR     FILE(*ALL)
+             GOTO       CMDLBL(STEP3)
+             ENDDO
+
+             DLTOVR     FILE(*ALL)
+             CLRPFM     FILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(%SST(&FLAG1 2 1)) VALUE(' ')
+
+
+ STEP3:        /*  台北　抓　高雄  ARLIB/INVTFRK  */
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP028PA) PARM(''K'')') +
+                        DDMFILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP4)
+
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(ARLIB/INVTFRK)  +
+                        LVLCHK(*NO)
+             OVRDBF     FILE(INVTFRX) TOFILE(QTEMP/DDMK)
+             OVRDBF     FILE(INVTFRP) TOFILE(ARLIB/INVTFRP)
+             OVRDBF     FILE(INVTFR)  TOFILE(DALIB/INVTFR)
+             CALL       PGM(ARLIB/ARP028RC)
+             MONMSG     MSGID(CPF0000)  EXEC(DO)
+             DLTOVR     FILE(*ALL)
+             GOTO       CMDLBL(STEP4)
+             ENDDO
+
+             DLTOVR     FILE(*ALL)
+             CLRPFM     FILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(%SST(&FLAG1 3 1)) VALUE(' ')
+
+ /* -------------------------------------------------------------- */
+
+ STEP4:        /*  台北　送　桃園  ARLIB/INVTFRT  */
+             CHGDDMF    FILE(QTEMP/DDMT) RMTFILE(ARLIB/INVTFRP) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(ARLIB/INVTFRP) TOFILE(QTEMP/DDMT) +
+                        MBROPT(*REPLACE)
+    /*9812A*/MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP41)
+
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP028PB) PARM(''T'')') +
+                        DDMFILE(QTEMP/DDMT)
+    /*9812A*/MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP41)
+
+             CHGVAR     VAR(%SST(&FLAG2 1 1)) VALUE(' ')
+
+    /*9812A START */
+ STEP41:       /*  台北　送　新桃  ARLIB/INVTFRU  */
+             CHGDDMF    FILE(QTEMP/DDMU) RMTFILE(ARLIB/INVTFRP) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(ARLIB/INVTFRP) TOFILE(QTEMP/DDMU) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP5)
+
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP028PB) PARM(''U'')') +
+                        DDMFILE(QTEMP/DDMU)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP5)
+
+             CHGVAR     VAR(%SST(&FLAG2 4 1)) VALUE(' ')
+    /*9812A END */
+
+ STEP5:        /*  台北　送　苗栗  ARLIB/INVTFRH  */
+             CHGDDMF    FILE(QTEMP/DDMH) RMTFILE(ARLIB/INVTFRP) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(ARLIB/INVTFRP) TOFILE(QTEMP/DDMH) +
+                        MBROPT(*REPLACE)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP6)
+
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP028PB) PARM(''H'')') +
+                        DDMFILE(QTEMP/DDMH)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP6)
+
+             CHGVAR     VAR(%SST(&FLAG2 2 1)) VALUE(' ')
+
+
+ STEP6:        /*  台北　送　高雄  ARLIB/INVTFRK  */
+             CHGDDMF    FILE(QTEMP/DDMK) RMTFILE(ARLIB/INVTFRP) +
+                        LVLCHK(*NO)
+             CPYF       FROMFILE(ARLIB/INVTFRP) TOFILE(QTEMP/DDMK) +
+                        MBROPT(*REPLACE) FMTOPT(*NOCHK)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP7)
+
+             SBMRMTCMD  CMD('CALL PGM(ARLIB/ARP028PB) PARM(''K'')') +
+                        DDMFILE(QTEMP/DDMK)
+             MONMSG     MSGID(CPF0000)  EXEC(GOTO STEP7)
+
+             CHGVAR     VAR(%SST(&FLAG2 3 1)) VALUE(' ')
+
+ /* -------------------------------------------------------------- */
+
+ STEP7:       /* 未成功廠區之訊息 */
+
+    /*9812A*/IF         COND(&FLAG1 *NE '    ') THEN(DO)
+             SNDMSG     TOUSR(&USER) MSG(+
+                        '發票轉出記錄抓廠區失敗"' || &FLAG1 || '"')
+             ENDDO
+
+    /*9812A*/IF         COND(&FLAG2 *NE '    ') THEN(DO)
+             SNDMSG     TOUSR(&USER) MSG(+
+                        '發票轉出記錄送廠區失敗"' || &FLAG2 || '"')
+             ENDDO
+
+             ENDPGM
+

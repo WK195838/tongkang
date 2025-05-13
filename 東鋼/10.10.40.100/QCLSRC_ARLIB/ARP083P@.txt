@@ -1,0 +1,52 @@
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DEVI) TYPE(*CHAR) LEN(10)
+             DCLF       FILE(ARP083S)
+
+             RTVJOBA    TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO CMDLBL(BATCH))
+             RTVDTAARA  DTAARA(*LDA (1001 10)) RTNVAR(&S#USER)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+
+
+ START:      SNDRCVF    RCDFMT(AR083F1)
+             CHGVAR     VAR(&S#ERR) VALUE(' ')
+             CHGVAR     VAR(&IN30)  VALUE('0')
+             IF         COND((&IN03 *EQ '1') *OR (&IN12 *EQ '1')) +
+                        THEN(RETURN)
+
+             IF         COND(&S#BKID  *EQ '   ') THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('銀行代號不可空白!')
+             CHGVAR     VAR(&IN30)  VALUE('1')
+             GOTO       START
+             ENDDO
+
+             CHGDTAARA  DTAARA(*LDA (301 3)) VALUE(&S#BKID)
+
+             SBMJOB     JOB(ARP083P) JOBD(ARJOBD) JOBQ(QCTL) +
+                          RQSDTA('CALL ARLIB/ARP083P')
+
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&DEVI)
+             SNDBRKMSG  MSG('<<承購發票下載作業開始執行...... ) +
+                        ....>>') TOMSGQ(&DEVI) +
+                        MSGTYPE(*INFO)
+             GOTO       CMDLBL(END)
+
+ BATCH:
+             CLRPFM     FILE(DALIB/ARDLOD)
+             MONMSG     MSGID(CPF0000)
+
+             OVRDBF     FILE(ARINVM) TOFILE(DALIB/ARINVM) SHARE(*YES)
+             OPNQRYF    FILE(ARINVM) OPTION(*ALL) QRYSLT('+
+                        (AMDLC1 *EQ " ") *AND +
+                        (AMDELT *NE "D")')
+             CALL       PGM(ARP083R)
+             CLOF       OPNID(ARINVM)
+             DLTOVR     FILE(*ALL)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&DEVI)
+             SNDBRKMSG  MSG('<<承購發票下載作業執行完畢, +
+                               請啟動PC相關程式執行下載+
+                        ....>>') TOMSGQ(&DEVI) +
+                        MSGTYPE(*INFO)
+  END:    ENDPGM
+

@@ -1,0 +1,214 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR126R
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     期後收回應收帳款明細表
+     H*            5.DATE-WRITTEN  95/06/28
+     H*            6.DATE-MODIFY
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR126F IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FTRNDTLL2IF  E           K        DISK
+     FSARVIN  IF  E           K        DISK
+     FRCVDTL  IF  E           K        DISK
+     FBCNAME  IF  E           K        DISK
+     FARR126T O   E             69     PRINTER
+     E*****************************************************************
+     IRAR126F
+     I                                              A1RVNOL1
+     I            DS
+     I                                        1  10 T#CHNM
+     I                                       10  10 D#NOF
+     I            DS
+     I                                       11  12 W#OEOF
+     I                                       11  11 D#OE
+     I                                       12  12 D#OF
+     I           UDS
+     I                                     10011010 U#USID
+     I                                      301 3080U#DATS
+     I                                      309 3160U#DATE
+     I                                      317 3240U#YMDS
+     I                                      325 3320U#YMDE
+     I                                      333 3360T#YEAR
+     I                                      337 342 T#CUST
+     C*****************************************************************
+     C*          KET  LIST
+     C*****************************************************************
+     C*FILE==>RCVDTL(繳款明細檔)
+     C           K#RCVD    KLIST
+     C                     KFLD           RVNO
+     C                     KFLD           RVITEM
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C                     MOVE *ON       *IN69
+     C*寫表頭
+     C                     MOVE U#DATS    T#DATS
+     C                     MOVE U#DATE    T#DATE
+     C                     MOVELU#USID    T#USID
+     C*
+     C           T#CUST    IFEQ *BLANK
+     C                     MOVEL'全部'  T#CUST
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR126T1S
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVELA1RVNO    RVNO
+     C                     Z-ADD0         RVITEM
+     C           K#RCVD    SETLLRVREC
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RVREC                    40
+     C   40                LEAVE
+     C*
+     C           RVNO      IFNE A1RVNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVELA1VNO1    T#VNO1
+     C                     MOVELRVNO      T#RVNO
+     C                     MOVELRVCUNO    T#CUNO
+     C                     MOVELRVCUNM    T#CUNM
+     C                     MOVELRVUSTP    T#USTP
+     C                     MOVELRVNTTP    T#NTTP
+     C                     MOVELRVACNO    T#ACNO
+9707 C                     MOVELRVACNO    W#ACNO  9
+9707 C           W#ACNO    CHAINRACNAME              41
+     C           *IN41     IFEQ *OFF
+     C                     MOVE ''      W#OEOF
+     C                     MOVELACCHNM    T#CHNM
+     C                     MOVE ''      D#NOF
+     C                     ENDIF
+     C                     MOVELRVACTP    T#ACTP
+     C                     Z-ADDRVDUDT    T#DUDT
+     C                     Z-ADDRVNTDT    T#GTDT
+     C                     MOVELRVPLAC    T#PLAC
+     C                     Z-ADDRVRAMT    T#RAMT
+     C*
+     C   69                WRITEAR126T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR126T1D
+     C*
+     C                     ADD  T#RAMT    T#SRNA           票據小計
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C                     CLEARAR126T1E
+     C                     Z-ADD0         W#CNTN  10
+     C           T#RVNO    CHAINSIREC                42
+     C*
+     C           *IN42     DOWEQ'0'
+     C                     ADD  1         W#CNTN
+     C                     EXSR SR1000                     搬移變數
+     C           W#CNTN    IFEQ 3
+     C   69                WRITEAR126T1H
+     C                     SETOF                     69
+     C                     WRITEAR126T1E                   沖銷明細
+     C                     ADD  T#INX1    T#SRXA
+     C                     ADD  T#INX2    T#SRXA
+     C                     ADD  T#INX3    T#SRXA
+     C                     CLEARAR126T1E
+     C                     Z-ADD0         W#CNTN
+     C                     ENDIF
+     C           T#RVNO    READESIREC                    42
+     C                     ENDDO
+     C*
+     C           W#CNTN    IFNE 0
+     C   69                WRITEAR126T1H
+     C                     SETOF                     69
+     C                     WRITEAR126T1E                   沖銷明細
+     C                     ADD  T#INX1    T#SRXA
+     C                     ADD  T#INX2    T#SRXA
+     C                     ADD  T#INX3    T#SRXA
+     C                     ENDIF
+     C*
+     C   69                WRITEAR126T1H
+     C                     SETOF                     69
+     C                     WRITEAR126T1S
+     C*
+     C                     ADD  T#SRNA    T#TRNA           票據合計
+     C                     ADD  T#SRXA    T#TRXA           繳款合計
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR126T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR126T1T
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*
+     C   69                WRITEAR126T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR126T1M
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C                     SELEC
+     C           W#CNTN    WHEQ 1
+     C                     MOVELSIINNO    T#INN1
+     C           SIINNO    CHAININREC                43
+     C   43                MOVEL*BLANK    T#APN1
+     C  N43                MOVELINAPNO    T#APN1
+     C                     Z-ADDININDT    T#IND1
+     C           SIINNO    CHAINTXREC                44
+     C  N44                Z-ADDTXDATE    T#DAT1
+     C                     Z-ADDSIINXA    T#INX1
+     C*
+     C           W#CNTN    WHEQ 2
+     C                     MOVELSIINNO    T#INN2
+     C           SIINNO    CHAININREC                43
+     C   43                MOVEL*BLANK    T#APN2
+     C  N43                MOVELINAPNO    T#APN2
+     C                     Z-ADDININDT    T#IND2
+     C           SIINNO    CHAINTXREC                44
+     C  N44                Z-ADDTXDATE    T#DAT2
+     C                     Z-ADDSIINXA    T#INX2
+     C*
+     C           W#CNTN    WHEQ 3
+     C                     MOVELSIINNO    T#INN3
+     C           SIINNO    CHAININREC                43
+     C   43                MOVEL*BLANK    T#APN3
+     C  N43                MOVELINAPNO    T#APN3
+     C                     Z-ADDININDT    T#IND3
+     C           SIINNO    CHAINTXREC                44
+     C  N44                Z-ADDTXDATE    T#DAT3
+     C                     Z-ADDSIINXA    T#INX3
+     C                     ENDSL
+     C*
+     C                     ENDSR
+

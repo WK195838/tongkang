@@ -1,0 +1,78 @@
+    /*****************************************************************/
+    /*                                                               */
+    /*        >>  PROGRAM INTRODUCTION  <<                           */
+    /*                                                               */
+    /*        1.PROGRAM-ID      ARP116P                              */
+    /*        2.PROGRAM-TYPE    CLP                                  */
+    /*        3.AUTHOR          S02LBU                               */
+    /*        4.FUNCTION       客戶應收應付互抵作業                */
+    /*        5.DATE-WRITTEN    96/09/28                             */
+    /*        6.UPDATE  DATE    99/08/17 2010AR517 S00WCJ (9908A)    */
+    /*                                                               */
+    /*****************************************************************/
+             PGM
+    /*9908A  DCL        VAR(&QYMD)   TYPE(*CHAR) LEN(6)  */
+    /*9908A*/DCL        VAR(&QYMD)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&C#YMD)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&C#DATS) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&C#DATE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&C#YM)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&USER)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&VRYR)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&VRMM)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&FILE1)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MBR1)   TYPE(*CHAR) LEN(4)
+             DCL        VAR(&BLYR)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&BLMM)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&FILE2)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MBR2)   TYPE(*CHAR) LEN(4)
+
+             RTVJOBA    TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0')  THEN(GOTO BATCH)
+         /*  SBMJOB     CMD(CALL PGM(ARP116P)) JOB(ARP116P) +
+                        JOBD(ARJOBD)  */
+         /*  RETURN                   */
+
+ BATCH:
+      /*取得本月傳票代開資料日期*/
+    /*9908A  START*/
+        /*   RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&QYMD)   */
+        /*   CHGVAR     VAR(&C#YMD)   VALUE('00' || &QYMD) */
+
+             RTVJOBA    CYMDDATE(&QYMD)
+             CHGVAR     VAR(&QYMD)    VALUE('0' *CAT &QYMD)
+             CHGVAR     VAR(&C#YMD)   VALUE(&QYMD)
+    /*9908A  END */
+             CHGVAR     VAR(&C#DATS)  VALUE(%SST(&C#YMD 1 6) || '01')
+             CHGVAR     VAR(&C#DATE)  VALUE(&C#YMD)
+
+      /*取得上月餘額代開資料年月*/
+             CHGVAR     VAR(&C#YM)    VALUE(%SST(&C#YMD 1 6))
+             CLRPFM     FILE(DALIB/RPAAST)
+
+   /* STEP1:客戶應收金額處理*/
+             OVRDBF     FILE(RCVDTL) TOFILE(DALIB/RCVDTL) SHARE(*YES)
+             OPNQRYF    FILE(RCVDTL) OPTION(*ALL) QRYSLT(' +
+                           ((RVACNO *EQ "2122")     *OR  +
+                            (RVACNO *EQ "1137"))    *AND +
+                            (DATE   *GE "00961201") *AND +
+                            (RVTXAR *EQ "P")        *AND +
+                            (RVACTP *EQ "D")')           +
+                        KEYFLD((RVCUNO)(RVNO))           +
+                        MAPFLD((DATE RVDATE *CHAR 8))
+             CALL       PGM(ARP116R1)
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+
+   /* STEP2:客戶應付金額處理*/
+             OVRDBF     FILE(ARPYST) TOFILE(DALIB/ARPYST) SHARE(*YES)
+             OPNQRYF    FILE(ARPYST) OPTION(*ALL) QRYSLT(' +
+                            (RRFLAG *NE "D")')           +
+                        KEYFLD((RRCUNO)(RRIVNO))
+             CALL       PGM(ARP116R2)
+             CLOF       OPNID(ARPYST)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

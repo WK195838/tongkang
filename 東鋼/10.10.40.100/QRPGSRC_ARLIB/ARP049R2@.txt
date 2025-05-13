@@ -1,0 +1,113 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP049R2
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     鋼筋地磅重與銷貨重差異分析（出貨調整）
+     H*            5.DATE-WRITTEN  86/04/26
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FARP049F UF  E           K        DISK                      A
+     FCBCUST  IF  E           K        DISK
+     F*****************************************************************
+     ITXREC
+     I                                              TXCUNOL2
+     I                                              TXRESVL1
+     I*------------------------------------------------------
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C                     Z-ADD0         W#WT04 120       銷貨重量
+     C                     Z-ADD0         W#WT05 120       調整重量
+     C                     MOVEL*BLANK    W#ORNO  5
+     C                     MOVEL*BLANK    W#CUNO  6
+     C                     MOVEL*BLANK    W#CUNM 10
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     Z-ADD0         W#WT04
+     C                     Z-ADD0         W#WT05
+     C                     MOVELTXRESV    W#ORNO
+     C                     MOVELTXCUNO    W#CUNO
+     C           W#CUNO    CHAINCBCUST               69
+     C  N69                MOVELCBCUNM    W#CUNM
+     C   69                MOVEL*BLANK    W#CUNM
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C           TXCODE    IFEQ 'SA04'
+     C                     ADD  TXQTY     W#WT04
+     C                     ENDIF
+     C*
+     C           TXCODE    IFEQ 'AR05'
+     C                     ADD  TXQTY     W#WT05
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  存檔
+     C*********************************
+     CSR         L1SR      BEGSR
+     C           K#WD      KLIST
+     C                     KFLD           W#CUNO
+     C                     KFLD           W#ORNO
+     C*
+     C           K#WD      CHAINWDREC                69
+     C           *IN69     IFEQ '0'
+     C                     Z-ADDW#WT04    WDSA04
+     C                     Z-ADDW#WT05    WDAR05
+     C                     UPDATWDREC
+     C                     ELSE
+     C                     CLEARWDREC
+     C                     MOVELW#ORNO    WDORNO
+     C                     MOVELW#CUNO    WDCUNO
+     C                     MOVELW#CUNM    WDCUNM
+     C                     Z-ADDW#WT04    WDSA04
+     C                     Z-ADDW#WT05    WDAR05
+     C                     WRITEWDREC
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  印核覆
+     C*********************************
+     CSR         LRSR      BEGSR
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C*                    WRITEAR049T1H
+     C*                    WRITEAR049T1M
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  子函式集
+     C*********************************
+

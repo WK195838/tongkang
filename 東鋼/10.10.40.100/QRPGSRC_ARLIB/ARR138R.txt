@@ -1,0 +1,155 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR138R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     營業發票作廢彙總表
+     H*            5.DATE-WRITTEN  102/03/05 2013AR731
+     H*            6.UPDATE  DATE  103/01/02 S00WCJ (0301A)
+     H*                            109/01/03 S00WCJ (0901A)
+     H*                            修正明細跨頁列印之BUG
+     H*                            113/01/03 S00WCJ (1301A)
+     H*                             增加N廠
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FDELMST  IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FARR138T O   E             69     PRINTER
+     IRDELMST
+     I                                              DMCUN1L1
+     I           UDS
+     I                                      501 501 T#ARE1
+     I                                      502 502 T#SALE
+     I                                      511 5180T#DAT1
+     I                                      521 5280T#DAT2
+     I                                     10011010 T#USID
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*              MAIN  PROGRAM
+     C*****************************************************************
+     C           *IN99     IFEQ *OFF
+     C                     EXSR INISR
+     C                     MOVE *ON       *IN99
+     C                     ENDIF
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLRN99                EXSR MSGSR
+     CLR 99                EXSR LRSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     SELEC
+     C           T#ARE1    WHEQ 'T'
+     C                     MOVE '八德'  T#ARNM
+     C           T#ARE1    WHEQ 'U'
+     C                     MOVE '桃園'  T#ARNM
+     C           T#ARE1    WHEQ 'H'
+     C                     MOVE '苗栗'  T#ARNM
+     C           T#ARE1    WHEQ 'M'
+     C                     MOVE '台中'  T#ARNM
+     C           T#ARE1    WHEQ 'K'
+     C                     MOVE '高雄'  T#ARNM
+     C           T#ARE1    WHEQ 'P'
+     C                     MOVEL'台北'  T#ARNM
+1301AC           T#ARE1    WHEQ 'N'
+1301AC                     MOVEL'大業'  T#ARNM
+     C                     OTHER
+     C                     MOVE '全部'  T#ARNM
+     C                     ENDSL
+     C*
+     C           T#SALE    IFEQ *BLANKS
+     C                     MOVEL'全部'  T#SANM
+     C                     ENDIF
+     C*
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C                     MOVEL*ALL'-'   T#LIN3
+     C                     MOVE *ALL'0'   W#IVNO  6
+     C                     Z-ADD0         T#AMT1
+     C                     Z-ADD0         T#AMT2
+     C                     MOVEL*BLANKS   W#YN    1
+     C                     CLEARAR138T1
+     C                     WRITEAR138TH
+     C                     MOVEL*ON       *IN51
+     C                     MOVEL*OFF      *IN69
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C*客戶別小計
+     C                     Z-ADD0         T#AMT1
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*
+     C           T#SALE    IFNE *BLANK
+     C                     MOVELT#SALE    W#SALE  2
+     C           DMINNO    CHAININVMST               55
+     C  N55      INRVID    IFNE W#SALE
+     C                     GOTO END100
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVELDMCUN1    T#CUNO
+     C                     MOVELDMCUM1    T#CUNM
+     C                     MOVELDMORN1    T#ORNO
+     C                     MOVELDMAREA    T#INAR
+     C                     MOVELDMDLNO    T#DLNO
+     C                     Z-ADDDMINDT    T#DATE
+     C                     MOVELDMINNO    T#INNO
+     C                     Z-ADDDMNBAL    T#AAMT
+0901AC   69                WRITEAR138TH
+0901AC                     MOVE *OFF      *IN69
+     C                     WRITEAR138T1
+     C                     MOVEL*OFF      *IN51
+     C*
+     C                     MOVEL'Y'       W#YN
+     C                     ADD  T#AAMT    T#AMT1
+     C                     ADD  T#AAMT    T#AMT2
+     C           END100    ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C   69                WRITEAR138TH
+     C                     MOVE *OFF      *IN69
+     C           W#YN      IFEQ 'Y'
+0301AC*          T#AMT1    ANDNE0
+     C                     WRITEAR138T2
+     C                     WRITEAR138T6
+     C                     MOVEL*ON       *IN51
+     C                     ENDIF
+     C*
+0301AC                     MOVEL*BLANKS   W#YN
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   69                WRITEAR138TH
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR138T4
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C           W#YN      IFNE 'Y'
+     C           T#AMT2    ANDEQ0
+     C                     EXSR MSGSR
+     C                     ELSE
+     C   69                WRITEAR138TH
+     C                     MOVEL*OFF      *IN69
+     C                     WRITEAR138T3
+     C                     WRITEAR138T6
+     C   69                WRITEAR138TH
+     C                     MOVEL*OFF      *IN69
+     C                     WRITEAR138T5
+     C                     ENDIF
+     C                     ENDSR
+

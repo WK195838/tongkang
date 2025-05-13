@@ -1,0 +1,47 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP050P1                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02YSH                                  */
+     /*     4.FUNCTION     進倉履約折讓自動處理作業-先前處理    */
+     /*     5.DATE-WRITTEN  91/02/20                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM        PARM(&P#YM2 &P#ACYM)
+
+             DCL        VAR(&P#YM2)   TYPE(*CHAR)  LEN(6)
+             DCL        VAR(&P#ACYM)  TYPE(*CHAR)  LEN(6)
+
+             CHGDTAARA  DTAARA(*LDA (301 6)) VALUE(&P#YM2)
+             CHGDTAARA  DTAARA(*LDA (401 6)) VALUE(&P#ACYM)
+
+             OVRDBF     FILE(INVMST)  TOFILE(DALIB/INVMST)  SHARE(*YES)
+             OVRDBF     FILE(INVDTL)  TOFILE(DALIB/INVDTL)
+             OVRDBF     FILE(INVDTY)  TOFILE(DALIB/INVDTL)
+
+             CLRPFM     DALIB/DISMSTTEMP
+             CLRPFM     DALIB/DISDTLTEMP
+
+             OVRDBF     FILE(DISMST)  TOFILE(DALIB/DISMSTTEMP)
+             OVRDBF     FILE(DISDTL)  TOFILE(DALIB/DISDTLTEMP)
+             OPNQRYF    FILE(INVMST)  QRYSLT('+
+                        (YYMM *EQ "' || &P#YM2 || '") *AND +
+                        (INTYPE *EQ "1") *AND +
+                        (INDECD *NE "D")') +
+                        MAPFLD((CHAR1 ININDT *CHAR 8) +
+                               (YYMM '%SST(CHAR1 1 6)' *CHAR 6)) +
+                        KEYFLD((INCUNO) (INORNO) (INNO))
+             CALL       PGM(ARE050R1)
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(DISMSTX)  TOFILE(DALIB/DISMSTTEMP)
+             OVRDBF     FILE(DISDTLX)  TOFILE(DALIB/DISDTLTEMP)
+             OVRDBF     FILE(DISMST)  TOFILE(DALIB/DISMST)
+             OVRDBF     FILE(DISDTL)  TOFILE(DALIB/DISDTL)
+             CALL       PGM(ARE050R4)
+             DLTOVR     FILE(*ALL)
+ ENDCLPGM:   ENDPGM
+

@@ -1,0 +1,139 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR072P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     型鋼廠別出貨數量表                     */
+     /*     5.DATE-WRITTEN  87/06/28                                */
+     /*     6.DATE-MODIFY   92/06/24                                */
+     /*                                                             */
+     /*  說明：*LDA  1 -->  成品大類(2, 3, 4, 5, (3+4+5))       */
+     /*               11 -->  起始年月                            */
+     /*               21 -->  終止年月                            */
+     /*               27 -->  內外銷別                            */
+     /*               28 -->  客戶代號起                          */
+     /*               34 -->  客戶代號迄                          */
+     /*               40 -->   FLAG                                 */
+     /*         當挑單一客戶時,CALL ARR072R1                      */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)     TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)   LEN(10)
+             DCL        VAR(&IN03)    TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&W#TYPE)  TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&W#BYMD)  TYPE(*CHAR)   LEN(8)
+             DCL        VAR(&W#EYMD)  TYPE(*CHAR)   LEN(8)
+             DCL        VAR(&W#YYMM)  TYPE(*CHAR)   LEN(6)
+             DCL        VAR(&W#CUN1)  TYPE(*CHAR)   LEN(6)
+             DCL        VAR(&W#CUN2)  TYPE(*CHAR)   LEN(6)
+             DCL        VAR(&W#COD1)  TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&W#FLAG)  TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&W#PDN1)  TYPE(*CHAR)   LEN(3)
+             DCL        VAR(&W#PDN2)  TYPE(*CHAR)   LEN(3)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+ INPUT:
+             CALL       PGM(ARR072RS) PARM(&IN03)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             SBMJOB     JOB(ARR072P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                        RQSDTA('CALL ARR072P')
+             RETURN
+
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1  1))  RTNVAR(&W#TYPE)
+             RTVDTAARA  DTAARA(*LDA (11 6))  RTNVAR(&W#YYMM)
+             CHGVAR     VAR(&W#BYMD) VALUE(&W#YYMM || '01')
+             RTVDTAARA  DTAARA(*LDA (21 6))  RTNVAR(&W#YYMM)
+             CHGVAR     VAR(&W#EYMD) VALUE(&W#YYMM || '31')
+             RTVDTAARA  DTAARA(*LDA (27 1)) RTNVAR(&W#COD1)
+             RTVDTAARA  DTAARA(*LDA (28 6)) RTNVAR(&W#CUN1)
+             RTVDTAARA  DTAARA(*LDA (34 6)) RTNVAR(&W#CUN2)
+             RTVDTAARA  DTAARA(*LDA (40 1)) RTNVAR(&W#FLAG)
+
+             IF         COND(&W#TYPE *EQ '1'    ) THEN(DO)
+             CHGVAR     VAR(&W#PDN1)  VALUE('200')
+             CHGVAR     VAR(&W#PDN2)  VALUE('299')
+             ENDDO
+
+             IF         COND(&W#TYPE *EQ '2'    ) THEN(DO)
+             CHGVAR     VAR(&W#PDN1)  VALUE('300')
+             CHGVAR     VAR(&W#PDN2)  VALUE('399')
+             ENDDO
+
+             IF         COND(&W#TYPE *EQ '3'    ) THEN(DO)
+             CHGVAR     VAR(&W#PDN1)  VALUE('400')
+             CHGVAR     VAR(&W#PDN2)  VALUE('499')
+             ENDDO
+
+             IF         COND(&W#TYPE *EQ '4'    ) THEN(DO)
+             CHGVAR     VAR(&W#PDN1)  VALUE('500')
+             CHGVAR     VAR(&W#PDN2)  VALUE('599')
+             ENDDO
+
+             IF         COND(&W#TYPE *EQ '5'    ) THEN(DO)
+             CHGVAR     VAR(&W#PDN1)  VALUE('600')
+             CHGVAR     VAR(&W#PDN2)  VALUE('699')
+             ENDDO
+
+             IF         COND(&W#TYPE *EQ '6'    ) THEN(DO)
+             CHGVAR     VAR(&W#PDN1)  VALUE('300')
+             CHGVAR     VAR(&W#PDN2)  VALUE('699')
+             ENDDO
+
+             IF         COND(&W#TYPE *EQ '7'    ) THEN(DO)
+             CHGVAR     VAR(&W#PDN1)  VALUE('3A0')
+             CHGVAR     VAR(&W#PDN2)  VALUE('399')
+             ENDDO
+
+             IF         COND(&W#TYPE *EQ '8'    ) THEN(DO)
+             CHGVAR     VAR(&W#PDN1)  VALUE('300')
+             CHGVAR     VAR(&W#PDN2)  VALUE('699')
+             ENDDO
+
+             IF         COND(&W#TYPE *EQ '9'    ) THEN(DO)
+             CHGVAR     VAR(&W#PDN1)  VALUE('200')
+             CHGVAR     VAR(&W#PDN2)  VALUE('299')
+             ENDDO
+
+             OVRPRTF    FILE(ARR072T) TOFILE(ARLIB/ARR072T) +
+                        PAGESIZE(*N 198)  CPI(15) +
+                        OVRFLW(57) HOLD(*YES) USRDTA('客廠出貨') +
+                        COPIES(1)
+             OVRPRTF    FILE(ARR072T1) TOFILE(ARLIB/ARR072T1) +
+                        PAGESIZE(*N 198)  CPI(15) +
+                        OVRFLW(57) HOLD(*YES) USRDTA('客廠出貨') +
+                        COPIES(1)
+             OVRDBF     FILE(TRNDTL) TOFILE(DALIB/TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE((TRNDTL)) QRYSLT(' +
+                           (TXCODE  *EQ "SA04")  *AND +
+                           (TXACNT  *NE "3"   )  *AND +
+                           (TXPDNM  *GE "' || &W#PDN1 || '") *AND +
+                           (TXPDNM  *LE "' || &W#PDN2 || '") *AND +
+                           (TXCUNO  *GE "' || &W#CUN1 || '") *AND +
+                           (TXCUNO  *LE "' || &W#CUN2 || '") *AND +
+                           (DATE    *GE "' || &W#BYMD || '") *AND +
+                           (DATE    *LE "' || &W#EYMD || '")') +
+                           KEYFLD((TXTXDT) (TXCUNO) (TXNO)) +
+                           MAPFLD((TXTXDT 'TXDATE / 100')  +
+                                  (DATE  TXDATE  *CHAR 8))
+
+     /* 當挑單一客戶時,CALL ARR072R1  */
+             IF         COND(&W#FLAG  *EQ ' ') THEN(DO)
+             CALL       PGM(ARR072R)
+             ENDDO
+             ELSE (DO)
+             CALL       PGM(ARR072R1)
+             ENDDO
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

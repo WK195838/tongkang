@@ -1,0 +1,148 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARP084RA
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     承購發票預支試算作業--試算寫入
+     H*            5.DATE-WRITTEN  90/11/10
+     H*            6.UPDATE
+     H*****************************************************************
+     H        1   Y                                     1
+     FARINVM  IP  E           K        DISK
+     FARBANK  IF  E           K        DISK
+     FARCUDT  IF  E           K        DISK
+     FARDEPT  IF  E           K        DISK
+     FARDEPTW O   E           K        DISK
+     E                    ARY       500 18
+     IRARINVM     01
+     I            DS
+     I                                        1  13 D#BACH
+     I                                        1   8 D#DATE
+     I                                        9  11 D#BKNO
+     I                                       12  13 D#SEQN
+     I            DS
+     I                                        1  18 D#ARY
+     I                                        1   6 D#CUNO
+     I                                        7  180D#CAMT
+     I           UDS
+     I                                      307 309 D#BKID
+     I                                      310 3210D#PAMT
+     I                                      322 3270D#PRAT
+     I                                      328 339 D#XAMT
+     I                                     10011010 D#USER
+     C  N99                EXSR INISR
+     C   01                EXSR DTLSR
+     CLR                   EXSR LRSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C*取得銀行融資成數
+     C           D#BKID    CHAINRARBANK             N40
+     C  N40                Z-ADDABINRT    W#INRT  65       融資成數
+     C   40                Z-ADD0         W#INRT
+     C*暫存客戶已融資金額
+     C                     MOVE *ALL'9'   ARY
+     C*
+     C           *LOVAL    SETLLRARCUDT
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C*
+     C                     READ RARCUDT             N    40
+     C   40                LEAVE
+     C*
+     C           ACBKID    IFNE D#BKID                     銀行代號
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVELACCUNO    D#CUNO           客戶代號
+     C                     Z-ADDACCAMT    D#CAMT           已預支金額
+     C                     ADD  1         I       30
+     C                     MOVE D#ARY     ARY,I
+     C                     ADD  1         W#CONT  30       紀錄次數
+     C                     ENDDO
+     C*取得批次號碼
+     C                     MOVE UDATE     D#DATE
+     C                     MOVE UDATE     W#DATE  8
+     C                     MOVE D#BKID    D#BKNO
+     C                     MOVE *BLANK    D#SEQN
+     C           D#BACH    SETGTRARDEPT
+     C                     READPRARDEPT                  40
+     C   40                MOVE '01'      D#SEQN
+     C  N40                MOVE ADBACH    D#BACH
+     C  N40      D#DATE    IFEQ W#DATE
+     C           D#BKNO    ANDEQD#BKID
+     C                     MOVE D#SEQN    W#SEQN  20
+     C                     ADD  1         W#SEQN
+     C                     MOVE W#SEQN    D#SEQN
+     C                     ELSE
+     C                     MOVE W#DATE    D#DATE
+     C                     MOVE D#BKID    D#BKNO
+     C                     MOVE '01'      D#SEQN
+     C                     ENDIF
+     C*
+     C                     SORTAARY
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C*檢核銀行代號
+     C           AMCUNO    CHAINRARCUDT             N40
+     C           ACBKID    IFNE D#BKID
+     C                     GOTO DTLEND
+     C                     ENDIF
+     C*試算總額大於欲預支總額
+     C           W#PAMT    IFGT D#PAMT
+     C                     SETON                     LR
+     C                     ENDIF
+     C*計算可預支金額(發票金額*融資成數  四捨五入)
+     C           AMDAMT    MULT W#INRT    W#AMT  120H      可預支金額
+     C*取得客戶目前已預支之總額
+     C           1         DO   W#CONT    I
+     C                     MOVE ARY,I     D#ARY
+     C*
+     C           AMCUNO    IFEQ D#CUNO                     客戶代號
+     C*計算開始
+     C           W#AMT     ADD  D#CAMT    D#CAMT 120       已預支金額
+     C*
+     C           D#CAMT    IFLE ACBAMT                     預支額度
+     C                     ADD  W#AMT     W#PAMT 120       試算總額
+     C                     EXSR WTRSR                      寫入工作檔
+     C                     MOVE D#ARY     ARY,I            更新ARY
+     C                     LEAVE
+     C                     ENDIF                           預支額度
+     C*
+     C                     ENDIF                           客戶代號
+     C                     ENDDO
+     C           DTLEND    ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C*紀錄試算總金額
+     C                     MOVE W#PAMT    D#XAMT
+     C                     ENDSR
+     C*****************************************************************
+     C           WTRSR     BEGSR
+     C*****************************************************************
+     C*寫入工作檔
+     C                     MOVE D#BACH    AWBACH           批次號碼
+     C                     MOVE ACBKID    AWBKID           銀行代號
+     C                     MOVE AMCUNO    AWCUNO           客戶代號
+     C                     MOVE AMCUNM    AWCUNM           客戶名稱
+     C                     MOVE AMINNO    AWINNO           發票號碼
+     C                     Z-ADDAMINDT    AWINDT           發票日期
+     C                     MOVE UDATE     AWDPDT           預支日期
+     C                     Z-ADDAMDAMT    AWAAMT           發票金額
+     C                     Z-ADDW#AMT     AWBAMT           預支金額
+     C           D#PRAT    DIV  100000    AWRATE           預支利率
+     C                     MOVE D#USER    AWADDM           新增人員
+     C                     MOVE UDATE     AWADDD           新增日期
+     C                     TIME           AWADDT           新增時間
+     C*
+     C                     WRITERARDEPTW
+     C                     ENDSR
+

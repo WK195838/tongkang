@@ -1,0 +1,102 @@
+    /*****************************************************************/
+    /*                                                               */
+    /*        >>  PROGRAM INTRODUCTION  <<                           */
+    /*                                                               */
+    /*        1.PROGRAM-ID      ARP116P                              */
+    /*        2.PROGRAM-TYPE    CLP                                  */
+    /*        3.AUTHOR          S02LBU                               */
+    /*        4.FUNCTION       客戶應收應付互抵作業                */
+    /*        5.DATE-WRITTEN    96/09/28                             */
+    /*                                                               */
+    /*****************************************************************/
+             PGM
+             DCL        VAR(&QYMD)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&C#YMD)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&C#DATS) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&C#DATE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&C#YM)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&USER)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&VRYR)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&VRMM)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&FILE1)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MBR1)   TYPE(*CHAR) LEN(4)
+             DCL        VAR(&BLYR)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&BLMM)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&FILE2)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MBR2)   TYPE(*CHAR) LEN(4)
+
+    /*取得本月傳票代開資料日期*/
+             RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&QYMD)
+             CHGVAR     VAR(&C#YMD)   VALUE('00' || &QYMD)
+             CHGVAR     VAR(&C#DATS)  VALUE(%SST(&C#YMD 1 6) || '01')
+             CHGVAR     VAR(&C#DATE)  VALUE(&C#YMD)
+
+    /*取得上月餘額代開資料年月*/
+             CHGVAR     VAR(&C#YM)    VALUE(%SST(&C#YMD 1 6))
+
+             RTVJOBA    TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0')  THEN(GOTO BATCH)
+
+             CHGDTAARA  DTAARA(*LDA (301 8)) VALUE(&C#DATS)
+             CHGDTAARA  DTAARA(*LDA (309 8)) VALUE(&C#DATE)
+             CHGDTAARA  DTAARA(*LDA (317 6)) VALUE(&C#YM)
+
+             SBMJOB     CMD(CALL PGM(ARP116P)) JOB(ARP116P) +
+                        JOBD(ARJOBD)
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (301  8)) RTNVAR(&C#DATS)
+             RTVDTAARA  DTAARA(*LDA (309  8)) RTNVAR(&C#DATE)
+             RTVDTAARA  DTAARA(*LDA (317  6)) RTNVAR(&C#YM)
+
+             CLRPFM     FILE(DALIB/RPAAST)
+
+   /* STEP1:客戶應收金額處理*/
+             OVRDBF     FILE(RCVDTL) TOFILE(DALIB/RCVDTL) SHARE(*YES)
+             OPNQRYF    FILE(RCVDTL) OPTION(*ALL) QRYSLT(' +
+                            (RVACNO *EQ "2122")     *AND +
+                            (DATE   *GE "00961201") *AND +
+                            (RVTXAR *EQ "P")        *AND +
+                            (RVACTP *EQ "D")')           +
+                        KEYFLD((RVCUNO)(RVNO))           +
+                        MAPFLD((DATE RVDATE *CHAR 8))
+             CALL       PGM(ARP116R1)
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+
+   /* STEP2:客戶應付金額處理*/
+             DLTF       FILE(QTEMP/ACVOUR)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(&VRYR)   VALUE(%SST(&C#DATS 3 2))
+             CHGVAR     VAR(&VRMM)   VALUE(%SST(&C#DATS 5 2))
+             CHGVAR     VAR(&FILE1)  VALUE('AC' || 'VR' || &VRYR)
+             CHGVAR     VAR(&MBR1)   VALUE('VR' || &VRMM)
+
+             OVRDBF     FILE(ACTRAN) TOFILE(DALIB/&FILE1) MBR(&MBR1)
+             CPYF       FROMFILE(ACTRAN) TOFILE(QTEMP/ACVOUR) +
+                          MBROPT(*REPLACE) CRTFILE(*YES) +
+                          INCREL((*IF ACNO *EQ '2122') (*AND ACDSC2 +
+                          *NE '        ') (*AND ACDC *EQ 'C'))
+
+             CHGVAR     VAR(&BLYR)   VALUE(%SST(&C#YM   3 2))
+             CHGVAR     VAR(&BLMM)   VALUE(%SST(&C#YM   5 2))
+             CHGVAR     VAR(&FILE2)  VALUE('AC' || 'BL' || &BLYR)
+             CHGVAR     VAR(&MBR2)   VALUE('BL' || &BLMM)
+
+             OVRDBF     FILE(ACTRAN) TOFILE(DALIB/&FILE2) MBR(&MBR2)
+             CPYF       FROMFILE(ACTRAN) TOFILE(QTEMP/ACVOUR) +
+                          MBROPT(*ADD) CRTFILE(*NO) INCREL((*IF +
+                          ACNO *EQ '2122') (*AND ACDSC2 *NE +
+                          '        ') (*AND ACDC *EQ 'C') (*AND +
+                          ACDSC2 *NE '00000000')) FMTOPT(*NOCHK)
+
+             OVRDBF     FILE(ACVOUR) TOFILE(QTEMP/ACVOUR) SHARE(*YES)
+             OPNQRYF    FILE(ACVOUR) KEYFLD((ACDSC2))
+             CALL       PGM(ARP116R2)
+             CLOF       OPNID(ACVOUR)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

@@ -1,0 +1,43 @@
+     /*****************************************************************/
+     /*                                                               */
+     /*               >>   PROGRAM INTRODUCTION   <<                  */
+     /*                                                               */
+     /*            1.PROGRAM-ID    ARP108P                            */
+     /*            2.PROGRAM-TYPE  CLP                                */
+     /*            3.AUTHOR        S02CSF                             */
+     /*            4.FUNCTION     應收帳款承購折讓金額確認處理      */
+     /*            5.DATE-WRITTEN  93/05/7                            */
+     /*            6.DATE-MODIFY                                      */
+     /*                                                               */
+     /*****************************************************************/
+            PGM
+            DCL        VAR(&INT)    TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&DSPID)  TYPE(*CHAR)  LEN(10)
+            DCL        VAR(&W#YMD)  TYPE(*CHAR)  LEN(6)
+            DCL        VAR(&W#AREA) TYPE(*CHAR)  LEN(1)
+
+            RTVJOBA    JOB(&DSPID)   TYPE(&INT)
+            IF         COND(&INT  *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+            SBMJOB     CMD(CALL PGM(ARLIB/ARP108P)) JOB(ARP108P) +
+                       JOBD(ARJOBD)
+            RETURN
+
+ BATCH:
+            RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&W#YMD)
+       /*   CHGVAR     VAR(&W#YMD)   VALUE('931206')  */
+            OVRDBF     FILE(TRNDTLL3) TOFILE(DALIB/TRNDTLL3) +
+                       SHARE(*YES)
+            OPNQRYF    FILE(TRNDTLL3) OPTION(*ALL)  QRYSLT(' +
+                       (TXFLAG *NE "D"     )            *AND +
+                       (TXFL01 *EQ "Y"     )            *AND +
+                       (TXDT   *EQ "' || &W#YMD || '")')     +
+                       MAPFLD((TXD1  TXTXDT       *CHAR 8 )  +
+                              (TXDT  '%SST(TXD1 3 6)' *CHAR 6 )) +
+                       KEYFLD((TXNO) (TXITEM))
+            CALL       PGM(ARLIB/ARP108R)
+            CLOF       OPNID(TRNDTLL3)
+            DLTOVR     FILE(*ALL)
+
+            ENDPGM
+

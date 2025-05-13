@@ -1,0 +1,41 @@
+     /************************************************************************/
+     /*                                                                     */
+     /*           >>   PROGRAM INTRODUCTION   <<                            */
+     /*                                                                     */
+     /*        1.PROGRAM-ID    ARP105P                                      */
+     /*        2.PROGRAM-TYPE  CLP                                          */
+     /*        3.AUTHOR        S02CSF                                       */
+     /*        4.FUNCTION     修正INVDTL稅額＝５，類別碼＜＞Ｚ的訂單編號*/
+     /*        5.DATE-WRITTEN  92/10/16                                     */
+     /*        6.DATE-MODIFY                                                */
+     /*                                                                     */
+     /***********************************************************************/
+            PGM
+            DCL        VAR(&AREA)   TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&INT)    TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&DSPID)  TYPE(*CHAR)  LEN(10)
+
+            RTVJOBA    JOB(&DSPID)   TYPE(&INT)
+            IF         COND(&INT  *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+            SBMJOB     CMD(CALL PGM(ARLIB/ARP105P)) JOB(ARP105P) +
+                       JOBD(ARJOBD)
+            RETURN
+
+ BATCH:
+            OVRDBF     FILE(INVDTL) TOFILE(DALIB/INVDTL) SHARE(*YES)
+            OPNQRYF    FILE(INVDTL) OPTION(*ALL)  QRYSLT(' +
+                       (IVACNT *EQ   "5")               *AND +
+                       (IVFL03 *NE   "Z")               *AND +
+                       (IVTXAR *EQ   "M")               *AND +
+                       (IVORNO *EQ   " " )              *AND +
+                       (ACDT   *NE   "999999")          *AND +
+                       (ACDT   *GE   "921014")')             +
+                       MAPFLD((ACD1   IVACDT   *CHAR 8)      +
+                              (ACDT   '%SST(ACD1 3 6)' *CHAR 6))
+            CALL       PGM(ARP105R)
+            CLOF       OPNID(INVDTL)
+            DLTOVR     FILE(*ALL)
+
+            ENDPGM
+

@@ -1,0 +1,131 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR123R1
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     客戶銷售排行榜（財會用）－銷貨
+     H*            5.DATE-WRITTEN  95/01/11
+     H*            6.DATE-MODIFY
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTRNDTL  IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FARR123F UF  E           K        DISK                      A
+     E                    ARY1      500 37
+     E*****************************************************************
+     ITXREC
+     I                                              TXCUNML1
+     I            DS
+     I                                        1  37 D#ARY1
+     I                                        1   6 D#CUNO
+     I                                        7  16 D#CUNM
+     I                                       17  26 D#IVNO
+     I                                       27  380D#AMT
+     I                                       29  400D#QTY
+     I           UDS
+     I                                      300 3050U#YM1
+     I                                      306 3110U#YM2
+     I                                      312 3140U#RAK1
+     I                                      315 3170U#RAK2
+     I                                      318 3280U#AMT
+     I                                     10011010 U#USID
+     I*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARRAR123F
+     C*
+     C                     Z-ADD0         W#QTY1 120       出貨量
+     C                     Z-ADD0         W#AMT1 120       出貨金額
+     C                     MOVE *ALL'9'   ARY1
+     C                     MOVE *ALL'9'   W#IVNO 10
+     C                     Z-ADD0         I       40
+     C*
+     C           TXCUNO    IFEQ 'EH028'
+     C                     Z-ADD0         W#TMP   10
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVELTXCUNO    W#CUNO  1
+     C           W#CUNO    IFEQ 'D'
+     C                     ADD  TXQTY     W#QTY1           出貨數量
+     C                     ADD  TXAMT     W#AMT1           出貨金額
+     C                     ELSE
+     C*外銷採用發票開立金額
+     C                     Z-ADD1         I
+     C                     SORTAARY1
+     C           1         DO   500       I
+     C                     MOVE ARY1,I    D#ARY1
+     C           TXIVNO    IFEQ D#IVNO
+     C                     ADD  TXAMT     D#AMT
+     C                     ADD  TXQTY     D#QTY
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C                     ELSE
+     C           D#IVNO    IFEQ W#IVNO
+     C                     MOVELTXCUNO    D#CUNO
+     C                     MOVELTXCUNM    D#CUNM
+     C                     MOVELTXIVNO    D#IVNO
+     C                     Z-ADDTXAMT     D#AMT
+     C                     Z-ADDTXQTY     D#QTY
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C                     EXSR SR1000
+     C           TXCUNM    CHAINRAR123F              40
+     C                     MOVELTXCUNO    A1CUNO
+     C                     MOVELTXCUNM    A1CUNM
+     C                     Z-ADDW#QTY1    A1QTY1
+     C                     Z-ADDW#AMT1    A1AMT1
+     C*          W#AMT1    DIV  W#QTY1    A1PRC1    H
+     C*
+     C   40                WRITERAR123F
+     C  N40                UPDATRAR123F
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C                     Z-ADD1         I
+     C*
+     C                     SORTAARY1
+     C           1         DO   500       I
+     C                     MOVE ARY1,I    D#ARY1
+     C*
+     C           D#IVNO    IFNE W#IVNO
+     C                     MOVELD#IVNO    INNO
+     C           INNO      CHAININREC                44
+     C  N44                ADD  INAAMT    W#AMT1
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+

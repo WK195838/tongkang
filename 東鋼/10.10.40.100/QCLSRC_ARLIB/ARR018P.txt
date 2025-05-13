@@ -1,0 +1,56 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE  101/09/24  2012AR682 S00WCJ (0109A)*/
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCL        VAR(&INT) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&BDATE1) TYPE(*DEC) LEN(8)
+             DCL        VAR(&BDATE1A) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&BDATE2) TYPE(*DEC) LEN(8)
+             DCL        VAR(&BDATE2A) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREA)    TYPE(*CHAR) LEN(1)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARR018RS) PARM(&IN03 &BDATE1 &BDATE2)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&BDATE1A) VALUE(&BDATE1)
+             CHGVAR     VAR(&BDATE2A) VALUE(&BDATE2)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&BDATE1A)
+             CHGDTAARA  DTAARA(*LDA (9 8)) VALUE(&BDATE2A)
+             SBMJOB     JOB(ARR018P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR018P')
+             RETURN
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (1 8))   RTNVAR(&BDATE1A)
+             RTVDTAARA  DTAARA(*LDA (9 8))   RTNVAR(&BDATE2A)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&BDATE1) VALUE(&BDATE1A)
+             CHGVAR     VAR(&BDATE2) VALUE(&BDATE2A)
+ /*0109A*/   CPYF       FROMFILE(DALIB/RCVDTL) TOFILE(QTEMP/RCVDTL) +
+                          MBROPT(*ADD) CRTFILE(*YES) INCREL((*IF +
+                          RVACNO *EQ '1131') (*OR RVACNO *EQ '111001'))
+             OVRDBF     FILE(RCVDTL) TOFILE(QTEMP/RCVDTL)
+             CALL       PGM(ARR018R1)
+             DLTOVR     *ALL
+
+             OVRDBF     FILE(RCVDTL) TOFILE(QTEMP/RCVDTL) SHARE(*YES)
+ /*0109A*/   OPNQRYF    FILE((QTEMP/RCVDTL)) +
+                          QRYSLT('                 RVDUDT = +
+                          %RANGE(' || &BDATE1A || '    ' || +
+                          &BDATE2A || ') & RVAREA *EQ "' || &AREA +
+                          || '"        & RVNTCD *EQ " +
+                          "                      & (RVACNO *EQ +
+                          "1131" *OR RVACNO *EQ "111001")')  +
+                           KEYFLD((RVDUDT) (RVTANO) (RVNO) +
+                          (RVPRDT))
+             OVRPRTF    FILE(QPRINT) PAGESIZE(*N 158) CPI(12)
+             CALL       PGM(ARR018R)
+             CLOF       OPNID(RCVDTL)
+             DLTOVR     FILE(*ALL)
+             DLTF       FILE(QTEMP/RCVDTL)
+             ENDPGM
+

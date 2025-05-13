@@ -1,0 +1,98 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR083RA
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     預收貨款增減明細表(銷貨預收)
+     H*            5.DATE-WRITTEN  89/04/08
+     H*
+     H*  說明：發票開立日期為本期但所對應之磅單為本期之前已出貨
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  IP  E           K        DISK
+     FTRNDTLL2IF  E           K        DISK
+     FARBBALT IF  E           K        DISK                      A
+     IINREC       01
+     I                                              INORNOL1
+     I            DS
+     I                                        1  10 INNO
+     I                                        3  100D#INNO
+     I            DS
+     I                                        1   60TXDATE
+     I                                        1   40D#YM1
+     I           UDS
+     I                                      501 5040U#YYMM
+     C*****************************************************************
+     C*              KEY   KLIST
+     C*****************************************************************
+     C           K#BALT    KLIST
+     C                     KFLD           ATORNO
+     C                     KFLD           ATCODE
+     C                     KFLD           ATNO
+     C*****************************************************************
+     C*              MAIN  PROGRAM
+     C*****************************************************************
+     C   L1                EXSR L1CLR
+     C   01                EXSR DTLSR
+     CL1                   EXSR L1SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#TAMT 110
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     MOVE *OFF      *IN40
+     C                     Z-ADD0         W#AMT
+     C           D#INNO    IFEQ 26411162
+     C                     Z-ADD0         W#TEST  10
+     C                     ENDIF
+     C           INNO      SETLLTXREC                      發票號碼
+     C           *IN40     DOWEQ*OFF
+     C           INNO      READETXREC                    40
+     C   40                LEAVE
+     C*
+     C           D#YM1     IFLT U#YYMM
+     C                     ADD  TXAMT     W#AMT  110
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C           W#AMT     DIV  INAAMT    W#PERT  75
+     C           W#PERT    MULT INBAMT    W#BAMT 110H
+     C                     MULT -1        W#BAMT
+     C                     ADD  W#BAMT    W#TAMT
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           W#TAMT    IFNE 0
+     C                     MOVE INORNO    ATORNO
+     C                     MOVE 'AC01'    ATCODE
+     C                     Z-ADD9999      ATNO
+     C           K#BALT    SETGTRARBBALT
+     C                     READPRARBBALT                 50
+     C           *IN50     IFEQ *ON
+     C           INORNO    ORNE ATORNO
+     C           ATCODE    ORNE ATCODE
+     C                     Z-ADD1         W#NO    40
+     C                     ELSE
+     C           ATNO      ADD  1         W#NO
+     C                     ENDIF
+     C*
+     C                     MOVE W#NO      ATNO
+     C           K#BALT    CHAINRARBBALT             50
+     C                     MOVE INORNO    ATORNO
+     C                     MOVE 'AC01'    ATCODE
+     C                     MOVE W#NO      ATNO
+     C                     MOVE INAREA    ATAREA           開立廠區
+     C                     Z-ADDW#TAMT    ATAMT            扣預收
+     C   50                WRITERARBBALT
+     C                     ENDIF
+     C                     ENDSR
+

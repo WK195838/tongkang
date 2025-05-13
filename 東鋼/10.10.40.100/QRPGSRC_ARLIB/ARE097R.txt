@@ -1,0 +1,540 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARE097R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     新桃工程自用每月單價分攤維護作業
+     H*          5.DATE-WRITTEN  98/02/20
+     H*          5.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARE097S CF  E                    WORKSTN
+     F                                        RRN   KSFILE SF1
+     FUENMST  UF  E           K        DISK
+     FUENMSTW IF  E           K        DISK
+     F            UNREC                             KRENAMEUNRECW
+     FUENDTL  UF  E           K        DISK
+     FUENDTLW UF  E           K        DISK
+     F            UVREC                             KRENAMEUVRECW
+     FACCTRL  IF  E           K        DISK
+     I*----------------------------------------------------------------
+     E                    ERR     1  31 70
+     E*****************************************************************
+     IUVRECW
+     I              UVYM                            F#YM
+     I              UVAREA                          F#AREA
+     I              UVCUNO                          F#CUNO
+     I              UVTRCD                          F#TRCD
+     I              UVPDNM                          F#PDNM
+     I              UVAMT                           F#AMT
+     I              UVQTY                           F#QTY
+     I              UVUPRC                          F#UPRC
+     I              UVTAX                           F#TAX
+     I*
+     IUNRECW
+     I              UNPDNM                          F1PDNM
+     I              UNTRCD                          F1TRCD
+     I              UNAMT                           F1AMT
+     I              UNQTY                           F1QTY
+     I*
+     I            DS
+     I                                        1   60S#YM
+     I                                        1   40D#YY
+     I                                        5   60D#MM
+     I*
+     I            DS
+     I                                        1   8 D#DATE
+     I                                        1   60D#YYMM
+     I                                        7   80D#MOTH
+     I*
+     I            DS
+     I                                        1   3 D#MARK
+     I                                        1   1 D#13
+     I                                        2   2 D#14
+     I                                        3   3 D#1U
+     I*
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10011010 D#USER
+     I                                     10111020 S#DEVN
+     I                                     10211021 D#AREA
+     C*****************************************************************
+     C*          KELY      LIST
+     C*****************************************************************
+     C* FILE => UENMST
+     C*
+     C           MSKEY     KLIST
+     C                     KFLD           K#YM    60       年月
+     C                     KFLD           K#AREA  1        廠區
+     C                     KFLD           K#CUNO  6        目標客戶
+     C                     KFLD           K#TRCD  2        異動代號
+     C*
+     C* FILE => UENMST
+     C*
+     C           M1KEY     KLIST
+     C                     KFLD           K#YM             年月
+     C                     KFLD           K#AREA           廠區
+     C                     KFLD           K#CUNO           目標客戶
+     C                     KFLD           K#TRCD           異動代號
+     C                     KFLD           K#PDNM  3        品名
+     C*
+     C* FILE => UENDTL
+     C*
+     C           M2KEY     KLIST
+     C                     KFLD           K#YM             年月
+     C                     KFLD           K#AREA           廠區
+     C                     KFLD           K#CUNO           目標客戶
+     C*
+     C* FILE => ACCTRL
+     C*
+     C           K#ACCT    KLIST
+     C                     KFLD           K#TXAR  1        廠區
+     C                     KFLD           K#YYMM  60       年月
+     C                     KFLD           K#FSYS  3        作業來源
+     C*
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C  N90                MOVE '1'       SCRN    1
+     C  N90                MOVE '1'       *IN,90
+     C                     MOVE UDATE     D#DATE
+     C                     Z-ADD12        D#MOTH
+     C*
+     C                     MOVELD#AREA    K#TXAR           廠區
+     C                     Z-ADDD#YYMM    K#YYMM           年月
+     C                     MOVEL'AC'      K#FSYS           作業來源
+     C*
+     C                     MOVEL*OFF      *IN50
+     C           K#ACCT    SETGTRACCTRL
+     C           *IN50     DOWEQ*OFF
+     C                     READPRACCTRL                  50
+     C*
+     C   50                LEAVE
+     C*
+     C           AAFSYS    IFNE 'AC'
+     C           AAAREA    ORNE D#AREA
+     C           AAESFG    OREQ 'Y'                        關帳碼
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     Z-ADDAAYYMM    S#YM
+     C                     LEAVE
+     C                     ENDDO
+     C*----------------------------------------------------------------
+     C*
+     C           *IN03     DOUEQ'1'
+     C           SCRN      CASEQ'1'       SR#01            畫面一
+     C           SCRN      CASEQ'2'       SR#02            畫面二
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C*
+     C*****************************************************************
+     CSR         SR#01     BEGSR
+     C*****************************************************************
+     C                     EXFMTTITLE
+     C   KC                EXSR KC#01                      離開
+     C                     EXSR CK#01                      CHECK畫面一
+     C  N99                EXSR PR#02
+     C  N99                MOVE '2'       SCRN
+     C*
+     CSR         SR#01Z    ENDSR
+     C**************************************************************
+     CSR         SR#02     BEGSR
+     C**************************************************************
+     C                     WRITEUND01
+     C                     EXFMTSFCTL1
+     C                     MOVEL*BLANK    S#MSG
+     C*
+     C   KC                EXSR KC#01                      離開
+     C   KL                MOVE '1'       SCRN             回上頁
+     C   KL                GOTO SR#02Z
+     C   KJ                EXSR KJ#02                      存檔
+     C   KJ                GOTO SR#02Z
+     C*
+     C                     EXSR CK#02
+     C*
+     CSR         SR#02Z    ENDSR
+     C**************************************************************
+     CSR         KC#01     BEGSR                           離開
+     C**************************************************************
+     C                     SETON                     LR
+     C                     RETRN
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     CSR         KJ#02     BEGSR
+     C**************************************************************
+     C                     EXSR CK#02
+     C  N99                EXSR FL#02
+     C  N99                MOVE '1'       SCRN
+     C*
+     CSR         KJ#02Z    ENDSR
+     C**************************************************************
+     CSR         CK#01     BEGSR
+     C**************************************************************
+     C*CHECK畫面一
+     C                     SETOF                     99
+     C                     MOVEA'0000'    *IN,41
+     C                     MOVEL*BLANK    S#ERR
+     C******
+     C*檢核年月
+     C******
+     C           D#YY      IFLT 98
+     C           D#YY      ORGT 9999
+     C                     SETON                     4199
+     C                     MOVELERR,1     S#ERR
+     C                     GOTO CK#01Z
+     C                     ENDIF
+     C*
+     C           D#MM      IFLT 1
+     C           D#MM      ORGT 12
+     C                     SETON                     4199
+     C                     MOVELERR,1     S#ERR
+     C                     GOTO CK#01Z
+     C                     ENDIF
+     C**
+     C*檢核廠區
+     C**
+     C           S#AREA    IFNE 'P'
+     C           S#AREA    ANDNE'T'
+     C           S#AREA    ANDNE'U'
+     C           S#AREA    ANDNE'M'
+     C           S#AREA    ANDNE'H'
+     C           S#AREA    ANDNE'K'
+     C                     SETON                     4299
+     C                     MOVELERR,2     S#ERR
+     C                     GOTO CK#01Z
+     C                     ENDIF
+     C**
+     C*檢核異動代號
+     C**
+     C           S#TRCD    IFNE '13'
+     C           S#TRCD    ANDNE'14'
+     C           S#TRCD    ANDNE'1U'
+     C                     SETON                     4399
+     C                     MOVELERR,3     S#ERR
+     C                     GOTO CK#01Z
+     C                     ENDIF
+     C******
+     C*檢核客戶
+     C******
+     C           S#CUNO    IFEQ *BLANK
+     C                     SETON                     4499
+     C                     MOVELERR,5     S#ERR
+     C                     GOTO CK#01Z
+     C                     ENDIF
+     C******
+     C*檢核資料是否存在
+     C******
+     C                     MOVELS#YM      K#YM             年月
+     C                     MOVELS#AREA    K#AREA           廠區
+     C                     MOVELS#CUNO    K#CUNO           目標客戶
+     C                     MOVELS#TRCD    K#TRCD           異動代號
+     C*
+     C                     MOVEL*OFF      *IN30
+     C           MSKEY     CHAINUNREC               N30
+     C           *IN30     IFEQ *ON
+     C                     SETON                     99
+     C                     MOVEA'1111'    *IN,41
+     C                     MOVELERR,7     S#ERR
+     C                     GOTO CK#01Z
+     C                     ENDIF
+     C******
+     C*檢核資料是否關帳
+     C******
+     C                     MOVELS#YM      P#YYMM  6
+     C                     MOVEL*BLANK    P#CODE  1
+     C                     CALL 'ACP101R'
+     C                     PARM           P#YYMM
+     C                     PARM           P#CODE
+     C                     FREE 'ACP101R'
+     C*
+     C           P#CODE    IFEQ '1'
+     C                     SETON                     99
+     C                     MOVEA'1'       *IN,41
+     C                     MOVELERR,9     S#ERR            已關帳
+     C                     GOTO CK#01Z
+     C                     ENDIF
+     C*
+     CSR         CK#01Z    ENDSR
+     C*****************************************************************
+     CSR         PR#02     BEGSR
+     C*****************************************************************
+     C                     Z-SUB12        S#NBR
+     C                     Z-ADD0         RRN     20
+     C*
+     C                     SETON                     84    SFL CLEAR
+     C                     WRITESFCTL1
+     C                     SETOF                     84
+     C*
+     C                     Z-ADDS#YM      S#YYMM           年月
+     C                     MOVELS#AREA    S#TXAR           廠區
+     C                     MOVELS#TRCD    S#TRC1           異動代號
+     C                     MOVELS#CUNO    S#CUN1           目標客戶
+     C                     Z-ADD0         S#AMTS           金額合計
+     C                     Z-ADD0         S#QTYS           數量合計
+     C**
+     C                     EXSR SR2100
+     C*
+     C           RRN       IFEQ 0
+     C                     MOVEL*ON       *IN85
+     C                     MOVELERR,7     S#ERR
+     C                     ELSE
+     C                     MOVEL*OFF      *IN85
+     C                     ENDIF
+     C*
+     CSR         PR#02Z    ENDSR
+     C****************************************************************
+     CSR         SR2100    BEGSR
+     C****************************************************************
+     C                     MOVEL*OFF      *IN97
+     C                     Z-ADDS#YYMM    K#YM             年月
+     C                     MOVELS#TXAR    K#AREA           廠區
+     C                     MOVELS#CUN1    K#CUNO           目標客戶
+     C                     MOVELS#TRC1    K#TRCD           異動代號
+     C*
+     C           MSKEY     SETLLUNREC                97
+     C           *IN97     DOWEQ'0'
+     C  N97      MSKEY     READEUNREC               N    97
+     C*
+     C   97                LEAVE
+     C*
+     C                     CLEARSF1
+     C                     ADD  1         RRN
+     C                     Z-ADDRRN       S#ITEM           項次
+     C                     MOVELUNPDNM    S#PDNM           品名
+     C                     Z-ADDUNQTY     S#QTY            數量
+     C                     Z-ADDUNAMT     S#AMT            金額
+     C*
+     C                     ADD  S#QTY     S#QTYS           數量合計
+     C                     ADD  S#AMT     S#AMTS           金額合計
+     C                     WRITESF1
+     C                     ENDDO
+     C****
+     C           RRN       IFGT 0
+     C                     ADD  13        S#NBR
+     C                     ENDIF
+     C*
+     C                     SETON                     75
+     C*
+     CSR                   ENDSR
+     C****************************************************************
+     CSR         SR2200    BEGSR
+     C****************************************************************
+     C                     MOVEL*OFF      *IN33
+     C           M2KEY     SETGTUVRECW
+     C           *IN33     DOWEQ*OFF
+     C                     READPUVRECW                   33
+     C*
+     C   33                LEAVE
+     C*
+     C           F#YM      IFNE K#YM
+     C           F#AREA    ORNE K#AREA
+     C           F#CUNO    ORNE K#CUNO
+     C           F#PDNM    ORNE K#PDNM
+     C           F#AMT     OREQ 0
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         W#TEMP 110
+     C                     Z-ADD0         W#TEMX 110
+     C           W#VAMT    SUB  W#AMT     W#TEMP
+     C           F#AMT     SUB  W#TEMP    F#AMT            金額
+     C           W#VTAX    SUB  W#TAX     W#TEMX
+     C           F#TAX     SUB  W#TEMX    F#TAX            金額
+     C           F#AMT     DIV  F#QTY     F#UPRC    H      單價
+     C                     UPDATUVRECW
+     C                     LEAVE
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C****************************************************************
+     CSR         CK#02     BEGSR
+     C****************************************************************
+     C                     SETOF                     9930
+     C                     MOVEA'0'       *IN,51
+     C                     MOVEL*BLANK    S#MSG
+     C                     Z-ADD0         S#AMTS
+     C                     Z-ADD0         S#QTYS
+     C                     Z-ADD0         RRN
+     C*
+     C           *IN30     DOWEQ*OFF
+     C                     ADD  1         RRN
+     C           RRN       CHAINSF1                  30
+     C*
+     C   30                LEAVE
+     C*
+     C           S#AMT     IFEQ 0
+     C                     ITER
+     C                     ENDIF
+     C***
+     C*CHECK金額
+     C***
+     C  N99      S#AMT     IFLE 0
+     C                     SETON                     5199
+     C                     MOVELERR,6     S#MSG
+     C                     ENDIF
+     C*
+     C                     MOVEL*OFF      *IN36
+     C                     Z-ADDS#YYMM    K#YM
+     C                     MOVELS#TXAR    K#AREA
+     C                     MOVELS#CUN1    K#CUNO
+     C           M2KEY     SETLLUVREC
+     C           *IN36     DOWEQ*OFF
+     C           M2KEY     READEUVREC               N    36
+     C*
+     C   36 99             LEAVE
+     C*
+     C           UVPDNM    IFNE S#PDNM
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           UVVRNO    IFNE *BLANK
+     C                     SETON                     5199
+     C                     MOVELERR,10    S#MSG
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           UVNO      IFNE *BLANK
+     C                     SETON                     5199
+     C                     MOVELERR,8     S#MSG
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ADD  S#QTY     S#QTYS
+     C                     ADD  S#AMT     S#AMTS
+     C                     UPDATSF1
+     C                     ENDDO
+     C*
+     C******
+     CSR         CK#02Z    ENDSR
+     C*****************************************************************
+     CSR         FL#02     BEGSR
+     C*****************************************************************
+     C*更新UENMST
+     C*
+     C                     Z-ADD1         RRN
+     C                     Z-ADDS#YYMM    K#YM             年月
+     C                     MOVELS#TXAR    K#AREA           廠區
+     C                     MOVELS#CUN1    K#CUNO           目標客戶
+     C                     MOVELS#TRC1    K#TRCD           異動代號
+     C*
+     C                     MOVEL*OFF      *IN30
+     C           1         DOWEQ1
+     C           RRN       CHAINSF1                  30
+     C                     ADD  1         RRN
+     C*
+     C   30                LEAVE
+     C*
+     C                     MOVELS#PDNM    K#PDNM           品名
+     C                     MOVEL*OFF      *IN31
+     C           M1KEY     CHAINUNREC                31
+     C           *IN31     IFEQ *OFF
+     C                     Z-ADDS#AMT     UNAMT            總金額
+     C                     MOVEL'C'       UNFLAG
+     C                     UPDATUNREC
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         W#AMT  110
+     C                     Z-ADD0         W#QTY  110
+     C                     Z-ADD0         W#TAX  110
+     C                     MOVEL*BLANK    D#MARK
+     C*
+     C*累計主檔中，該廠區該品名之金額
+     C*
+     C                     MOVEL*OFF      *IN35
+     C           M2KEY     SETLLUNRECW
+     C           *IN35     DOWEQ*OFF
+     C           M2KEY     READEUNRECW              N    35
+     C*
+     C   35                LEAVE
+     C*
+     C           F1PDNM    IFNE S#PDNM
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*該異動之品項金額如為零，則數量不予累計
+     C*
+     C           F1AMT     IFEQ 0
+     C                     SELEC
+     C           F1TRCD    WHEQ '13'
+     C                     MOVEL'0'       D#13
+     C           F1TRCD    WHEQ '14'
+     C                     MOVEL'0'       D#14
+     C           F1TRCD    WHEQ '1U'
+     C                     MOVEL'0'       D#1U
+     C                     ENDSL
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     ADD  F1AMT     W#AMT            金額
+     C                     ADD  F1QTY     W#QTY            數量
+     C                     ENDDO
+     C*
+     C           W#AMT     MULT 0.05      W#TAX     H      稅額
+     C                     Z-ADD0         W#VAMT 110
+     C                     Z-ADD0         W#VTAX 110
+     C*
+     C*更新UENDTL
+     C*
+     C                     MOVEL*OFF      *IN32
+     C           M2KEY     SETLLUVREC
+     C           *IN32     DOWEQ*OFF
+     C           M2KEY     READEUVREC                    32
+     C*
+     C   32                LEAVE
+     C*
+     C           UVPDNM    IFNE S#PDNM
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           UVTRCD    IFEQ '13'
+     C           D#13      ANDEQ'0'
+     C           UVTRCD    OREQ '14'
+     C           D#14      ANDEQ'0'
+     C           UVTRCD    OREQ '1U'
+     C           D#1U      ANDEQ'0'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     Z-ADD0         UVUPRC
+     C                     Z-ADD0         W#UPRC 116
+     C           W#AMT     DIV  W#QTY     UVUPRC    H      單價
+     C           W#AMT     DIV  W#QTY     W#UPRC    H      單價
+     C           W#UPRC    MULT UVQTY     UVAMT     H      金額
+     C           UVAMT     MULT 0.05      UVTAX     H      稅額
+     C*
+     C                     MOVEL'C'       UVFLAG
+     C                     MOVELD#USER    UVTXUS           代開人員
+     C                     MOVE UDATE     UVTXDD           代開日期
+     C                     TIME           UVTXDT           代開時間
+     C                     ADD  UVAMT     W#VAMT
+     C                     ADD  UVTAX     W#VTAX
+     C                     UPDATUVREC
+     C                     ENDDO
+     C*
+     C           W#VAMT    IFNE W#AMT
+     C           W#VTAX    ORNE W#TAX
+     C                     EXSR SR2200
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     CSR         FL#02Z    ENDSR
+     C*****************************************************************
+** ERR
+01-年月輸入錯誤！
+02-廠區輸入錯誤！
+03-異動代號輸入錯誤!
+04-品名代號不存在!
+05-客戶代號不可空白!
+06-金額不可小於或等於零!
+07-資料不存在!
+08-此品名中有部份資料已開立發票，欲重新分攤單價請先作廢發票！
+09-關帳日期已過，請與相關人員聯絡！
+10-此品名中有部份資料已代開傳票，欲重新分攤單價請先還原代開！
+

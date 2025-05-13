@@ -1,0 +1,162 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP110RS1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     銷退與銷折資料重新下載處理（畫面）
+     H*            5.DATE-WRITTEN  103/03/06
+     H*            6.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARP110S1CF  E                    WORKSTN
+     F*ACCTRX  IF  E           K        DISK
+     E*************************************************************
+     E                    ERR     1  16 70
+     I*************************************************************
+     I           UDS
+     I                                     10111020 S#DEVI
+     I                                      300 300 U#COD1
+     I                                      301 308 U#DAT1
+     I                                      309 316 U#DAT2
+     C**************************************************************
+     C*   程式參數傳遞區
+     C**************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN03  1
+     C**************************************************************
+     C*          KEY  LIST
+     C**************************************************************
+     C*FILE==>ACCTRL(傳票程序控制檔)
+     C*          K#AC      KLIST
+     C*                    KFLD           AAAREA            廠區別
+     C*                    KFLD           AAYYMM            年月
+     C*                    KFLD           AAFSYS            作業來源
+     C**************************************************************
+     C*   主程式開始
+     C**************************************************************
+     C                     EXSR SR0000                     初始程式
+     C*
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C                     ENDCS
+     C                     ENDDO
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+     C**************************************************************
+     C           SR0000    BEGSR
+     C**************************************************************
+     C                     MOVEL'01'      W#PRID  2        畫面一
+     C*
+     C                     ENDSR
+     C**************************************************************
+     C           SR1000    BEGSR
+     C**************************************************************
+     C*W#PRID='01'-->畫面一
+     C           W#PRID    DOWEQ'01'
+     C                     EXFMTAR110F1                    螢幕輸入
+     C                     MOVEL*BLANK    S#ERR
+     C                     MOVE *OFF      *IN99
+     C*
+     C           *IN03     IFEQ '1'
+     C           *IN12     OREQ '1'
+     C                     MOVEL'1'       P#IN03           回前畫面
+     C                     MOVEL'00'      W#PRID           結束
+     C                     LEAVE
+     C                     ENDIF
+     C*檢核
+     C                     EXSR SR1100                     檢核
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C**************************************************************
+     C           SR1100    BEGSR
+     C**************************************************************
+     C                     MOVEA'0000000' *IN,50
+     C*檢核是否選擇欲下載檔案
+     C           S#COD1    IFEQ *BLANK
+     C                     MOVELERR,1     S#ERR
+     C                     SETON                     5099
+     C                     GOTO CHKEND
+     C                     ENDIF
+     C*
+     C*檢核欲下載的檔案日期是否輸入==>銷貨檔
+     C           S#COD1    IFNE *BLANK
+     C*
+     C           S#DAT1    IFEQ 0
+     C                     MOVELERR,2     S#ERR
+     C                     SETON                     5199
+     C                     GOTO CHKEND
+     C                     ELSE
+     C                     MOVE S#DAT1    W#DATE  8
+     C                     MOVE W#DATE    P#PDAT
+     C                     CALL 'UTS102R'
+     C                     PARM           P#PDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LEAP  1
+     C                     PARM           P#ERR   1
+     C           P#ERR     IFNE '0'
+     C                     MOVELERR,3     S#ERR
+     C                     SETON                     5199
+     C                     GOTO CHKEND
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           S#DAT2    IFEQ 0
+     C                     MOVELERR,4     S#ERR
+     C                     SETON                     5299
+     C                     GOTO CHKEND
+     C                     ELSE
+     C                     MOVE S#DAT2    W#DATE  8
+     C                     MOVE W#DATE    P#PDAT
+     C                     CALL 'UTS102R'
+     C                     PARM           P#PDAT  8
+     C                     PARM '1'       P#MODE  1
+     C                     PARM           P#MTL  24
+     C                     PARM           P#LEAP  1
+     C                     PARM           P#ERR   1
+     C           P#ERR     IFNE '0'
+     C                     MOVELERR,5     S#ERR
+     C                     SETON                     5299
+     C                     GOTO CHKEND
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           S#DAT1    IFGT S#DAT2
+     C                     MOVELERR,6     S#ERR
+     C                     SETON                     515299
+     C                     GOTO CHKEND
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C*
+     C  N99                MOVELS#COD1    U#COD1
+     C  N99                MOVE S#DAT1    U#DAT1
+     C  N99                MOVE S#DAT2    U#DAT2
+     C  N99                MOVEL'00'      W#PRID           成功
+     C*
+     C           CHKEND    ENDSR
+     C*****************************************************************
+** ERR
+０１－請選擇欲下載檔案並輸入日期！
+０２－請輸入銷貨的起始日期！
+０３－銷貨起始日期輸入錯誤！
+０４－請輸入銷貨的終止日期！
+０５－銷貨終止日期輸入錯誤！
+０６－銷貨終止日期不可大於銷貨起始日期！
+０７－請輸入發票主檔的起始日期！
+０８－發票主檔起始日期輸入錯誤！
+０９－請輸入發票主檔的終止日期！
+１０－發票主檔終止日期輸入錯誤！
+１１－發票主檔終止日期不可大於發票主檔起始日期！
+１２－請輸入發票明細檔的起始日期！
+１３－發票明細檔起始日期輸入錯誤！
+１４－請輸入發票明細檔的終止日期！
+１５－發票明細檔終止日期輸入錯誤！
+１６－發票明細檔終止日期不可大於發票明細檔起始日期！
+

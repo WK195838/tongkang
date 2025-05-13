@@ -1,0 +1,260 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR134R1
+     H*            2.PROGRAM-TYPE  RPG
+     H*            3.AUTHOR        S02LBU
+     H*            4.FUNCTION     折讓單統計表（含銷折／銷退／預收）
+     H*                            ***彙總表***
+     H*            5.DATE-WRITTEN  98/01/12
+     H*            6.DATE-MODIFY  100/03/08  S00WCJ (0003A)
+     H*                           將T與U合併顯示。
+     H*
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR134F IP  E           K        DISK
+     FARR134T O   E             69     PRINTER
+     E*----------------------------------------------------------------
+     E                    TABA1   1   8  2   TABA2  10
+     E                    TABB1   1   6  1   TABB2   6
+     E                    ARY        10 32
+     E*****************************************************************
+     IRAR134F
+     I                                              A4ACNTL1
+     I           UDS
+     I                                      301 3080U#DATS
+     I                                      309 3160U#DATE
+     I                                      317 317 U#ARE1
+     I                                      318 318 U#ARE2
+     I            DS
+     I                                        1  32 D#ARY
+     I                                        1   1 D#AREA
+     I                                        2  120D#AMT
+     I                                       13  210D#TAX
+     I                                       22  320D#TOT
+     I            DS
+     I                                        1   2 A4ACNT
+     I                                        1   1 D#ACNT
+     I*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     SETON                     6999
+     C*
+     C                     MOVEL*ALL'='   T#LIN1
+     C                     MOVEL*ALL'='   T#LIN2
+     C                     MOVEL*ALL'-'   T#LIN3
+     C                     MOVEL*ALL'='   T#LIN4
+     C*
+     C           U#ARE1    LOKUPTABB1     TABB2          61
+     C   61                MOVE TABB2     T#NAME
+     C*
+     C                     Z-ADDU#DATS    T#DATS
+     C                     Z-ADDU#DATE    T#DATE
+     C                     Z-ADD0         W#CONT  20
+     C                     MOVEL*BLANK    W#RESV  1
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     CLEARAR134T1D
+     C                     CLEARAR134T1A
+     C                     MOVEL*OFF      *IN50
+     C*
+     C*如為銷折，需於第１行先寫入銷貨折讓，
+     C*於下一行再寫入相對應之細項折讓名稱。
+     C*
+     C                     MOVELD#ACNT    W#ACNT  2
+     C           W#ACNT    IFEQ '3 '
+     C           W#CONT    IFEQ 0
+     C           W#ACNT    LOKUPTABA1     TABA2          60
+     C   60                MOVE TABA2     T#ACNT
+     C                     MOVEL*ON       *IN50
+     C   69                WRITEAR134T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR134T1D
+     C                     ADD  1         W#CONT
+     C                     ENDIF
+     C*
+     C           A4ACNT    LOKUPTABA1     TABA2          60
+     C   60                MOVE TABA2     T#ACN1
+     C                     MOVELA4ACNT    W#RESV
+     C*
+     C                     ELSE
+     C           A4ACNT    LOKUPTABA1     TABA2          60
+     C   60                MOVE TABA2     T#ACNT
+     C                     ENDIF
+     C*
+     C                     MOVEL*ALL'9'   ARY
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD1         I       20
+     C*
+     C                     SORTAARY
+     C           1         DO   10        I
+     C                     MOVE ARY,I     D#ARY
+     C           A4AREA    IFEQ D#AREA
+     C                     ADD  A4AMT     D#AMT            未稅
+     C                     ADD  A4TAX     D#TAX            含稅
+     C                     ADD  A4TOT     D#TOT            金額
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           D#AREA    IFEQ '9'
+     C                     MOVELA4AREA    D#AREA           廠區
+     C                     Z-ADDA4AMT     D#AMT            未稅
+     C                     Z-ADDA4TAX     D#TAX            含稅
+     C                     Z-ADDA4TOT     D#TOT            金額
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C                     Z-ADD1         I
+     C*
+     C                     SORTAARY
+     C           1         DO   10        I
+     C                     MOVE ARY,I     D#ARY
+     C*
+     C           D#AREA    IFEQ '9'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           D#TOT     IFEQ 0
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*如不為銷折，寫入Ｔ１Ｄ，反之則寫入Ｔ１Ａ
+     C*
+     C           W#ACNT    IFNE '3 '
+     C                     SELEC
+     C           D#AREA    WHEQ 'P'
+     C                     Z-ADDD#AMT     T#AMTP           未稅
+     C           D#AREA    WHEQ 'T'
+0003AC           D#AREA    OREQ 'U'
+     C                     Z-ADDD#AMT     T#AMTT           未稅
+     C           D#AREA    WHEQ 'M'
+     C                     Z-ADDD#AMT     T#AMTM           未稅
+     C           D#AREA    WHEQ 'K'
+     C                     Z-ADDD#AMT     T#AMTK           未稅
+     C                     ENDSL
+     C*
+     C                     ELSE
+     C                     SELEC
+     C           D#AREA    WHEQ 'P'
+     C                     Z-ADDD#AMT     T#AMP1           未稅
+     C           D#AREA    WHEQ 'T'
+0003AC           D#AREA    OREQ 'U'
+     C                     Z-ADDD#AMT     T#AMT1           未稅
+     C           D#AREA    WHEQ 'M'
+     C                     Z-ADDD#AMT     T#AMM1           未稅
+     C           D#AREA    WHEQ 'K'
+     C                     Z-ADDD#AMT     T#AMK1           未稅
+     C                     ENDSL
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           W#ACNT    IFNE '3 '
+     C           T#AMTP    ADD  T#AMTT    T#AMTS
+     C                     ADD  T#AMTM    T#AMTS
+     C                     ADD  T#AMTK    T#AMTS
+     C                     ELSE
+     C           T#AMP1    ADD  T#AMT1    T#AMS1
+     C                     ADD  T#AMM1    T#AMS1
+     C                     ADD  T#AMK1    T#AMS1
+     C                     ENDIF
+     C*
+     C   69                WRITEAR134T1H
+     C                     MOVE *OFF      *IN69
+     C*
+     C           W#ACNT    IFNE '3 '
+     C           W#RESV    IFEQ '3'
+     C           T#AMP2    ADD  T#AMT2    T#AMS2
+     C                     ADD  T#AMM2    T#AMS2
+     C                     ADD  T#AMK2    T#AMS2
+     C                     WRITEAR134T1B
+     C                     MOVEL'X'       W#RESV
+     C                     ENDIF
+     C                     WRITEAR134T1D
+     C*
+     C                     ELSE
+     C                     WRITEAR134T1A
+     C                     ADD  T#AMP1    T#AMP2           未稅
+     C                     ADD  T#AMT1    T#AMT2           未稅
+     C                     ADD  T#AMM1    T#AMM2           未稅
+     C                     ADD  T#AMK1    T#AMK2           未稅
+     C                     ENDIF
+     C*總計
+     C           W#ACNT    IFEQ '3 '
+     C                     ADD  T#AMP1    T#TAMP           未稅
+     C                     ADD  T#AMT1    T#TAMT           未稅
+     C                     ADD  T#AMM1    T#TAMM           未稅
+     C                     ADD  T#AMK1    T#TAMK           未稅
+     C                     ENDIF
+     C*
+     C                     ADD  T#AMTP    T#TAMP           未稅
+     C                     ADD  T#AMTT    T#TAMT           未稅
+     C                     ADD  T#AMTM    T#TAMM           未稅
+     C                     ADD  T#AMTK    T#TAMK           未稅
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LRSR      BEGSR
+     C*****************************************************************
+     C           T#TAMP    ADD  T#TAMT    T#TAMS           未稅
+     C                     ADD  T#TAMM    T#TAMS           未稅
+     C                     ADD  T#TAMK    T#TAMS           未稅
+     C*
+     C   69                WRITEAR134T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR134T1T
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C*
+     C   69                WRITEAR134T1H
+     C                     MOVE *OFF      *IN69
+     C                     WRITEAR134T1M
+     C*
+     C                     ENDSR
+     C*****************************************************************
+**  TABA1 TABA2
+2 銷貨退回
+3 銷貨折讓
+31磅差折讓
+33價差折讓
+3X其　　它
+4 預收折讓
+5 扣預沖回
+6 預折退款
+**  TABB1 TABB2
+A全部
+P台北
+T桃園
+H苗栗
+M台中
+K高雄
+

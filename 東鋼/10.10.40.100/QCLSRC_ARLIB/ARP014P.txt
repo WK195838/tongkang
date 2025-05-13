@@ -1,0 +1,96 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE  100/11/28 2011AR634 S00WCJ (0011A) */
+    /*                            配合IFRS修改                  */
+    /*                           101/12/13 2012AR704 S00WCJ (0112A) */
+    /*                            配合IFRS正式轉換修改          */
+    /*                           108/08/02 S00WCJ (0808A)           */
+    /*                            排除異動代號為D之資料不做代開 */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCL        VAR(&P#YYMM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&P#DATE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&P#CODE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&ACYM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&YM)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&Y)    TYPE(*CHAR) LEN(4)
+             DCL        VAR(&M)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DTARA) TYPE(*CHAR) LEN(11)
+             DCL        VAR(&WSID)  TYPE(*CHAR) LEN(10)
+ /*0011A*/   DCL        VAR(&D#VNO1) TYPE(*CHAR) LEN(6)
+ /*0011A*/   DCL        VAR(&D#VNO2) TYPE(*CHAR) LEN(6)
+ /*0112A*/   DCL        VAR(&IFRSD)  TYPE(*CHAR) LEN(6)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&WSID)
+             CHGVAR     VAR(&DTARA) VALUE('ACCTLDTA' *CAT &AREA)
+             RTVDTAARA  DTAARA(&DTARA (1 6)) RTNVAR(&ACYM)
+             IF         COND(&INT *EQ '1') THEN(DO)
+
+  DISPLY:    CALL       PGM(ARP014RS) PARM(&IN03 &YM &ACYM)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGDTAARA  DTAARA(*LDA (1 6)) VALUE(&YM)
+             CHGDTAARA  DTAARA(*LDA (7 2)) VALUE('01')
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&P#YYMM)
+             RTVDTAARA  DTAARA(*LDA (1 8)) RTNVAR(&P#DATE)
+
+             CALL    PGM(ACP101R) PARM(&P#YYMM &P#CODE)
+             IF         COND(&P#CODE *EQ '1') THEN(DO)
+             SNDBRKMSG  MSG('關帳日期已過，請與相關人員聯絡！') +
+                          TOMSGQ(&WSID)
+             GOTO       CMDLBL(DISPLY)
+             ENDDO
+
+         /*  SBMJOB     JOB(ARP014P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARP014P')  */
+         /*  RETURN                               */
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (1    6)) RTNVAR(&YM)
+             RTVDTAARA  DTAARA(*LDA (1    4)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (5    2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+ /*0112A*/   RTVDTAARA  DTAARA(ARIFRSCTL (1  6)) RTNVAR(&IFRSD)
+ /*0112A*/   CHGDTAARA  DTAARA(*LDA (221  6)) VALUE(&IFRSD)
+
+             OVRDBF     FILE(INVDTL) TOFILE(INVDTL) SHARE(*YES)
+ /*0808A*/   OPNQRYF    FILE((INVDTL)) QRYSLT('                +
+                          IVYM   *EQ  "' || &YM || '"          +
+                    *AND  IVFLAG  *NE "D"                      +
+                    *AND  IVACNT *EQ  "4"                      +
+                    *AND  IVDECD *NE  "D"                      +
+                    *AND  IVFL03 *NE  "Z"')                    +
+                          KEYFLD((IVNO))                       +
+                          MAPFLD((ZONE6 IVACDT *ZONED 8)       +
+                                 (CHAR6 ZONE6  *CHAR  8)       +
+                                 (IVYM '%SST(CHAR6 1 6)' *CHAR 6))
+             OVRDBF     FILE(ACTRAN) TOFILE('AC' || &AREA || +
+                          'R') LVLCHK(*NO)
+             OVRDBF     FILE(ARWF02) TOFILE(ARWF02) SHARE(*YES)
+             CLRPFM     FILE(ARWF02)
+             CALL       PGM(ARP014RC)
+             CLOF       OPNID(INVDTL)
+             OPNQRYF    FILE((ARWF02))                          +
+                          KEYFLD((W2ACDT) (W2AREA) (W2NO))
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT)
+             CALL       PGM(ARP014R)
+             CLOF       OPNID(ARWF02)
+             DLTOVR     FILE(*ALL)
+
+ /*0112A*/  IF   COND(&YM  *LT &IFRSD)  THEN(DO)
+ /*0011A STRAT */
+
+             RTVDTAARA  DTAARA(*LDA (201 6)) RTNVAR(&D#VNO1)
+             RTVDTAARA  DTAARA(*LDA (211 6)) RTNVAR(&D#VNO2)
+
+             CALL       PGM(ARS888P) PARM(&AREA &YM &D#VNO1 &D#VNO2)
+ /*0011A  END */
+ /*0112A*/  ENDDO
+  ENDCL:     ENDPGM
+

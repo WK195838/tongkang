@@ -1,0 +1,115 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    TREXPTCVTR
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION    外銷美國扣抵12.5%稅額之資料轉入TRNETL
+     H*            5.DATE-WRITTEN  107/04/16 S00WCJ
+     H*                            外銷美國之型鋼需加扣25%的關稅，
+     H*                            與客戶協調後公司付一半12.5%，此
+     H*                            部份營業鴻銘經理依磅單由EXCEL分
+     H*                            攤後寫入TREXPT，再轉入TRNDTL新
+     H*                            增價差之資料
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FTREXPT  UP  E           K        DISK
+     F            TXREC                             KRENAMEEXPT
+     FTRNDTLLMIF  E           K        DISK
+     I*
+     IEXPT
+     I              TXNO                            T#TXNO
+     I              TXITEM                          T#ITEM
+     I              TXACDT                          T#ACDT
+     I              TXORNO                          T#ORNO
+     I              TXPDNM                          T#PDNM
+     I              TXQTY                           T#QTY
+     I              TXUPRC                          T#UPRC
+     I              TXAMT                           T#AMT
+     I              TXTAX                           T#TAX
+     I              TXRESV                          T#RESV
+     I*
+     I            DS
+     I                                        1  30 T#RESV
+     I                                        1   7 D#RES1
+     I                                       30  30 D#RESV
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10011010 D1USER
+     I                                     10011001 D#DEPT
+     I                                     10111020 DEVNM
+     I                                     10211021 TXAR
+     C*****************************************************************
+     C*          Parameter List
+     C*****************************************************************
+     C*P#PRC='Y'執行轉換
+     C*
+     C           *ENTRY    PLIST
+     C                     PARM           P#PRC   1        *處理碼
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           T#TXNO
+     C                     KFLD           T#ORNO
+     C*
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C           P#PRC     IFNE 'Y'
+     C                     MOVEL*ON       *INLR
+     C                     ENDIF
+     C*
+     C  N99                EXSR SR1000
+     C*
+     C           T#TXNO    IFNE W#TXNO
+     C*
+     C                     Z-ADD0         W#ITEM
+     C                     MOVEL*OFF      *IN50
+     C           T#TXNO    SETLLTXREC
+     C           *IN50     DOWEQ*OFF
+     C           T#TXNO    READETXREC               N    50
+     C   50                LEAVE
+     C           TXITEM    IFGE W#ITEM
+     C                     Z-ADDTXITEM    W#ITEM  20
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     MOVELT#TXNO    W#TXNO
+     C                     ENDIF
+     C*
+     C           KEY01     CHAINTXREC               N51
+     C                     MOVEL'A'       TXFLAG
+     C                     MOVEL'3'       TXACNT
+     C                     ADD  1         W#ITEM
+     C                     Z-ADDW#ITEM    T#ITEM
+     C                     Z-ADD1070331   T#ACDT
+     C                     MOVEL*BLANK    TXVUNO
+     C                     MULT -1        T#AMT
+     C                     MOVEL*ALL'0'   D#RES1
+     C                     MOVEL*BLANK    D#RESV
+     C           *DATE     SUB  19000000  TXTXDT
+     C                     SELEC
+     C           T#PDNM    WHNE TXPDNM
+     C                     MOVEL'P'       D#RESV
+     C           T#QTY     WHNE TXQTY
+     C                     MOVEL'Q'       D#RESV
+     C           T#AMT     WHGT 0
+     C                     MOVEL'A'       D#RESV
+     C                     ENDSL
+     C*
+     C   51                MOVEL'E'       D#RESV
+     C                     UPDATEXPT
+     C*
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C                     Z-ADD0         W#ITEM
+     C                     MOVEL*BLANK    W#TXNO  8
+     C                     MOVEL*ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+

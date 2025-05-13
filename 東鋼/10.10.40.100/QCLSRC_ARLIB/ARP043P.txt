@@ -1,0 +1,100 @@
+             PGM
+             DCLF       FILE(ARP043S)
+             DCL        VAR(&P#YYMM) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&P#CODE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)   /*執行狀態*/
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)  TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DATEA) TYPE(*CHAR) LEN(6)   /*系統日期*/
+             DCL        VAR(&DATEB) TYPE(*CHAR) LEN(6)   /*關帳日期*/
+             DCL        VAR(&DATEX) TYPE(*CHAR) LEN(6)   /*輸入日期*/
+             DCL       VAR(&P#PDAT) TYPE(*CHAR) LEN(8)   /*輸入日期*/
+             DCL       VAR(&P#MODE) TYPE(*CHAR) LEN(1)   /*年份別*/
+             DCL       VAR(&P#MTL)  TYPE(*CHAR) LEN(24)  /*月日數*/
+             DCL       VAR(&P#LEAP) TYPE(*CHAR) LEN(1)   /*閏年碼*/
+             DCL        VAR(&FLAG)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&AREA)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DTARA) TYPE(*CHAR) LEN(11)
+             DCL        VAR(&YM)    TYPE(*CHAR) LEN(4)
+             DCL        VAR(&Y)     TYPE(*CHAR) LEN(2)
+             DCL        VAR(&M)     TYPE(*CHAR) LEN(2)
+
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&DTARA) VALUE('ACCTLDTA2' *CAT &AREA)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+
+             IF COND(&INT *EQ '1') THEN(DO)
+                RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&DATEA)
+                RTVDTAARA  DTAARA(DALIB/&DTARA (1 6)) RTNVAR(&DATEB)
+                RTVDTAARA  DTAARA(*LDA (951 35)) RTNVAR(&S#COMP)
+                RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+                CHGVAR     VAR(&S#AREA) VALUE(&AREA)
+ DISPLAY:
+                SNDRCVF    RCDFMT(AR043F1)
+                IF         COND(&IN03 *EQ '1') THEN(RETURN)
+                CHGVAR     VAR(&DATEX)   VALUE(&S#DATE)
+                CHGDTAARA  DTAARA(*LDA (301 6)) VALUE(&DATEX)
+                RTVDTAARA  DTAARA(*LDA (301 4)) RTNVAR(&P#YYMM)
+                CHGVAR     VAR(&FLAG)    VALUE('0')
+                CHGVAR     VAR(&P#PDAT)  VALUE('  ' || &DATEX)
+                CHGVAR     VAR(&P#MODE)  VALUE('1')
+         /*     CALL       PGM(C01) PARM(&S#DATE &FLAG)     */
+
+                CALL    PGM(ACP101R) PARM(&P#YYMM &P#CODE)
+                IF         COND(&P#CODE *EQ '1') THEN(DO)
+                CHGVAR     VAR(&S#MSG) VALUE('關帳日期已過')
+                GOTO       CMDLBL(DISPLAY)
+                ENDDO
+
+                CALL       PGM(UTS102R) PARM(&P#PDAT &P#MODE +
+                                        &P#MTL &P#LEAP &FLAG)
+                IF         COND(&FLAG = '0') THEN(                  +
+                           CHGVAR &S#MSG '日期錯誤' )
+                ELSE IF    COND(&DATEX > &DATEA) THEN(               +
+                           CHGVAR &S#MSG '日期不可大於系統日期' )
+                ELSE IF    COND(&DATEB > &DATEX) THEN(               +
+                           CHGVAR &S#MSG '該日期已關帳請查核' )
+                ELSE DO
+                   CHGDTAARA  DTAARA(*LDA (307 1)) VALUE(&AREA)
+            /*     SBMJOB     JOB(ARP043P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                              RQSDTA('CALL ARP043P')   */
+            /*     RETURN                              */
+                ENDDO
+                CHGVAR     VAR(&IN51) VALUE('1')
+                GOTO DISPLAY
+             ENDDO
+
+BATCH:
+             RTVDTAARA  DTAARA(*LDA (301 6)) RTNVAR(&DATEB)
+             RTVDTAARA  DTAARA(*LDA (301 4)) RTNVAR(&YM)
+             CHGVAR     VAR(&DATEX) VALUE(&YM || '01')
+             RTVDTAARA  DTAARA(*LDA (301 2)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (303 2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (307 1)) RTNVAR(&AREA)
+
+             CRTDUPOBJ  OBJ(INVDTL) FROMLIB(DALIB) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP) NEWOBJ(INVDTLW) DATA(*NO)
+
+             OVRDBF     FILE(INVDTLW) TOFILE(QTEMP/INVDTLW)
+             OVRDBF     FILE(INVDTL) TOFILE(DALIB/INVDTL) SHARE(*YES)
+
+             OPNQRYF    FILE((INVDTL)) +
+                        QRYSLT('IVPDCD *EQ "A10" *AND +
+                                IVDECD *NE "D" *AND +
+                                IVACNO *EQ " " *AND +
+                               (IVACDT *LE ' || &DATEB || ' *AND +
+                                IVACDT *GE ' || &DATEX || ')') +
+                          KEYFLD((IVACDT) (IVNO))
+
+             CALL       PGM(ARP043R1)  /*複製要處理的資料至INVDTLW */
+             CLOF       OPNID(INVDTL)
+
+             OVRDBF     FILE(ACTRAN) TOFILE(DALIB/('AC' || &AREA || +
+                          'R' || &Y)) MBR('VR' || &M) LVLCHK(*NO)
+             OVRPRTF    FILE(ARP043T) TOFILE(ARLIB/ARP043T) +
+                        USRDTA('勞務清單') CPI(12)
+             CALL       PGM(ARP043R2)  /*傳票代開及列表*/
+             DLTOVR     FILE(*ALL)
+             CHGDTAARA  DTAARA(DALIB/&DTARA (1 6)) VALUE(&DATEB)
+             ENDPGM
+

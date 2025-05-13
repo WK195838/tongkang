@@ -1,0 +1,97 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR001P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     請款單列印作業                         */
+     /*     5.DATE-WRITTEN  88/10/12                                */
+     /*     6.UPDATE  DATE  100/03/15  S00WCJ (0003A)               */
+     /*                      增加記錄TRNDTL中磅單日期區間       */
+     /*                     105/10/13  S00WCJ (0510A)               */
+     /*                      修改OUTQ                             */
+     /*                                                             */
+     /***************************************************************/
+             PGM        PARM(&CUNO &APNO &OPT &YN &CODE)
+
+             DCL        VAR(&CUNO)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&APNO)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&OPT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&YN)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&CODE)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)  TYPE(*LGL)  LEN(1)
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+ DISPLAY:
+             IF         COND(&CUNO *EQ  ' ')   THEN(DO)
+                        CALL  PGM(ARR001RS)  PARM(&CUNO &APNO &IN03)
+             IF         COND(&IN03 *EQ '1')    THEN(RETURN)
+             ENDDO
+
+/*0510A*/    SBMJOB     JOB(ARR001P) JOBD(ARJOBD) JOBQ(ARJOBQ) +
+                          OUTQ(PPB0011) RQSDTA('CALL PGM(ARR001P) +
+                          PARM(''' || &CUNO || ''' ''' || &APNO || +
+                          ''' ''' || &OPT || ''' ''' || &YN || '''  +
+                          ''' || &CODE || ''')')
+
+             RETURN
+
+ BATCH:
+   STEP1:
+             DLTF       FILE(QTEMP/ARR001F)
+             MONMSG     MSGID(CPF0000)
+
+             CRTDUPOBJ  OBJ(ARR001F) FROMLIB(ARLIB) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+
+   STEP2:    /* 前期處理 */
+             OVRDBF     FILE(ARR001F) TOFILE(QTEMP/ARR001F)
+             CALL       PGM(ARR001R1) PARM(&CUNO &APNO &OPT)
+             DLTOVR     FILE(*ALL)
+
+             IF         COND((&YN   *EQ 'Y')  *OR +
+                             (&CODE *EQ 'Y')) THEN(DO)
+             OVRDBF     FILE(ARR001F) TOFILE(QTEMP/ARR001F)
+             OPNQRYF    FILE(ARR001F) OPTION(*ALL)               +
+                        KEYFLD((*FILE))
+             CALL       PGM(ARR001R4)
+             CLOF       OPNID(ARR001F)
+             DLTOVR     FILE(*ALL)
+             ENDDO
+
+             CPYF       FROMFILE(QTEMP/ARR001F) +
+                          TOFILE(ARLIB/ARR001F) MBROPT(*REPLACE)
+
+   STEP3:    /* 列印報表 */
+ /*0510A*/   OVRPRTF    FILE(ARR001T) PAGESIZE(*N 158) CPI(12) +
+                          OUTQ(PPB0011) HOLD(*YES) SAVE(*YES) +
+                          USRDTA('請款單')
+             OVRDBF     FILE(ARR001F) TOFILE(QTEMP/ARR001F) SHARE(*YES)
+             OPNQRYF    FILE(ARR001F) +
+                        KEYFLD((ARORNO) (ARINDT) (ARINNO) (ARWTNO))
+    /*0003A START */
+                CALL    PGM(ARR001R5)
+                POSDBF  OPNID(ARR001F) POSITION(*START)
+    /*0003A  END */
+
+             CALL       PGM(ARR001R2) PARM(&YN &CODE)
+             CLOF       OPNID(ARR001F)
+             DLTOVR     FILE(*ALL)
+   STEP4:    /* 列印報表FOR應收帳款承購*/
+   /*        OVRPRTF    FILE(ARR001T) CPI(12) OUTQ(&OUTQ) HOLD(*YES) +
+                        USRDTA('請款單')                    */
+   /*        OVRDBF     FILE(ARR001F) TOFILE(QTEMP/ARR001F) +
+                        SHARE(*YES)                           */
+   /*        OPNQRYF    FILE(ARR001F) +
+                        KEYFLD((ARORNO) (ARINDT) (ARINNO))    */
+   /*        CALL       PGM(ARR001R3)                         */
+   /*        CLOF       OPNID(ARR001F)                        */
+   /*        DLTOVR     FILE(*ALL)                            */
+
+ ENDCLPGM:   ENDPGM
+

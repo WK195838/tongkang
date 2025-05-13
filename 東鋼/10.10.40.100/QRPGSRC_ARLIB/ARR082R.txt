@@ -1,0 +1,500 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR082R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     信用狀押匯月報表
+     H*            5.DATE-WRITTEN  88/12/08
+     H*            6.UPDATE  DATE 111/11/18 2022AR00050 S00WCJ (1111A)
+     H*                            增加票據別篩選欄位
+     H*
+     H*  說明：ARX1-->記錄每位客戶之總金額（排序用）
+     H*          ARY1-->記錄那些日期有資料
+     H*          ARZ1-->記錄每個客戶該日的金額
+     H*          目前以十八個日期加上一個總計為最高上限
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+1111AF*RCVDTL  IP  E           K        DISK
+1111AFARR082F IP  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FARR082T O   E             66     PRINTER
+1111AFARR082T1O   E             67     PRINTER
+     F*****************************************************************
+1111AE                    ARX1     9999 17
+1111AE                    ARY1       35 13
+     E                    ARZ1     3000 29
+     I*****************************************************************
+1111AIAR082FR
+     I                                              RVCUNOL2
+     I                                              RVDUDTL1
+     I*----------------------------------------------------------------
+     I           UDS
+     I                                        1   40R#YY
+     I                                        5   60R#MM
+1111AI                                        8   8 R#NTTP
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     I            DS
+     I                                        1  17 X#DATA
+     I                                        1  110X@TAMT
+     I                                       12  17 X@CUNO
+     I            DS
+     I                                        1  13 Y#DATA
+     I                                        1   20Y@DATE
+     I                                        3  130Y@TAMT
+     I            DS
+     I                                        1  19 Z#DATA
+     I                                        1   6 Z@CUNO
+     I                                        7   80Z@DATE
+     I                                        9  190Z@AMT
+     I            DS
+     I                                        1   80RVDUDT
+     I                                        7   80D#DATE
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C                     Z-ADD0         ARX1L   40
+     C                     Z-ADD0         ARY1L   40
+     C                     Z-ADD0         ARZ1L   40
+     C*
+     C                     MOVEL*ALL'9'   ARX1
+     C                     MOVEL*ALL'9'   ARY1
+     C                     MOVEL*ALL'9'   ARZ1
+     C*
+     C                     SETON                     66
+1111AC                     SETON                     67
+     C                     Z-ADD0         W#TAMT 110
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2清除函式換客戶
+     C*********************************
+     CSR         L2CLR     BEGSR
+     C                     Z-ADD0         W#CAMT 110       客戶總計
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1清除函式換日期
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C                     Z-ADD0         W#DAMT 110       客戶日期計
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C                     ADD  RVRAMT    W#DAMT           每日計
+     C                     ADD  RVRAMT    W#CAMT           客戶計
+     C                     ADD  RVRAMT    W#TAMT           全計
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L1 函式  更換日期
+     C*********************************
+     CSR         L1SR      BEGSR
+     C                     EXSR SR1000                     加入客戶
+     C                     EXSR SR2000                     加入日期
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  L2 函式  更換客戶
+     C*********************************
+     CSR         L2SR      BEGSR
+     C                     EXSR SR3000                     客戶總計
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  LR 函式  （彙總及列表）
+     C*********************************
+     CSR         LRSR      BEGSR
+     C                     SORTAARY1                       日期排序
+{    C           1         DO   ARY1L     I
+     C                     MOVELARY1,I    Y#DATA
+     C                     MOVE Y@DATE    W#TMPD  2
+     C           W#TMPD    CAT  '日':0  P#HEAD  6
+     C                     EXSR SR4000                     表頭名稱
+}    C                     ENDDO
+     C*
+     C           1         ADD  ARY1L     I
+     C                     MOVEL'總計'  P#HEAD
+     C                     EXSR SR4000                     表頭總計
+     C*
+1111AC           I         IFGT 25
+1111AC                     MOVEL*ON       *IN77
+1111AC                     ELSE
+1111AC                     MOVEL*OFF      *IN77
+1111AC                     ENDIF
+     C*
+     C                     SORTAARX1                       客戶總排序
+     C                     Z-ADDARX1L     I
+{    C           1         DOWEQ1
+     C           I         IFLE 0
+     C                     LEAVE
+     C                     ENDIF
+     C                     CLEARAR082T1D
+1111AC                     CLEARAR082TD
+     C                     MOVELARX1,I    X#DATA
+     C                     MOVELX@CUNO    R#CUNO           客戶編號
+1111AC           R#CUNO    IFNE *BLANKS
+     C           R#CUNO    CHAINCBCUST               69    客戶名稱
+     C  N69                MOVELCBCUNM    R#CUNM
+1111AC   69                MOVEL*ALL'*'   R#CUNM
+1111AC                     ELSE
+1111AC                     MOVEL'非營業'R#CUNM
+1111AC                     ENDIF
+     C*
+ {   C           1         DO   ARZ1L     J       40       SETLL CUNO
+     C                     MOVELARZ1,J    Z#DATA
+     C           X@CUNO    IFEQ Z@CUNO
+     C                     LEAVE
+     C                     ENDIF
+ }   C                     ENDDO
+     C*
+ {   C           1         DOWEQ1                          READE CUNO
+     C                     MOVELARZ1,J    Z#DATA
+     C           X@CUNO    IFNE Z@CUNO
+     C                     LEAVE
+     C                     ENDIF
+  {  C           1         DO   ARY1L     K       40       取得日期位
+     C                     MOVELARY1,K    Y#DATA
+     C           Y@DATE    IFEQ Z@DATE
+     C                     LEAVE
+     C                     ENDIF
+  }  C                     ENDDO
+     C           Z@AMT     DIV  10000     P#AMT   60H
+     C                     EXSR SR5000                     設定列值
+     C                     ADD  1         J
+     C           J         IFGT ARZ1L
+     C                     LEAVE
+     C                     ENDIF
+ }   C                     ENDDO
+     C*
+     C           1         ADD  ARY1L     K
+     C           X@TAMT    DIV  10000     P#AMT     H
+     C                     EXSR SR5000                     設定總計
+     C*
+     C   66                WRITEAR082T1H
+     C   66                WRITEAR082T1A
+     C   66                WRITEAR082T1B
+1111AC   67 77             WRITEAR082TH
+1111AC   67 77             WRITEAR082TA
+1111AC   67 77             WRITEAR082TB
+     C                     SETOF                     66
+1111AC                     SETOF                     67
+     C                     WRITEAR082T1D                   印出一筆
+1111AC   77                WRITEAR082TD
+     C*
+     C                     SUB  1         I
+}    C                     ENDDO
+     C*
+     C                     CLEARAR082T1D                   設定合計列
+1111AC                     CLEARAR082TD
+     C                     MOVEL'合計'  R#CUNM
+     C           1         DO   ARY1L     K
+     C                     MOVELARY1,K    Y#DATA
+     C           Y@TAMT    DIV  10000     P#AMT     H
+     C                     EXSR SR5000
+     C                     ENDDO
+     C           1         ADD  ARY1L     K
+     C           W#TAMT    DIV  10000     P#AMT     H
+     C                     EXSR SR5000
+     C*
+     C   66                WRITEAR082T1H
+     C   66                WRITEAR082T1A
+1111AC   67 77             WRITEAR082TH
+1111AC   67 77             WRITEAR082TA
+     C                     SETOF                     66
+1111AC                     SETOF                     67
+     C                     WRITEAR082T1B                   列印分隔
+     C                     WRITEAR082T1D                   印出一筆
+1111AC   77                WRITEAR082TB
+1111AC   77                WRITEAR082TD
+     C*
+     C*
+9706 C*          ARY1L     IFGT 22                         日數超過
+1111AC           ARY1L     IFGT 24                         日數超過
+     C   66                WRITEAR082T1H
+     C                     WRITEAR082T1X
+1111AC   67 77             WRITEAR082TH
+1111AC      77             WRITEAR082TX
+     C                     ENDIF
+     CSR                   ENDSR
+     C*
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C                     WRITEAR082T1H
+     C                     WRITEAR082T1M
+     CSR                   ENDSR
+     C*
+     C*****************************************************************
+     C*  子函式集
+     C*****************************************************************
+     C*----------------------------------------------------------------
+     C*  加入客戶 ARZ1
+     C*----------------------------------------------------------------
+     CSR         SR1000    BEGSR
+     C                     MOVEL'F'       W#RTNV  1
+     C*
+     C           1         DO   ARZ1L     I       40
+     C                     MOVELARZ1,I    Z#DATA
+     C           Z@CUNO    IFEQ RVCUNO
+     C           Z@DATE    ANDEQD#DATE
+     C                     MOVEL'T'       W#RTNV
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           W#RTNV    IFEQ 'F'
+     C                     ADD  1         ARZ1L
+     C                     Z-ADDARZ1L     I
+     C                     MOVELRVCUNO    Z@CUNO
+     C                     Z-ADDD#DATE    Z@DATE
+     C                     Z-ADD0         Z@AMT
+     C                     ENDIF
+     C*
+     C                     ADD  W#DAMT    Z@AMT
+     C                     MOVELZ#DATA    ARZ1,I
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------------------------------
+     C*  加入日期 ARY1
+     C*----------------------------------------------------------------
+     CSR         SR2000    BEGSR
+     C                     MOVEL'F'       W#RTNV
+     C*
+     C           1         DO   ARY1L     I       40
+     C                     MOVELARY1,I    Y#DATA
+     C           Y@DATE    IFEQ D#DATE
+     C                     MOVEL'T'       W#RTNV
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           W#RTNV    IFEQ 'F'
+     C                     ADD  1         ARY1L
+     C                     Z-ADDARY1L     I
+     C                     Z-ADDD#DATE    Y@DATE
+     C                     Z-ADD0         Y@TAMT
+     C                     ENDIF
+     C*
+     C                     ADD  W#DAMT    Y@TAMT
+     C                     MOVELY#DATA    ARY1,I
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------------------------------
+     C*  加入客戶總計 ARX1
+     C*----------------------------------------------------------------
+     CSR         SR3000    BEGSR
+     C                     MOVEL'F'       W#RTNV
+     C*
+     C           1         DO   ARX1L     I       40
+     C                     MOVELARX1,I    X#DATA
+     C           X@CUNO    IFEQ RVCUNO
+     C                     MOVEL'T'       W#RTNV
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C           W#RTNV    IFEQ 'F'
+     C                     ADD  1         ARX1L
+     C                     Z-ADDARX1L     I
+     C                     MOVELRVCUNO    X@CUNO
+     C                     Z-ADD0         X@TAMT
+     C                     ENDIF
+     C*
+     C                     ADD  W#CAMT    X@TAMT
+     C                     MOVELX#DATA    ARX1,I
+     CSR                   ENDSR
+     C*
+     C*================================================================
+     C*  列表表頭設值   I, P#HEAD
+     C*================================================================
+     CSR         SR4000    BEGSR
+     C                     SELEC
+     C           I         WHEQ 1
+     C                     MOVELP#HEAD    R#A001
+     C                     MOVEL'------'  R#B001
+     C           I         WHEQ 2
+     C                     MOVELP#HEAD    R#A002
+     C                     MOVEL'------'  R#B002
+     C           I         WHEQ 3
+     C                     MOVELP#HEAD    R#A003
+     C                     MOVEL'------'  R#B003
+     C           I         WHEQ 4
+     C                     MOVELP#HEAD    R#A004
+     C                     MOVEL'------'  R#B004
+     C           I         WHEQ 5
+     C                     MOVELP#HEAD    R#A005
+     C                     MOVEL'------'  R#B005
+     C           I         WHEQ 6
+     C                     MOVELP#HEAD    R#A006
+     C                     MOVEL'------'  R#B006
+     C           I         WHEQ 7
+     C                     MOVELP#HEAD    R#A007
+     C                     MOVEL'------'  R#B007
+     C           I         WHEQ 8
+     C                     MOVELP#HEAD    R#A008
+     C                     MOVEL'------'  R#B008
+     C           I         WHEQ 9
+     C                     MOVELP#HEAD    R#A009
+     C                     MOVEL'------'  R#B009
+     C           I         WHEQ 10
+     C                     MOVELP#HEAD    R#A010
+     C                     MOVEL'------'  R#B010
+     C           I         WHEQ 11
+     C                     MOVELP#HEAD    R#A011
+     C                     MOVEL'------'  R#B011
+     C           I         WHEQ 12
+     C                     MOVELP#HEAD    R#A012
+     C                     MOVEL'------'  R#B012
+     C           I         WHEQ 13
+     C                     MOVELP#HEAD    R#A013
+     C                     MOVEL'------'  R#B013
+     C           I         WHEQ 14
+     C                     MOVELP#HEAD    R#A014
+     C                     MOVEL'------'  R#B014
+     C           I         WHEQ 15
+     C                     MOVELP#HEAD    R#A015
+     C                     MOVEL'------'  R#B015
+     C           I         WHEQ 16
+     C                     MOVELP#HEAD    R#A016
+     C                     MOVEL'------'  R#B016
+     C           I         WHEQ 17
+     C                     MOVELP#HEAD    R#A017
+     C                     MOVEL'------'  R#B017
+     C           I         WHEQ 18
+     C                     MOVELP#HEAD    R#A018
+     C                     MOVEL'------'  R#B018
+     C           I         WHEQ 19
+     C                     MOVELP#HEAD    R#A019
+     C                     MOVEL'------'  R#B019
+     C           I         WHEQ 20
+9706 C                     MOVELP#HEAD    R#A020
+ .   C                     MOVEL'------'  R#B020
+ .   C           I         WHEQ 21
+ .   C                     MOVELP#HEAD    R#A021
+9706 C                     MOVEL'------'  R#B021
+9708 C           I         WHEQ 22
+ .   C                     MOVELP#HEAD    R#A022
+ .   C                     MOVEL'------'  R#B022
+ .   C           I         WHEQ 23
+ .   C                     MOVELP#HEAD    R#A023
+9708 C                     MOVEL'------'  R#B023
+1111AC           I         WHEQ 24
+1111AC                     MOVELP#HEAD    R#A024
+1111AC                     MOVEL'------'  R#B024
+1111AC           I         WHEQ 25
+1111AC                     MOVELP#HEAD    R#A025
+1111AC                     MOVEL'------'  R#B025
+1111AC           I         WHEQ 26
+1111AC                     MOVELP#HEAD    R#A026
+1111AC                     MOVEL'------'  R#B026
+1111AC           I         WHEQ 27
+1111AC                     MOVELP#HEAD    R#A027
+1111AC                     MOVEL'------'  R#B027
+1111AC           I         WHEQ 28
+1111AC                     MOVELP#HEAD    R#A028
+1111AC                     MOVEL'------'  R#B028
+1111AC           I         WHEQ 29
+1111AC                     MOVELP#HEAD    R#A029
+1111AC                     MOVEL'------'  R#B029
+1111AC           I         WHEQ 30
+1111AC                     MOVELP#HEAD    R#A030
+1111AC                     MOVEL'------'  R#B030
+1111AC           I         WHEQ 31
+1111AC                     MOVELP#HEAD    R#A031
+1111AC                     MOVEL'------'  R#B031
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+     C*================================================================
+     C*  資料設值  K, P#AMT
+     C*================================================================
+     CSR         SR5000    BEGSR
+     C                     SELEC
+     C           K         WHEQ 1
+     C                     Z-ADDP#AMT     R#$001
+     C           K         WHEQ 2
+     C                     Z-ADDP#AMT     R#$002
+     C           K         WHEQ 3
+     C                     Z-ADDP#AMT     R#$003
+     C           K         WHEQ 4
+     C                     Z-ADDP#AMT     R#$004
+     C           K         WHEQ 5
+     C                     Z-ADDP#AMT     R#$005
+     C           K         WHEQ 6
+     C                     Z-ADDP#AMT     R#$006
+     C           K         WHEQ 7
+     C                     Z-ADDP#AMT     R#$007
+     C           K         WHEQ 8
+     C                     Z-ADDP#AMT     R#$008
+     C           K         WHEQ 9
+     C                     Z-ADDP#AMT     R#$009
+     C           K         WHEQ 10
+     C                     Z-ADDP#AMT     R#$010
+     C           K         WHEQ 11
+     C                     Z-ADDP#AMT     R#$011
+     C           K         WHEQ 12
+     C                     Z-ADDP#AMT     R#$012
+     C           K         WHEQ 13
+     C                     Z-ADDP#AMT     R#$013
+     C           K         WHEQ 14
+     C                     Z-ADDP#AMT     R#$014
+     C           K         WHEQ 15
+     C                     Z-ADDP#AMT     R#$015
+     C           K         WHEQ 16
+     C                     Z-ADDP#AMT     R#$016
+     C           K         WHEQ 17
+     C                     Z-ADDP#AMT     R#$017
+     C           K         WHEQ 18
+     C                     Z-ADDP#AMT     R#$018
+     C           K         WHEQ 19
+     C                     Z-ADDP#AMT     R#$019
+9706 C           K         WHEQ 20
+ .   C                     Z-ADDP#AMT     R#$020
+ .   C           K         WHEQ 21
+9706 C                     Z-ADDP#AMT     R#$021
+9708 C           K         WHEQ 22
+ .   C                     Z-ADDP#AMT     R#$022
+ .   C           K         WHEQ 23
+9708 C                     Z-ADDP#AMT     R#$023
+1111AC           K         WHEQ 24
+1111AC                     Z-ADDP#AMT     R#$024
+1111AC           K         WHEQ 25
+1111AC                     Z-ADDP#AMT     R#$025
+1111AC           K         WHEQ 26
+1111AC                     Z-ADDP#AMT     R#$026
+1111AC           K         WHEQ 27
+1111AC                     Z-ADDP#AMT     R#$027
+1111AC           K         WHEQ 28
+1111AC                     Z-ADDP#AMT     R#$028
+1111AC           K         WHEQ 29
+1111AC                     Z-ADDP#AMT     R#$029
+1111AC           K         WHEQ 30
+1111AC                     Z-ADDP#AMT     R#$030
+1111AC           K         WHEQ 31
+1111AC                     Z-ADDP#AMT     R#$031
+     C                     ENDSL
+     CSR                   ENDSR
+     C*
+

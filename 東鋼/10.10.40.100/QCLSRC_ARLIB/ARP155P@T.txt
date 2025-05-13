@@ -1,0 +1,82 @@
+     /*******************************************************************/
+     /*                                                                 */
+     /*          >>   PROGRAM INTRODUCTION   <<                         */
+     /*                                                                 */
+     /*       1.PROGRAM-ID    ARP155P                                   */
+     /*       2.PROGRAM-TYPE  CLP                                       */
+     /*       3.AUTHOR        S00WCJ                                    */
+     /*       4.FUNCTION     型鋼外銷繳款金額統計                     */
+     /*       5.DATE-WRITTEN  113/09/30 2024AR00033                     */
+     /*       6.DATE-MODIFY                                             */
+     /*                                                                 */
+     /*******************************************************************/
+            PGM
+            DCL        VAR(&COND)   TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&INT)    TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&DSPID)  TYPE(*CHAR)  LEN(10)
+            DCL        VAR(&W#YMD)  TYPE(*CHAR)  LEN(8)
+            DCL        VAR(&D#DATE) TYPE(*DEC)   LEN(8 0)
+            DCL        VAR(&W#DATE) TYPE(*CHAR)  LEN(8)
+            DCL        VAR(&W#RDAT) TYPE(*CHAR)  LEN(8)
+            DCL        VAR(&P#PDAT) TYPE(*CHAR)  LEN(8)
+            DCL        VAR(&P#RDAT) TYPE(*CHAR)  LEN(8)
+            DCL        VAR(&P#OMOD) TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&P#MODE) TYPE(*CHAR)  LEN(1)
+            DCL        VAR(&P#DAYS) TYPE(*CHAR)  LEN(4)
+            DCL        VAR(&P#ERR)  TYPE(*CHAR)  LEN(1)
+
+            RTVJOBA    JOB(&DSPID)   TYPE(&INT)
+            IF         COND(&INT  *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+/*          SBMJOB     CMD(CALL PGM(ARP155P)) JOB(ARP155P) +
+                       JOBD(ARJOBD)       */
+/*          RETURN     */
+
+ BATCH:
+
+     /*      ADDLIBLE   LIB(DALIB)      */
+     /*      MONMSG   MSGID(CPF2103)    */
+     /*      ADDLIBLE   LIB(ARLIB)      */
+     /*      MONMSG   MSGID(CPF2103)    */
+
+            RTVJOBA    CYMDDATE(&W#YMD)
+            CHGVAR     VAR(&W#YMD)  VALUE('0' *CAT &W#YMD)
+
+            RTVJOBA    CYMDDATE(&W#DATE)
+            CHGVAR     VAR(&W#DATE)   VALUE('0' *CAT &W#DATE)
+
+            CHGVAR     VAR(&P#PDAT)  VALUE(&W#DATE) /*來源日期*/
+            CHGVAR     VAR(&P#MODE)  VALUE('1') /*中國年*/
+            CHGVAR     VAR(&P#DAYS)  VALUE('0030') /*天數*/
+            CHGVAR     VAR(&P#OMOD)  VALUE('1') /* 1:往前, 2:往後  */
+            CALL       PGM(UTS104R) PARM(&P#PDAT  &P#MODE  &P#OMOD  &P#DAYS +
+                                          &P#RDAT &P#ERR)
+            IF         COND(&P#ERR *EQ '0') THEN(DO)
+            CHGVAR     VAR(&W#RDAT)  VALUE(&P#RDAT)
+
+            ENDDO
+
+
+
+            OVRDBF     FILE(RCVDTL) TOFILE(RCVDTL) SHARE(*YES)
+            OVRDBF     FILE(SARCVF) TOFILE(SARCVF) SHARE(*YES)
+
+            OPNQRYF    FILE(SARCVF)  QRYSLT('      +
+                       (SRFL02 *EQ "Y")          *AND           +
+                       (CUNO   *EQ "EH")         *AND         +
+                       (DAT1   *GE "' || &W#RDAT || '")  *AND    +
+                       (DAT1   *LE "' || &W#YMD || '")') +
+                       MAPFLD((DAT1  SRRVDT       *CHAR 8 )     +
+                              (CUNO  '%SST(SRCUNO 1 2)')) +
+                       KEYFLD((SRRVNO) (SRRLNO))
+
+  /*      CPYFRMQRYF    FROMOPNID(SARCVF) TOFILE(S00WCJ/SARCF) +
+              MBROPT(*REPLACE)  CRTFILE(*YES)     */
+
+            CALL       PGM(ARP155RA)
+            CLOF       OPNID(SARCVF)
+            DLTOVR     FILE(*ALL)
+
+
+            ENDPGM
+

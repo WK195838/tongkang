@@ -1,0 +1,84 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP074P1                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02YSH                                  */
+     /*     4.FUNCTION     折讓代開傳票(FOR H ONLY)               */
+     /*     5.DATE-WRITTEN  89/12/29                                */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&AREA)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&YYMM)  TYPE(*CHAR) LEN(4)
+             DCL        VAR(&YY)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&MM)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&FNAME) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MNAME) TYPE(*CHAR) LEN(10)
+
+             RTVDTAARA  DTAARA(*LDA (1 4)) RTNVAR(&YYMM)
+             RTVDTAARA  DTAARA(*LDA (1 2)) RTNVAR(&YY)
+             RTVDTAARA  DTAARA(*LDA (3 2)) RTNVAR(&MM)
+             RTVDTAARA  DTAARA(*LDA (7 1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&FNAME) +
+                        VALUE('AC' || &AREA || 'R' || &YY)
+             CHGVAR     VAR(&MNAME) VALUE('VR' || &MM)
+
+
+STEP1:       /* 刪除已代開過的資料 */
+
+             OVRDBF     FILE(ACTRAN) TOFILE(&FNAME) MBR(&MNAME)        +
+                        SHARE(*YES)
+             OPNQRYF    FILE(ACTRAN) OPTION(*ALL) +
+                        QRYSLT('ACVRNO *GE "P601" *AND +
+                                ACVRNO *LE "P650"')
+
+             CALL       PGM(ARP074R1)  /*刪除輸入日期後的資料*/
+             CLOF       OPNID(ACTRAN)
+             DLTOVR     *ALL
+
+
+STEP2:       /* 代開開始*/   /*------------------*/
+
+             OVRDBF     FILE(ACTRAN) TOFILE(&FNAME) MBR(&MNAME)        +
+                        SHARE(*YES)
+             OVRPRTF    FILE(ARP074T) TOFILE(ARP074T) PAGESIZE(*N +
+                          132) CPI(10) HOLD(*YES) USRDTA('折讓退回')
+
+             CHGDDMF    FILE(ARLIB/ARDDM) RMTFILE(ARLIB/QCLSRC)
+             SBMRMTCMD  CMD('CALL ARLIB/ARP074P2') DDMFILE(ARLIB/ARDDM)
+
+             DLTF       FILE(QTEMP/TRNDTLX)
+             MONMSG     MSGID(CPF0000)
+
+             CRTDUPOBJ  OBJ(TRNDTL) FROMLIB(DALIB) OBJTYPE(*FILE) +
+                          TOLIB(QTEMP) NEWOBJ(TRNDTLX)
+             CHGDDMF    FILE(ARLIB/ARDDM) RMTFILE(QTEMP/TRNDTLX)
+             CPYF       FROMFILE(ARLIB/ARDDM) TOFILE(QTEMP/TRNDTLX) +
+                          TOMBR(*FROMMBR) MBROPT(*REPLACE) +
+                          INCREL((*IF TXCODE *EQ 'AR06') (*AND +
+                          TXDATE *GE 900101)) FMTOPT(*MAP *DROP)
+             OVRDBF     FILE(TRNDTL) TOFILE(QTEMP/TRNDTLX) SHARE(*YES)
+
+             OPNQRYF    FILE(TRNDTL) OPTION(*ALL) +
+                        QRYSLT('+
+                              (TXCODE *EQ "AR06") *AND +
+                              (DATE *EQ "999999") *AND +
+                              (RESV *EQ "' || &YYMM || '") *AND +
+                              (TXIVNO *NE "*") *AND +
+                              (TXIVNO *NE "#") *AND +
+                              ((TXACNT *EQ "2") *OR +
+                               (TXACNT *EQ "3")) *AND +
+                              (TXFLAG *NE "D")') +
+                        MAPFLD((RESV '%SST(TXRESV 1 4)' *CHAR 4) +
+                               (ACDT TXACDT *CHAR 8) +
+                               (DATE '%SST(ACDT 3 6)' *CHAR 6)) +
+                        KEYFLD((TXORNO) (TXNO) (TXPDNM))
+
+             CALL       PGM(ARP074R)  /*傳票代開及列表*/
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

@@ -1,0 +1,348 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    LLE004R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     營業出口押匯資料維護
+     H*          5.DATE-WRITTEN  96/06/11
+     H*          6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARQ018S CF  E                    WORKSTN
+     F                                        RRN   KSFILE SF1
+     FTRNDTLL3IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FACTRAN  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     E*****************************************************************
+     E                    TABA   12  12  2 0 TABB    2 0 每月最後一天
+     E*
+     E                    ERR     1  24 70
+     I*****************************************************************
+     I            DS
+     I                                        1  15 TXRESV
+     I                                        1   20D#YY
+     I                                        3   40D#MM
+     I*
+     I            DS
+     I                                        1  32 ACDM04
+     I                                        1   8 D#DM04
+     I            DS
+     I                                        1   80D#YMD
+     I                                        1   40D#YEAR
+     I                                        5   60D#MOTH
+     I                                        7   80D#DD
+     I*
+     I*
+     I            DS
+     I                                        1   4 ACVRNO
+     I                                        1   1 D#VRN1
+     I*
+     ICMD1       IDS
+     I I            'OVRDBF FILE(ACTRAN)-     1  31 CMD1S1
+     I              ' TOFILE(ACHR'
+     I                                       32  33 CMD1YY
+     I I            ') MBR(VR'               34  41 CMD1S2
+     I                                       42  43 CMD1MM
+     I I            ') SHARE(*YES)'          44  56 CMD1S3
+     ICMD2       IDS
+     I I            'OPNQRYF FILE((-          1  56 CMD2S1
+     I              'ACTRAN)) KEYFLD((-
+     I              'ACYMD) (ACVRNO) (-
+     I              'ACITEM))'
+     ICMD3       IDS
+     I I            'CLOF OPNID(ACTRAN)'      1  18 CMD3S1
+     I*
+     I           UDS
+     I                                      951 985 COMP
+     I                                     10011010 U#USID
+     I                                     10111020 S#DEVN
+     I                                     10211021 TXAR
+     C*****************************************************************
+     C*          KEY       LIST
+     C*****************************************************************
+     C           K#SARC    KLIST
+     C                     KFLD           K#NTTP  1        票據別
+     C                     KFLD           K#NO   10        信用狀縮碼
+     C*
+     C           K#CMDL    KLIST
+     C                     KFLD           K#NTNO 20        信用狀全碼
+     C                     KFLD           K#DATE  80       押匯日期
+     C*
+     C           K#TRAN    KLIST
+     C                     KFLD           K#VRNO  4        傳票號碼
+     C                     KFLD           K#ITEM  20       項次
+     C*
+     C**************************************************************
+     C*          MAIN      PROGRAM
+     C**************************************************************
+     C  N90                MOVE '1'       SCRN    1
+     C  N90                MOVE '1'       *IN,90
+     C*
+     C           *IN03     DOUEQ'1'
+     C           SCRN      CASEQ'1'       SR#01
+     C           SCRN      CASEQ'2'       SR#02
+     C           SCRN      CASEQ'3'       SR#03
+     C                     ENDCS
+     C                     ENDDO
+     C                     SETON                     LR
+     C                     RETRN
+     C*****************************************************************
+     CSR         SR#01     BEGSR
+     C*****************************************************************
+     C                     EXFMTTITLE
+     C                     MOVE *BLANK    S#ERR
+     C*
+     C   KC                EXSR KC#01
+     C                     EXSR CK#01                       CHK畫面一
+     C*
+     C  N90                EXSR PR#02
+     C  N90                MOVE '2'       SCRN             畫面二
+     C   90                MOVE '1'       SCRN
+     C*
+     CSR         SR#01Z    ENDSR
+     C*****************************************************************
+     CSR         SR#02     BEGSR
+     C*****************************************************************
+     C           RRN       IFEQ 0                          SFLDSP OFF
+     C                     MOVE *ON       *IN72
+     C                     MOVELERR,3     S#ERR
+     C                     ELSE
+     C                     MOVE *OFF      *IN72
+     C                     ENDIF
+     C*
+     C                     WRITEUND01
+     C                     EXFMTSFCTL1                     畫面二
+     C*
+     C                     MOVEA'0'       *IN,42
+     C                     MOVEL*BLANK    S#ERR
+     C*
+     C   KC                EXSR KC#01
+     C   KL                EXSR KL#01
+     C   KL                GOTO SR#02Z
+     C*
+     C                     Z-ADD1         RRN
+     C                     MOVEL*OFF      *IN40
+     C*
+     C           1         DOWEQ1
+     C           RRN       CHAINSF1                  40
+     C   40                LEAVE
+     C*
+     C                     ADD  1         RRN
+     C           S#OPT     IFEQ ' '
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           S#OPT     IFNE 'Y'
+     C                     MOVELERR,2     S#ERR
+     C                     SETON                     42
+     C                     UPDATSF1
+     C                     LEAVE
+     C                     ELSE
+     C                     EXSR PR#03
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     CSR         SR#02Z    ENDSR
+     C*****************************************************************
+     CSR         SR#03     BEGSR
+     C*****************************************************************
+     C                     EXFMTDETAIL                     畫面三
+     C*
+     C                     MOVEA'0000'    *IN,51
+     C                     MOVEA'0'       *IN,56
+     C*
+     C   KC                EXSR KC#01
+     C   KL                EXSR KL#01
+     C   KL                GOTO SR#03Z
+     C*
+     CSR         SR#03Z    ENDSR
+     C*****************************************************************
+     CSR         KC#01     BEGSR
+     C*****************************************************************
+     C* CLOF
+     C           *IN99     IFEQ *ON
+     C                     Z-ADD18        LENGTH 155
+     C                     CALL 'QCMDEXC'
+     C                     PARM           CMD3
+     C                     PARM           LENGTH
+     C                     ENDIF
+     C* PF03 =離開
+     C                     SETON                     LR
+     C                     RETRN
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         KL#01     BEGSR
+     C*****************************************************************
+     C* PF12 =回前畫面
+     C*
+     C           SCRN      IFEQ '3'
+     C                     EXSR PR#02
+     C                     MOVE '2'       SCRN
+     C                     ELSE
+     C                     MOVE '1'       SCRN
+     C                     MOVE *BLANK    S#ERR
+     C                     MOVE *BLANK    S#IVNO           發票號碼
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         CK#01     BEGSR
+     C*****************************************************************
+     C* CHECK畫面一
+     C                     SETOF                     4190
+     C                     MOVEL*BLANK    S#ERR
+     C*
+     C                     MOVE *OFF      *IN97
+     C           S#IVNO    CHAINTRNDTLL3            N97
+     C           *IN97     IFEQ *ON
+     C                     SETON                     4190
+     C                     MOVELERR,1     S#ERR
+     C                     ENDIF
+     C*
+     CSR         CK#01Z    ENDSR
+     C*****************************************************************
+     CSR         PR#02     BEGSR
+     C*****************************************************************
+     C                     SETON                     71     SFL CLEAR
+     C                     WRITESFCTL1
+     C                     SETOF                     71
+     C*
+     C                     Z-ADD0         RRN     20
+     C                     Z-SUB12        S#NBR
+     C                     MOVELS#IVNO    W#IVNO 10
+     C*
+     C           W#IVNO    SETLLTXREC                97
+     C           *IN97     DOWEQ*OFF
+     C           W#IVNO    READETXREC                    97
+     C*
+     C   97                LEAVE
+     C*
+     C           TXFL01    IFNE 'Y'
+     C           TXFLAG    OREQ 'D'
+     C           TXACDT    ORNE 999999
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     CLEARSF1
+     C                     ADD  1         RRN
+     C                     MOVELW#IVNO    S#IVNO           發票號碼
+     C                     MOVELTXNO      S#APNO           折讓單號
+     C                     MOVELTXTXAR    S#TXAR           廠區
+     C                     Z-ADDTXAMT     S#AMT            金額
+     C                     Z-ADDTXTAX     S#TAX            稅額
+     C*
+     C           D#MM      LOKUPTABA      TABB           60
+     C   60                Z-ADDTABB      D#DD
+     C                     Z-ADDD#YY      D#YEAR
+     C                     Z-ADDD#MM      D#MOTH
+     C                     Z-ADDD#YMD     S#ACDT           入帳日期
+     C*
+     C                     WRITESF1
+     C                     ENDDO
+     C*
+     C           RRN       IFGT 0
+     C                     ADD  13        S#NBR
+     C                     ENDIF
+     C*
+     C                     SETON                     74
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         PR#03     BEGSR
+     C*****************************************************************
+     C                     MOVE *OFF      *IN97
+     C           S#IVNO    SETLLIVREC
+     C           *IN97     DOWEQ*OFF
+     C           S#IVNO    READEIVREC                    97
+     C*
+     C   97                LEAVE
+     C*
+     C                     Z-ADD0         W#AMT  110
+     C           IVAMT     MULT -1        W#AMT
+     C*
+     C           IVAPNO    IFNE S#APNO                     憑證編號
+     C           S#AMT     ORNE W#AMT
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVELIVAPNO    S#NO             折讓單號
+     C*
+     C                     MOVEA'00'      *IN,40
+     C           S#IVNO    CHAININREC                40
+     C  N40                MOVELINCUNM    S#CUNM           客戶名稱
+     C   40                MOVEL*BLANK    S#CUNM
+     C*
+     C  N40      INCUNO    CHAINCBCUST               41
+     C  N41                MOVELCBMUID    S#MUID           統一編號
+     C   41                MOVEL*BLANK    S#MUID
+     C                     EXSR SR3100
+     C                     LEAVE
+     C                     ENDDO
+     C*
+     C                     MOVE '3'       SCRN
+     C                     MOVEL'查詢'  S#MOD
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         SR3100    BEGSR
+     C*****************************************************************
+     C                     CLOSEACTRAN
+     C*
+     C                     MOVE D#YY      CMD1YY
+     C                     MOVE D#MM      CMD1MM
+     C* CLOF
+     C           *IN99     IFEQ *ON
+     C                     Z-ADD18        LENGTH 155
+     C                     CALL 'QCMDEXC'
+     C                     PARM           CMD3
+     C                     PARM           LENGTH
+     C                     ENDIF
+     C* OVRDBF
+     C                     Z-ADD56        LENGTH 155
+     C                     CALL 'QCMDEXC'
+     C                     PARM           CMD1
+     C                     PARM           LENGTH
+     C* OPNQRYF
+     C                     Z-ADD56        LENGTH 155
+     C                     CALL 'QCMDEXC'
+     C                     PARM           CMD2
+     C                     PARM           LENGTH
+     C*
+     C                     MOVE *ON       *IN99
+     C                     MOVE *OFF      *IN61
+     C                     MOVEL'P000'    K#VRNO
+     C                     Z-ADD0         K#ITEM
+     C*
+     C                     OPEN ACTRAN
+     C           K#TRAN    SETLLACTRAN
+     C           *IN61     DOWEQ*OFF
+     C                     READ ACTRAN                   61*EOF
+     C*
+     C   61                LEAVE
+     C*
+     C           D#VRN1    IFNE 'P'
+     C           D#DM04    ORNE TXNO
+     C                     ITER
+     C                     ELSE
+     C                     MOVELACVRNO    S#VRNO           傳票號碼
+     C                     Z-ADDACYMD     S#YMD            傳票日期
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+**  TABA TABB
+013102280331043005310630073108310930103111301231
+** ERR
+01-發票號碼不存在或輸入錯誤
+02-如欲修改或查詢該資料，請於欲挑選資料前上”Ｙ”碼
+03-無符合條件之資料
+

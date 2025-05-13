@@ -1,0 +1,512 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARE055R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02CSF
+     H*          4.FUNCTION     營業退款過入財會處理作業　
+     H*          5.DATE-WRITTEN  93/10/14
+     H*          5.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARE055SACF  E                    WORKSTN
+     F                                        RRN1  KSFILE AR055F1
+     F                                        RRN2  KSFILE AR055F2
+     FARRETN  UF  E           K        DISK
+     FGLTRAN  UF  E           K        DISK                      A
+     FGLSEQ   UF  E           K        DISK                      A
+     FCBCUST  IF  E           K        DISK
+     E                    ERR     1   4 70               *錯誤訊息
+     I            DS
+     I                                        1  10 D#GLNO
+     I                                        1   1 D#KIND
+     I                                        2   5 D#MMDD
+     I                                        6   80D#SEQN
+     I                                        9  10 D#BLAK
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10111020 S#DEVN
+     I                                     10211021 U#AREA
+     I                                      308 308 P#CODE
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           P#IN12  1
+     C*****************************************************************
+     C*FILE==>GLTRAN(製票暫存檔)
+     C           K#GLTN    KLIST
+     C                     KFLD           GLTRNO
+     C                     KFLD           GLITEM
+     C*
+     C*FILE==>GLSEQ(製票暫存編號檔)
+     C           K#GSEQ    KLIST
+     C                     KFLD           SQAREA
+     C                     KFLD           SQKIND
+     C                     KFLD           SQYMD
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C                     EXSR SR0000
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           畫面一
+     C           W#PRID    CASEQ'02'      SR2000            READC
+     C           W#PRID    CASEQ'03'      SR3000           畫面二
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*----------------------------------------------------------------
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVE *ALL'='   S#LIN3
+     C                     MOVE *ALL'='   S#LIN4
+     C                     MOVE *ALL'='   S#LIN5
+     C                     MOVE *ALL'='   S#LIN6
+     C                     MOVEL'01'      W#PRID  2
+     C                     MOVEL*BLANK    W#FLAG  1
+     C*只有台北需做資料上下傳
+     C           U#AREA    IFEQ 'P'
+     C                     MOVE *ON       *IN60
+     C                     ELSE
+     C                     MOVE *OFF      *IN60
+     C                     ENDIF
+     C*                    MOVE *OFF      *IN99
+     C*                    MOVE *ON       *IN49
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*----------------------------------------------------------------
+     C*W#PRID='01'--->ARE055S-1 畫面
+     C*
+     C           W#FLAG    IFEQ *BLANK
+     C                     Z-SUB11        S#NBR1
+     C                     Z-ADD0         RRN1    50
+     C*
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN73            SFLCLR
+     C                     WRITEAR055F1C
+     C                     MOVE *OFF      *IN73
+     C*
+     C           S#KEY1    SETLLRARRETN
+     C                     EXSR SR1100
+     C*
+     C           RRN1      IFEQ 0                          SFLDSP OFF
+     C                     MOVE *ON       *IN72
+     C                     MOVELERR,1     S#ERR1
+     C                     ELSE
+     C                     MOVE *OFF      *IN72
+     C                     ENDIF
+     C*
+     C*                    MOVE *OFF      *IN48
+     C                     MOVEL*BLANK    S#KEY1
+     C                     ENDIF
+     C*顯示畫面
+     C           W#PRID    DOWEQ'01'
+     C*
+     C                     WRITEAR055H
+     C                     WRITEAR055F1M
+     C                     EXFMTAR055F1C
+     C                     MOVEL*BLANK    S#ERR1
+     C                     SETOF                     31
+     C*結束作業
+     C*
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     MOVEL'0'       P#IN12
+     C                     LEAVE
+     C                     ENDIF
+     C*回上頁
+     C           *IN12     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     MOVEL'1'       P#IN12
+     C                     LEAVE
+     C                     ENDIF
+     C*上傳廠區退款資料
+     C   60      *IN05     IFEQ *ON
+     C                     CALL 'ARP112P'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*下送台北製票資料
+     C   60      *IN06     IFEQ *ON
+     C                     CALL 'ARP112PF'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*REPOSITION
+     C           S#KEY1    IFNE *BLANK
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C  N72                MOVEL'02'      W#PRID
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR                           讀入資料
+     C*****************************************************************
+     C                     MOVE *BLANK    W#ORNO  6
+     C                     MOVE *OFF      *IN40
+     C           *IN40     DOWEQ*OFF
+     C                     READ RARRETN                  40
+     C   40                LEAVE
+     C*
+     C                     CLEARAR055F1
+     C*只讀貸方
+     C           ANDC      IFEQ 'D'
+     C           ANITEM    IFEQ 1
+     C                     MOVELANORNO    W#ORNO
+     C                     ENDIF
+     C                     ITER
+     C                     ENDIF
+     C*檢核製票碼
+     C           P#CODE    IFEQ 'N'
+     C           ANFL03    ANDNE*BLANK                     過入財會碼
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVELANRTNO    S#RTNO           退款編號
+     C                     Z-ADDANCFDT    S#RTDT           退款日期
+     C                     MOVELANCUNO    S#CUNO           客戶代號
+     C                     MOVELANCUNM    S#CUNM           客戶名稱
+     C                     MOVELW#ORNO    S#ORNO           訂單編號
+     C                     Z-ADDANAAMT    S#AAMT           退款金額
+     C                     MOVELANGLNO    S#TRNO           製票號碼
+     C                     Z-ADDANTRDT    S#TRDT           製票日期
+     C*
+     C                     ADD  1         RRN1
+     C                     WRITEAR055F1
+     C*
+     C                     ENDDO
+     C*
+     C           RRN1      IFGT 0
+     C                     ADD  12        S#NBR1
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*----------------------------------------------------------------
+     C*READC-->AR055F1
+     C                     Z-ADD1         RRN1
+     C                     MOVE *OFF      *IN99
+     C*
+     C           W#PRID    DOWEQ'02'
+     C*
+     C                     READCAR055F1                  43
+     C   43                MOVE '01'      W#PRID
+     C   43                MOVE *ON       *IN99
+     C   43                LEAVE
+     C*
+     C           S#OPT1    IFEQ *BLANK
+     C                     MOVEL' '       W#FLAG
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVELS#OPT1    W#OPT1  1
+     C                     EXSR SR2100                     檢核
+     C*有錯
+     C           *IN99     IFEQ *ON
+     C                     UPDATAR055F1
+     C                     MOVEL'X'       W#FLAG
+     C                     MOVE '01'      W#PRID
+     C*
+     C                     ELSE
+     C*沒錯
+     C                     SELEC
+     C           W#OPT1    WHEQ '5'
+     C                     MOVEL'03'      W#PRID
+     C                     LEAVE
+     C           W#OPT1    WHEQ '1'
+     C                     EXSR SR2200
+     C                     MOVEL'01'      W#PRID
+     C                     MOVEL' '       W#FLAG
+     C           W#OPT1    WHEQ '4'
+     C                     EXSR SR2300
+     C                     MOVEL'01'      W#PRID
+     C                     MOVEL' '       W#FLAG
+     C                     ENDSL
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2100    BEGSR
+     C*****************************************************************
+     C                     SETOF                     319899
+     C                     Z-ADD1         RRN1
+     C           *IN98     DOWEQ*OFF
+     C           RRN1      CHAINAR055F1              98
+     C   98                LEAVE
+     C*檢核
+     C           S#OPT1    IFEQ '1'                        製票
+     C           S#TRNO    ANDNE*BLANK
+     C                     MOVELERR,2     S#ERR1
+     C                     SETON                     319899
+     C                     ENDIF
+     C*
+     C  N99      S#OPT1    IFEQ '4'
+     C           S#TRNO    IFEQ *BLANK
+     C                     MOVELERR,3     S#ERR1
+     C                     SETON                     319899
+     C                     ENDIF
+     C*
+     C  N99      S#TRNO    CHAINRGLTRAN              46
+     C  N46N99   GLVRNO    IFNE *BLANK
+     C                     MOVELERR,4     S#ERR1
+     C                     SETON                     319899
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ADD  1         RRN1
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2200    BEGSR
+     C*****************************************************************
+     C*製票
+     C                     Z-ADD1         RRN1
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C           RRN1      CHAINAR055F1              90
+     C   90                LEAVE
+     C*
+     C           S#OPT1    IFEQ '1'
+     C                     EXSR SR2210                     製票
+     C                     ENDIF
+     C*
+     C                     ADD  1         RRN1
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2210    BEGSR
+     C*****************************************************************
+     C*取得製票號碼流水號
+     C                     MOVELU#AREA    SQAREA
+     C                     MOVEL'3'       SQKIND
+     C                     MOVE UDATE     SQYMD
+     C           K#GSEQ    CHAINRGLSEQ               44
+     C           *IN44     IFEQ *OFF
+     C                     MOVEL'3'       D#KIND           類別
+     C                     MOVE UDATE     D#MMDD           月日
+     C                     Z-ADDSQNO      D#SEQN           流水號
+     C                     MOVEL*BLANK    D#BLAK
+     C                     ADD  1         SQNO
+     C                     UPDATRGLSEQ
+     C                     ELSE
+     C                     Z-ADD1         SQNO
+     C                     MOVEL'3'       D#KIND
+     C                     MOVE UDATE     D#MMDD
+     C                     Z-ADDSQNO      D#SEQN
+     C                     MOVE *BLANK    D#BLAK
+     C                     ADD  1         SQNO
+     C                     WRITERGLSEQ
+     C                     ENDIF
+     C*
+     C*寫入製票檔與更新退款檔
+     C                     EXSR SR2211
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2211    BEGSR
+     C*****************************************************************
+     C*寫入製票檔
+     C           S#RTNO    SETLLRARRETN
+     C                     MOVE *OFF      *IN45
+     C           *IN45     DOWEQ*OFF
+     C                     READ RARRETN                  45
+     C   45                LEAVE
+     C*
+     C           ANRTNO    IFNE S#RTNO
+     C                     LEAVE
+     C                     ENDIF
+     C*寫入製票檔
+     C                     CLEARRGLTRAN
+     C                     MOVELU#AREA    GLCARD           廠別
+     C                     MOVEL'A'       GLKIND           類別
+     C                     MOVE UDATE     GLYMD            製票日期
+     C                     MOVELD#GLNO    GLTRNO           製票號碼
+     C                     Z-ADDANITEM    GLITEM           項次
+     C                     MOVELANDC      GLDC             借貸
+     C                     MOVELANACNO    GLNO             會計科目
+     C                     MOVELANDPNO    GLDPNO           部門代號
+     C                     MOVELANRLNO    GLRLNO           相關號碼
+     C                     MOVE ANDUDT    GLDUE            到期日
+     C                     MOVELANCUNO    GLCUNO           對象編號
+     C                     MOVELANCUNM    GLCSNM           對象簡稱
+     C                     Z-ADDANAAMT    GLAMT            金額
+     C                     MOVELU#USID    GLEMNO           製票員
+     C                     MOVELANDSC1    GLDESC           摘要
+     C*                    MOVELANDSC2    GLDSC1           摘要一
+     C                     WRITERGLTRAN
+     C*更新退款檔
+     C                     MOVEL'C'       ANFLAG           處理代碼
+     C                     MOVELD#GLNO    ANGLNO           製票號碼
+     C                     MOVEL'Y'       ANFL03           過入製票碼
+     C                     MOVELU#USID    ANTRUS           過入人員
+     C                     MOVE UDATE     ANTRDT           過入日期
+     C                     UPDATRARRETN
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2300    BEGSR
+     C*****************************************************************
+     C*取消製票
+     C                     Z-ADD1         RRN1
+     C                     MOVE *OFF      *IN90
+     C           *IN90     DOWEQ*OFF
+     C           RRN1      CHAINAR055F1              90
+     C   90                LEAVE
+     C*
+     C           S#OPT1    IFEQ '4'
+     C                     EXSR SR2310                     取消製票
+     C                     ENDIF
+     C*
+     C                     ADD  1         RRN1
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2310    BEGSR
+     C*****************************************************************
+     C*取消製票
+     C           S#RTNO    SETLLRARRETN
+     C                     MOVE *OFF      *IN47
+     C           *IN47     DOWEQ*OFF
+     C                     READ RARRETN                  47
+     C   47                LEAVE
+     C*
+     C           ANRTNO    IFNE S#RTNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVELANGLNO    GLTRNO
+     C                     Z-ADDANITEM    GLITEM
+     C           K#GLTN    CHAINRGLTRAN              48
+     C  N48                DELETRGLTRAN
+     C*更新退款檔
+     C                     MOVEL'C'       ANFLAG           處理代碼
+     C                     MOVEL*BLANK    ANGLNO           製票號碼
+     C                     MOVEL' '       ANFL03           過入製票碼
+     C                     UPDATRARRETN
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*----------------------------------------------------------------
+     C*W#PRID='03'--->ARE055S-2 畫面
+     C*
+     C                     Z-SUB5         S#NBR2
+     C                     Z-ADD0         RRN2    50
+     C*
+     C* CLEAR SUBFILE
+     C                     MOVE *ON       *IN73            SFLCLR
+     C                     WRITEAR055F2C
+     C                     MOVE *OFF      *IN73
+     C*
+     C                     EXSR SR3100                     寫入SFL
+     C                     EXSR SR3200                     讀入檔頭
+     C*
+     C           RRN2      IFEQ 0                          SFLDSP OFF
+     C                     MOVE *ON       *IN72
+     C                     MOVELERR,3     S#ERR1
+     C                     ELSE
+     C                     MOVE *OFF      *IN72
+     C                     ENDIF
+     C*
+     C*                    MOVE *OFF      *IN48
+     C*顯示畫面
+     C           W#PRID    DOWEQ'03'
+     C*
+     C                     WRITEAR055H
+     C                     WRITEAR055F2M
+     C                     EXFMTAR055F2C
+     C                     MOVEL*BLANK    S#ERR1
+     C*結束作業
+     C*
+     C           *IN03     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     MOVEL'0'       P#IN12
+     C                     LEAVE
+     C                     ENDIF
+     C*回上頁
+     C           *IN12     IFEQ *ON
+     C                     MOVE '01'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3100    BEGSR                           讀入資料
+     C*****************************************************************
+     C                     Z-ADD0         W#AAMT 110
+     C*
+     C           S#RTNO    SETLLRARRETN
+     C                     MOVE *OFF      *IN41
+     C           *IN41     DOWEQ*OFF
+     C                     READ RARRETN                  41
+     C   41                LEAVE
+     C*
+     C           ANRTNO    IFNE S#RTNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     CLEARAR055F2
+     C*
+     C                     MOVELANDC      S#DC             退款日期
+     C                     MOVELANACNO    S#ACNO           會計科目
+     C                     MOVELANRLNO    S#RLNO           相關號碼
+     C                     Z-ADDANDUDT    S#DUDT           到期日
+     C                     MOVELANCSNM    S#CSNM           對象別
+     C                     MOVELANDSC2    S#DSC2           輔助摘要
+     C                     Z-ADDANAAMT    S#AAMT           金額
+     C                     MOVELANDSC1    S#DSC1           摘要
+     C                     ADD  1         RRN2
+     C                     Z-ADDRRN2      S#SFI2           項次
+     C*
+     C                     WRITEAR055F2
+     C*退款總金額
+     C           ANDC      IFEQ 'C'
+     C                     ADD  ANAAMT    W#AAMT
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C*
+     C           RRN2      IFGT 0
+     C                     ADD  6         S#NBR2
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3200    BEGSR                           讀入資料
+     C*****************************************************************
+     C           S#CUNO    CHAINCBREC                42
+     C  N42                MOVELCBFNAM    S#FNAM           受款人
+     C                     MOVELANDPNO    S#DPNO           退款部門
+     C                     Z-ADDW#AAMT    S#OAMT           金額
+     C*
+     C                     ENDSR
+     C*****************************************************************
+**  ERR
+01-無相關資料！
+02-該筆資料已製票完成，若要異動請先取消製票！
+03-該筆資料尚未製票，無法取消製票！
+04-該筆資料已入傳票，無法取消製票！
+

@@ -1,0 +1,49 @@
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DATE1)  TYPE(*DEC)  LEN(6)
+             DCL        VAR(&DATE1A) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DATE2)  TYPE(*DEC)  LEN(6)
+             DCL        VAR(&DATE2A) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&TXAR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&TXAR1)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&TXAR2)  TYPE(*CHAR) LEN(1)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARR040RS) PARM(&IN03 &DATE1 &DATE2)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&DATE1A) VALUE(&DATE1)
+             CHGVAR     VAR(&DATE2A) VALUE(&DATE2)
+             CHGDTAARA  DTAARA(*LDA (1 6)) VALUE(&DATE1A)
+             CHGDTAARA  DTAARA(*LDA (7 6)) VALUE(&DATE2A)
+             SBMJOB     JOB(ARR040P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR040P')
+             RETURN
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (1 6))    RTNVAR(&DATE1A)
+             RTVDTAARA  DTAARA(*LDA (7 6))    RTNVAR(&DATE2A)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&TXAR)
+             CHGVAR     VAR(&DATE1) VALUE(&DATE1A)
+             CHGVAR     VAR(&DATE2) VALUE(&DATE2A)
+             IF         COND(&TXAR = 'P' *OR &TXAR = 'L') THEN(DO)
+                        CHGVAR VAR(&TXAR1)    VALUE('P')
+                        CHGVAR VAR(&TXAR2)    VALUE('L')
+             ENDDO
+             IF         COND(&TXAR *NE 'P' *AND &TXAR *NE 'L') THEN(DO)
+                        CHGVAR VAR(&TXAR1)    VALUE(&TXAR)
+                        CHGVAR VAR(&TXAR2)    VALUE(&TXAR)
+             ENDDO
+             OVRDBF     FILE(INVMST) TOFILE(INVMST) SHARE(*YES)
+             OPNQRYF    FILE((INVMST)) QRYSLT('                +
+                          ININDT = %RANGE(' || &DATE1A || '    +
+                                          ' || &DATE2A || ') & +
+                          INDECD *EQ "D"                     & +
+                         (INAREA *EQ "' || &TXAR1 || '"  *OR   +
+                          INAREA *EQ "' || &TXAR2 || '")')      +
+                          KEYFLD((INNO))
+             CALL       PGM(ARR040R)
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

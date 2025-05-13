@@ -1,0 +1,107 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR075R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     新版發票列印作業（依日期分類）
+     H*            5.DATE-WRITTEN  88/03/13
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMSTL4IF  E           K        DISK
+     FINVCUT  IF  E           K        DISK                      A
+     FARSAID  IF  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     F*****************************************************************
+     I            DS
+     I                                        1   3 IVPDCD
+     I                                        1   1 D#IVPD
+     I           UDS
+     I                                        1   80U#FRDT
+     I                                       11  180U#TODT
+     I                                     10011010 U#USID
+     I                                     10011003 U#DPID
+     I                                     10211021 U#AREA
+     C*****************************************************************
+     C*        搜尋關鍵
+     C*****************************************************************
+     C           K#IV      KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+9009 C                     Z-ADDU#FRDT    W#FRDT  80
+9009 C                     Z-ADDU#TODT    W#TODT  80
+     C*
+     C           W#FRDT    SETLLINREC                69
+     C           *IN69     DOWEQ'0'
+     C                     READ INREC                    69
+     C*
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C           ININDT    IFGT W#TODT                     日期之外
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     SELEC
+     C           INDECD    WHEQ 'D'                        已作廢
+     C                     ITER
+     C           INPRTC    WHNE *BLANK                     已印出
+     C                     ITER
+     C           INAREA    WHNE U#AREA                     非本廠區
+     C                     ITER
+     C                     ENDSL
+     C*
+     C                     EXSR SR1000                     寫入分類
+     C                     ENDDO
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+     C*
+     C*********************************
+     C* 寫入發票分類檔
+     C*********************************
+     CSR         SR1000    BEGSR
+     C           INNO      CHAINRINVCUT              69
+     C  N69                GOTO ES1000                     已有不再寫
+     C*
+     C           INRVID    CHAINRARSAID              69    收款業務
+     C  N69                MOVELSALOCA    W#AREA  1
+     C   69                MOVEL'*'       W#AREA
+     C*
+     C           INTYPE    IFEQ '9'                        其他類
+     C                     MOVELINAREA    W#AREA
+     C                     ENDIF
+     C*
+     C           INTYPE    IFEQ '1'                        出貨類
+     C                     MOVELINNO      IVNO
+     C                     MOVEL'1'       IVACNT
+     C           K#IV      CHAINIVREC                69
+     C           *IN69     IFEQ '0'
+     C           D#IVPD    IFEQ '3'                        型鋼
+     C           D#IVPD    OREQ '4'                        鋼板
+     C           D#IVPD    OREQ '5'                        鋼板
+     C                     MOVEL'H'       W#AREA           一律採苗栗
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVEL'A'       CUFLAG
+     C                     MOVELW#AREA    CUAREA
+     C                     MOVELINNO      CUNO
+     C                     MOVELINTYPE    CUTYPE
+     C                     MOVELINKIND    CUKIND
+     C                     MOVELINAREA    CUINEA
+     C                     Z-ADDININDT    CUINDT
+     C                     MOVELINORNO    CUORNO
+     C                     MOVELINCUNO    CUCUNO
+     C                     MOVELINCUNM    CUCUNM
+     C                     MOVELINRVID    CURVID
+     C                     WRITERINVCUT
+     CSR         ES1000    ENDSR
+     C*
+

@@ -1,0 +1,181 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP052R3
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CLJ
+     H*            4.FUNCTION     應收系統檔案備份移出（發票）
+     H*            5.DATE-WRITTEN  86/12/20
+     H*
+     H* 說明：以發票明細之入帳日期為移出之根據，但同一張發票之各明細
+     H*       中若有一筆之入帳日期在移出期限外，則整張發票皆不移出，
+     H*       以確保發票資料的完整性。
+     H*
+     H* 注意：預收類的發票保留
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FINVMST  UF  E           K        DISK
+     FINVDTL  UF  E           K        DISK
+     FINVMSTBKO   E           K        DISK
+     F            INREC                             KRENAMEINRECW
+     FINVDTLBKO   E           K        DISK
+     F            IVREC                             KRENAMEIVRECW
+     FARP052F IF  E           K        DISK
+     F*****************************************************************
+     I           UDS
+     I                                     10211021 U#AREA
+     I*
+     IBKDTA      UDS                             36
+9008 I                                        1   60W#BKDT
+LYW  I                                        1   4 W#BKYM
+     I*
+     I            DS
+     I                                        1   5 IVRESV
+     I                                        1   4 D#ACDT
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C           *NAMVAR   DEFN ARBACKUP  BKDTA  36
+     C           *LOCK     IN   BKDTA
+     C                     UNLCKBKDTA
+     C*
+     C                     EXSR SR1000                     移除無子
+     C                     EXSR SR2000                     移除無主
+     C                     EXSR SR3000                     移除整張
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+     C*
+     C*----------------------------------------
+     C*  無子孤魂移出
+     C*----------------------------------------
+     CSR         SR1000    BEGSR
+     C           *LOVAL    SETLLINREC                69
+     C           1         DOWEQ1
+     C*
+     C                     READ INREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           INNO      CHAINIVREC                69    找子
+     C           *IN69     IFEQ '1'                        無子
+     C                     WRITEINRECW
+     C                     DELETINREC
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  無主孤魂移出
+     C*----------------------------------------
+     CSR         SR2000    BEGSR
+     C                     MOVEL*BLANK    W#IVNO 10
+     C           *LOVAL    SETLLIVREC                69
+     C           1         DOWEQ1
+     C*
+     C                     READ IVREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           W#IVNO    IFNE IVNO                       首張明細
+     C                     MOVELIVNO      W#IVNO
+     C                     MOVEL'F'       W#MOVE  1
+     C           IVNO      CHAININREC                69    找主
+     C           *IN69     IFEQ '1'
+     C                     MOVEL'T'       W#MOVE           無主孤魂
+     C                     ENDIF
+     C                     ENDIF                           首張明細
+     C*
+     C           W#MOVE    IFEQ 'T'
+     C                     WRITEIVRECW
+     C                     DELETIVREC
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  整張發票判斷移出
+     C*----------------------------------------
+     CSR         SR3000    BEGSR
+     C           *LOVAL    SETLLINREC                69
+     C           1         DOWEQ1
+     C*
+     C                     READ INREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           INTYPE    IFEQ '2'                        預收類發票
+     C           INDECD    ANDNE'D'                        且未作廢
+     C                     ITER                            不搬
+     C                     ENDIF
+     C*
+     C           INCUNO    CHAINARP052F              69
+     C           *IN69     IFEQ '0'                        未結案不搬
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     EXSR SR3100                     檢核明細
+     C           W#RTNV    IFEQ 'T'
+     C                     EXSR SR3200                     移除明細
+     C                     WRITEINRECW                     移除發票
+     C                     DELETINREC
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  檢核發票明細是否全部在移出期限內
+     C*----------------------------------------
+     CSR         SR3100    BEGSR
+     C                     MOVEL'T'       W#RTNV  1
+     C           INNO      SETLLIVREC                69
+     C           1         DOWEQ1
+     C*
+     C           INNO      READEIVREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           IVACDT    IFEQ 999999                     不代傳票
+     C           D#ACDT    IFGE W#BKYM
+     C                     MOVEL'F'       W#RTNV
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     ELSE                            代開傳票
+     C           IVACDT    IFGE W#BKDT
+     C                     MOVEL'F'       W#RTNV
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+     C*----------------------------------------
+     C*  移出該發票號碼的所有發票明細
+     C*----------------------------------------
+     CSR         SR3200    BEGSR
+     C           INNO      SETLLIVREC                69
+     C           1         DOWEQ1
+     C*
+     C           INNO      READEIVREC                    69
+     C           *IN69     IFEQ '1'
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     WRITEIVRECW                     移出明細
+     C                     DELETIVREC
+     C*
+     C                     ENDDO
+     CSR                   ENDSR
+     C*
+

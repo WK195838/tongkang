@@ -1,0 +1,264 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP201R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     外銷報關記錄介面傳輸ARCINI->ARCINV
+     H*            5.DATE-WRITTEN  105/09/06 2016AR1007
+     H*            6.UPDATE DATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARCINIL1UP  E           K        DISK
+     FARCINV  UF  E           K        DISK                      A
+     FARCINIG O   E           K        DISK
+     F            RARCINI                           KRENAMEARCIIG
+     FCBCUST  IF  E           K        DISK
+     FSAMAST  IF  E           K        DISK
+     FARP201T1O   E             69     PRINTER
+     FARP201T O   E             70     PRINTER
+     E                    TAB1    1  14  1   TAB2   28
+     I*
+     I            DS
+     I                                        1   80RICDTE
+     I                                        1   60D#YYMM
+     I            DS
+     I                                        1   6 RIOCUS
+     I                                        1   1 D#KIND
+     I                                        2   2 D#CUN1
+     I                                        3   5 D#CUN2
+     I                                        6   6 D#CD01
+     I           UDS
+     I                                        1   1 AR#P
+     I                                        2  11 C#USER
+     I                                       12  12 W#ER
+     I                                       13  22 J#USER
+     I                                      801 8080W#DATE
+     C*****************************************************************
+     C           KEY       KLIST
+     C                     KFLD           RIAREA
+     C                     KFLD           RIORNO
+     C                     KFLD           RIYYMM
+     C                     KFLD           RISEQ
+     C*
+     C           KEY01     KLIST
+     C                     KFLD           S1OREA
+     C                     KFLD           S1ORNO
+     C*
+     C*****************************************************************
+     C*INITIALIZE
+     C  N90                MOVEA'1111'    *IN,69
+     C  N90                MOVEL*BLANK    W#FLAG  1        *處理代碼
+     C  N90                SETON                     90
+     C*
+     C                     MOVEA'0000'    *IN,11
+     C                     MOVEA'0000000' *IN,51
+     C                     MOVEA'0000000' *IN,58
+     C           RIFLAG    COMP 'A'                      11
+     C           RIFLAG    COMP 'C'                      12
+     C           RIFLAG    COMP 'D'                      13
+     C*寫入報表
+     C   69                WRITEAR01T11
+     C                     MOVE *OFF      *IN69
+     C   70                WRITEAR01T21
+     C                     MOVE *OFF      *IN70
+     C*
+     C           RIFLAG    IFNE ' '
+     C           KEY       CHAINRARCINV              31
+     C                     EXSR MOVE1
+     C*
+     C                     SETOF                     99
+     C*逐筆處理, ACD可連續處理上送
+     C*資料不存在時
+    1C           *IN31     IFEQ '1'                        *NR
+     C*刪除時資料不存在,取消過入並列於上送清單
+     C   13                SETON                     9961  *取消過入
+     C*
+     C*檢核
+     C  N99                EXSR CKRTN
+     C  N99                EXSR CKDATE
+     C  N99                WRITERARCINV
+     C   61                SETOF                     99    *取消過入
+    1C                     ENDIF
+     C*
+     C*資料存在時
+     C           *IN31     IFEQ '0'
+0505AC*合約未傳輸各廠不檢核傳送
+0505AC*                    EXSR CKPASS                     *傳送檢核
+     C  N99N13             EXSR CKRTN
+     C*異動檢核
+     C  N99                UPDATRARCINV
+    2C                     ENDIF
+     C*
+     C*傳輸資料正常RISTCL='C'
+     C  N99                MOVEL'C'       RISTCL           *執行碼
+     C  N99 61             MOVEL'D'       RISTCL           *取消過入
+     C*傳輸資料異常RISTCL='E' (未上傳ARCINV)
+     C   99                MOVEL'E'       RISTCL           *執行碼
+     C   99 51             MOVEL'F'       RISTCL           廠區錯誤
+     C   99 52             MOVEL'G'       RISTCL           訂單錯誤
+     C   99 53             MOVEL'H'       RISTCL           訂單空白
+     C   99 54             MOVEL'I'       RISTCL           客戶錯誤
+     C   99 55             MOVEL'J'       RISTCL           客戶空白
+     C   99 56             MOVEL'M'       RISTCL           客戶訂單不符
+     C   99 57             MOVEL'K'       RISTCL           日期錯誤
+     C   99 58             MOVEL'L'       RISTCL           報關年月錯
+     C*  99 60             MOVEL' '       RISTCL           *需重上送
+     C*訊息說明
+     C           RISTCL    LOKUPTAB1      TAB2           34
+     C   34                MOVELTAB2      S#STCL
+     C  N34                MOVEL*BLANK    S#STCL
+     C                     MOVEL'Y'       AR#P             *有資料
+     C*
+     C                     UPDATRARCINI
+     C*記錄處理完後寫介面LOG
+     C                     MOVELJ#USER    RIUSER           *JOB
+     C                     MOVELC#USER    RICUSR           *CUR
+     C                     Z-ADDW#DATE    RIXPDD
+     C                     TIME           RIXPDT
+     C                     WRITEARCIIG
+     C*寫入報表
+     C           *IN99     IFEQ *OFF                       *上送清單
+     C                     WRITEAR01T12
+     C                     ELSE
+     C                     WRITEAR01T22                    *錯誤清單
+     C                     MOVEL'Y'       W#ER             *有錯誤
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     CLR 90                WRITEAR01T13
+     CLR 90                WRITEAR01T23
+     C*****************************************************************
+     C           MOVE1     BEGSR
+     C  N31                MOVELRIFLAG    W#FLAG  1        處理代號
+     C   31                MOVEL*BLANK    W#FLAG  1        處理代號
+     C*
+     C                     MOVELRIFLAG    R1FLAG           處理代碼
+     C                     MOVELRIAREA    R1AREA           報關廠區
+     C                     MOVELRIORNO    R1ORNO           訂單編號
+     C                     Z-ADDRISEQ     R1SEQ            訂單流水號
+     C                     MOVELRIOCUS    R1OCUS           客戶編號
+     C                     MOVELRIOCNM    R1OCNM           客戶名稱
+     C                     Z-ADDRIYYMM    R1YYMM           報關年月
+     C                     Z-ADDRICDTE    R1CDTE           報關日期
+     C                     Z-ADDRISACD    R1SACD           起出貨日
+     C                     Z-ADDRIEACD    R1EACD           迄出貨日
+     C                     Z-ADDRITRAT    R1TRAT           報關匯率
+     C                     Z-ADDRIFCUR    R1FCUR           外幣報關金額
+     C                     Z-ADDRIAMT     R1AMT            台幣報關金額
+     C                     MOVELRIAPNO    R1APNO           報單號碼
+     C                     MOVELRIIVNO    R1IVNO           發票號碼
+     C                     Z-ADDRIQTY     R1QTY            報關數量
+     C                     Z-ADDRIENTD    R1ENTD           建檔日期
+     C                     MOVELRIENTM    R1ENTM           建檔人員
+     C                     Z-ADDRIUPDD    R1UPDD           異動日期
+     C                     Z-ADDRIUPDT    R1UPDT           異動時間
+     C                     MOVELRIUPDM    R1UPDM           異動人員
+     C                     MOVELRIRES1    R1RES1           保留１
+     C                     MOVELRIRES2    R1RES2           保留２
+     C                     MOVELRIRES3    R1RES3           保留３
+     C*
+     C                     ENDSR
+     C****************************************************************
+     C           CKRTN     BEGSR
+     C*報關廠區
+     C  N99      RIAREA    IFNE 'H'
+     C           RIAREA    ANDNE'K'
+     C           RIAREA    ANDNE'U'
+     C                     SETON                     9951  廠區
+     C                     ENDIF
+     C*訂單編號
+     C                     MOVELRIORNO    S1OREA
+     C                     MOVE RIORNO    S1ORNO
+     C*
+     C  N99      RIORNO    IFNE *BLANKS
+     C           KEY01     CHAINSAMAST               52
+     C   52                SETON                     99    訂單不存在
+     C           *IN52     IFEQ *OFF
+     C           S1KIND    IFNE D#KIND
+     C           S1CUN1    ORNE D#CUN1
+     C           S1CUN2    ORNE D#CUN2
+     C           S1CD01    ORNE D#CD01
+     C                     SETON                     5699  訂單客戶不符
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C  N99      RIORNO    IFEQ *BLANKS
+     C                     SETON                     5399  訂單空白
+     C                     ENDIF
+     C*客戶編號
+     C  N99      RIOCUS    IFNE *BLANKS
+     C           RIOCUS    CHAINCBCUST               54
+     C   54                SETON                     99    客戶錯誤
+     C                     ENDIF
+     C*
+     C  N99      RIOCUS    IFEQ *BLANKS
+     C                     SETON                     9955  客戶空白
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C****************************************************************
+     C*檢核日期
+     C           CKDATE    BEGSR
+     C*
+     C*報關日期
+     C*
+     C                     Z-ADDRICDTE    W#DAY   80
+     C                     CALL 'C018'
+     C                     PARM           W#DAY
+     C                     PARM           W#ERR   1
+     C  N99      W#ERR     IFEQ '1'
+     C                     SETON                     9957  *日期錯誤
+     C                     ENDIF
+     C*起年貨日
+     C                     Z-ADDRISACD    W#DAY   80
+     C                     CALL 'C018'
+     C                     PARM           W#DAY
+     C                     PARM           W#ERR
+     C  N99      W#ERR     IFEQ '1'
+     C                     SETON                     9957  *日期錯誤
+     C                     ENDIF
+     C*迄出貨日
+     C                     Z-ADDRIEACD    W#DAY   80
+     C                     CALL 'C018'
+     C                     PARM           W#DAY
+     C                     PARM           W#ERR
+     C  N99      W#ERR     IFEQ '1'
+     C                     SETON                     9957  *日期錯誤
+     C                     ENDIF
+     C*
+     C*報關年月
+     C*
+     C  N99      R1YYMM    IFNE D#YYMM
+     C                     SETON                     9958
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C****************************************************************
+     C*前筆處理至D碼HSCONT未傳輸時
+     C*後面同單據需於下次再送並寫入錯誤清單中告知非資料錯誤
+     C           CKPASS    BEGSR
+     C           W#FLAG    IFEQ 'D'
+     C                     SETON                     9960  *需再上送
+     C                     ENDIF
+     C                     ENDSR
+** AR1
+CC-上送成功
+DD-上送取消(資料不存在)
+EE-資料異常不存在
+FF-廠區有誤
+GG-訂單號碼不存在
+HH-訂單號碼不可空白
+II-客戶編號不存在
+JJ-客戶編號不可空白
+KK-日期錯誤
+LL-報關年月錯誤
+MM-客戶與訂單不符
+NN-
+PP-
+  -檔案傳輸中，請稍候再上傳
+

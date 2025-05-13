@@ -1,0 +1,220 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARR099R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02LBU
+     H*            4.FUNCTION     應收帳款承購(E-FACTORING)繳款呈核表
+     H*            5.DATE-WRITTEN  91/10/07
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARCVMS  IP  E           K        DISK
+     FARCVDT  IF  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FARINVM  IF  E           K        DISK
+     FARCVCK  IF  E           K        DISK
+     FARR099T O   E             66     PRINTER
+     F*****************************************************************
+     IRARCVMS
+     I                                              ASENDTL2
+     I                                              ASRCNOL1
+     I*------------------------------------------------------
+     I           UDS
+     I                                     10011010 U#USID
+     I                                     10211021 U#AREA
+     C*
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*********************************
+     C*  初始程式
+     C*********************************
+     CSR         INISR     BEGSR
+     C*
+     C           K#CVCK    KLIST
+     C                     KFLD           AKRCNO           沖銷單號
+     C                     KFLD           AKRCTM           沖銷項次
+     C                     SETON                     66
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L2清除函式換日期
+     C*********************************
+     C           L2CLR     BEGSR
+     C*
+     C                     CLEARAR099T1T
+     C*
+     C                     ENDSR
+     C*********************************
+     C*  L1清除函式換繳款單
+     C*********************************
+     CSR         L1CLR     BEGSR
+     C*
+     C                     CLEARAR099T1S
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  DETAIL TIME 函式
+     C*********************************
+     CSR         DTLSR     BEGSR
+     C*
+     C                     CLEARAR099T1D
+     C                     Z-ADDASENDT    R#RVDT           輸入日期
+     C*
+     C*給定ARCVCK之KEY值
+     C                     MOVELASRCNO    AKRCNO           沖銷單號
+     C                     Z-ADD0         AKRCTM           沖銷項次
+     C*
+     C*
+     C                     MOVELASRCNO    R#RVNO           沖銷單號
+     C                     MOVELASCUNO    R#CUNO           客戶代號
+     C           ASCUNO    CHAINCBCUST               69
+     C   69                MOVEL*BLANK    R#CUNM
+     C  N69                MOVELCBCUNM    R#CUNM
+     C*
+     C           K#CVCK    SETLLRARCVCK
+     C                     MOVE *OFF      *IN60
+     C           *IN60     DOWEQ*OFF
+     C                     READ RARCVCK                  60
+     C*
+     C           ASRCNO    IFNE AKRCNO
+     C           *IN60     OREQ *ON
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVELAKNTTP    R#NTTP           票據別
+     C                     MOVELAKBANM    R#PBID           付款銀行
+     C                     MOVELAKRLNO    R#NTNO           票據號碼
+     C                     Z-ADDAKDUDT    R#DUDT           到期日
+     C                     Z-ADDAKRAMT    R#RAMT           收款金額
+     C                     MOVELAKRESV    R#RESV           備註
+     C*
+     C   66                WRITEAR099T1H
+     C                     SETOF                     66
+     C                     WRITEAR099T1D                   繳款明細
+     C                     ADD  R#RAMT    R#SRNA           小計票據　
+     C*
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L1 函式  繳款單號更改
+     C*********************************
+     CSR         L1SR      BEGSR
+     C*
+     C                     WRITEAR099T1L                   換行
+     C                     CLEARAR099T1E
+     C                     Z-ADD0         W#CNTN  10
+     C*
+     C           ASRCNO    CHAINRARCVDT              69
+     C           *IN69     DOWEQ'0'
+     C                     ADD  1         W#CNTN
+     C                     EXSR SR1000                     搬移變數
+     C*
+     C           W#CNTN    IFEQ 3
+     C   66                WRITEAR099T1H
+     C                     SETOF                     66
+     C                     WRITEAR099T1E                   沖銷明細
+     C*
+     C                     ADD  R#INX1    R#SRXA           小計繳款　
+     C                     ADD  R#INX2    R#SRXA
+     C                     ADD  R#INX3    R#SRXA
+     C                     CLEARAR099T1E
+     C                     Z-ADD0         W#CNTN
+     C                     ENDIF
+     C           ASRCNO    READERARCVDT                  69
+     C                     ENDDO
+     C*
+     C           W#CNTN    IFNE 0
+     C   66                WRITEAR099T1H
+     C                     SETOF                     66
+     C                     WRITEAR099T1E                   沖銷明細
+     C*
+     C                     ADD  R#INX1    R#SRXA           小計繳款　
+     C                     ADD  R#INX2    R#SRXA
+     C                     ADD  R#INX3    R#SRXA
+     C                     ENDIF
+     C*
+     C   66                WRITEAR099T1H
+     C                     SETOF                     66
+     C                     WRITEAR099T1S
+     C*
+     C                     ADD  R#SRNA    R#TRNA           合計票據
+     C                     ADD  R#SRXA    R#TRXA           合計繳款
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  L2 函式
+     C*********************************
+     CSR         L2SR      BEGSR
+     C*
+     C   66                WRITEAR099T1H
+     C                     SETOF                     66
+     C                     WRITEAR099T1T                   寫出合計
+     C                     WRITEAR099T1X                   寫出覆核
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  LR 函式  (NOTHING)
+     C*********************************
+     CSR         LRSR      BEGSR
+     C*
+     CSR                   ENDSR
+     C*********************************
+     C*  查無資料函式
+     C*********************************
+     CSR         MSGSR     BEGSR
+     C*
+     C                     WRITEAR099T1H
+     C                     WRITEAR099T1M
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C*  子函式集
+     C*****************************************************************
+     C*********************************
+     C*  列印沖銷發票內容之搬移變數
+     C*********************************
+     CSR         SR1000    BEGSR
+     C*
+     C                     SELEC
+     C           W#CNTN    WHEQ 1
+     C                     MOVELATINNO    R#INN1
+     C           ATINNO    CHAINRARINVM              69
+     C   69                MOVEL*BLANK    R#APN1
+     C  N69                MOVELAMAPN2    R#APN1           請款單號
+     C                     MOVELAMINDT    R#IND1           發票日期
+     C                     Z-ADDATAMT3    R#INX1           沖銷金額
+     C*
+     C           W#CNTN    WHEQ 2
+     C                     MOVELATINNO    R#INN2
+     C           ATINNO    CHAINRARINVM              69
+     C   69                MOVEL*BLANK    R#APN2
+     C  N69                MOVELAMAPN2    R#APN2           請款單號
+     C                     MOVELAMINDT    R#IND2           發票日期
+     C                     Z-ADDATAMT3    R#INX2           沖銷金額
+     C*
+     C           W#CNTN    WHEQ 3
+     C                     MOVELATINNO    R#INN3
+     C           ATINNO    CHAINRARINVM              69
+     C   69                MOVEL*BLANK    R#APN3
+     C  N69                MOVELAMAPN2    R#APN3           請款單號
+     C                     MOVELAMINDT    R#IND3           發票日期
+     C                     Z-ADDATAMT3    R#INX3           沖銷金額
+     C*
+     C                     ENDSL
+     C*
+     CSR                   ENDSR
+

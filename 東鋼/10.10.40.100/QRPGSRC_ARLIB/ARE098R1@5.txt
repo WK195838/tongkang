@@ -1,0 +1,190 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARE098R1
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     區間發票開立試算表
+     H*            5.DATE-WRITTEN  99/05/27  2010AR421
+     H*            6.UPDATE-DATE   99/08/02  2010AR514
+     H*                            99/12/14  2010AR560  S00WCJ (9912A)
+     H*                           100/02/09  2011ARXXX  S00WCJ (0002A)
+     H*                           101/11/12  2012AR699  S00WCJ (0111A)
+     H*
+     H*****************************************************************
+     FINVTRL  IP  E           K        DISK
+     FARE098T O   E             60     PRINTER      KINFDS PRTCTL
+     F*
+9908AE*                   ARY        30 24
+9908AE*9912A              ARY        35 24
+9912AE                    ARY        35 35
+     E*
+     IRINVTRL
+     I                                              ITTXDEL1
+     IPRTCTL      DS
+     I                                    B 367 3680CURLIN
+     I                                    B 369 3720CURPAG
+     I            DS
+9912AI*                                       1  24 D#ARY
+9912AI                                        1  35 D#ARY
+     I                                        1   3 D#PDN1
+     I                                        4  100D#QTY
+9908AI                                       11  213D#SAM1
+9908AI*                                      11  170D#SQTY
+9908AI                                       22  280D#SQTY
+9908AI*                                      18  240D#SAMT
+9908AI                                       29  350D#SAMT
+     I*
+     I           UDS
+     I                                      801 8080R#DATE
+     I                                      951 985 COMP
+     I                                     10011010 U#USID
+     I                                     10111020 DEVNM
+     C*
+     C****************************************************************
+     C*          *ENTRY    PLIST
+     C*                    PARM           R#NO   10
+     C*
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C                     EXSR SR1000
+     C   60                EXSR SR2000
+     CL1                   EXSR SR3000
+     CLR                   EXSR SR4000
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*由於表頭資料寫在檔案中，故先讀一筆資料後再印表頭
+     C* 印表頭
+     C                     CLEARAR098T1M
+9912AC                     CLEARAR098T2M
+     C                     MOVEL*ALL'9'   ARY
+     C                     MOVEL*ON       *IN10
+     C                     MOVELITORNO    R#ORNO
+     C                     MOVELITCUNO    R#CUNO
+     C                     MOVELITCUNM    R#CUNM
+     C                     MOVELITNO      R#NO
+     C                     WRITEAR098T1H
+     C                     MOVEL*OFF      *IN60
+     C                     MOVEL*ON       *IN51
+     C                     Z-ADD1         I       20
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C                     Z-ADDITTXDE    R#TXDE
+     C                     MOVELITTXNO    R#TXNO
+     C                     Z-ADDITITEM    R#ITEM
+     C                     MOVELITPDNM    R#PDNM
+     C                     Z-ADDITUPRC    R#UPRC
+     C                     Z-ADDITQTY     R#QTY
+     C                     Z-ADDITSQTY    R#SQTY
+     C                     Z-ADDITSPRC    R#SPRC
+     C                     Z-ADDITAMT     R#AMT
+9908AC           R#UPRC    MULT R#QTY     R#TAM1
+0111AC           R#SQTY    IFNE 0
+0111AC           R#AMT     ORNE 0
+0111AC           R#QTY     ADD  R#SQTY    R#UQTY
+0111AC           R#TAM1    ADD  R#AMT     R#UAMT
+0111AC                     ENDIF
+0111AC*
+     C*
+     C  N10                EXSR SR0000
+     C*
+     C*將類別合計至ARY中
+     C*
+     C                     SORTAARY
+     C           1         DO   30        I
+     C                     MOVE ARY,I     D#ARY
+     C*
+     C           D#PDN1    IFEQ '999'
+     C                     MOVELITPDNM    D#PDN1
+     C                     Z-ADDITQTY     D#QTY
+     C                     Z-ADDITSQTY    D#SQTY
+     C                     Z-ADDITAMT     D#SAMT
+9908AC                     Z-ADDR#TAM1    D#SAM1
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ELSE
+     C           ITPDNM    IFEQ D#PDN1
+     C                     ADD  ITQTY     D#QTY
+     C                     ADD  ITSQTY    D#SQTY
+     C                     ADD  ITAMT     D#SAMT
+9908AC                     ADD  R#TAM1    D#SAM1
+     C                     MOVE D#ARY     ARY,I
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     WRITEAR098T1D
+     C                     SETOF                     51
+0111AC                     Z-ADD0         R#UQTY
+0111AC                     Z-ADD0         R#UAMT
+     C           END100    ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*
+     C                     WRITEAR098T1X
+     C                     WRITEAR098T1H
+     C                     SETOF                     60
+     C                     ENDSR
+     C*
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*
+     C                     SETON                     51
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4000    BEGSR
+     C*****************************************************************
+     C*
+     C                     Z-ADD1         J       20
+     C                     SORTAARY
+     C           1         DO   30        J
+     C                     MOVE ARY,J     D#ARY
+     C           D#PDN1    IFNE '999'
+     C                     MOVE D#PDN1    R#SPDM
+     C                     Z-ADDD#QTY     R#TQTY
+     C                     Z-ADDD#SQTY    R#TQY2
+     C                     Z-ADDD#SAMT    R#TAMT
+9908AC                     Z-ADDD#SAM1    R#TAM2
+9912AC                     ADD  R#TQTY    R1TQTY
+9912AC                     ADD  R#TQY2    R1TQY2
+9912AC                     ADD  R#TAMT    R1TAMT
+9912AC                     ADD  R#TAM2    R1TAM2
+0111AC           R#TQY2    IFNE 0
+0111AC           R#TAM2    ORNE 0
+0111AC           R#TQTY    ADD  R#TQY2    R#UQY2
+0111AC           R#TAM2    ADD  R#TAMT    R#UAM2
+0111AC           R1TQTY    ADD  R1TQY2    R1UQY2
+0111AC           R1TAM2    ADD  R1TAMT    R1UAM2
+0111AC                     ENDIF
+     C*
+     C                     WRITEAR098T1M
+     C                     WRITEAR098T1L
+     C                     MOVEL*ON       *IN55
+     C                     ELSE
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDDO
+0002AC           CURLIN    IFLE 54
+9912AC                     WRITEAR098T2M
+     C*
+0002AC*          CURLIN    IFLE 58
+     C                     WRITEAR098T1T
+     C                     WRITEAR098T2T
+     C                     ELSE
+     C                     WRITEAR098T1X
+0002AC                     WRITEAR098T1H
+0002AC                     WRITEAR098T2M
+     C                     WRITEAR098T1T
+     C                     WRITEAR098T2T
+     C                     ENDIF
+     C                     ENDSR
+

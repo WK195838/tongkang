@@ -1,0 +1,419 @@
+     H*****************************************************************
+     H*
+     H*          >>  PROGRAM INTRODUCTION  <<
+     H*          1.PROGRAM-ID    ARR127R
+     H*          2.PROGRAM-TYPE  RPG/400
+     H*          3.AUTHOR        S02LBU
+     H*          4.FUNCTION     外銷銷貨差異明細表
+     H*          5.DATE-WRITTEN  92/01/09
+     H*          6.DATE-MODIFY
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARCINV  IP  E                    DISK
+     FTRNDTLL4IF  E           K        DISK
+     FARR127T1O   E             66     PRINTER
+     F*****************************************************************
+     E                    ARY1       30 24
+     E                    ARY2       30  3
+     E                    ARY3       30 35
+     E*----------------------------------------------------------------
+     IRARCINV
+     I                                              R1OCUSL2
+     I                                              R1IVNOL1
+     I*
+     I            DS
+     I                                        1   80C1CDTE
+     I                                        1   6 D#CDYM
+     I*
+     I            DS
+     I                                        1   9 TXORNO
+     I                                        1   6 D#ORNO
+     I*
+     I            DS
+     I                                        1  24 D#ARY1
+     I                                        1   3 D#PDNO
+     I                                        4  140D#AMT
+     I                                       15  240D#QTY
+     I*
+     I            DS
+     I                                        1   3 D#ARY2
+     I                                        1   3 D#PDNM
+     I*
+     I            DS
+     I                                        1  35 D#ARY3
+     I                                        1   3 D#PDN3
+     I                                        4  140D#AMT3
+     I                                       15  240D#QTY3
+     I                                       25  350D#CAMT
+     I*
+     I            DS
+     I                                        1  10 TXIVNO
+     I                                        1   1 D#IVN1
+     I*
+     I            DS
+     I                                        1   80TXDATE
+     I                                        1   6 D#YM
+     I*
+     I           UDS
+     I                                      301 306 D#YMS
+     I                                      309 314 D#YME
+     I                                      317 317 D#AREA
+     C*****************************************************************
+     C*          KEY       LIST
+     C*****************************************************************
+     C           TXKEY     KLIST
+     C                     KFLD           K#ORNO  6
+     C*
+     C*****************************************************************
+     C*          MAIN      PROGRAM
+     C*****************************************************************
+     C  N90                EXSR INZ#01
+     C  N90                SETON                     90
+     C   L2                EXSR DL#L2
+     C   L1                EXSR DL#L1
+     C                     EXSR DP#01
+     CL1 90                EXSR TL#L1
+     CL2 90                EXSR TL#L2
+     CLR 90                EXSR TL#LR
+     CLRN90                EXSR MSGSR
+     C*
+     C*****************************************************************
+     CSR         INZ#01    BEGSR
+     C*****************************************************************
+     C                     MOVE *ALL'='   T#LIN1
+     C                     MOVE *ALL'='   T#LIN2
+     C                     MOVE *ALL'-'   T#LIN3
+     C                     MOVE *ALL'-'   T#LIN4
+     C*
+     C                     MOVELD#YMS     T#YMS            起報關年月
+     C                     MOVELD#YME     T#YME            訖報關年月
+     C                     MOVELD#AREA    T#AREA           廠別
+     C*
+     C*清空總合計暫存值
+     C*
+     C                     Z-ADD0         W#TAM1 100
+     C                     Z-ADD0         W#TAM2 100
+     C                     Z-ADD0         W#TAM3 100
+     C                     Z-ADD0         W#TQTY 100
+     C                     Z-ADD0         W#AMT3 100
+     C                     Z-ADD0         W#QTY3 100
+     C                     Z-ADD0         W#CAMT 100
+     C*
+     C                     MOVEA*ALL'9'   ARY3
+     C                     MOVE *ON       *IN66
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         DL#L2     BEGSR
+     C*****************************************************************
+     C*清空客戶小計暫存值
+     C*
+     C                     Z-ADD0         W#AM1S 100
+     C                     Z-ADD0         W#AM2S 100
+     C                     Z-ADD0         W#AM3S 100
+     C                     Z-ADD0         W#QTYS 100
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         DL#L1     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#CNT1  40       銷貨品名筆數計算
+     C                     Z-ADD1         W#CNT2  40        ARY筆數計算
+     C                     Z-ADD0         W#SUBT 100        W#CNT1 - W#CNT2
+     C                     Z-ADD0         W#AMT1 100       報關金額
+     C                     MOVEA*ALL'9'   ARY1
+     C                     MOVEA*ALL'9'   ARY2
+     C                     MOVE *OFF      *IN41
+     C*
+     C*清空客戶小計暫存值
+     C*
+     C                     Z-ADD0         W#AMT  100
+     C                     Z-ADD0         W#SAM1 100
+     C                     Z-ADD0         W#SAM2 100
+     C                     Z-ADD0         W#SAM3 100
+     C                     Z-ADD0         W#SQTY 100
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         DP#01     BEGSR
+     C*****************************************************************
+     C*依品名計算相關銷貨資料及筆數
+     C*
+     C           R1IVNO    IFEQ W#ORNO
+     C                     ADD  R1AMT     W#AMT1
+     C                     GOTO ENDPSR
+     C                     ELSE
+     C                     Z-ADDR1AMT     W#AMT1
+     C                     MOVELR1IVNO    W#ORNO 10
+     C                     EXSR SR1000
+     C                     ENDIF
+     C*
+     CSR         ENDPSR    ENDSR
+     C*****************************************************************
+     CSR         TL#L1     BEGSR
+     C*****************************************************************
+     C           R1ORNO    IFEQ 'H10513'
+     C                     MOVEL'X'       W#TEMP  1
+     C                     ENDIF
+     C*
+     C                     MOVELR1OCUS    T#CUNO           客戶代號
+     C                     MOVELR1OCNM    T#CUNM           客戶簡稱
+     C                     MOVELR1ORNO    T#ORNO           訂單編號
+     C                     MOVELR1APNO    T#NO             報關號碼
+     C                     Z-ADDR1CDTE    T#CDTE           報關日期
+     C*
+     C*讀取ARY2中之品名並計算筆數
+     C*
+     C                     Z-ADD1         J
+     C                     SORTAARY2
+     C           1         DO   30        J
+     C                     MOVE ARY2,J    D#ARY2
+     C*
+     C           D#PDNM    IFNE '999'
+     C                     MOVELD#PDNM    W#PDNM  3
+     C                     ADD  1         W#CNT1
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C*讀取ARY1中之銷貨數量及金額，
+     C*並依品名不同累計筆數，
+     C*如ARY1中之筆數與ARY2筆數相同，
+     C*表示該訂單資料已至最後一筆，
+     C*則將報關金額減銷貨金額之差異寫入至最後一筆
+     C*
+     C                     Z-ADD1         I
+     C                     SORTAARY1
+     C           1         DO   30        I
+     C                     MOVE ARY1,I    D#ARY1
+     C*
+     C           D#PDNO    IFNE '999'
+     C                     MOVELD#PDNO    T#PDNO           品名
+     C                     Z-ADDD#AMT     T#AMT1           報關金額
+     C                     Z-ADDD#AMT     T#AMT2           銷貨金額
+     C                     Z-ADDD#QTY     T#QTY            銷貨數量
+     C                     ADD  T#AMT1    W#AMT
+     C*
+     C           W#CNT1    IFEQ W#CNT2
+     C           W#AMT1    SUB  W#AMT     W#SUBT
+     C                     ADD  W#SUBT    T#AMT1           報關金額
+     C                     ENDIF
+     C*
+     C           T#AMT1    SUB  T#AMT2    T#AMT3           差異金額
+     C*
+     C   66                WRITEAR127T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR127T1D
+     C*
+     C*訂單小計相關數值累計
+     C*
+     C                     ADD  T#AMT1    W#SAM1           報關金額
+     C                     ADD  T#AMT2    W#SAM2           銷貨金額
+     C                     ADD  T#AMT3    W#SAM3           差異金額
+     C                     ADD  T#QTY     W#SQTY           數量
+     C*
+     C                     MOVE *ON       *IN41
+     C                     ADD  1         W#CNT2
+     C*===========
+     C                     Z-ADD1         K       40
+     C                     SORTAARY3
+     C           1         DO   30        K
+     C                     MOVE ARY3,K    D#ARY3
+     C*
+     C           D#PDN3    IFEQ D#PDNO
+     C                     ADD  D#AMT     D#AMT3           銷貨金額
+     C                     ADD  D#QTY     D#QTY3           銷貨數量
+     C                     ADD  T#AMT1    D#CAMT           報關金額
+     C                     MOVE D#ARY3    ARY3,K
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           D#PDN3    IFEQ '999'
+     C                     CLEARARY3,K
+     C                     MOVELD#PDNO    D#PDN3           品名
+     C                     Z-ADDD#AMT     D#AMT3           銷貨金額
+     C                     Z-ADDD#QTY     D#QTY3           銷貨數量
+     C                     Z-ADDT#AMT1    D#CAMT           報關金額
+     C                     MOVE D#ARY3    ARY3,K
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C*===========
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C*寫入訂單小計相關數值
+     C*
+     C                     Z-ADDW#SAM1    T#SAM1
+     C                     Z-ADDW#SAM2    T#SAM2
+     C                     Z-ADDW#SAM3    T#SAM3
+     C                     Z-ADDW#SQTY    T#SQTY
+     C*
+     C   66                WRITEAR127T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR127T1L
+     C                     WRITEAR127T1S
+     C*
+     C*客戶小計相關數值累計
+     C*
+     C                     ADD  T#SAM1    W#AM1S
+     C                     ADD  T#SAM2    W#AM2S
+     C                     ADD  T#SAM3    W#AM3S
+     C                     ADD  T#SQTY    W#QTYS
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         TL#L2     BEGSR
+     C*****************************************************************
+     C*寫入客戶小計相關數值
+     C*
+     C                     Z-ADDW#AM1S    T#AM1S
+     C                     Z-ADDW#AM2S    T#AM2S
+     C                     Z-ADDW#AM3S    T#AM3S
+     C                     Z-ADDW#QTYS    T#QTYS
+     C*
+     C   66                WRITEAR127T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR127T1L
+     C                     WRITEAR127T2S
+     C*
+     C*總合計相關數值累計
+     C*
+     C                     ADD  T#AM1S    W#TAM1
+     C                     ADD  T#AM2S    W#TAM2
+     C                     ADD  T#AM3S    W#TAM3
+     C                     ADD  T#QTYS    W#TQTY
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         TL#LR     BEGSR
+     C*****************************************************************
+     C*寫入總合計
+     C*
+     C                     Z-ADDW#TAM1    T#TAM1
+     C                     Z-ADDW#TAM2    T#TAM2
+     C                     Z-ADDW#TAM3    T#TAM3
+     C                     Z-ADDW#TQTY    T#TQTY
+     C*
+     C   66                WRITEAR127T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR127T1L                   畫線
+     C                     WRITEAR127T1T                   寫入總合計
+     C                     WRITEAR127T1N                   寫品名抬頭
+     C*
+     C*依品名讀取合計資料
+     C*
+     C                     Z-ADD1         K
+     C                     SORTAARY3
+     C           1         DO   30        K
+     C                     MOVE ARY3,K    D#ARY3
+     C*
+     C           D#PDN3    IFNE '999'
+     C                     MOVELD#PDN3    T#PDNM           品名
+     C                     Z-ADDD#AMT3    T#SAMT           銷貨金額
+     C                     Z-ADDD#QTY3    T#SAQT           數量
+     C                     Z-ADDD#CAMT    T#CAMT           報關金額
+     C*
+     C*依品名累計合計數
+     C*
+     C                     ADD  D#AMT3    W#AMT3           銷貨金額
+     C                     ADD  D#QTY3    W#QTY3           數量
+     C                     ADD  D#CAMT    W#CAMT           報關金額
+     C*
+     C   66                WRITEAR127T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR127T1P                   寫品名小計
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C*依品名寫入合計數
+     C*
+     C                     Z-ADDW#AMT3    T#TSAM           銷貨金額
+     C                     Z-ADDW#QTY3    T#TSQT           數量
+     C                     Z-ADDW#CAMT    T#TCAM           報關金額
+     C*
+     C   66                WRITEAR127T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR127T2T                   寫品名合計
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C           MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INZ#01
+     C*
+     C   66                WRITEAR127T1H
+     C                     MOVE *OFF      *IN66
+     C                     WRITEAR127T1M
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*依品名以ARY1記錄銷貨明細中之數量及金額
+     C*
+     C                     MOVE *OFF      *IN40
+     C           R1ORNO    SETLLTXREC
+     C           *IN40     DOWEQ*OFF
+     C           R1ORNO    READETXREC                    40
+     C*
+     C   40                LEAVE
+     C*
+     C           D#IVN1    IFNE '#'
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           TXACDT    IFLT R1SACD
+     C           TXACDT    ORGT R1EACD
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     Z-ADD1         I       40
+     C                     SORTAARY1
+     C           1         DO   30        I
+     C                     MOVE ARY1,I    D#ARY1
+     C*
+     C           TXPDNM    IFEQ D#PDNO
+     C                     ADD  TXAMT     D#AMT            金額
+     C                     ADD  TXQTY     D#QTY            銷貨數量
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           D#PDNO    IFEQ '999'
+     C                     CLEARARY1,I
+     C                     MOVELTXPDNM    D#PDNO           品名
+     C                     Z-ADDTXAMT     D#AMT            金額
+     C                     Z-ADDTXQTY     D#QTY            銷貨數量
+     C                     MOVE D#ARY1    ARY1,I
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C*以ARY2記錄銷貨明細中之品名筆數
+     C*
+     C                     Z-ADD1         J       40
+     C                     SORTAARY2
+     C           1         DO   30        J
+     C                     MOVE ARY2,J    D#ARY2
+     C*
+     C           TXPDNM    IFEQ D#PDNM
+     C                     LEAVE
+     C                     ELSE
+     C*
+     C           D#PDNM    IFEQ '999'
+     C                     CLEARARY2,J
+     C                     MOVELTXPDNM    D#PDNM           品名
+     C                     MOVE D#ARY2    ARY2,J
+     C                     LEAVE
+     C                     ENDIF
+     C                     ENDIF
+     C                     ENDDO
+     C*
+     C                     ENDDO
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+

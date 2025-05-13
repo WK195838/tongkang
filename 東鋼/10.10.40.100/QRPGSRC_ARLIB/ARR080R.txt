@@ -1,0 +1,229 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP072R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02YSH
+     H*            4.FUNCTION     發票與銷貨金額差異代開
+     H*            5.DATE-WRITTEN  89/05/24
+     H*            6.DATE-UPDATE   92/08/19
+     H*                           104/10/05  2015AR953  S00WCJ (0409A)
+     H*                            產品代碼3碼擴5碼
+     H*
+     H*****************************************************************
+     H        1   Y                                     1                 BR003
+     FARR080F IP  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FINVDTL  IF  E           K        DISK
+     FARR080T O   E             69     PRINTER
+     E*************************************************************
+     E                    TAB1    1   6  1   TAB1R   8
+     I*****************************************************************
+     IRARR080F
+     I                                              A1ORNOL2
+     I                                              A1IVNOL1
+     I                                              A1PDNML1
+     I*------------------------------------------------------
+TEST I            DS
+ .   I                                        1  10 A1IVNO
+ .   I                                        3  10 D#IVNO
+     I            DS
+     I                                        1   4 T#NO
+     I                                        1   1 D#TNO1
+     I            DS
+     I                                        1   4 D#VRNO
+     I                                        1   1 D#VRN1
+     I                                        2   40D#VRN2
+     I            DS
+     I                                        1   3 D#DSC
+     I                                        1   1 D#DSC1
+     I                                        2   2 D#DSC2
+     I            DS
+     I                                        1   6 D#NO
+     I                                        1   1 D#NO1
+     I                                        2   2 D#NO2
+     I                                        3   6 D#NO3
+     I           UDS
+     I                                        2   70U#YYMM
+     I                                        2   50U#YY
+     I                                        6   70U#MM
+     I                                        1   1 U#AREA
+     I                                     10011010 U#USID
+     C*****************************************************************
+     C*         KEY  LIST
+     C*****************************************************************
+     C           K#VDTL    KLIST
+     C                     KFLD           IVNO
+     C                     KFLD           IVACNT
+     C                     KFLD           IVITEM
+     C*****************************************************************
+     C*        主程式開始
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C  N99                SETON                     99
+     C   L2                EXSR L2CLR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CL2 99                EXSR L2SR
+     CLR 99                EXSR LRSR
+     CLRN99                EXSR MSGSR
+     C*
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C*報表表頭設定
+     C           U#AREA    LOKUPTAB1      TAB1R          66
+     C   66                MOVELTAB1R     R#AREA           廠區
+     C                     Z-ADDU#YY      R#YY             年
+     C                     Z-ADDU#MM      R#MM             月
+     C                     Z-ADD0         W#AMTD
+     C                     SETON                     69
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     CSR         L2CLR     BEGSR                           換訂單
+     C*****************************************************************
+     C                     CLEARAR080T1S
+     C                     Z-ADD0         W#ITEM  40       明細筆數
+     C                     Z-ADD0         W#AMTD
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         L1CLR     BEGSR                           換發票品名
+     C*****************************************************************
+     C                     CLEARAR080T1D
+     C                     Z-ADD0         W#AMTB           銷貨金額
+     C                     Z-ADD0         W#AMTA           發票金額
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         DTLSR     BEGSR
+     C*****************************************************************
+     C                     ADD  A1AMT     W#AMTB 120       銷貨金額
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         L1SR      BEGSR
+     C*****************************************************************
+TEST C           D#IVNO    IFEQ '38880993'
+ .   C                     Z-ADD0         W#TEST  10
+ .   C                     ENDIF
+     C*
+     C           A1IVNO    CHAININREC                50
+     C                     MOVELINCUNO    D#CUNO  1
+     C*
+     C           INKIND    IFEQ '2'                        二聯式
+     C           D#CUNO    ANDNE'E'                        外銷客戶
+     C           INCUNO    ANDNE'DH0101'
+     C           W#AMTB    MULT 1.05      W#AMTB    H
+     C                     ENDIF
+     C*
+     C*自發票明細檔中計算該品名之發票金額
+     C                     MOVE *OFF      *IN70
+     C*
+     C                     MOVE INNO      IVNO
+     C                     MOVE *BLANK    IVACNT
+     C                     Z-ADD0         IVITEM
+     C           K#VDTL    SETLLIVREC
+     C           *IN70     DOWEQ*OFF
+     C                     READ IVREC                    70
+     C*
+     C           *IN70     IFEQ *ON
+     C           IVNO      ORNE INNO
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C           A1PDNM    IFEQ IVPDCD                     品名代號
+     C           IVACNT    ANDEQ'1'                        出貨類
+     C                     ADD  IVAMT     W#AMTA 120       發票金額
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C           W#AMTA    SUB  W#AMTB    W#AMTC 120       差額
+     C*寫入報表
+     C           W#AMTC    IFNE 0
+     C                     MOVELINCUNO    R#CUNO           客戶編號
+     C                     MOVELINCUNM    R#CUNM           客戶名稱
+     C                     MOVELINORNO    R#ORNO           訂單編號
+     C                     MOVELA1IVNO    R#INNO           發票編號
+0409AC                     MOVELA1PDNM    R#PDN3           品名
+     C                     Z-ADDW#AMTA    R#AMTA           發票金額
+     C                     Z-ADDW#AMTB    R#AMTB           銷貨金額
+     C                     Z-ADDW#AMTC    R#AMTC           差異金額
+     C*
+     C           R#AMTB    IFEQ 0
+     C                     MOVEL'原訂單'R#MARK
+     C                     MOVELA1ORNO    R#ORN1
+     C                     ADD  R#AMTA    W#AMTD  90
+     C                     ADD  R#AMTA    W#AMTE  90
+     C                     ELSE
+     C                     MOVE *BLANK    R#MARK
+     C                     ENDIF
+     C*
+     C   69                WRITEAR080T1H
+     C   69                SETOF                     69
+     C                     WRITEAR080T1D
+     C*小計
+     C                     ADD  1         W#ITEM           累計筆數
+     C                     ADD  R#AMTA    R#SAMA           發票金額
+     C                     ADD  R#AMTB    R#SAMB           銷貨金額
+     C                     ADD  R#AMTC    R#SAMC           差異金額
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         L2SR      BEGSR
+     C*****************************************************************
+     C           W#ITEM    IFGT 0
+8901 C           W#AMTD    IFGT 0
+  .  C                     MOVEL'原訂單'R#MAR1
+  .  C                     Z-ADDW#AMTD    R#AMTD
+  .  C                     ELSE
+  .  C                     MOVE *BLANK    R#MAR1
+8901 C                     Z-ADD0         W#AMTD
+8901 C                     Z-ADD0         R#AMTD
+  .  C                     ENDIF
+     C*
+     C   69                WRITEAR080T1H
+     C   69                SETOF                     69
+     C                     WRITEAR080T1S
+     C*合計
+     C                     ADD  R#SAMA    R#TAMA           發票金額
+     C                     ADD  R#SAMB    R#TAMB           銷貨金額
+     C                     ADD  R#SAMC    R#TAMC           差異金額
+     C                     ENDIF
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         LRSR      BEGSR                           印合計
+     C*****************************************************************
+     C           W#AMTE    IFGT 0
+     C                     MOVEL'原訂單'R#MAR2
+     C                     Z-ADDW#AMTE    R#AMTE
+     C                     ENDIF
+     C*
+     C   69                WRITEAR080T1H
+     C   69                SETOF                     69
+     C                     WRITEAR080T1T
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+     CSR         MSGSR     BEGSR
+     C*****************************************************************
+     C                     EXSR INISR
+     C   69                WRITEAR080T1H
+     C   69                SETOF                     69
+     C                     WRITEAR080T1M
+     C*
+     CSR                   ENDSR
+     C*****************************************************************
+** TAB1
+ 全公司
+P台北
+M台中
+T桃園
+H苗栗
+K高雄
+

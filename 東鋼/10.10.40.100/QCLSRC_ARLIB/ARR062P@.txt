@@ -1,0 +1,119 @@
+     /***************************************************************/
+     /*                                                             */
+     /*            1.PROGRAM-ID    ARR062P                          */
+     /*            2.PROGRAM-TYPE  CLP                              */
+     /*            4.FUNCTION     客戶銷貨折讓明細表              */
+     /*            5.DATE-WRITTEN  84/09/25                         */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&TYPE)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR) LEN(10)
+             DCL        VAR(&AREA)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&S#M1)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&W#DATE)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#ERR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&YEAR)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&MONTH)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&W#YM1)   TYPE(*CHAR) LEN(5)
+             DCL        VAR(&W#YM2)   TYPE(*CHAR) LEN(5)
+
+             DCL        VAR(&P#DATE)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&P#MODE)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&P#MTL)   TYPE(*CHAR) LEN(24)
+             DCL        VAR(&P#LEAP)  TYPE(*CHAR) LEN(1)
+
+             DCLF       FILE(ARR062S)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&TYPE)
+             IF         COND(&TYPE='0') THEN(GOTO CMDLBL(BATCH))
+             RTVDTAARA  DTAARA(*LDA (951 35))  RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVN)
+             RTVDTAARA  DTAARA(*LDA (1021 1))  RTNVAR(&AREA)
+             RTVSYSVAL  SYSVAL(QYEAR) RTNVAR(&YEAR)
+             RTVSYSVAL  SYSVAL(QMONTH) RTNVAR(&MONTH)
+             CHGVAR     VAR(&S#YM1) VALUE('00' *CAT &YEAR *CAT &MONTH)
+             CHGVAR     VAR(&S#YM2) VALUE('00' *CAT &YEAR *CAT &MONTH)
+  START:     SNDRCVF
+             CHGVAR     VAR(&IN30) VALUE('0')
+             IF         COND(&IN03 *EQ '1')  THEN(RETURN)
+             CHGDTAARA  DTAARA(*LDA (1 6))  VALUE(&S#YM1)
+             /*        */
+             IF      COND((&S#YM1 *EQ '      ') *OR (&S#YM2 *EQ +
+                '      ')) THEN(DO)
+               CHGVAR     VAR(&IN30)  VALUE('1')
+               CHGVAR     VAR(&S#ERR) VALUE('日期不可空白！！')
+               GOTO       CMDLBL(START)
+             ENDDO
+             IF         COND(&S#YM1 *GT &S#YM2) THEN(DO)
+               CHGVAR     VAR(&IN30)  VALUE('1')
+               CHGVAR     VAR(&S#ERR) VALUE('日期區間錯誤！')
+               GOTO CMDLBL(START)
+             ENDDO
+             CHGVAR     VAR(&W#DATE) VALUE(&S#YM1 *CAT '01')
+             CHGVAR     VAR(&P#DATE) VALUE(&W#DATE)
+             CHGVAR     VAR(&P#MODE) VALUE('1')
+             CALL       PGM(UTS102R) PARM(&P#DATE &P#MODE +
+                        &P#MTL &P#LEAP &W#ERR)
+             IF         COND(&W#ERR *NE '0' ) THEN(DO)
+               CHGVAR     VAR(&IN30)  VALUE('1')
+               CHGVAR     VAR(&S#ERR) VALUE('日期錯誤！')
+               GOTO       CMDLBL(START)
+             ENDDO
+
+             CHGVAR     VAR(&W#DATE) VALUE(&S#YM2 *CAT '01')
+             CHGVAR     VAR(&P#DATE) VALUE(&W#DATE)
+             CALL       PGM(UTS102R) PARM(&P#DATE &P#MODE +
+                        &P#MTL &P#LEAP &W#ERR)
+             IF         COND(&W#ERR *NE '0' ) THEN(DO)
+               CHGVAR     VAR(&IN30)  VALUE('1')
+               CHGVAR     VAR(&S#ERR) VALUE('日期錯誤！')
+               GOTO       CMDLBL(START)
+             ENDDO
+             CHGDTAARA  DTAARA(*LDA (1 6))  VALUE(&S#YM1)
+             CHGDTAARA  DTAARA(*LDA (7 6))  VALUE(&S#YM2)
+             SBMJOB     JOB(ARR062P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR062P')
+             RETURN
+ BATCH:
+             CLRPFM     WMST
+             RTVDTAARA  DTAARA(*LDA (1 6))    RTNVAR(&S#YM1)
+             RTVDTAARA  DTAARA(*LDA (7 6))    RTNVAR(&S#YM2)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             RTVDTAARA  DTAARA(*LDA (3 4))    RTNVAR(&W#YM1)
+             RTVDTAARA  DTAARA(*LDA (9 4))    RTNVAR(&W#YM2)
+
+             OVRDBF     FILE(INVDTL) TOFILE(INVDTL) SHARE(*YES)
+   /*        OPNQRYF    FILE((INVDTL)) QRYSLT('ACDT *GE "' || &S#YM1 +
+                          || '" *AND ACDT *LE "' || &S#YM2 || '" +
+                          *AND IVACNT *eq "3" *and ivdecd *ne "D" +
+                          *and ivfl03 *ne "Z"') KEYFLD((IVNO)) +
+                          MAPFLD((ZONE61 IVACDT *ZONED 6) (CHAR61 +
+                          ZONE61 *CHAR 6) (ACDT '%SST(CHAR61 1 4)' +
+                          *CHAR 4))   */
+
+             OPNQRYF    FILE(INVDTL) +
+                        QRYSLT('IVACNT *EQ "3" *AND +
+                                IVDECD *NE "D" *AND +
+                                IVFL03 *NE "Z" *AND +
+                              ((ACDT *GE "' || &S#YM1 || '" *AND +
+                                ACDT *LE "' || &S#YM2 || '") *OR +
+                               (IVACDT *EQ 99999999 *AND +
+                                RVDT *GE "' || &W#YM1 || '" *AND +
+                                RVDT *LE "' || &W#YM2 || '"))') +
+                        MAPFLD((ZONE61 IVACDT *ZONED 6) +
+                               (CHAR61 ZONE61 *CHAR 6) +
+                               (ACDT '%SST(CHAR61 1 6)' *CHAR 6) +
+                               (RVDT '%SST(IVRESV 1 5)' *CHAR 5)) +
+                        KEYFLD(IVNO)
+
+             CALL       PGM(ARR062RA)
+             CLOF       OPNID(INVDTL)
+
+             OVRDBF     FILE(WMST) TOFILE(WMST) SHARE(*YES)
+             OPNQRYF    FILE((WMST)) KEYFLD((WNSALE) (WNNO))
+             CALL       PGM(ARR062R)
+             CLOF       OPNID(WMST)
+             DLTOVR     FILE(*ALL)
+             RETURN     /* BATCH JOB */
+             ENDPGM
+

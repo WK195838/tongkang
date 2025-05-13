@@ -1,0 +1,408 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARE102R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     獎勵金單價設定維護
+     H*            5.WRITER-DATE   101/02/15 2012AR641 S00WCJ
+     H*            5.DATE-UPDATE
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FARRDPR  UF  E           K        DISK                      A
+     FARRDTLL2IF  E           K        DISK
+     FARE102S CF  E                    WORKSTN
+     F                                        RRN   KSFILE AR102F2
+     E                    ERR     1  26 70               *錯誤訊息
+     I            DS
+     I                                        1  10 S#SRID
+     I                                        1   8 D#SID1
+     I                                        9  10 D#SID2
+     I           UDS
+     I                                      101 103 U#PRNO
+     I                                     10011010 S#USER
+     I                                     10111020 S#DEVN
+     I                                     10211021 D#AREA
+     C*****************************************************************
+     C*          Key       List
+     C*****************************************************************
+     C*FILE==>SAMAST
+     C*****************************************************************
+     C*Main Program
+     C*****************************************************************
+     C                     EXSR SR0000                     *初值設定
+     C           W#PRID    DOUEQ'00'
+     C           W#PRID    CASEQ'01'      SR1000           *前置處理
+     C           W#PRID    CASEQ'02'      SR2000           *畫面一
+     C           W#PRID    CASEQ'03'      SR3000           * READC
+     C                     ENDCS
+     C                     ENDDO
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*初值設定
+     C                     MOVE *ALL'='   S#LIN1
+     C                     MOVE *ALL'='   S#LIN2
+     C                     MOVE *ALL'='   S#LIN3
+     C                     MOVE 'ARE102S-'D#SID1
+     C                     MOVE *ON       *IN31            * CURSOR
+     C                     MOVEA'00000'   *IN,50
+     C                     MOVEA'0000'    *IN,71
+     C                     MOVE '01'      W#PRID  2
+     C*
+     C           U#PRNO    IFNE *BLANKS
+     C                     MOVELU#PRNO    S#PRNO
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*W#PRID='01'--->ARE100S-1畫面
+     C* Clear subfile
+     C                     MOVEA'0000'    *IN,71
+     C                     MOVE *ON       *IN74            *SFLCLR
+     C                     WRITEAR102F2C
+     C                     MOVE *OFF      *IN74            *SFLCLR
+     C                     Z-ADD*ZEROS    W#CNT   20
+     C                     Z-ADD*ZEROS    RRN     40
+     C                     Z-SUB11        S#NBR
+     C*
+     C*讀入SUBFILE AR100F2
+     C           S#PRNO    SETLLRARRDPR              65    *1->NR
+     C  N65                READ RARRDPR             N    65*EOF
+     C  N65                EXSR SR1100                     * MOVE DATA
+     C                     MOVE '02'      W#PRID
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C* MOVE DARA TO DISPLAY
+     C                     Z-ADD0         W#CNT   20
+     C                     Z-ADD0         S#OPTX
+     C           W#CNT     DOWLT12
+     C                     MOVELPRNO      S#PRXO           *補助類別
+     C                     MOVELPRNAME    S1NAME
+     C                     Z-ADDPRPRIC    S1PRIC
+     C                     MOVE PRUPDM    S#UPXM           *異動人員
+     C                     ADD  1         RRN
+     C                     WRITEAR102F2
+     C                     ADD  1         W#CNT
+     C                     READ RARRDPR             N    65*EOF
+     C   65                LEAVE
+     C                     ENDDO
+     C*
+     C           W#CNT     IFGT *ZERO                      *至少一筆
+     C                     ADD  12        S#NBR
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*
+     C*顯示畫面一
+     C*
+     C           W#PRID    DOWEQ'02'
+     C                     MOVEA'0000'    *IN,71
+     C           S#ERR     IFEQ *BLANK
+     C                     MOVE *ON       *IN31            * CURSOR
+     C                     ENDIF
+     C           RRN       IFEQ *ZEROS                     *NO DATA
+     C  N99                MOVE ERR,2     S#ERR
+     C                     MOVE *ON       *IN72            *SFLDSP OFF
+     C                     ENDIF
+     C           W#CNT     IFGE 12
+     C                     MOVE *ON       *IN73            *SFLEND OFF
+     C                     ENDIF
+     C                     MOVE '1'       D#SID2
+     C                     MOVE *OFF      *IN30            *MODE
+     C**
+     C                     WRITEAR102H
+     C                     WRITEAR102F2M
+     C                     EXFMTAR102F2C
+     C                     MOVE *OFF      *IN31            * CURSOR
+     C                     MOVEA'00000'   *IN,50
+     C                     MOVE *OFF      *IN99
+     C                     MOVE *BLANK    S#ERR
+     C*PF3=Exit
+     C           *IN03     IFEQ *ON
+     C           *IN07     OREQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*F12=Exit
+     C           *IN12     IFEQ *ON
+     C                     MOVE '00'      W#PRID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*PA1=翻下頁
+     C           *IN91     IFEQ *ON
+     C   65                MOVEAERR,2     S#ERR
+     C  N65                EXSR SR1100
+     C                     ITER
+     C                     ENDIF
+     C*
+     C                     MOVE '03'      W#PRID
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR3000    BEGSR
+     C*****************************************************************
+     C*READC逐筆撿核
+     C                     MOVEA'00000'   *IN,50
+     C                     MOVE *OFF      *IN99
+     C                     MOVEA'0000'    *IN,71
+     C                     MOVE *BLANK    S#ERR
+     C                     Z-ADDRRN       W#TEMP  40
+     C                     Z-ADD1         RRN
+     C*
+     C           W#PRID    DOWEQ'03'
+     C                     READCAR102F2                9898*ER*EOF
+     C           *IN98     IFEQ *ON
+     C*第一列資料檢核
+     C           S#OPTA    IFEQ 1                          *新增
+     C                     EXSR SR4100
+     C                     ENDIF
+     C                     LEAVE
+     C                     ENDIF
+     C           S#OPTX    IFEQ *ZEROS
+     C                     ITER
+     C                     ENDIF
+     C*
+     C           S#OPTX    IFEQ 2
+     C                     EXSR SR4200
+     C                     ENDIF
+     C*
+     C           S#OPTX    IFEQ 4
+     C                     EXSR SR4300
+     C                     ENDIF
+     C*
+     C                     MOVE *ON       *IN70
+     C                     UPDATAR102F2
+     C                     MOVE *OFF      *IN70
+     C                     ENDDO
+     C*************************
+     C* READC 資料存檔/刪除
+     C************************
+     C           S#ERR     IFNE *BLANK
+     C                     MOVE '02'      W#PRID
+     C                     Z-ADDW#TEMP    RRN
+     C                     ELSE
+     C                     EXSR SR5320                     * CLR BUFFER
+     C*
+     C                     MOVEA'00'      *IN,96
+     C                     Z-ADD1         RRN
+     C           W#PRID    DOWEQ'03'
+     C                     READCAR102F2                9898*ER*EOF
+     C           *IN98     IFEQ '1'
+     C*
+     C           S#OPTA    IFEQ 1
+     C                     EXSR SR5100                     *存檔
+     C                     ENDIF
+     C                     EXSR SR5600
+     C   96                EXSR SR5310
+     C                     LEAVE
+     C                     ENDIF
+     C           S#OPTX    IFEQ *ZEROS                     *修改
+     C                     ITER                            *存檔
+     C                     ENDIF
+     C           S#OPTX    IFEQ 2                          *修改
+     C                     EXSR SR5200                     * SUBF SAVE
+     C  N97                EXSR SR5500                     * REPOSITION
+     C  N97                MOVE *ON       *IN97
+     C                     ENDIF
+     C*
+     C           S#OPTX    IFEQ 3                          *複製
+     C  N96                EXSR SR5300                     * SUBF CHK
+     C  N96                MOVE '1'       *IN96
+     C                     ENDIF
+     C******
+     C           S#OPTX    IFEQ 4                          *刪除
+     C                     EXSR SR5400                     *刪除作業
+     C  N97                EXSR SR5500                     * REPOSITION
+     C  N97                MOVE *ON       *IN97
+     C                     ENDIF
+     C*
+     C                     ENDDO
+     C                     MOVE '01'      W#PRID
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4100    BEGSR
+     C*****************************************************************
+     C*第一筆資料編審(OP=1)
+     C                     MOVE *BLANK    S#ERR
+     C                     MOVEA'00000'   *IN,50
+     C                     MOVEA'00'      *IN,60
+     C*
+     C*CHECK 資料是否已存在
+     C*
+     C           S#PRNO    CHAINARRDPR               60    *NR
+     C           *IN60     IFEQ *OFF
+     C  N99                MOVE ERR,1     S#ERR
+     C                     SETON                     9950
+     C                     ENDIF
+     C*
+     C           S#NAME    IFEQ *BLANKS
+     C  N99                MOVELERR,3     S#ERR
+     C                     SETON                     9951
+     C                     ENDIF
+     C*
+     C*CHECK  OPTA
+     C*
+     C           S#OPTA    IFNE 1
+     C  N99                MOVEAERR,12    S#ERR
+     C                     SETON                       99
+     C                     ENDIF
+     C*
+     C           S#PRIC    IFEQ 0
+     C  N99                MOVELERR,3     S#ERR
+     C                     SETON                     9951
+     C                     ENDIF
+     C*
+     C           EN4100    ENDSR
+     C*****************************************************************
+     C           SR4200    BEGSR
+     C*****************************************************************
+     C*
+     C           S1PRIC    IFEQ 0
+     C  N99                MOVE ERR,3     S#ERR
+     C                     SETON                     9953
+     C                     ENDIF
+     C*
+     C           S1NAME    IFEQ *BLANKS
+     C  N99                MOVELERR,3     S#ERR
+     C                     SETON                     9953
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR4300    BEGSR
+     C*****************************************************************
+     C*
+     C           S#PRXO    CHAINARRDTLL2             60
+     C  N99N60             MOVE ERR,4     S#ERR
+     C                     SETON                     9953
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR5100    BEGSR
+     C*****************************************************************
+     C*第一筆存檔作業
+     C*
+     C                     CLEARRARRDPR
+     C           S#PRNO    CHAINRARRDPR              60    *NR
+     C                     MOVEL'A'       PRFLAG           *處理代號
+     C                     MOVELS#PRNO    PRNO             *補助類別
+     C                     MOVELS#NAME    PRNAME           *說明
+     C                     Z-ADDS#PRIC    PRPRIC           *單價
+     C*
+     C                     MOVE S#USER    PRENTM           *建檔人員
+     C           *DATE     SUB  19000000  PRENTD           *建檔日期
+     C                     TIME           PRENTT           *建檔時間
+     C                     MOVE S#USER    PRUPDM           *異動人員
+     C           *DATE     SUB  19000000  PRUPDD           *異動日期
+     C                     TIME           PRUPDT           *異動時間
+     C*
+     C                     WRITERARRDPR
+     C                     MOVEAERR,15    S#ERR
+     C                     MOVE *OFF      *IN60
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR5200    BEGSR
+     C*****************************************************************
+     C*SFL存檔作業
+     C*
+     C           S#PRXO    CHAINRARRDPR              60    *NR
+     C                     MOVE 'C'       PRFLAG           *處理代號
+     C                     MOVELS1NAME    PRNAME           *說明
+     C                     Z-ADDS1PRIC    PRPRIC           *單價
+     C*
+     C                     MOVE S#USER    PRUPDM           *異動人員
+     C           *DATE     SUB  19000000  PRUPDD           *異動日期
+     C                     TIME           PRUPDT           *異動時間
+     C*
+     C  N60                UPDATRARRDPR
+     C   60                WRITERARRDPR
+     C                     MOVE *OFF      *IN60
+     C                     MOVE ERR,16    S#ERR
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           SR5300    BEGSR
+     C*****************************************************************
+     C*複製處理(OP=3)
+     C                     MOVELS#PRXO    W#PRXO  1        *補助類別
+     C                     MOVELS1NAME    W#NAME 18
+     C                     Z-ADDS1PRIC    W#PRIC  63
+     C                     MOVE 1         W#OPTA  10       * OP CODE
+     C                     ENDSR
+     C*****************************************************************
+     C           SR5310    BEGSR
+     C*****************************************************************
+     C*複製處理(OP=3)
+     C                     MOVELW#PRXO    S#PRNO           *補助類別
+     C                     MOVELW#NAME    S#NAME           *說明
+     C                     Z-ADDW#PRIC    S#PRIC           *單價
+     C                     MOVELW#OPTA    S#OPTA           * OP CODE
+     C                     ENDSR
+     C*****************************************************************
+     C           SR5320    BEGSR
+     C*****************************************************************
+     C*
+     C                     Z-ADD*ZEROS    W#OPTA
+     C                     MOVEL*BLANK    W#PRXO           *補助類別
+     C                     MOVEL*BLANK    W#NAME           *說明
+     C                     Z-ADD0         W#PRIC           *單價
+     C                     ENDSR
+     C*
+     C*****************************************************************
+     C           SR5400    BEGSR
+     C*****************************************************************
+     C*刪除作業(OP=4)
+     C           S#PRXO    CHAINRARRDPR              60    *NR
+     C  N60                DELETRARRDPR
+     C                     MOVE *OFF      *IN60
+     C                     ENDSR
+     C*****************************************************************
+     C           SR5500    BEGSR
+     C**************************************************************
+     C*
+     C                     Z-ADD*ZEROS    S#OPTA
+     C                     MOVELS#PRXO    S#PRNO           *補助類別
+     C                     MOVELS1NAME    S#NAME           *說明
+     C                     Z-ADDS1PRIC    S#PRIC           *單價
+     C                     ENDSR
+     C**************************************************************
+     C           SR5600    BEGSR
+     C**************************************************************
+     C*
+     C                     Z-ADD*ZEROS    S#OPTA
+     C                     MOVEL*BLANKS   S#NAME           *說明
+     C                     Z-ADD0         S#PRIC           *單價
+     C                     ENDSR
+     C**************************************************************
+**  ERR
+01-資料已存在！
+02-資料不存在！
+03-欄位不可為0或空白！
+04-此筆資料已用於獎勵金代開，不可刪除!!
+05-
+06-
+07-
+08-
+09-
+10-
+11-
+12-
+13-
+14-
+15-新增完成
+16-修改完成
+17-
+

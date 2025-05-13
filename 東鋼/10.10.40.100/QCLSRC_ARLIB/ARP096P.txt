@@ -1,0 +1,198 @@
+     /****************************************************************/
+     /*                                                              */
+     /*               >>   PROGRAM INTRODUCTION   <<                 */
+     /*                                                              */
+     /*            1.PROGRAM-ID    ARP096P                           */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S02YSH                            */
+     /*            4.FUNCTION     反傾銷預警處理                   */
+     /*            5.DATE-WRITTEN  91/11/04                          */
+     /*                                                              */
+     /****************************************************************/
+             PGM
+             DCLF       FILE(ARP096S)
+             DCL        VAR(&INT)     TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSPID)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&C#YYMM)  TYPE(*CHAR) LEN(4) /*年月暫存*/
+             DCL        VAR(&D#DCML)  TYPE(*DEC)  LEN(7 0) /*數字暫存*/
+             DCL        VAR(&C#DCML)  TYPE(*CHAR) LEN(7) /*數字暫存*/
+             DCL        VAR(&W#DATE)  TYPE(*DEC)   LEN(8 0)
+             DCL        VAR(&W#LDAY)  TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&W#CDAY)  TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&W#ERR)   TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&W#MOD)   TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&W#CNT)   TYPE(*CHAR)  LEN(4)
+             DCL        VAR(&W#FUN)   TYPE(*CHAR)  LEN(1)
+
+             RTVJOBA    JOB(&DSPID) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+             RTVDTAARA  DTAARA(*LDA (1011 10))   RTNVAR(&S#DEVN)
+             RTVDTAARA  DTAARA(*LDA (1001 10))   RTNVAR(&S#USER)
+
+   START:    SNDRCVF    (AR096F1)
+             CHGVAR     VAR(&IN30)  VALUE('0')
+             CHGVAR     VAR(&IN31)  VALUE('0')
+             CHGVAR     VAR(&IN32)  VALUE('0')
+             CHGVAR     VAR(&IN33)  VALUE('0')
+             CHGVAR     VAR(&IN34)  VALUE('0')
+             CHGVAR     VAR(&IN35)  VALUE('0')
+             CHGVAR     VAR(&IN36)  VALUE('0')
+             CHGVAR     VAR(&IN37)  VALUE('0')
+             CHGVAR     VAR(&IN38)  VALUE('0')
+             CHGVAR     VAR(&IN39)  VALUE('0')
+             CHGVAR     VAR(&S#ERR) VALUE(' ')
+
+             IF         COND((&IN03 *EQ '1') *OR (&IN12 *EQ '1')) +
+                        THEN(GOTO CMDLBL(ENDPGM))
+     /*檢核輸入欄位*/
+             IF         COND(&S#STYM *EQ 0) THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('起始年月錯誤!')
+             CHGVAR     VAR(&IN30)   VALUE('1')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             CHGVAR     VAR(&W#DATE) VALUE(&S#STYM *100 + 1)
+             CHGVAR     VAR(&W#LDAY)  VALUE(&W#DATE)
+             CHGVAR     VAR(&W#MOD)   VALUE('1') /*中國年*/
+             CHGVAR     VAR(&W#CNT)   VALUE('0001') /*天數*/
+             CHGVAR     VAR(&W#FUN)   VALUE('1') /* 1:往前, 2:往後 */
+             CALL       PGM(UTS104R) PARM(&W#LDAY  &W#MOD  &W#FUN &W#CNT +
+                                          &W#CDAY &W#ERR)
+             IF         COND(&W#ERR *NE '0') THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('起始年月錯誤!')
+             CHGVAR     VAR(&IN30)   VALUE('1')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             IF         COND(&S#EDYM *EQ 0) THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('終止年月錯誤!')
+             CHGVAR     VAR(&IN31)   VALUE('1')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             CHGVAR     VAR(&W#DATE) VALUE(&S#EDYM *100 + 1)
+             CHGVAR     VAR(&W#LDAY)  VALUE(&W#DATE)
+             CHGVAR     VAR(&W#MOD)   VALUE('1') /*中國年*/
+             CHGVAR     VAR(&W#CNT)   VALUE('0001') /*天數*/
+             CHGVAR     VAR(&W#FUN)   VALUE('1') /* 1:往前, 2:往後 */
+             CALL       PGM(UTS104R) PARM(&W#LDAY  &W#MOD  &W#FUN &W#CNT +
+                                          &W#CDAY &W#ERR)
+             IF         COND(&W#ERR *NE '0') THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('終止年月錯誤!')
+             CHGVAR     VAR(&IN31)   VALUE('1')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             IF         COND(&S#EDYM *LT &S#STYM) THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('起始年月不得大於終止年月!  ')
+             CHGVAR     VAR(&IN30)   VALUE('1')
+             CHGVAR     VAR(&IN31)   VALUE('1')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             IF         COND(&S#BVOM *EQ 0) THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('內銷變動成本錯誤!')
+             CHGVAR     VAR(&IN32)   VALUE('1')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             IF         COND(&S#CVOM *EQ 0) THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('外銷變動成本錯誤!')
+             CHGVAR     VAR(&IN33)   VALUE('1')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             IF         COND(&S#BTOM *EQ 0) THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('內銷總成本錯誤!')
+             CHGVAR     VAR(&IN34)   VALUE('1')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             IF         COND(&S#CTOM *EQ 0) THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('外銷總成本錯誤!')
+             CHGVAR     VAR(&IN35)   VALUE('1')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             IF         COND(&S#BRAT *EQ 0) THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('內銷借款利率錯誤!')
+             CHGVAR     VAR(&IN36)   VALUE('1')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             IF         COND(&S#CRAT *EQ 0) THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('外銷借款利率錯誤!')
+             CHGVAR     VAR(&IN37)   VALUE('1')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             IF         COND(&S#BPCK *EQ 0) THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('內銷包裝成本錯誤!')
+             CHGVAR     VAR(&IN38)   VALUE('1')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             IF         COND(&S#CPCK *EQ 0) THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('外銷包裝成本錯誤!')
+             CHGVAR     VAR(&IN39)   VALUE('1')
+             GOTO       CMDLBL(START)
+             ENDDO
+
+       /*紀錄輸入值*/
+             CHGVAR     VAR(&C#YYMM)  VALUE(&S#STYM)
+             CHGDTAARA  DTAARA(*LDA (301 4)) VALUE(&C#YYMM)
+
+             CHGVAR     VAR(&C#YYMM)  VALUE(&S#EDYM)
+             CHGDTAARA  DTAARA(*LDA (305 4)) VALUE(&C#YYMM)
+
+             CHGVAR     VAR(&D#DCML)  VALUE(&S#BVOM * 100000)
+             CHGVAR     VAR(&C#DCML)  VALUE(&D#DCML)
+             CHGDTAARA  DTAARA(*LDA (309 7)) VALUE(&C#DCML)
+
+             CHGVAR     VAR(&D#DCML)  VALUE(&S#CVOM * 100000)
+             CHGVAR     VAR(&C#DCML)  VALUE(&D#DCML)
+             CHGDTAARA  DTAARA(*LDA (316 7)) VALUE(&C#DCML)
+
+             CHGVAR     VAR(&D#DCML)  VALUE(&S#BTOM * 100000)
+             CHGVAR     VAR(&C#DCML)  VALUE(&D#DCML)
+             CHGDTAARA  DTAARA(*LDA (323 7)) VALUE(&C#DCML)
+
+             CHGVAR     VAR(&D#DCML)  VALUE(&S#CTOM * 100000)
+             CHGVAR     VAR(&C#DCML)  VALUE(&D#DCML)
+             CHGDTAARA  DTAARA(*LDA (330 7)) VALUE(&C#DCML)
+
+             CHGVAR     VAR(&D#DCML)  VALUE(&S#BRAT * 100000)
+             CHGVAR     VAR(&C#DCML)  VALUE(&D#DCML)
+             CHGDTAARA  DTAARA(*LDA (337 7)) VALUE(&C#DCML)
+
+             CHGVAR     VAR(&D#DCML)  VALUE(&S#CRAT * 100000)
+             CHGVAR     VAR(&C#DCML)  VALUE(&D#DCML)
+             CHGDTAARA  DTAARA(*LDA (344 7)) VALUE(&C#DCML)
+
+             CHGVAR     VAR(&D#DCML)  VALUE(&S#BPCK * 100000)
+             CHGVAR     VAR(&C#DCML)  VALUE(&D#DCML)
+             CHGDTAARA  DTAARA(*LDA (351 7)) VALUE(&C#DCML)
+
+             CHGVAR     VAR(&D#DCML)  VALUE(&S#CPCK * 100000)
+             CHGVAR     VAR(&C#DCML)  VALUE(&D#DCML)
+             CHGDTAARA  DTAARA(*LDA (358 7)) VALUE(&C#DCML)
+
+             SNDBRKMSG   MSG('<<反傾銷預警處理作業+
+                              ,已開始處理,請稍待...>>')    +
+                              TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             SBMJOB     JOB(ARP096P) JOBD(ARJOBD) +
+                        RQSDTA('CALL ARP096P')
+             RETURN
+    BATCH:
+             CALL       PGM(ARP096P1)   /*處理內銷*/
+             CALL       PGM(ARP096P2)   /*處理外銷*/
+
+             CALL       PGM(ARP096R1)   /*內銷資料整理*/
+             CALL       PGM(ARP096R2)   /*外銷資料整理*/
+
+             SNDBRKMSG   MSG('<<反傾銷預警處理作業+
+                              ,處理完畢,請啟動瀏覽程式...>>')    +
+                              TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+
+    ENDPGM:  ENDPGM
+

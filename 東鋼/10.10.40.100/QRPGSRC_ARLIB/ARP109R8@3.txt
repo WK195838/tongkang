@@ -1,0 +1,246 @@
+     H*****************************************************************
+     H*
+     H*               >>   PROGRAM INTRODUCTION   <<
+     H*
+     H*            1.PROGRAM-ID    ARP109R8
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S02CSF
+     H*            4.FUNCTION     電子商務--折讓銷退資料下載處理
+     H*            5.DATE-WRITTEN  97/02/14
+     H*            6.DATE-UPDATE  100/05/20 S00WCJ (0005A)
+     H*                            誠鋼金小姐反應資料會重覆產生
+     H*                           100/06/16 S00WCJ (0006B)
+     H*                            誠鋼金小姐反應同一筆發料若有二筆折
+     H*                            讓資料只會寫入一筆
+     H*                           103/02/20 S00WCJ (0302A)
+     H*                            一張折讓單中有二筆相同品名只會寫入
+     H*                            一筆資料
+     H*
+     H*****************************************************************
+     H        1   Y                                     1
+     FTRNDTL  IP  E           K        DISK
+     FCBCUST  IF  E           K        DISK
+     FINVMST  IF  E           K        DISK
+     FHIPROD  IF  E           K        DISK
+     FDISLOG  UF  E           K        DISK                      A
+     FARCBDW  UF  E           K        DISK
+     FARDIDW  UF  E           K        DISK                      A
+     I*****************************************************************
+     ITXREC
+     I                                              TXCUNOL1
+     C*****************************************************************
+     C*          KEY   LIST
+     C*****************************************************************
+     C*FILE==>ARDIDW(銷貨明細檔下載)
+     C           K#DIDW    KLIST
+     C                     KFLD           AIVNNO           客戶統編
+     C                     KFLD           AIFILE           檔案序號
+     C                     KFLD           AISEQN           資料處理序號
+     C*
+     C*FILE==>DISLOG(折退下載ＬＯＧ檔)
+     C           K#LOG     KLIST
+     C                     KFLD           K#IVNO 10        發票號碼
+     C                     KFLD           K#IVTP  1        發票別
+0006AC                     KFLD           K#DATE  80       退折日期
+0006AC                     KFLD           K#PDNM  3        品名
+0302AC                     KFLD           K#CAMT 110       金額
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C  N99                EXSR INISR
+     C   L1                EXSR L1CLR
+     C                     EXSR DTLSR
+     CL1 99                EXSR L1SR
+     CLR                   RETRN
+     C*****************************************************************
+     C           INISR     BEGSR
+     C*****************************************************************
+     C                     MOVE *ON       *IN99
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1CLR     BEGSR
+     C*****************************************************************
+     C                     Z-ADD0         W#ARSQ  50
+     C                     Z-ADD0         W#DISQ  50
+     C                     Z-ADD0         W#SEQ6  60
+     C                     MOVEL*BLANK    W#MUID 10
+     C*
+     C*先判斷該客戶是否要做資料交換
+     C*
+     C           TXCUNO    CHAINCBREC                40
+     C           *IN40     IFEQ *OFF
+     C                     MOVELCBMUID    W#MUID
+     C           W#MUID    CHAINRARCBDW              41
+     C  N41      ADFLE6    IFEQ 'Y'
+     C           ADSEQ6    ADD  1         W#SEQ6
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           DTLSR     BEGSR
+     C*****************************************************************
+     C* 1.先判斷此筆銷貨是否已下載（已存於DISLOG檔）
+     C* 2.若此筆銷貨未下載，將該筆資料寫入ＬＯＧ檔，並且也寫入下載檔
+     C* 3.用*IN50來判斷資料是否需下載
+     C*
+     C  N41      ADFLE6    IFEQ 'Y'                        銷貨下載
+     C                     MOVELTXIVNO    K#IVNO
+     C                     MOVELTXIVTP    K#IVTP
+0006AC           TXDATE    ADD  19110000  K#DATE
+0006AC                     MOVELTXPDNM    K#PDNM
+0302AC                     Z-ADDTXAMT     K#CAMT
+     C           K#LOG     CHAINRDISLOG              42
+     C*
+     C           *IN42     IFEQ *ON
+     C                     EXSR ARDSR                      寫入折退下載檔
+     C                     EXSR LOGSR                      寫入ＬＯＧ
+     C                     ELSE
+     C                     EXSR CHKSR
+0005AC* N50                EXSR ARDSR                      寫入折退下載檔
+0005AC* N50                EXSR LOGSR                      寫入ＬＯＧ
+0005AC   50                EXSR ARDSR                      寫入折退下載檔
+0005AC   50                EXSR LOGSR                      寫入ＬＯＧ
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           L1SR      BEGSR
+     C*****************************************************************
+     C           W#ARSQ    IFNE 0
+     C*
+     C           TXCUNO    CHAINCBREC                45
+     C           *IN45     IFEQ *OFF
+     C                     MOVELCBMUID    W#MUID
+     C           W#MUID    CHAINRARCBDW              46
+     C  N46      ADFLE6    IFEQ 'Y'
+     C                     ADD  1         ADSEQ6
+     C                     UPDATRARCBDW
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     ENDIF
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           CHKSR     BEGSR
+     C*****************************************************************
+     C*用*IN50來判斷資料是否已下載
+     C* ==>當欲下載資料與ＬＯＧ檔內的資料完全相同時，則不下載
+     C*
+     C                     MOVEL*OFF      *IN50
+     C                     MOVELTXIVNO    K#IVNO           發票號碼
+     C                     MOVELTXIVTP    K#IVTP           發票別
+0006AC           TXDATE    ADD  19110000  K#DATE           退折日期
+0006AC                     MOVELTXPDNM    K#PDNM           品名
+     C           K#LOG     CHAINRDISLOG              50
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           ARDSR     BEGSR
+     C*****************************************************************
+     C*寫入折讓下載檔
+     C                     ADD  1         W#ARSQ
+     C                     MOVELW#MUID    AIVNNO           統一編號
+     C                     Z-ADDW#SEQ6    AIFILE           檔案序號
+     C                     Z-ADDW#ARSQ    AISEQN           資料處理號
+     C*
+     C           K#DIDW    CHAINRARDIDW              43
+     C                     CLEARRARDIDW
+     C*
+     C           TXFLAG    IFEQ 'D'
+     C                     MOVEL'D'       AIDECD           作廢碼
+     C           19110000  ADD  TXTXDT    AIDEDT           作廢日期
+     C                     ENDIF
+     C*
+     C                     MOVELTXIVNO    AINO             發票號碼
+     C                     MOVELW#MUID    AIVNNO           客戶統編
+     C                     MOVELTXNO      AIRESV           折退編號
+     C           19110000  ADD  TXDATE    AIINDT           退折日期
+     C                     Z-ADDW#ARSQ    AISEQN           資料處理序號
+     C                     Z-ADDW#SEQ6    AIFILE           檔案序號
+     C                     Z-ADDTXQTY     AIQTY            數量
+     C                     Z-ADDTXUPRC    AIUPRC           單價
+     C                     Z-ADDTXAMT     AICAMT           退折金額
+     C                     Z-ADDTXTAX     AICTAX           退折稅額
+     C*
+     C           TXACNT    IFEQ '2'
+     C                     MOVEL'1'       AIMARK           銷貨退回
+     C                     ELSE
+     C           TXACNT    IFEQ '3'
+     C                     MOVEL'2'       AIMARK           銷貨折讓
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVEL*OFF      *IN51
+     C           TXPDNM    CHAINHIPROD               51
+     C  N51                MOVELF4CHIN    AICHIN           中文品名
+     C   51                MOVEL*BLANK    AICHIN
+     C*
+     C           TXIVNO    CHAININVMST               51
+     C  N51                MOVELINTXTP    ISTXTP           課稅別
+     C   51                MOVEL*BLANK    ISTXTP
+     C*
+     C   43                WRITERARDIDW
+     C*
+     C                     ENDSR
+     C*****************************************************************
+     C           LOGSR     BEGSR
+     C*****************************************************************
+     C*寫入折退ＬＯＧ檔
+     C*
+0006AC*          TXIVNO    CHAINRDISLOG              44
+0006AC           K#LOG     CHAINRDISLOG              44
+     C*
+     C           TXFLAG    IFEQ 'D'
+     C                     MOVEL'D'       ISDECD           作廢碼
+     C           19110000  ADD  TXTXDT    ISDEDT           作廢日期
+     C                     ENDIF
+     C*
+     C   42                MOVEL'A'       ISFLAG
+     C  N42N50             MOVEL'C'       ISFLAG           處理代碼
+     C                     MOVELTXIVNO    ISNO             發票號碼
+     C                     MOVELTXNO      ISRESV           折退編號
+     C                     MOVELTXCUNO    ISCUNO           客戶代號
+     C                     MOVELTXCUNM    ISCUNM           客戶名稱
+     C                     MOVELTXPDNM    ISPDNM           品名代號
+     C                     MOVELTXIVTP    ISTYPE           發票類別
+     C           19110000  ADD  TXDATE    ISINDT           退折日期
+     C                     MOVELW#MUID    ISVNNO           客戶統編
+     C   44                ADD  1         W#DISQ
+     C                     Z-ADDW#DISQ    ISSEQN           資料處理序號
+     C                     Z-ADDW#SEQ6    ISFILE           檔案序號
+     C   42                Z-ADDTXQTY     ISQTY            數量
+     C   42                Z-ADDTXUPRC    ISUPRC           單價
+     C   42                Z-ADDTXAMT     ISCAMT           退折金額
+     C   42                Z-ADDTXTAX     ISCTAX           退折稅額
+     C  N42N50             ADD  TXQTY     ISQTY            數量
+     C  N42N50             ADD  TXUPRC    ISUPRC           單價
+     C  N42N50             ADD  TXAMT     ISCAMT           退折金額
+     C  N42N50             ADD  TXTAX     ISCTAX           退折稅額
+     C*
+     C           TXACNT    IFEQ '2'
+     C                     MOVEL'1'       ISMARK           銷貨退回
+     C                     ELSE
+     C           TXACNT    IFEQ '3'
+     C                     MOVEL'2'       ISMARK           銷貨折讓
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C                     MOVEL*OFF      *IN51
+     C           TXPDNM    CHAINHIPROD               51
+     C  N51                MOVELF4CHIN    ISCHIN           中文品名
+     C   51                MOVEL*BLANK    ISCHIN
+     C*
+     C           TXIVNO    CHAININVMST               51
+     C  N51                MOVELINTXTP    ISTXTP           課稅別
+     C   51                MOVEL*BLANK    ISTXTP
+     C*
+     C   44                WRITERDISLOG
+     C  N44                UPDATRDISLOG
+     C*
+     C                     ENDSR
+     C*****************************************************************
+
