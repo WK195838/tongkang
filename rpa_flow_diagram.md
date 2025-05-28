@@ -2,15 +2,14 @@
 
 ```mermaid
 graph TD
-    A[RPA拉轉式] --> B[SRC清單]
+    A[RPA拉程式] --> B[SRC清單]
     A --> C[SRC]
+    C --> E[同步Github]
+
     B --> D[篩選正式SRC]
-    B --> E[同步Github]
-    E --> F[Cursor拉車地]
-    F --> G[分析SRC]
-    G --> H[熟SRC清單層級性善溝通單<br>100萬+1張]
+    E --> F[Cursor拉至本地]
+    F --> G[CURSOR分析SRC]
+    G --> H[照正式SRC清單轉規格書清單<br>100筆1張]
     D --> I[轉CSV]
-    
-    %% 底部註記
-    J[拉清單生成用的範本MD-<br>DDS<br>RPG<br>CLP]
-``` 
+    I --> E[同步Github]
+    H --> J[按清單生成規格書MD檔<hr>並更新清單<hr>DDS<hr>RPG<hr>CLP]
