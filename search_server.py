@@ -25,8 +25,9 @@ class SearchHandler(BaseHTTPRequestHandler):
             query = params.get("q", [""])[0]
             results = self._search_files(query)
             body = [
+                "<h1>規格書文件查詢</h1>",
                 "<form action='/search'>",
-                f"<input name='q' value='{html.escape(query)}'>",
+                f"<input name='q' value='{html.escape(query)}' maxlength='60'>",
                 "<input type='submit' value='Search'>",
                 "</form>"
             ]
@@ -35,9 +36,7 @@ class SearchHandler(BaseHTTPRequestHandler):
                     body.append("<ul>")
                     for _, p in results:
                         rel = p.relative_to(BASE_DIR).as_posix()
-                        body.append(
-                            f"<li><a href='/open?file={html.escape(rel)}'>{html.escape(rel)}</a></li>"
-                        )
+                        body.append(f"<li><a href='/open?file={html.escape(rel)}'>{html.escape(rel)}</a></li>")
                     body.append("</ul>")
                 else:
                     body.append("{無相關資料}")
