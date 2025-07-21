@@ -1,0 +1,104 @@
+  /******************************************************************/
+  /*                                                                */
+  /*               UPDATE  DATE  102/05/23 S00WCJ (0205A)           */
+  /*                              修改列印份數2改為1(蘇麗卿)  */
+  /*                       108/08/21  2019AR00057 S00WCJ (0808A)    */
+  /*                        配合磅單過至項次修改                  */
+  /*                       109/03/05 2020AR00013 S00WCJ (0903A)     */
+  /*                        配合鋼胚獨立一份報表修改              */
+  /*                       112/01/11 2023AR00005 S00WCJ (1201A)     */
+  /*                        增加庫別代號                          */
+  /*                                                                */
+  /******************************************************************/
+
+             PGM
+             DCL        VAR(&INT) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DATEF) TYPE(*DEC) LEN(8 0)
+             DCL        VAR(&DATET) TYPE(*DEC) LEN(8 0)
+             DCL        VAR(&DATEFA) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATETA) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREA)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#AREA)   TYPE(*CHAR) LEN(1)
+/*0903A*/    DCL        VAR(&W#CHYN) TYPE(*CHAR) LEN(1)
+/*0903A*/    DCL        VAR(&S#TYPE) TYPE(*CHAR) LEN(1)
+/*1201A*/    DCL        VAR(&S#STPE) TYPE(*CHAR) LEN(1)
+
+/*0903A*/    CHGVAR     VAR(&W#CHYN) VALUE('Y')
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+/*1201A*/    CALL       PGM(ARR039RS) PARM(&IN03 &DATEF &DATET +
+                                           &W#CHYN  &S#TYPE &S#STPE +
+                                           &W#AREA)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&DATEFA)       VALUE(&DATEF)
+             CHGVAR     VAR(&DATETA)       VALUE(&DATET)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&DATEFA)
+             CHGDTAARA  DTAARA(*LDA (9 8)) VALUE(&DATETA)
+/*20240105A*/
+
+/*0903A*/    CHGDTAARA  DTAARA(*LDA (18 1)) VALUE(&S#TYPE)
+/*1201A*/    CHGDTAARA  DTAARA(*LDA (19 1)) VALUE(&S#STPE)
+
+/*           SBMJOB     JOB(ARR039PK) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR039PK')  */
+/*           RETURN       */
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (1 8))   RTNVAR(&DATEFA)
+             RTVDTAARA  DTAARA(*LDA (9 8))   RTNVAR(&DATETA)
+/*0903A*/    RTVDTAARA  DTAARA(*LDA (18 1))  RTNVAR(&S#TYPE)
+/*1201A*/    RTVDTAARA  DTAARA(*LDA (19 1))  RTNVAR(&S#STPE)
+/*           RTVDTAARA  DTAARA(*LDA (1021 1))   RTNVAR(&AREA)  */
+             RTVDTAARA  DTAARA(*LDA (1021 1))   RTNVAR(&AREA)
+/*0101A      CHGVAR     VAR(&AREA) VALUE(&W#AREA)             */
+/*20240105A*/
+             CPYF       FROMFILE(DALIB/TRNDTL) +
+                          TOFILE(QTEMP/TRNDTL) MBROPT(*REPLACE) +
+                          CRTFILE(*YES) INCREL((*IF TXDATE *GE +
+                          &DATEFA) (*AND TXDATE *LE &DATETA))
+
+             RUNSQLSTM  SRCFILE(ARLIB/QCLSRC) SRCMBR(ARR039SQL) +
+                          COMMIT(*NONE)
+
+/*20240105A  END   */
+
+             OVRDBF     FILE(TRNDTL) TOFILE(QTEMP/TRNDTL) SHARE(*YES)
+/*0903A 鋼胚*/
+/*0903A*/  IF       COND(&S#TYPE *EQ '1') THEN(DO)
+/*0903A*/    OPNQRYF    FILE((TRNDTL)) QRYSLT('                     +
+                          TXTXAR       *EQ "' || &AREA || '"      & +
+                          TXFLAG       *NE "D"                    & +
+                          TXACDT *EQ %RANGE(' || &DATEFA || '       +
+                                        ' || &DATETA || ')        & +
+                          TXCODE *EQ "SA04"                       & +
+                          (%SST(TXRESV 16 2) *NE "1J")            & +
+                          %SST(TXPDNM 1 1) *EQ "1"')                +
+                          KEYFLD((TXACDT)(TXNO) (TXACNT)(TXORNO))
+
+/*0903A*/    OVRPRTF    FILE(QPRINT) OUTQ(PRT20) COPIES(1) +
+                        PAGESIZE(*N 158) CPI(12) +
+                          HOLD(*YES) USRDTA('鋼胚日報')
+
+/*0903A*/  ENDDO
+/*0903A 鋼筋*/
+/*                %SST(TXNO 1 1) *EQ "' || &AREA || '"    & + */
+/*0903A*/  IF       COND(&S#TYPE  *EQ '2') THEN(DO)
+             OPNQRYF    FILE((TRNDTL)) QRYSLT('                     +
+                          TXTXAR       *EQ "' || &AREA || '"      & +
+                          TXFLAG       *NE "D"                    & +
+                          TXACDT *EQ %RANGE(' || &DATEFA || '       +
+                                        ' || &DATETA || ')        & +
+                          TXCODE *EQ "SA04"                       & +
+                          %SST(TXPDNM 1 1) *EQ "2"')                +
+                          KEYFLD((TXACDT)(TXNO) (TXACNT)(TXORNO))
+/*0903A*/    OVRPRTF    FILE(QPRINT) OUTQ(PRT20) COPIES(1) +
+                        PAGESIZE(*N 158) CPI(12) +
+                          HOLD(*YES) USRDTA('鋼筋日報')
+/*0903A*/   ENDDO
+             CALL       PGM(ARR039R) PARM(&W#AREA)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+END1:
+             ENDPGM
+

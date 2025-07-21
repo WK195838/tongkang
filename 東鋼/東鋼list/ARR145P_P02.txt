@@ -1,0 +1,107 @@
+    /****************************************************************/
+    /*                                                              */
+    /*          >>   PROGRAM INTRODUCTION  <<                       */
+    /*            1.PROGRAM-ID     ARR145P                          */
+    /*            2.PROGRAM-TYPE   CLP                              */
+    /*            3.AUTHOR         S00WCJ                           */
+    /*            4.FUNCTION      外銷應收帳款查詢報表            */
+    /*            5.DATE-WRITTEN   108/08/05 2019AR00053            */
+    /*            6.DATE-MODIFY                                     */
+    /*                                                            */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCLF       FILE(ARR145S)
+
+             DCL        VAR(&DSPID)   TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&INT)     TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&QDATE)   TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&W#PROD)  TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&W#ERR)  TYPE(*CHAR) LEN(1)
+
+             RTVJOBA    JOB(&DSPID) OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+       /*           */
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+
+             RTVJOBA    CYMDDATE(&QDATE)
+             CHGVAR     VAR(&QDATE)   VALUE('0' *CAT &QDATE)
+
+  START:
+             SNDRCVF
+             IF         COND(&IN03 *EQ '1')   THEN(RETURN)
+             IF         COND(&IN12 *EQ '1')   THEN(RETURN)
+
+       /* 紀錄輸入值 */
+             CHGVAR     VAR(&W#PROD)    VALUE(&S#PROD)
+             CHGDTAARA  DTAARA(*LDA (1 1))  VALUE(&W#PROD)
+             CHGDTAARA  DTAARA(*LDA (517 10)) VALUE(&DSPID)
+
+             SBMJOB     CMD(CALL PGM(ARR145P)) JOB(ARR145P) +
+                        JOBD(ARJOBD)
+             SNDBRKMSG  MSG('<<外銷應收帳款查詢報表，+
+             開始處理，請稍待...>>') +
+                         TOMSGQ(&DSPID) MSGTYPE(*INFO)
+             RETURN     /* INTERACTIVE JOB   */
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1  1))     RTNVAR(&W#PROD)
+             RTVDTAARA  DTAARA(*LDA (517 10)) RTNVAR(&DSPID)
+
+
+             OVRPRTF    FILE(ARR145T) TOFILE(ARR145T) +
+                        USRDTA('外銷應收') HOLD(*YES) +
+                        PAGESIZE(*N  120) CPI(15)
+
+             OVRDBF     FILE(ARSTATL1)  TOFILE(ARSTATL1) SHARE(*YES)
+
+ /*W#PROD=2鋼筋(X訂單)*/
+
+           IF      COND(&W#PROD *EQ '2') THEN(DO)
+             OPNQRYF    FILE(ARSTATL1) QRYSLT(' +
+                        ORNO  *EQ "X" *AND  +
+                        ARNBAL *NE 0  *AND  +
+                        CUNO  *EQ "E"       +
+                                       ') +
+                        MAPFLD((ORNO '%SST(ARORNO 1 1)')  +
+                               (CUNO '%SST(ARCUNO 1 1)')) +
+                        KEYFLD((ARCUNO) (ARORNO))
+           ENDDO
+
+ /*W#PROD=3型鋼*/
+
+           IF      COND(&W#PROD *EQ '3') THEN(DO)
+             OPNQRYF    FILE(ARSTATL1) QRYSLT(' +
+                        ORNO  *EQ "H" *AND  +
+                        ARNBAL *NE 0  *AND  +
+                        CUNO  *EQ "E"       +
+                                       ') +
+                        MAPFLD((ORNO '%SST(ARORNO 1 1)')  +
+                               (CUNO '%SST(ARCUNO 1 1)')) +
+                        KEYFLD((ARCUNO) (ARORNO))
+           ENDDO
+
+
+ /*W#PROD=' ' 全部*/
+
+           IF      COND(&W#PROD *EQ ' ') THEN(DO)
+             OPNQRYF    FILE(ARSTATL1) QRYSLT(' +
+                        ARNBAL *NE 0  *AND  +
+                        ARORNO *NE "V00003" *AND +
+                        CUNO  *EQ "E"       +
+                                       ') +
+                        MAPFLD((CUNO '%SST(ARCUNO 1 1)')) +
+                        KEYFLD((ARCUNO) (ARORNO))
+           ENDDO
+
+                 CALL      PGM(ARR145R)
+                 CLOF       OPNID(ARSTATL1)
+             DLTOVR     FILE(*ALL)
+
+             SNDBRKMSG  MSG('<<外銷應收帳款查詢報表+
+                處理完畢，請列印...>>'                               ) +
+                          TOMSGQ(&DSPID) MSGTYPE(*INFO)
+             ENDPGM
+

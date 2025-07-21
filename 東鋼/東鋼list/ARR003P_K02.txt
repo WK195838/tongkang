@@ -1,0 +1,45 @@
+           /******************************************************/
+           /*                                                    */
+           /*   PROGRAM   ID        :   ARR003R                  */
+           /*   PROGRAM   FUNCTION  :  預收貨款餘額明細表      */
+           /*   AUTHER              :   NANCY                    */
+           /*   CREATE    DATE      :   81/10/01                 */
+           /*   MAINTAIN  DATE      :                            */
+           /*   RELATION  PROGRAM   :   ARR003R,ARR003S          */
+           /*   NOTE                :                            */
+           /*   UPDATE  DATE  103/04/30  2014AR825 S00WCJ (0304A) */
+           /*                                                    */
+           /******************************************************/
+             PGM
+             DCL        VAR(&INT) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&ORNOT) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&ORNOF) TYPE(*CHAR) LEN(6)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARR003RS) PARM(&IN03 &ORNOF &ORNOT)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGDTAARA  DTAARA(*LDA (1 6)) VALUE(&ORNOF)
+             CHGDTAARA  DTAARA(*LDA (7 6)) VALUE(&ORNOT)
+             SBMJOB     JOB(ARR003P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR003P')
+             RETURN
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&ORNOF)
+             RTVDTAARA  DTAARA(*LDA (7 6)) RTNVAR(&ORNOT)
+             OVRDBF     FILE(ARSTAT) TOFILE(ARSTAT)
+             OVRDBF     FILE(INVMST) TOFILE(INVMST) SHARE(*YES)
+/*0304A*/    OPNQRYF    FILE((INVMST)) QRYSLT('                  +
+                          INORNO *EQ %RANGE("' || &ORNOF || '"   +
+                          "' || &ORNOT || '")                    +
+                          *AND INDECD *EQ " "                    +
+                          *AND (INTYPE *EQ "2"                   +
+                          *OR   INBAMT *NE 0                     +
+                          *OR   INDAMT *NE 0)')                  +
+                           KEYFLD((INORNO) (ININDT) (INNO))
+             CALL       PGM(ARR003R)
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+ENDCLPGM:    ENDPGM
+

@@ -1,0 +1,105 @@
+    /***************************************************************/
+    /*                                                             */
+    /*             UPDATE DATE  98/05/18 2009AR309 S00WCJ(9805)    */
+    /*                          將傳票檔ACTRAN改為正式線上名稱 */
+    /*                           ACVOUR                            */
+    /*                          98/10/16 2009AR357 S00WCJ (9810A)  */
+    /*                          98/11/06 2009QR375 S00WCJ (9811A)  */
+    /*                         100/12/02 2011AR634 S00WCJ (0012A)  */
+    /*                          配合IFRS修改                   */
+    /*                         101/12/14 2012AR704 S00WCJ (0112A)  */
+    /*                          配合IFRS正式轉換修改           */
+    /*                         107/05/15 2018AR1155 S00WCJ (0705A) */
+    /*                          增加列印部門代號及歸屬部門，放寬 */
+    /*                          報表行數                         */
+    /*                                                             */
+    /***************************************************************/
+             PGM
+             DCL        VAR(&P#YYMM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&P#DATE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&P#CODE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&YMD)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&Y)    TYPE(*CHAR) LEN(4)
+             DCL        VAR(&M)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&WSID)  TYPE(*CHAR) LEN(10)
+ /*0012A*/   DCL        VAR(&D#VNO1) TYPE(*CHAR) LEN(6)
+ /*0012A*/   DCL        VAR(&D#VNO2) TYPE(*CHAR) LEN(6)
+ /*0012A*/   DCL        VAR(&YM)   TYPE(*CHAR)  LEN(6)
+ /*0112A*/   DCL        VAR(&IFRSD) TYPE(*CHAR) LEN(8)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&WSID)
+
+ DISPLY:     IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARP019RS) PARM(&IN03 &YMD)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&YMD)
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&P#YYMM)
+             RTVDTAARA  DTAARA(*LDA (1 8)) RTNVAR(&P#DATE)
+
+             CALL    PGM(ACP101R) PARM(&P#YYMM &P#CODE)
+             IF         COND(&P#CODE *EQ '1') THEN(DO)
+             SNDBRKMSG  MSG('關帳日期已過，請與相關人員聯絡！') +
+                          TOMSGQ(&WSID)
+             GOTO       CMDLBL(DISPLY)
+             ENDDO
+
+             SBMJOB     JOB(ARP019P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARP019P')
+             RETURN
+             ENDDO
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1    8)) RTNVAR(&YMD)
+             RTVDTAARA  DTAARA(*LDA (1    4)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (5    2)) RTNVAR(&M)
+ /*0012A*/   RTVDTAARA  DTAARA(*LDA (1    6)) RTNVAR(&YM)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+ /*0112A*/   RTVDTAARA  DTAARA(ARIFRSCTL (1  8))  RTNVAR(&IFRSD)
+    /*9810A  START */
+       /*    OVRPRTF    FILE(ARP019T) TOFILE(ARP019T) PAGESIZE(*N +
+                          120) CPI(15) HOLD(*YES) USRDTA('審核要件') */
+    /*9810A  END */
+    /*9811A  START */
+             OVRPRTF    FILE(ARP019T) TOFILE(ARP019T) PAGESIZE(*N +
+                          132) CPI(10) HOLD(*YES) USRDTA('審核要件')
+    /*9811A  END  */
+
+             OVRDBF     FILE(RCVDTLL1) TOFILE(RCVDTLL1) SHARE(*YES)
+             OPNQRYF    FILE((RCVDTLL1))     QRYSLT('   +
+                          RVDATE *EQ   ' || &YMD || '          +
+                    *AND  RVTYPE *EQ   "3"                     +
+                    *AND  %SST(RVNO 1 1) *EQ  "' || &AREA || '" +
+                    *AND  RVDECD *NE  "D"')                    +
+                          KEYFLD((RVNO)(RVITEM))
+
+    /*9805A  START */
+         /*  OVRDBF     FILE(ACTRAN) TOFILE(('AC' || &AREA || 'R'))  +
+                          LVLCHK(*NO) */
+
+             OVRDBF     FILE(ACVOUR) TOFILE(('AC' || &AREA || 'R'))  +
+                          LVLCHK(*NO)
+    /*9805A  END */
+ /*0705A     OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 176) +
+                          CPI(13.3)  */
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 198) +
+                          CPI(15)
+             CALL       PGM(ARP019R)
+             CLOF       OPNID(RCVDTLL1)
+             DLTOVR     FILE(*ALL)
+
+ /*0112A*/  IF     COND(&YMD  *LT  &IFRSD)  THEN(DO)
+ /*0012A STRAT */
+
+             RTVDTAARA  DTAARA(*LDA (201 6)) RTNVAR(&D#VNO1)
+             RTVDTAARA  DTAARA(*LDA (211 6)) RTNVAR(&D#VNO2)
+
+             CALL       PGM(ARS888P) PARM(&AREA &YM &D#VNO1 &D#VNO2)
+ /*0012A  END */
+ /*0112A*/  ENDDO
+             ENDPGM
+

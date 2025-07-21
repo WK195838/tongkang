@@ -1,0 +1,159 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARP074P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02YSH                                  */
+     /*     4.FUNCTION     折讓退回代開傳票                       */
+     /*     5.DATE-WRITTEN  89/12/29                                */
+     /*     6.UPDATE DATE  100/11/22  2011AR634  S00WCJ (0011A)     */
+     /*                     配合IFRS修改                        */
+     /*                    101/12/13  2012AR704  S00WCJ (0112A)     */
+     /*                     配合IFRS正式轉換修改                */
+     /*                    102/03/05  S00WCJ (0203A)                */
+     /*                     修改代開區間，C02001開始為獎勵金代開*/
+     /*                    111/03/15 2022AR00013 S00WCJ (1103A)     */
+     /*                     排除銷貨運費折扣資料                  */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCLF       FILE(ARP103S)
+             DCL        VAR(&P#YYMM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&P#CODE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)   /*執行狀態*/
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&USER)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&AREA)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&YYMM)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&YY)    TYPE(*CHAR) LEN(4)
+             DCL        VAR(&MM)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&FNAME) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MNAME) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&C#SDAT) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&C#EDAT) TYPE(*CHAR) LEN(8)
+ /*0011A*/   DCL        VAR(&D#VNO1) TYPE(*CHAR) LEN(6)
+ /*0011A*/   DCL        VAR(&D#VNO2) TYPE(*CHAR) LEN(6)
+ /*0112A*/   DCL        VAR(&IFRSD)  TYPE(*CHAR) LEN(6)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             RTVDTAARA  DTAARA(*LDA (951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+             CHGVAR     VAR(&S#AREA) VALUE(&AREA)
+ DISPLAY:
+             SNDRCVF    RCDFMT(AR103F1)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+             CHGVAR     VAR(&YYMM) VALUE(&S#YYMM)
+             CHGVAR     VAR(&P#YYMM) VALUE(&S#YYMM)
+             CHGVAR     VAR(&YY) VALUE(%SST(&YYMM 1 4))
+             CHGVAR     VAR(&MM) VALUE(%SST(&YYMM 5 2))
+             CHGVAR     VAR(&FNAME) +
+                        VALUE('AC' || &AREA || 'R')
+             CHGVAR     VAR(&MNAME) VALUE('VR' || &MM)
+             CHKOBJ     OBJ(&FNAME) OBJTYPE(*FILE)
+             MONMSG     CPF0000     EXEC(DO)
+             CHGVAR     VAR(&S#ERR) +
+                        VALUE('折扣代開傳票作業，無法找到指定+
+                          的傳票檔：' || &FNAME)
+                        GOTO DISPLAY
+             ENDDO
+
+             ADDLIBLE   ACCOUNT
+             MONMSG     CPF0000
+
+             CALL    PGM(ACCOUNT/ACP101R) PARM(&P#YYMM &P#CODE)
+             IF         COND(&P#CODE *EQ '1') THEN(DO)
+             CHGVAR     VAR(&S#ERR) VALUE('關帳日期已過')
+             GOTO       CMDLBL(DISPLAY)
+             ENDDO
+
+             CHGDTAARA  DTAARA(*LDA (301 6)) VALUE(&YYMM)
+             CHGDTAARA  DTAARA(*LDA (307 1)) VALUE(&S#AREA)
+
+             SBMJOB     JOB(ARP103P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARP103P')
+             RETURN
+
+BATCH:
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+             RTVDTAARA  DTAARA(*LDA (301 6)) RTNVAR(&YYMM)
+             RTVDTAARA  DTAARA(*LDA (301 4)) RTNVAR(&YY)
+             RTVDTAARA  DTAARA(*LDA (305 2)) RTNVAR(&MM)
+             RTVDTAARA  DTAARA(*LDA (307 1)) RTNVAR(&AREA)
+ /*0112A*/   RTVDTAARA  DTAARA(ARIFRSCTL (1  6))  RTNVAR(&IFRSD)
+
+             CHGVAR     VAR(&FNAME) +
+                        VALUE('AC' || &AREA || 'R')
+             CHGVAR     VAR(&MNAME) VALUE('VR' || &MM)
+
+
+STEP1:       /* 刪除已代開過的資料 */
+
+             OVRDBF     FILE(ACTRAN) TOFILE(&FNAME) SHARE(*YES)
+ /*0203A*/   OPNQRYF    FILE(ACTRAN) OPTION(*ALL) +
+                        QRYSLT('ACVRNO *GE "C00800" *AND +
+                                ACVRNO *LE "C02000" *AND +
+                                YM     *EQ "' || &YYMM || '" *AND +
+                                ACAREA *EQ "' || &AREA || '"')    +
+                        MAPFLD((YM  ACYM  *CHAR 6))
+
+             CALL       PGM(ARP103R1)  /*刪除輸入日期後的資料*/
+             CLOF       OPNID(ACTRAN)
+             DLTOVR     *ALL
+
+ /*0112A*/  IF    COND(&YYMM  *LT &IFRSD) THEN(DO)
+ /*0011A STRAT */
+
+             CHGVAR     VAR(&D#VNO1)    VALUE('C00800')
+ /*0203A*/   CHGVAR     VAR(&D#VNO2)    VALUE('C02000')
+
+             CALL       PGM(ARS888P) PARM(&AREA &YYMM &D#VNO1 &D#VNO2)
+ /*0011A  END */
+ /*0112A*/  ENDDO
+
+STEP2:       /* 代開開始*/   /*------------------*/
+
+             OVRDBF     FILE(ACTRAN) TOFILE(&FNAME) SHARE(*YES)
+             OVRDBF     FILE(INVDTL) TOFILE(INVDTL) SHARE(*YES)
+             OVRPRTF    FILE(ARP103T) TOFILE(ARP103T) PAGESIZE(*N +
+                          132) CPI(10) HOLD(*YES) USRDTA('折扣開１')
+             OVRPRTF    FILE(ARP103TA) TOFILE(ARP103TA) PAGESIZE(*N +
+                          132) CPI(10) HOLD(*YES) USRDTA('折扣開２')
+
+/*1103A*/    OPNQRYF    FILE(INVDTL) OPTION(*ALL) +
+                        QRYSLT('+
+                              (IVACNT *EQ "3") *AND +
+                              (IVFL03 *EQ "K") *AND +
+                              (ACD1   *EQ "' || &YYMM || '") *AND +
+                              (IVTXAR *EQ "' || &AREA || '") *AND +
+                              %SST(IVMAK1 1 1) *EQ %VALUES(" ") *AND +
+                              (IVDECD *NE "D")') +
+                        MAPFLD((ACDT IVACDT  *CHAR 8)  +
+                               (ACD1 '%SST(ACDT   1 6)' *CHAR 6)) +
+                        KEYFLD((IVNO) (IVPDCD))
+
+             CALL       PGM(ARP103R)  /*傳票代開及列表*/
+             CLOF       OPNID(INVDTL)
+             DLTOVR     FILE(*ALL)
+
+ /*0112A*/  IF    COND(&YYMM  *LT &IFRSD)  THEN(DO)
+ /*0011A STRAT */
+
+             RTVDTAARA  DTAARA(*LDA (201 6)) RTNVAR(&D#VNO1)
+             RTVDTAARA  DTAARA(*LDA (211 6)) RTNVAR(&D#VNO2)
+
+             CALL       PGM(ARS888P) PARM(&AREA &YYMM &D#VNO1 &D#VNO2)
+ /*0011A  END */
+ /*0112A*/  ENDDO
+
+             SNDBRKMSG  MSG('<<折扣代開傳票處理完畢，請列印           +
+                        ....>>') +
+                        TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+
+             ENDPGM
+

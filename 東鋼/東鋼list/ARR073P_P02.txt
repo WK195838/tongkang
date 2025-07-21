@@ -1,0 +1,118 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR073P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     已過入財會營業繳款明細表               */
+     /*     5.DATE-WRITTEN  87/08/18                                */
+     /*     6.UPDATE  DATE  99/05/06 2010AR476 S00WCJ (9905A)       */
+     /*                     99/08/17 2010AR517 S00WCJ (9908A)       */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)     TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)   LEN(10)
+             DCL        VAR(&W#FLAG)  TYPE(*CHAR)   LEN(1)
+    /*9908A  START*/
+        /*   DCL        VAR(&W#DATE)  TYPE(*DEC)    LEN(6 0) */
+        /*   DCL        VAR(&W#UDATE) TYPE(*CHAR)   LEN(6)   */
+             DCL        VAR(&W#DATE)  TYPE(*DEC)    LEN(8 0)
+             DCL        VAR(&W#UDATE) TYPE(*CHAR)   LEN(8)
+    /*9908A  END */
+             DCL        VAR(&W#RVDT)  TYPE(*CHAR)   LEN(8)
+
+             DCL        VAR(&P#PDAT) TYPE(*CHAR) LEN(8)  /*輸入日期*/
+             DCL        VAR(&P#MODE) TYPE(*CHAR) LEN(1)  /*年份別*/
+             DCL        VAR(&P#MTL)  TYPE(*CHAR) LEN(24) /*月日數*/
+             DCL        VAR(&P#LEAP) TYPE(*CHAR) LEN(1)  /*閏年碼*/
+
+             DCLF       FILE(ARLIB/ARR073S)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+    /*9908A  START */
+       /*    RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&W#UDATE) */
+
+             RTVJOBA    CYMDDATE(&W#UDATE)
+             CHGVAR     VAR(&W#UDATE)  VALUE('0' *CAT &W#UDATE)
+    /*9908A   END  */
+             CHGVAR     VAR(&S#RVDT)  VALUE(&W#UDATE)
+ INPUT:
+             SNDRCVF    RCDFMT(AR073F1)
+             IF         COND(&IN03 *EQ '1' *OR &IN12 *EQ '1') +
+                        THEN(RETURN)
+
+             CHGVAR     VAR(&IN51) VALUE('0')
+             CHGVAR     VAR(&IN52) VALUE('0')
+
+             IF         COND(&S#RVDP *EQ ' ') THEN(DO)
+                CHGVAR  VAR(&IN51) VALUE('1')
+                CHGVAR  VAR(&S#MSG1) VALUE('繳款廠區不可空白')
+                GOTO INPUT
+             ENDDO
+
+      /*     CHGVAR     VAR(&W#DATE) VALUE(&S#RVDT)           */
+      /*     CALL       PGM(C01) PARM(&W#DATE &W#FLAG)        */
+             CHGVAR     VAR(&P#PDAT) VALUE(&S#RVDT)
+             CHGVAR     VAR(&P#MODE) VALUE('1')
+             CALL       PGM(UTS102R) PARM(&P#PDAT &P#MODE +
+                                          &P#MTL &P#LEAP &W#FLAG)
+             IF         COND(&W#FLAG *NE '0') THEN(DO)
+                CHGVAR  VAR(&IN52) VALUE('1')
+                CHGVAR  VAR(&S#MSG1) VALUE('日期格式錯誤！')
+                 GOTO    INPUT
+             ENDDO
+
+             CHGVAR     VAR(&W#DATE)  VALUE(&W#UDATE)
+             IF         COND(&S#RVDT *GT &W#DATE) THEN(DO)
+                CHGVAR  VAR(&IN52) VALUE('1')
+                CHGVAR  VAR(&S#MSG1) VALUE('日期不可超過系統日期')
+                GOTO    INPUT
+             ENDDO
+
+             CHGDTAARA  DTAARA(*LDA (1 1)) VALUE(&S#RVDP)
+             CHGVAR     VAR(&W#RVDT)       VALUE(&S#RVDT)
+             CHGDTAARA  DTAARA(*LDA (2 8)) VALUE(&W#RVDT)
+             SBMJOB     JOB(ARR073P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                        RQSDTA('CALL ARR073P')
+    /*9905A  START */
+       /*    CHGDTAARA  DTAARA(*LDA (801 70)) +
+             VALUE('已過入財會繳款明細表已匯入排程中。')  */
+             CHGDTAARA  DTAARA(*LDA (601 70)) +
+             VALUE('已過入財會繳款明細表已匯入排程中。')
+    /*9905A  END  */
+             RETURN
+
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 1)) RTNVAR(&S#RVDP)
+             RTVDTAARA  DTAARA(*LDA (2 8)) RTNVAR(&W#RVDT)
+
+                        /* 已過入 */
+             OVRPRTF    FILE(ARR073T) TOFILE(ARLIB/ARR073T) +
+                        PAGESIZE(*N 198)  CPI(15) +
+                        HOLD(*YES) USRDTA('已過繳款') +
+                        COPIES(2)
+             OVRDBF     FILE(SARVIN) TOFILE(DALIB/SARVIN)
+             OVRDBF     FILE(SARCVF) TOFILE(DALIB/SARCVF) SHARE(*YES)
+             OPNQRYF    FILE(SARCVF) +
+                        QRYSLT( +
+                         'SRFL02 *EQ "Y" *AND   +
+                          SRFL01 *EQ "Y" *AND   +
+                     %SST(SRRVNO 1 1) *EQ "' || &S#RVDP || '" *AND +
+                          SRRVDT *EQ ' || &W#RVDT ) +
+                        KEYFLD((SRRVID) (SRRVDT) (SRRVNO))
+
+             CALL       PGM(ARR073R)
+             CLOF       OPNID(SARCVF)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

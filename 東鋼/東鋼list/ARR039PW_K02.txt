@@ -1,0 +1,66 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR039PW                                */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCJ                                  */
+     /*     4.FUNCTION     出貨日報表(代傳票)(代加工)         */
+     /*     5.DATE-WRITTEN  107/03/21 2018AR1144                    */
+     /*     6.UPDATE  DATE  109/03/06 2020AR00013 S00WCJ (0903A)    */
+     /*                      配合鋼胚產生新報表，共用螢幕程式修改 */
+     /*                     112/01/11 2023AR00005 S00WCJ (1201A)    */
+     /*                      配合增加庫別選項修改                 */
+     /*                                                             */
+     /***************************************************************/
+
+             PGM
+             DCL        VAR(&INT) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DATEF) TYPE(*DEC) LEN(8 0)
+             DCL        VAR(&DATET) TYPE(*DEC) LEN(8 0)
+             DCL        VAR(&DATEFA) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATETA) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREA)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#AREA)   TYPE(*CHAR) LEN(1)
+/*0903A*/    DCL        VAR(&W#CHYN) TYPE(*CHAR) LEN(1)
+/*0903A*/    DCL        VAR(&S#TYPE) TYPE(*CHAR) LEN(1)
+/*1201A*/    DCL        VAR(&S#STPE) TYPE(*CHAR) LEN(1)
+
+/*0903A*/    CHGVAR     VAR(&W#CHYN) VALUE('N')
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+/*1201A*/    CALL       PGM(ARR039RS) PARM(&IN03 &DATEF &DATET +
+                                           &W#CHYN  &S#TYPE &S#STPE +
+                                           &W#AREA)
+
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&DATEFA)       VALUE(&DATEF)
+             CHGVAR     VAR(&DATETA)       VALUE(&DATET)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&DATEFA)
+             CHGDTAARA  DTAARA(*LDA (9 8)) VALUE(&DATETA)
+             SBMJOB     JOB(ARR039PW) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR039PW')
+             RETURN
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (1 8))   RTNVAR(&DATEFA)
+             RTVDTAARA  DTAARA(*LDA (9 8))   RTNVAR(&DATETA)
+             RTVDTAARA  DTAARA(*LDA (1021 1))   RTNVAR(&AREA)
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+             OPNQRYF    FILE((TRNDTL)) QRYSLT('                     +
+                          TXTXAR       *EQ "' || &AREA || '"      & +
+                          TXFLAG       *NE "D"                    & +
+                          TXACDT *EQ %RANGE(' || &DATEFA || '       +
+                                        ' || &DATETA || ')        & +
+                          TXCODE *EQ "SA04"                       & +
+                          (%SST(TXRESV 16 2) *EQ "1J")')  +
+                          KEYFLD((TXACDT)(TXNO) (TXACNT)(TXORNO))
+             OVRPRTF    FILE(QPRINT) OUTQ(PRT20) COPIES(1) +
+                          HOLD(*YES) USRDTA('加工日報')
+             CALL       PGM(ARR039RW)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

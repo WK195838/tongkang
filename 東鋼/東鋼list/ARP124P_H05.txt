@@ -1,0 +1,83 @@
+    /****************************************************************/
+    /*                                                              */
+    /*        >>   PROGRAM INTRODUCTION  <<                         */
+    /*        1.PROGRAM-ID     ARP124P                              */
+    /*        2.PROGRAM-TYPE   CLP                                  */
+    /*        3.AUTHOR         S00WCJ                               */
+    /*        4.FUNCTION      折讓沖銷傳票代開                    */
+    /*        5.DATE-WRITTEN   103/08/20 2014AR862                  */
+    /*        6.DATE-MODIFY    109/03/03 2020AR00012 S00WCJ (0903A) */
+    /*                          增加檢核表選擇欄位                */
+    /*                                                              */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCL        VAR(&P#YYMM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&P#DATE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&P#CODE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&YMD)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&VRNOF) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&Y)    TYPE(*CHAR) LEN(4)
+             DCL        VAR(&M)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&WSID)  TYPE(*CHAR) LEN(10)
+/*0903A*/    DCL        VAR(&S#CHYN)  TYPE(*CHAR)  LEN(1)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&WSID)
+
+ DISPLY:     IF         COND(&INT *EQ '1') THEN(DO)
+/*0903A*/    CALL       PGM(ARP124RS) PARM(&IN03 &YMD &S#CHYN)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&YMD)
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&P#YYMM)
+             RTVDTAARA  DTAARA(*LDA (1 8)) RTNVAR(&P#DATE)
+/*0903A*/    CHGDTAARA  DTAARA(*LDA (11 1)) VALUE(&S#CHYN)
+
+             CALL    PGM(ACP101R) PARM(&P#YYMM &P#CODE)
+             IF         COND(&P#CODE *EQ '1') THEN(DO)
+             SNDBRKMSG  MSG('關帳日期已過，請與相關人員聯絡！') +
+                          TOMSGQ(&WSID)
+             GOTO       CMDLBL(DISPLY)
+             ENDDO
+
+             SBMJOB     JOB(ARP124P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARP124P')
+             RETURN
+             ENDDO
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1    8)) RTNVAR(&YMD)
+             RTVDTAARA  DTAARA(*LDA (1    4)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (5    2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+
+             OVRDBF     FILE(ARSRAE) TOFILE(ARSRAE)  SHARE(*YES)
+             OPNQRYF    FILE(ARSRAE) OPTION(*ALL) +
+                        QRYSLT('+
+                              (ASFACT *EQ "' || &AREA || '") *AND +
+                              (ASGLNO *EQ " ") *AND +
+                              (ASDECD *NE "Y")') +
+                        MAPFLD((W#DATE ASPYDE *CHAR 8)) +
+                        KEYFLD((ASCUNO) (ASPYDE) (ASTXNO) +
+                               (ASITEM))
+
+  /*   CPYFRMQRYF     FROMOPNID(ARSRAE) TOFILE(S00WCJ/ARSR) +
+            MBROPT(*REPLACE) CRTFILE(*YES)    */
+
+             OVRDBF     FILE(ACTRAN) TOFILE(('AC' || &AREA || +
+                          'R')) LVLCHK(*NO)
+             OVRPRTF    FILE(ARP124T) TOFILE(ARP124T) PAGESIZE(*N +
+                          158) CPI(13.3) HOLD(*YES) +
+                          USRDTA('折沖傳清')
+             CALL       PGM(ARP124R)
+
+             CLOF       OPNID(ARSRAE)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

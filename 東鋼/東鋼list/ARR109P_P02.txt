@@ -1,0 +1,121 @@
+        /**********************************************************/
+        /*                                                        */
+        /*        >>   PROGRAM INTRODUCTION  <<                   */
+        /*        1.PROGRAM-ID     ARR109P                        */
+        /*        2.PROGRAM-TYPE   CLP                            */
+        /*        3.AUTHOR         S02CSF                         */
+        /*        4.FUNCTION      客戶暫收貨款餘額明細表（營業）*/
+        /*        5.DATE-WRITTEN   92/02/25                       */
+        /*        6.DATE-MODIFY    99/07/30 2010AR508 S00WCJ (9907A) */
+        /*                                                        */
+        /**********************************************************/
+           PGM
+           DCLF     FILE(ARR109S)
+           DCL      VAR(&TYPE)    TYPE(*CHAR)  LEN(1)
+           DCL      VAR(&S#DEVN)  TYPE(*CHAR)  LEN(10)
+           DCL      VAR(&S#USER)  TYPE(*CHAR)  LEN(10)
+           DCL      VAR(&CUN1)    TYPE(*CHAR)  LEN(6) /*客戶代號暫存*/
+           DCL      VAR(&CUN2)    TYPE(*CHAR)  LEN(6) /*客戶代號暫存*/
+           DCL      VAR(&ARE1)    TYPE(*CHAR)  LEN(1) /*廠區暫存*/
+           DCL      VAR(&ARE2)    TYPE(*CHAR)  LEN(1) /*廠區暫存*/
+           DCL      VAR(&ORN1)    TYPE(*CHAR)  LEN(6) /*訂單代號暫存*/
+           DCL      VAR(&ORN2)    TYPE(*CHAR)  LEN(6) /*訂單代號暫存*/
+           DCL      VAR(&C#AREA)  TYPE(*CHAR)  LEN(1)
+    /*9907A  START */
+           DCL      VAR(&W#SALE)  TYPE(*CHAR)  LEN(1)
+    /*9907A  END  */
+
+           RTVJOBA  JOB(&S#DEVN)  USER(&S#USER) TYPE(&TYPE)
+
+           IF       COND(&TYPE *EQ '0') THEN(GOTO CMDLBL(BATCH))
+
+           RTVDTAARA  DTAARA(*LDA (1011 10))   RTNVAR(&S#DEVN)
+           RTVDTAARA  DTAARA(*LDA (1001 10))   RTNVAR(&S#USER)
+ START:    SNDRCVF
+
+           IF         COND(&IN03 *EQ '1') THEN(RETURN)
+           IF         COND(&IN12 *EQ '1') THEN(RETURN)
+
+  /*  CHECK 客戶代號*/
+           IF         COND(&S#CUNO *EQ ' ') THEN(DO)
+           CHGVAR     VAR(&CUN1)     VALUE('      ')
+           CHGVAR     VAR(&CUN2)     VALUE('999999')
+           ENDDO
+           ELSE (DO)
+           CHGVAR     VAR(&CUN1)     VALUE(&S#CUNO)
+           CHGVAR     VAR(&CUN2)     VALUE(&S#CUNO)
+           ENDDO
+
+  /*  CHECK 廠區　　*/
+           IF         COND(&S#AREA *EQ ' ') THEN(DO)
+           CHGVAR     VAR(&ARE1)     VALUE(' ')
+           CHGVAR     VAR(&ARE2)     VALUE('9')
+           ENDDO
+           ELSE (DO)
+           CHGVAR     VAR(&ARE1)     VALUE(&S#AREA)
+           CHGVAR     VAR(&ARE2)     VALUE(&S#AREA)
+           ENDDO
+
+  /*  CHECK 訂單編號  */
+           IF         COND(&S#ORNO *EQ ' ') THEN(DO)
+           CHGVAR     VAR(&ORN1)     VALUE('      ')
+           CHGVAR     VAR(&ORN2)     VALUE('999999')
+           ENDDO
+           ELSE (DO)
+           CHGVAR     VAR(&ORN1)     VALUE(&S#ORNO)
+           CHGVAR     VAR(&ORN2)     VALUE(&S#ORNO)
+           ENDDO
+
+           CHGDTAARA  DTAARA(*LDA  (300  6))  VALUE(&CUN1)
+           CHGDTAARA  DTAARA(*LDA  (306  6))  VALUE(&CUN2)
+           CHGDTAARA  DTAARA(*LDA  (312  1))  VALUE(&ARE1)
+           CHGDTAARA  DTAARA(*LDA  (313  1))  VALUE(&ARE2)
+           CHGDTAARA  DTAARA(*LDA  (314  6))  VALUE(&ORN1)
+           CHGDTAARA  DTAARA(*LDA  (320  6))  VALUE(&ORN2)
+    /*9908A  START */
+           CHGDTAARA  DTAARA(*LDA  (326  1))  VALUE(&S#SALE)
+    /*9908A  END   */
+
+           SBMJOB     JOB(ARR109P) JOBD(ARJOBD) +
+                      RQSDTA('CALL ARR109P')
+           SNDBRKMSG  MSG('<<客戶暫收貨款餘額明細表（營業）+
+                          ,已開始處理,請稍待...>>')    +
+                          TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+           RETURN
+   BATCH:
+           RTVDTAARA  DTAARA(*LDA (300 6))  RTNVAR(&CUN1)
+           RTVDTAARA  DTAARA(*LDA (306 6))  RTNVAR(&CUN2)
+           RTVDTAARA  DTAARA(*LDA (312 1))  RTNVAR(&ARE1)
+           RTVDTAARA  DTAARA(*LDA (313 1))  RTNVAR(&ARE2)
+           RTVDTAARA  DTAARA(*LDA (314 6))  RTNVAR(&ORN1)
+           RTVDTAARA  DTAARA(*LDA (320 6))  RTNVAR(&ORN2)
+           RTVDTAARA  DTAARA(*LDA (1021  1)) RTNVAR(&C#AREA)
+    /*9907A  START */
+           RTVDTAARA  DTAARA(*LDA (326 1))  RTNVAR(&W#SALE)
+    /*9907A  END   */
+
+           IF         COND(&C#AREA *NE 'P') THEN(DO)
+           CHGVAR     VAR(&ARE1)     VALUE(&C#AREA)
+           CHGVAR     VAR(&ARE2)     VALUE(&C#AREA)
+           ENDDO
+
+           OVRPRTF    FILE(ARR109T) TOFILE(ARR109T) PAGESIZE(*N 198)    +
+                      CPI(15) HOLD(*YES) USRDTA('營業暫收')
+           OVRDBF     FILE(AR2159D) TOFILE(AR2159D) SHARE(*YES)
+           OPNQRYF    FILE(AR2159D) OPTION(*ALL) QRYSLT(' +
+                        (ADCUNO    *GE "' || &CUN1   || '") *AND +
+                        (ADCUNO    *LE "' || &CUN2   || '") *AND +
+                        (ADORNO    *GE "' || &ORN1   || '") *AND +
+                        (ADORNO    *LE "' || &ORN2   || '") *AND +
+                        (ADAREA    *GE "' || &ARE1   || '") *AND +
+                        (ADAREA    *LE "' || &ARE2   || '")') +
+                      KEYFLD((ADCUNO) (ADAREA) (ADORNO))
+    /*9907A CALL       PGM(ARR109R)  */
+    /*9907A*/  CALL       PGM(ARR109R)   PARM(&W#SALE)
+           DLTOVR     FILE(*ALL)
+
+           SNDBRKMSG  MSG('<<客戶暫收貨款餘額明細表（營業）+
+                         ,已處理完成,請列印...>>')    +
+                         TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+   END:    ENDPGM
+

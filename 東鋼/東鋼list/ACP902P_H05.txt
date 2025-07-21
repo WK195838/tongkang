@@ -1,0 +1,110 @@
+/*                                                                          */
+/*      97/06/11 2008MT229 S00TPC(9706A)                                    */
+/*      99/05/27 2009MT388 S00TPC(9905A)                                    */
+/*     100/11/11 1001108MT S00TPC(0011A)                                    */
+/*     101/12/07 2012MT635 S00TPC(0112A)                                    */
+/*     113/08/15 2024MT00017 S00TPC(1308A)                                  */
+/*                                                                          */
+             PGM
+/*0112A*/    DCL        VAR(&IFRSYM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&P#YYMM) TYPE(*CHAR) LEN(6)
+/*9905A*/    DCL        VAR(&P#YM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&P#CODE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&INT)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN07)  TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN09)  TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DATE)  TYPE(*DEC)  LEN(8)
+             DCL        VAR(&DATEA) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATE1) TYPE(*DEC)  LEN(8)
+             DCL        VAR(&DATE2) TYPE(*DEC)  LEN(8)
+             DCL        VAR(&DATE1A) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATE2A) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATEB) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATEX) TYPE(*CHAR) LEN(8)
+/*1308A*/    DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&Y)     TYPE(*CHAR) LEN(4)
+             DCL        VAR(&M)     TYPE(*CHAR) LEN(2)
+             DCL        VAR(&YM)    TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DTARA) TYPE(*CHAR) LEN(11)
+             DCL        VAR(&S#TYPE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&TIME)     TYPE(*CHAR) LEN(6)
+/*0011A*/    DCL        VAR(&P#VRNS) TYPE(*CHAR) LEN(6)
+/*0011A*/    DCL        VAR(&P#VRNE) TYPE(*CHAR) LEN(6)
+/*1308A*/    RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&DTARA) VALUE('ACDTAARA')
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+/*0112A*/    RTVDTAARA  DTAARA(AMIFRSCTL (1 6)) RTNVAR(&IFRSYM)
+             RTVDTAARA  DTAARA(&DTARA (9 8)) RTNVAR(&DATEB)
+             RTVSYSVAL  SYSVAL(QTIME) RTNVAR(&TIME)
+ DISPLY:     CALL       PGM(ACP902RS) PARM(&IN07 &DATE1 &DATE2 &DATE +
+                          &AREA &DATEB &IN09)
+             IF         COND(&IN07 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&DATE1A) VALUE(&DATE1)
+             CHGVAR     VAR(&DATE2A) VALUE(&DATE2)
+             CHGVAR     VAR(&DATEA) VALUE(&DATE)
+             CHGDTAARA  DTAARA(*LDA (1 8)) VALUE(&DATEA)
+             CHGDTAARA  DTAARA(*LDA (9 1)) VALUE(&AREA)
+             CHGDTAARA  DTAARA(*LDA (10 8)) VALUE(&DATE1A)
+             CHGDTAARA  DTAARA(*LDA (18 8)) VALUE(&DATE2A)
+/*0112A*/    CHGDTAARA  DTAARA(*LDA (472 6)) VALUE(&IFRSYM)
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&P#YYMM)
+/*9905A*/    RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&P#YM)
+/*0011A*/    CHGDTAARA  DTAARA(*LDA (51 6)) VALUE(&TIME)
+             CALL    PGM(ACP101R) PARM(&P#YYMM &P#CODE)
+             IF         COND(&P#CODE *EQ '1') THEN(DO)
+             GOTO       CMDLBL(DISPLY)
+             ENDDO
+             /* 重新代開時執行*/
+             IF      COND(&IN09 *EQ '1') THEN(DO)
+                     CALL MIP033P  PARM(&P#YM)
+                     GOTO DISPLY
+             ENDDO
+/*0011A      SBMJOB     JOB(ACP902P) JOBD(ACJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ACP902P')                  */
+/*0011A      RETURN                                               */
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (1 8)) RTNVAR(&DATEA)
+             RTVDTAARA  DTAARA(*LDA (1 4)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (5 2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (1 6)) RTNVAR(&YM)
+             RTVDTAARA  DTAARA(*LDA (9 1)) RTNVAR(&AREA)
+/*9905A*/    RTVDTAARA  DTAARA(*LDA (10 8)) RTNVAR(&DATE1A)
+/*9905A*/    RTVDTAARA  DTAARA(*LDA (18 8)) RTNVAR(&DATE2A)
+/*0011A*/    RTVDTAARA  DTAARA(*LDA (51 6)) RTNVAR(&TIME)
+/*0011A*/    CHGDTAARA  DTAARA(*LDA (51 6)) VALUE(&TIME)
+             CHGVAR     VAR(&DATEX) VALUE(&YM *CAT '01')
+             OVRDBF     FILE(MTACTP) TOFILE(MTACTP) SHARE(*YES)
+             OPNQRYF    FILE((MTACTP)) OPTION(*ALL) +
+                          QRYSLT('                            +
+                          A1ACD  *NE "D"                &     +
+                          A1CODE *EQ "1"                &     +
+                          A1LOCA *EQ "' || &AREA || '"  &     +
+                          A1RVDT *EQ %RANGE(' || &DATE1A || '    +
+                                            ' || &DATE2A || ') ') +
+                          KEYFLD((A1CTRL)(A1RVDT)(A1RVNO))
+
+ /*9706A*/   OVRDBF     FILE(ACVOUR) TOFILE(('AC' || &AREA || 'R'))
+ /*9706A*/   OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 156) +
+                          CPI(12) USRDTA('收料代開')
+             CALL       PGM(ACP902R)
+             CLOF       OPNID(MTACTP)
+             DLTOVR     FILE(*ALL)
+
+/*0112A*/    RTVDTAARA  DTAARA(*LDA (472 6)) RTNVAR(&IFRSYM)
+/*0112A*/    IF         COND(&YM *LT &IFRSYM) THEN(DO)
+             /*區間傳票代開同步(IFRS同步ROC) */
+/*0011A*/    RTVDTAARA  DTAARA(*LDA (31 6)) RTNVAR(&P#VRNS)
+/*0011A*/    RTVDTAARA  DTAARA(*LDA (41 6)) RTNVAR(&P#VRNE)
+/*0011A*/    CALL       PGM(MTS888P) PARM(&AREA &YM &P#VRNS &P#VRNE)
+/*0112A*/    ENDDO
+/*0112A*/    ELSE       CMD(DO)
+             /*區間傳票代開會計科目轉換(IFRS) */
+/*0112A*/    RTVDTAARA  DTAARA(*LDA (31 6)) RTNVAR(&P#VRNS)
+/*0112A*/    RTVDTAARA  DTAARA(*LDA (41 6)) RTNVAR(&P#VRNE)
+/*0112A*/    CALL       PGM(MTS666P) PARM(&AREA &YM &P#VRNS &P#VRNE)
+/*0112A*/    ENDDO
+
+             ENDPGM
+

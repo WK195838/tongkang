@@ -1,0 +1,159 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR141P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCJ                                  */
+     /*     4.FUNCTION     客戶別發票明細表                       */
+     /*     5.DATE-WRITTEN  103/08/29  2014AR865                    */
+     /*     6.UPDATE  DATE                                          */
+     /*                                                             */
+     /***************************************************************/
+
+             PGM
+             DCL        VAR(&DSPID)   TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&W#ERR)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#DAT1) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#DAT2) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&W#ARES) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#AREE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#USER) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&W#YYMS) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&W#YYME) TYPE(*CHAR) LEN(5)
+
+        DCLF       FILE(ARR141S)
+
+             RTVJOBA    JOB(&DSPID) OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVN)
+             RTVDTAARA  DTAARA(*LDA (1001 10)) RTNVAR(&W#USER)
+
+  START:
+             IF         COND(&W#USER *EQ 'U15TSC' *OR &W#USER *EQ +
+                             'Q04CYS') THEN(DO)
+                CHGVAR   VAR(&S#CUNO)  VALUE('DM313')
+             ENDDO
+
+             SNDRCVF    RCDFMT(AR141F1)
+
+             IF         COND(&IN03 *EQ '1')   THEN(RETURN)
+             IF         COND(&IN12 *EQ '1')   THEN(RETURN)
+
+             CHGVAR     VAR(&IN41)    VALUE('0')
+             CHGVAR     VAR(&IN42)    VALUE('0')
+             CHGVAR     VAR(&IN43)    VALUE('0')
+             CHGVAR     VAR(&S#ERR)   VALUE(' ')
+
+             IF       COND(&S#CUNO *EQ ' ')  THEN(DO)
+                     CHGVAR  VAR(&S#ERR)  VALUE('訊息-客戶欄位+
+                              不可空白!')
+                      CHGVAR VAR(&IN43)    VALUE('1')
+             ENDDO
+
+                 IF      COND(&S#DAT1 *EQ 0) THEN(DO)
+                      CHGVAR   VAR(&S#ERR)  VALUE('訊息-日期欄位+
+                             不可空白!')
+                      CHGVAR   VAR(&IN41)   VALUE('1')
+                      GOTO     CMDLBL(START)
+                 ENDDO
+
+             IF       COND(&S#DAT1 *NE 0) THEN(DO)
+                  CALL     PGM(C018) PARM(&S#DAT1 &W#ERR)
+               IF       COND(&W#ERR *EQ '1') THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-輸入日期錯誤!')
+                   CHGVAR  VAR(&IN41)  VALUE('1')
+                   GOTO     CMDLBL(START)
+               ENDDO
+             ENDDO
+
+             IF       COND(&S#DAT2 *NE 0) THEN(DO)
+                  CALL     PGM(C018) PARM(&S#DAT2 &W#ERR)
+               IF       COND(&W#ERR *EQ '1') THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-輸入日期錯誤!')
+                   CHGVAR  VAR(&IN42)  VALUE('1')
+                   GOTO     CMDLBL(START)
+               ENDDO
+             ENDDO
+
+             IF      COND(&S#DAT1 *NE 0  *AND &S#DAT2 *EQ 0) THEN(DO   )
+                   CHGVAR  VAR(&S#DAT2)  VALUE(&S#DAT1)
+             ENDDO
+
+
+             IF       COND(&S#DAT1 *GT &S#DAT2) THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-日期區間錯誤!')
+                   CHGVAR  VAR(&IN41)  VALUE('1')
+                   CHGVAR  VAR(&IN42)  VALUE('1')
+                   GOTO     CMDLBL(START)
+             ENDDO
+
+
+             CHGVAR     VAR(&W#DAT1)   VALUE(&S#DAT1)
+             CHGVAR     VAR(&W#DAT2)   VALUE(&S#DAT2)
+             CHGDTAARA  DTAARA(*LDA (1   8)) VALUE(&W#DAT1)
+             CHGDTAARA  DTAARA(*LDA (11  8)) VALUE(&W#DAT2)
+             CHGDTAARA  DTAARA(*LDA (21  1)) VALUE(&S#FACT)
+             CHGDTAARA  DTAARA(*LDA (31  6)) VALUE(&S#CUNO)
+
+             SBMJOB     JOB(ARR141P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR141P')
+             SNDBRKMSG  MSG('<<客戶別發票明細表，開始處理，請稍待...>>') +
+                          TOMSGQ(&DSPID) MSGTYPE(*INFO)
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1  8)) RTNVAR(&W#DAT1)
+             RTVDTAARA  DTAARA(*LDA (2  5)) RTNVAR(&W#YYMS)
+             RTVDTAARA  DTAARA(*LDA (11 8)) RTNVAR(&W#DAT2)
+             RTVDTAARA  DTAARA(*LDA (12 5)) RTNVAR(&W#YYME)
+             RTVDTAARA  DTAARA(*LDA (21 1)) RTNVAR(&S#FACT)
+             RTVDTAARA  DTAARA(*LDA (31 6)) RTNVAR(&S#CUNO)
+
+
+             IF        COND(&S#FACT *EQ ' ') THEN(DO)
+                       CHGVAR   VAR(&W#ARES)  VALUE(' ')
+                       CHGVAR   VAR(&W#AREE)  VALUE('9')
+             ENDDO
+
+             IF        COND(&S#FACT *NE ' ') THEN(DO)
+                       CHGVAR   VAR(&W#ARES)  VALUE(&S#FACT)
+                       CHGVAR   VAR(&W#AREE)  VALUE(&S#FACT)
+             ENDDO
+
+      /*     CLRPFM     ARR139F     */
+             OVRDBF     FILE(INVMSTJ1) TOFILE(INVMSTJ1) SHARE(*YES)
+             OVRPRTF    FILE(ARR141T) TOFILE(ARR141T) PAGESIZE(*N +
+                          132) CPI(15) HOLD(*YES) USRDTA('客戶發票')
+
+             OPNQRYF    FILE((INVMSTJ1)) QRYSLT('                  +
+                           (INCUNO *EQ "' || &S#CUNO || '") *AND +
+                           (((ACDT *GE "' || &W#DAT1 || '") *AND    +
+                             (ACDT *LE "' || &W#DAT2 || '")) *OR    +
+                            ((INDT *GE "' || &W#DAT1 || '" ) *AND +
+                             (INDT *LE "' || &W#DAT2 || '"))  *OR  +
+                            ((IVRESV *GE "' || &W#YYMS || '") *AND +
+                             (IVRESV *LE "' || &W#YYME || '"))) *AND +
+                           (INDECD *EQ " ") *AND                  +
+                           (IVACNT *NE "6" *AND IVACNT *NE "7") *AND +
+                           (INAREA *GE "' || &W#ARES || '") *AND  +
+                           (INAREA *LE "' || &W#AREE || '")')  +
+                          KEYFLD((INAREA) (INCUNO) (ININDT) (INNO)  +
+                                 (IVACNT)) +
+                          MAPFLD((INDT  ININDT *CHAR 8) +
+                                 (ACDT  IVACDT *CHAR 8))
+
+   /*     CPYFRMQRYF    FROMOPNID(INVMSTJ1) TOFILE(S00WCJ/INJ1) +
+              MBROPT(*REPLACE)  CRTFILE(*YES)    */
+
+             CALL       PGM(ARR141R)
+
+             CLOF       OPNID(INVMSTJ1)
+             DLTOVR     FILE(*ALL)
+
+      ENDPGM
+

@@ -1,0 +1,214 @@
+    /****************************************************************/
+    /*                                                              */
+    /*        UPDATE  DATE  99/10/11  2010AR530 S00WCJ (9910A)      */
+    /*                     104/09/16  2015AR954 S00WCJ (0409A)      */
+    /*                      新增外銷彙總表                        */
+    /*                     108/08/21  2019AR00057 S00WCJ (0808A)    */
+    /*                      配合磅單過至項次修改                  */
+    /*                     110/09/27  2021AR00038 S00WCJ (1009A)    */
+    /*                      訂單編號原僅適用外銷彙總表，改為所有外*/
+    /*                      銷資料適用                            */
+    /*                     111/11/11  2022AR00048 S00WCJ (1111A)    */
+    /*                      配合U磅單由I廠出，實務上比對資料之*/
+    /*                      便利性，U磅單排序改為依出貨廠區順序 */
+    /*                      排序                                  */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+             DCL        VAR(&INT) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DATEF) TYPE(*DEC) LEN(8 0)
+             DCL        VAR(&DATET) TYPE(*DEC) LEN(8 0)
+             DCL        VAR(&DATEFA) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATETA) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&AREA)   TYPE(*CHAR) LEN(1)
+    /*9910A  START */
+             DCL        VAR(&W#SALE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#PROC) TYPE(*CHAR) LEN(1)
+    /*9910A  END */
+ /*0409A*/   DCL        VAR(&S#ORNO) TYPE(*CHAR) LEN(6)
+ /*0409A*/   DCL        VAR(&W#ORNS) TYPE(*CHAR) LEN(6)
+ /*0409A*/   DCL        VAR(&W#ORNE) TYPE(*CHAR) LEN(6)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '1') THEN(DO)
+    /*9910A  CALL       PGM(ARR039RS) PARM(&IN03 &DATEF &DATET)  */
+             CALL       PGM(ARR039RS) PARM(&IN03 &DATEF &DATET +
+                           &W#SALE &W#PROC &S#ORNO)  /*0409A*/
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGVAR     VAR(&DATEFA)       VALUE(&DATEF)
+             CHGVAR     VAR(&DATETA)       VALUE(&DATET)
+             CHGDTAARA  DTAARA(*LDA (301 8)) VALUE(&DATEFA)
+             CHGDTAARA  DTAARA(*LDA (309 8)) VALUE(&DATETA)
+    /*9910A  START*/
+             CHGDTAARA  DTAARA(*LDA (321 1)) VALUE(&W#SALE)
+             CHGDTAARA  DTAARA(*LDA (322 1)) VALUE(&W#PROC)
+    /*9910A  END */
+ /*0409A*/   CHGDTAARA  DTAARA(*LDA (341 6)) VALUE(&S#ORNO)
+             SBMJOB     JOB(ARR039P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR039P')
+             RETURN
+             ENDDO
+
+             RTVDTAARA  DTAARA(*LDA (301 8))   RTNVAR(&DATEFA)
+             RTVDTAARA  DTAARA(*LDA (309 8))   RTNVAR(&DATETA)
+             RTVDTAARA  DTAARA(*LDA (1021 1))   RTNVAR(&AREA)
+    /*9910A  START*/
+             RTVDTAARA  DTAARA(*LDA (321 1))   RTNVAR(&W#SALE)
+             RTVDTAARA  DTAARA(*LDA (322 1))   RTNVAR(&W#PROC)
+    /*9910A  END */
+ /*0409A*/   RTVDTAARA  DTAARA(*LDA (341 6))   RTNVAR(&S#ORNO)
+ /*0409A*/   IF    COND(&S#ORNO *EQ '      ') THEN(DO)
+ /*0409A*/         CHGVAR  VAR(&W#ORNS)  VALUE('      ')
+ /*0409A*/         CHGVAR  VAR(&W#ORNE)  VALUE('999999')
+             ENDDO
+ /*0409A*/   IF    COND(&S#ORNO *NE '      ') THEN(DO)
+ /*0409A*/         CHGVAR  VAR(&W#ORNS)  VALUE(&S#ORNO)
+ /*0409A*/         CHGVAR  VAR(&W#ORNE)  VALUE(&S#ORNO)
+ /*0409A*/   ENDDO
+
+
+/*1111A*/
+/*1111A*/    DLTF       FILE(QTEMP/ARR039F)
+/*1111A*/    MONMSG     MSGID(CPF0000)
+
+/*1111A*/    CRTDUPOBJ  OBJ(ARR039F) FROMLIB(DALIB) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+/*1111A*/    OVRDBF    FILE(ARR039F)  TOFILE(QTEMP/ARR039F) SHARE(*YES)
+/*1111A*/
+
+
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+                  /*    %SST(TXNO 1 1) *EQ "' || &AREA || '" */
+    /*9910A  START */
+         /*  OPNQRYF    FILE((TRNDTL)) QRYSLT('                     +
+                          TXTXAR       *EQ "' || &AREA || '"      & +
+                          TXFLAG       *NE "D"                    & +
+                          TXACDT *EQ %RANGE(' || &DATEFA || '       +
+                                        ' || &DATETA || ')        & +
+                          TXCODE *EQ "SA04"')                       +
+                          KEYFLD((TXACDT)(TXNO) (TXACNT)(TXORNO)) */
+
+/*0808A*/    OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 158) +
+                          CPI(12)
+
+      /*內銷&鋼胚*/
+          IF    COND(&W#SALE *EQ '1' *AND &W#PROC *EQ '1') THEN(DO)
+/*1111A*/    OPNQRYF    FILE((TRNDTL)) OPTION(*ALL) +
+                          QRYSLT('                     TXTXAR       +
+                          *EQ "' || &AREA || '"      & TXFLAG       +
+                          *NE "D"                    & TXACDT *EQ +
+                          %RANGE(' || &DATEFA || '       ' || +
+                          &DATETA || ')        & CUNO *NE "E" *AND +
+                          PDNM *EQ "1" *AND TXCODE *EQ "SA04"') +
+                          KEYFLD((TXACDT) (TXNO) (TXACNT) (TXORNO)) +
+                          MAPFLD((CUNO '%SST(TXCUNO 1 1)') (PDNM +
+                          '%SST(TXPDNM 1 1)'))
+          ENDDO
+
+      /*內銷&鋼筋*/
+          IF    COND(&W#SALE *EQ '1' *AND &W#PROC *EQ '2') THEN(DO)
+/*1111A*/    OPNQRYF    FILE((TRNDTL)) OPTION(*ALL) +
+                          QRYSLT('                     TXTXAR       +
+                          *EQ "' || &AREA || '"      & TXFLAG       +
+                          *NE "D"                    & TXACDT *EQ +
+                          %RANGE(' || &DATEFA || '       ' || +
+                          &DATETA || ')        & CUNO *NE "E" *AND +
+                          PDNM *EQ "2" *AND TXCODE *EQ "SA04"') +
+                          KEYFLD((TXACDT) (TXNO) (TXACNT) (TXORNO)) +
+                          MAPFLD((CUNO '%SST(TXCUNO 1 1)') (PDNM +
+                          '%SST(TXPDNM 1 1)'))
+          ENDDO
+
+      /*外銷&鋼胚*/
+          IF    COND(&W#SALE *EQ '2' *AND &W#PROC *EQ '1') THEN(DO)
+/*1111A*/    OPNQRYF    FILE((TRNDTL)) OPTION(*ALL) +
+                          QRYSLT('                     TXTXAR       +
+                          *EQ "' || &AREA || '"      & TXFLAG       +
+                          *NE "D"                    & ORNO         +
+                          *EQ %RANGE("' || &W#ORNS || '"       "' +
+                          || &W#ORNE || '")  & TXACDT *EQ %RANGE(' +
+                          || &DATEFA || '       ' || &DATETA || +
+                          ')        & CUNO *EQ "E" *AND PDNM *EQ +
+                          "1" *AND TXCODE *EQ "SA04"') +
+                          KEYFLD((TXACDT) (TXNO) (TXACNT) (TXORNO)) +
+                          MAPFLD((CUNO '%SST(TXCUNO 1 1)') (PDNM +
+                          '%SST(TXPDNM 1 1)') (ORNO '%SST(TXORNO 1 +
+                          6)'))
+          ENDDO
+
+      /*外銷&鋼筋*/
+          IF    COND(&W#SALE *EQ '2' *AND &W#PROC *EQ '2') THEN(DO)
+/*1111A*/    OPNQRYF    FILE((TRNDTL)) OPTION(*ALL) +
+                          QRYSLT('                     TXTXAR       +
+                          *EQ "' || &AREA || '"      & TXFLAG       +
+                          *NE "D"                    & ORNO         +
+                          *EQ %RANGE("' || &W#ORNS || '"       "' +
+                          || &W#ORNE || '")  & TXACDT *EQ %RANGE(' +
+                          || &DATEFA || '       ' || &DATETA || +
+                          ')        & CUNO *EQ "E" *AND PDNM *EQ +
+                          "2" *AND TXCODE *EQ "SA04"') +
+                          KEYFLD((TXACDT) (TXNO) (TXACNT) (TXORNO)) +
+                          MAPFLD((CUNO '%SST(TXCUNO 1 1)') (PDNM +
+                          '%SST(TXPDNM 1 1)') (ORNO '%SST(TXORNO 1 +
+                          6)'))
+          ENDDO
+
+    /*9910A  END */
+/*1111A*/    CALL       PGM(ARR039R1)
+/*1111A*/    CLOF       OPNID(TRNDTL)
+/*1111A*/
+/*1111A*/    OPNQRYF    FILE((ARR039F)) KEYFLD((TXACDT) (F1TXNO) +
+/*1111A*/                                      (TXACNT) (TXORNO))
+             CALL       PGM(ARR039R)
+/*1111A*/    CLOF       OPNID(ARR039F)
+             DLTOVR     FILE(*ALL)
+
+ /*0409A  外銷*/
+
+ /*0409A*/ IF    COND(&W#SALE *EQ '2') THEN(DO)
+      /*外銷&鋼胚*/
+ /*0409A*/   OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+ /*0409A*/   OVRPRTF    FILE(ARR039T) TOFILE(ARR039T) PAGESIZE(*N +
+                          120) CPI(15) HOLD(*YES) USRDTA('外銷彙總')
+ /*0409A*/ IF    COND(&W#SALE *EQ '2' *AND &W#PROC *EQ '1') THEN(DO)
+             OPNQRYF    FILE((TRNDTL)) OPTION(*ALL) +
+                          QRYSLT('                     TXTXAR       +
+                          *EQ "' || &AREA || '"      & TXFLAG       +
+                          *NE "D"                      +
+                                &  ORNO *EQ %RANGE("' || &W#ORNS ||   +
+                          '"       "' || &W#ORNE || '")  +
+                               & TXACDT *EQ %RANGE(' || &DATEFA || +
+                          '       ' || &DATETA || ')        & CUNO +
+                          *EQ "E" *AND PDNM *EQ "1" *AND TXCODE *EQ +
+                          "SA04"') KEYFLD((TXCUNO) (ORNO) (TXPDNM) +
+                          (TXUPRC)) MAPFLD((CUNO '%SST(TXCUNO 1 +
+                          1)') (ORNO '%SST(TXORNO 1 6)') (PDNM +
+                          '%SST(TXPDNM 1 1)'))
+          ENDDO
+
+      /*外銷&鋼筋*/
+ /*0409A*/ IF    COND(&W#SALE *EQ '2' *AND &W#PROC *EQ '2') THEN(DO)
+             OPNQRYF    FILE((TRNDTL)) OPTION(*ALL) +
+                          QRYSLT('                     TXTXAR       +
+                          *EQ "' || &AREA || '"      & TXFLAG       +
+                          *NE "D"                    & TXACDT *EQ +
+                          %RANGE(' || &DATEFA || '       ' || +
+                          &DATETA || ')        & ORNO   *EQ +
+                          %RANGE("' || &W#ORNS || '"    "' || &W#ORNE +
+                          || '")      & CUNO *EQ "E" *AND PDNM *EQ +
+                          "2" *AND TXCODE *EQ "SA04"') +
+                          KEYFLD((TXCUNO) (ORNO) (TXPDNM) (TXUPRC)) +
+                          MAPFLD((CUNO '%SST(TXCUNO 1 1)') (ORNO +
+                          '%SST(TXORNO 1 6)') (PDNM '%SST(TXPDNM 1 +
+                          1)'))
+          ENDDO
+     /*   CPYFRMQRYF    FROMOPNID(TRNDTL) TOFILE(S00WCJ/TRN1) +
+              MBROPT(*REPLACE)  CRTFILE(*YES)  */
+             CALL       PGM(ARR039RA)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+       ENDDO
+             ENDPGM
+

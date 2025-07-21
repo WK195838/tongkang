@@ -1,0 +1,134 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR139P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCJ                                  */
+     /*     4.FUNCTION     磅差統計表                             */
+     /*     5.DATE-WRITTEN  102/03/08  2013AR732                    */
+     /*     6.UPDATE  DATE  102/04/08  2013AR739  S00WCJ (0204A)    */
+     /*                     103/06/30  2014AR844  S00WCJ (0306A)    */
+     /*                      增加廠區篩選                         */
+     /*                     112/12/19  2023AR00053  S00WCJ (1212A)  */
+     /*                      增加品名2160.2161.2162.2170.2171.2172*/
+     /*                      並修改報表顯示之排序方式             */
+     /*                                                             */
+     /***************************************************************/
+
+             PGM
+             DCL        VAR(&DSPID)   TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&W#ERR)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#DAT1) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#DAT2) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+ /*0306A*/   DCL        VAR(&W#FACT) TYPE(*CHAR) LEN(1)
+
+        DCLF       FILE(ARR139S)
+
+             RTVJOBA    JOB(&DSPID) OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVN)
+
+  START:
+             SNDRCVF    RCDFMT(AR139F1)
+
+             IF         COND(&IN03 *EQ '1')   THEN(RETURN)
+             IF         COND(&IN12 *EQ '1')   THEN(RETURN)
+
+             CHGVAR     VAR(&IN41)    VALUE('0')
+             CHGVAR     VAR(&IN42)    VALUE('0')
+             CHGVAR     VAR(&S#ERR)   VALUE(' ')
+
+                 IF      COND(&S#DAT1 *EQ 0) THEN(DO)
+                      CHGVAR   VAR(&S#ERR)  VALUE('訊息-日期欄位+
+                             不可空白!')
+                      CHGVAR   VAR(&IN41)   VALUE('1')
+                      GOTO     CMDLBL(START)
+                 ENDDO
+
+             IF       COND(&S#DAT1 *NE 0) THEN(DO)
+                  CALL     PGM(C018) PARM(&S#DAT1 &W#ERR)
+               IF       COND(&W#ERR *EQ '1') THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-輸入日期錯誤!')
+                   CHGVAR  VAR(&IN41)  VALUE('1')
+                   GOTO     CMDLBL(START)
+               ENDDO
+             ENDDO
+
+             IF       COND(&S#DAT2 *NE 0) THEN(DO)
+                  CALL     PGM(C018) PARM(&S#DAT2 &W#ERR)
+               IF       COND(&W#ERR *EQ '1') THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-輸入日期錯誤!')
+                   CHGVAR  VAR(&IN42)  VALUE('1')
+                   GOTO     CMDLBL(START)
+               ENDDO
+             ENDDO
+
+             IF      COND(&S#DAT1 *NE 0  *AND &S#DAT2 *EQ 0) THEN(DO   )
+                   CHGVAR  VAR(&S#DAT2)  VALUE(&S#DAT1)
+             ENDDO
+
+
+             IF       COND(&S#DAT1 *GT &S#DAT2) THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-日期區間錯誤!')
+                   CHGVAR  VAR(&IN41)  VALUE('1')
+                   CHGVAR  VAR(&IN42)  VALUE('1')
+                   GOTO     CMDLBL(START)
+             ENDDO
+
+             CHGVAR     VAR(&W#DAT1)   VALUE(&S#DAT1)
+             CHGVAR     VAR(&W#DAT2)   VALUE(&S#DAT2)
+             CHGDTAARA  DTAARA(*LDA (1   8)) VALUE(&W#DAT1)
+             CHGDTAARA  DTAARA(*LDA (11  8)) VALUE(&W#DAT2)
+ /*0306A*/   CHGDTAARA  DTAARA(*LDA (21  1)) VALUE(&S#FACT)
+
+             SBMJOB     JOB(ARR139P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR139P')
+             SNDBRKMSG  MSG('<<磅差統計表，開始處理，請稍待...>>') +
+                          TOMSGQ(&DSPID) MSGTYPE(*INFO)
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1  8)) RTNVAR(&W#DAT1)
+             RTVDTAARA  DTAARA(*LDA (11 8)) RTNVAR(&W#DAT2)
+             RTVDTAARA  DTAARA(*LDA (21 1)) RTNVAR(&W#FACT)
+
+             CLRPFM     ARR139F
+             OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+ /*1212A     OVRPRTF    FILE(ARR139T) TOFILE(ARR139T) PAGESIZE(*N +
+                          132) CPI(15) USRDTA('磅差統計')    */
+
+             OPNQRYF    FILE((TRNDTL)) QRYSLT('                  +
+                           (ACDT *GE "' || &W#DAT1 || '") *AND    +
+                           (ACDT *LE "' || &W#DAT2 || '") *AND    +
+                           (TXCODE *EQ "SA04") *AND               +
+                           (TXACNT *EQ "2")')                     +
+                          KEYFLD((TXACDT) (TXPDNM)) +
+                          MAPFLD((ACDT  TXACDT *CHAR 8))
+
+     /*   CPYFRMQRYF    FROMOPNID(TRNDTL) TOFILE(S00WCJ/TR1) +
+              MBROPT(*REPLACE)  CRTFILE(*YES)   */
+             CALL       PGM(ARR139R)
+
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+
+ /*1212A*/   OVRPRTF    FILE(ARR139T) TOFILE(ARR139T) PAGESIZE(*N +
+                          158) CPI(12) COPIES(1) HOLD(*YES) +
+                          USRDTA('磅差統１')
+ /*1212A*/   OVRPRTF    FILE(ARR139T1) TOFILE(ARR139T1) PAGESIZE(*N +
+                          158) CPI(12) COPIES(1) HOLD(*YES) +
+                          USRDTA('磅差統２')
+             OVRDBF     FILE(ARR139F)  TOFILE(ARR139F) SHARE(*YES)
+
+             OPNQRYF    FILE(ARR139F) KEYFLD((F9DATE))
+
+             CALL       PGM(ARR139R1)
+             CLOF       OPNID(ARR139F)
+             DLTOVR     FILE(*ALL)
+      ENDPGM
+

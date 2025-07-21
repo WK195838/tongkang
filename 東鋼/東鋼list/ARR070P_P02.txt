@@ -1,0 +1,140 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR070P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     未過入財會營業繳款明細表               */
+     /*     5.DATE-WRITTEN  87/05/29                                */
+     /*     6.UPDATE  DATE  99/05/05 2010AR476 S00WCJ (9905A)       */
+     /*                     99/08/17 2010AR517 S00WCJ (9908A)       */
+     /*                    107/10/29 2018AR00024 S00WCJ (0710A)     */
+     /*                     新增業務員篩選欄位                    */
+     /*                    109/05/28 S00WCJ (0905A)                 */
+     /*                     排序增加繳款項次                      */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)     TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)   LEN(10)
+             DCL        VAR(&W#FLAG)  TYPE(*CHAR)   LEN(1)
+    /*9908A  DCL        VAR(&W#DATE)  TYPE(*DEC)    LEN(6 0) */
+    /*9908A*/DCL        VAR(&W#DATE)  TYPE(*DEC)    LEN(8 0)
+    /*9908A  DCL        VAR(&W#UDATE) TYPE(*CHAR)   LEN(6)  */
+    /*9908A*/DCL        VAR(&W#UDATE) TYPE(*CHAR)   LEN(8)
+             DCL        VAR(&W#RVDT)  TYPE(*CHAR)   LEN(8)
+
+             DCL        VAR(&P#PDAT) TYPE(*CHAR) LEN(8)  /*輸入日期*/
+             DCL        VAR(&P#MODE) TYPE(*CHAR) LEN(1)  /*年份別*/
+             DCL        VAR(&P#MTL)  TYPE(*CHAR) LEN(24) /*月日數*/
+             DCL        VAR(&P#LEAP) TYPE(*CHAR) LEN(1)  /*閏年碼*/
+/*0710A*/    DCL        VAR(&W#RVIS) TYPE(*CHAR) LEN(2)
+/*0710A*/    DCL        VAR(&W#RVIE) TYPE(*CHAR) LEN(2)
+/*0710A*/    DCL        VAR(&S#RVID) TYPE(*CHAR) LEN(1)
+
+             DCLF       FILE(ARLIB/ARR070S)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+    /*9908A  START */
+          /* RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&W#UDATE) */
+
+             RTVJOBA    CYMDDATE(&W#UDATE)
+             CHGVAR     VAR(&W#UDATE)   VALUE('0' *CAT &W#UDATE)
+    /*9908A  END  */
+             CHGVAR     VAR(&S#RVDT)  VALUE(&W#UDATE)
+ INPUT:
+             SNDRCVF    RCDFMT(AR070F1)
+             IF         COND(&IN03 *EQ '1' *OR &IN12 *EQ '1') +
+                        THEN(RETURN)
+
+             CHGVAR     VAR(&IN51) VALUE('0')
+             CHGVAR     VAR(&IN52) VALUE('0')
+
+             IF         COND(&S#RVDP *EQ ' ') THEN(DO)
+                CHGVAR  VAR(&IN51) VALUE('1')
+                CHGVAR  VAR(&S#MSG1) VALUE('繳款廠區不可空白')
+                GOTO INPUT
+             ENDDO
+
+          /* CHGVAR     VAR(&W#DATE) VALUE(&S#RVDT)    */
+          /* CALL       PGM(C01) PARM(&W#DATE &W#FLAG) */
+             CHGVAR     VAR(&P#PDAT) VALUE(&S#RVDT)
+             CHGVAR     VAR(&P#MODE) VALUE('1')
+             CALL       PGM(UTS102R) PARM(&P#PDAT &P#MODE +
+                                          &P#MTL &P#LEAP &W#FLAG)
+             IF         COND(&W#FLAG *NE '0') THEN(DO)
+                CHGVAR  VAR(&IN52) VALUE('1')
+                CHGVAR  VAR(&S#MSG1) VALUE('日期格式錯誤！')
+                 GOTO    INPUT
+             ENDDO
+
+             CHGVAR     VAR(&W#DATE)  VALUE(&W#UDATE)
+             IF         COND(&S#RVDT *GT &W#DATE) THEN(DO)
+                CHGVAR  VAR(&IN52) VALUE('1')
+                CHGVAR  VAR(&S#MSG1) VALUE('日期不可超過系統日期')
+   /*           GOTO    INPUT          */
+             ENDDO
+
+             CHGDTAARA  DTAARA(*LDA (1 1)) VALUE(&S#RVDP)
+             CHGVAR     VAR(&W#RVDT)       VALUE(&S#RVDT)
+             CHGDTAARA  DTAARA(*LDA (2 8)) VALUE(&W#RVDT)
+/*0710A*/    CHGDTAARA  DTAARA(*LDA (11 1)) VALUE(&S#RVID)
+             SBMJOB     JOB(ARR070P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                        RQSDTA('CALL ARR070P')
+    /*9905A START */
+         /*  CHGDTAARA  DTAARA(*LDA (801 70)) +
+             VALUE('未過入財會營業繳款明細表已匯入排程中。')  */
+             CHGDTAARA  DTAARA(*LDA (601 70)) +
+             VALUE('未過入財會營業繳款明細表已匯入排程中。')
+    /*9905A  END */
+             RETURN
+
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 1)) RTNVAR(&S#RVDP)
+             RTVDTAARA  DTAARA(*LDA (2 8)) RTNVAR(&W#RVDT)
+/*0710A*/    RTVDTAARA  DTAARA(*LDA (11 1)) RTNVAR(&S#RVID)
+
+/*0710A*/    IF      COND(&S#RVID *EQ ' ') THEN(DO)
+/*0710A*/         CHGVAR    VAR(&W#RVIS)   VALUE('  ')
+/*0710A*/         CHGVAR    VAR(&W#RVIE)   VALUE('99')
+/*0710A*/    ENDDO
+
+/*0710A*/    IF      COND(&S#RVID *NE ' ') THEN(DO)
+/*0710A*/         CHGVAR    VAR(&W#RVIS)   VALUE(&S#RVID || ' ')
+/*0710A*/         CHGVAR    VAR(&W#RVIE)   VALUE(&S#RVID || ' ')
+/*0710A*/    ENDDO
+
+
+                        /* 已確認未過入（且未列印者） */
+             OVRPRTF    FILE(ARR070T) TOFILE(ARLIB/ARR070T) +
+                        PAGESIZE(*N 198) CPI(15) +
+                        OVRFLW(57) HOLD(*YES) USRDTA('未過已確') +
+                        COPIES(1)
+             OVRDBF     FILE(SARVIN) TOFILE(SARVIN)
+             OVRDBF     FILE(SARCVF) TOFILE(SARCVF) SHARE(*YES)
+/*0905A*/    OPNQRYF    FILE(SARCVF) +
+                        OPTION(*ALL) +
+                        QRYSLT( +
+                         'SRFL02 *EQ " " *AND   +
+                          SRFL03 *EQ " " *AND   +
+                          SRFL01 *EQ "Y" *AND   +
+                          (SRRVID *GE "' || &W#RVIS || '" *AND +
+                           SRRVID *LE "' || &W#RVIE || '") *AND +
+                     %SST(SRRVNO 1 1) *EQ "' || &S#RVDP || '" *AND +
+                          SRRVDT *EQ ' || &W#RVDT ) +
+                        KEYFLD((SRRVID) (SRRVDT) (SRRVNO) (SRITEM))
+
+             CALL       PGM(ARR070R)
+             CLOF       OPNID(SARCVF)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

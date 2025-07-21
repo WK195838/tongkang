@@ -1,0 +1,169 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR127P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02LBU                                    */
+        /*        4.FUNCTION      外銷銷貨差異明細表                       */
+        /*        5.DATE-WRITTEN   96/01/26                                  */
+        /*        6.DATE-MODIFY   112/02/09  2023AR00006 S00WCJ (1202A)      */
+        /*                         新增廠區N                               */
+        /*                                                                   */
+        /*********************************************************************/
+            PGM
+            DCLF       FILE(ARR127S)
+            DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+            DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+            DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+            DCL        VAR(&W#CUNS) TYPE(*CHAR) LEN(6)
+            DCL        VAR(&W#CUNE) TYPE(*CHAR) LEN(6)
+            DCL        VAR(&W#DPNS) TYPE(*CHAR) LEN(4)
+            DCL        VAR(&W#DPNE) TYPE(*CHAR) LEN(4)
+            DCL        VAR(&W#DATE) TYPE(*CHAR) LEN(8)
+            DCL        VAR(&W#MMS)  TYPE(*CHAR) LEN(2)
+            DCL        VAR(&W#YMS)  TYPE(*CHAR) LEN(6)
+            DCL        VAR(&W#MME)  TYPE(*CHAR) LEN(2)
+            DCL        VAR(&W#YME)  TYPE(*CHAR) LEN(6)
+            DCL        VAR(&W#YMDS) TYPE(*CHAR) LEN(8)
+            DCL        VAR(&W#YMDE) TYPE(*CHAR) LEN(8)
+            DCL        VAR(&W#AREA) TYPE(*CHAR) LEN(1)
+            DCL        VAR(&W#OPT)  TYPE(*CHAR) LEN(1)
+            DCL        VAR(&W#BLK)  TYPE(*CHAR) LEN(70)
+
+            RTVJOBA    OUTQ(&OUTQ)  TYPE(&INT)
+            RTVDTAARA  DTAARA(*LDA (1011 10))   RTNVAR(&S#DEVN)
+            RTVDTAARA  DTAARA(*LDA (1021  1))   RTNVAR(&S#AREA)
+            IF         COND(&INT *EQ '1') THEN(DO)
+            CHGVAR     VAR(&S#OPT)     VALUE('1')
+
+ START:     SNDRCVF
+            CHGVAR     VAR(&IN41)      VALUE('0')
+            CHGVAR     VAR(&IN42)      VALUE('0')
+            CHGVAR     VAR(&IN43)      VALUE('0')
+            CHGVAR     VAR(&IN44)      VALUE('0')
+            CHGVAR     VAR(&S#ERR)     VALUE(&W#BLK)
+
+            IF         COND(&IN03 *EQ '1') THEN(RETURN)
+            CHGVAR     VAR(&W#YMS)     VALUE(&S#YMS)
+            CHGVAR     VAR(&W#MMS)     VALUE(%SST(&W#YMS 5 2))
+            CHGVAR     VAR(&W#YME)     VALUE(&S#YME)
+            CHGVAR     VAR(&W#MME)     VALUE(%SST(&W#YME 5 2))
+
+  /* CHECH  起始報關月份 */
+            IF         COND((&W#MMS *LT '01')  *OR +
+                            (&W#MMS *GT '12')) THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('報關年月輸入錯誤')
+            CHGVAR     VAR(&IN41)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+  /* CHECH  終止報關月份 */
+            IF         COND((&W#MME *LT '01')  *OR +
+                            (&W#MME *GT '12')) THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('報關年月輸入錯誤')
+            CHGVAR     VAR(&IN43)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+  /* CHECH  起訖報關月份 */
+            IF         COND((&W#YMS *GT &W#YME)) THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('起訖報關月份輸入錯誤')
+            CHGVAR     VAR(&IN41)      VALUE('1')
+            CHGVAR     VAR(&IN43)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+  /* CHECH  廠區 */
+/*1202A*/   IF         COND((&S#AREA *NE 'H')  *AND +
+                            (&S#AREA *NE 'K')  *AND +
+                            (&S#AREA *NE 'N')  *AND +
+                            (&S#AREA *NE 'P')) THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('廠區別輸入錯誤')
+            CHGVAR     VAR(&IN42)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+  /* CHECH  出表選擇 */
+            CHGVAR     VAR(&W#OPT)     VALUE(&S#OPT)
+            IF         COND((&W#OPT  *NE '1')  *AND +
+                            (&W#OPT  *NE '2')) THEN(DO)
+            CHGVAR     VAR(&S#ERR)     VALUE('出表選擇輸入錯誤')
+            CHGVAR     VAR(&IN44)      VALUE('1')
+            GOTO       CMDLBL(START)
+            ENDDO
+
+            CHGVAR     VAR(&W#YMDS)  VALUE(&W#YMS || '01')
+            CHGVAR     VAR(&W#YMDE)  VALUE(&W#YME || '31')
+            CHGVAR     VAR(&W#AREA)  VALUE(&S#AREA)
+
+            CHGDTAARA  DTAARA(*LDA (301 8)) VALUE(&W#YMDS)
+            CHGDTAARA  DTAARA(*LDA (309 8)) VALUE(&W#YMDE)
+            CHGDTAARA  DTAARA(*LDA (317 1)) VALUE(&W#AREA)
+            CHGDTAARA  DTAARA(*LDA (318 1)) VALUE(&W#OPT)
+
+            SBMJOB     JOB(ARR127P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                         RQSDTA('CALL ARR127P')
+            RETURN
+            ENDDO
+
+ BATCH:
+            RTVDTAARA  DTAARA(*LDA (301 8))  RTNVAR(&W#YMDS)
+            RTVDTAARA  DTAARA(*LDA (301 6))  RTNVAR(&W#YMS)
+            RTVDTAARA  DTAARA(*LDA (309 8))  RTNVAR(&W#YMDE)
+            RTVDTAARA  DTAARA(*LDA (309 6))  RTNVAR(&W#YME)
+            RTVDTAARA  DTAARA(*LDA (317 1))  RTNVAR(&W#AREA)
+            RTVDTAARA  DTAARA(*LDA (318 1))  RTNVAR(&W#OPT)
+
+            OVRDBF     FILE(ARCINV) TOFILE(ARCINV) SHARE(*YES)
+            OPNQRYF    FILE(ARCINV) OPTION(*ALL) QRYSLT('           +
+                           (YYMM   *GE "' || &W#YMS  || '")    *AND +
+                           (YYMM   *LE "' || &W#YME  || '")    *AND +
+                           (R1AREA *EQ "' || &W#AREA || '")    *AND +
+                           (R1FLAG *NE "D")')                       +
+                       KEYFLD((*FILE))                              +
+                       MAPFLD((YYMM   R1YYMM *CHAR 6))
+            CALL       PGM(ARR127R)
+            CLOF       OPNID(ARCINV)
+            DLTOVR     FILE(*ALL)
+
+            OVRDBF     FILE(ARCINV) TOFILE(ARCINV) SHARE(*YES)
+
+ /*出表選擇為1 :訂單編號、客戶編號*/
+            IF         COND((&W#OPT *EQ '1'))    THEN(DO)
+            OVRPRTF    FILE(ARR127T1) TOFILE(ARR127T1) PAGESIZE(*N 158) +
+                       CPI(12) HOLD(*YES) USRDTA('外銷明細')
+
+            OPNQRYF    FILE(ARCINV) QRYSLT('                        +
+                           (YYMM   *GE "' || &W#YMS  || '")    *AND +
+                           (YYMM   *LE "' || &W#YME  || '")    *AND +
+                           (R1AREA *EQ "' || &W#AREA || '")    *AND +
+                           (R1FLAG *NE "D")')                       +
+                       KEYFLD((R1OCUS) (R1IVNO))                    +
+                       MAPFLD((YYMM   R1YYMM *CHAR 6))
+
+            CALL       PGM(ARR127R1)
+            CLOF       OPNID(ARCINV)
+            DLTOVR     FILE(*ALL)
+            ENDDO
+
+ /*出表選擇為2 :訂單編號、報單號碼*/
+            IF         COND((&W#OPT *EQ '2'))    THEN(DO)
+            OVRPRTF    FILE(ARR127T2) TOFILE(ARR127T2) PAGESIZE(*N 158) +
+                       CPI(12) HOLD(*YES) USRDTA('外銷明細')
+
+            OPNQRYF    FILE(ARCINV) QRYSLT('                        +
+                           (YYMM   *GE "' || &W#YMS  || '")    *AND +
+                           (YYMM   *LE "' || &W#YME  || '")    *AND +
+                           (R1AREA *EQ "' || &W#AREA || '")    *AND +
+                           (R1FLAG *NE "D")')                       +
+                       KEYFLD((R1APNO) (R1IVNO))                    +
+                       MAPFLD((YYMM   R1YYMM *CHAR 6))
+
+            OVRDBF     FILE(ARCIBK) TOFILE(ARCINV)
+            CALL       PGM(ARR127R2)
+            CLOF       OPNID(ARCINV)
+            DLTOVR     FILE(*ALL)
+            ENDDO
+
+            ENDPGM
+

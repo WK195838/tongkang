@@ -1,0 +1,129 @@
+        /*********************************************************************/
+        /*                                                                   */
+        /*        >>   PROGRAM INTRODUCTION  <<                              */
+        /*        1.PROGRAM-ID     ARR124P                                   */
+        /*        2.PROGRAM-TYPE   CLP                                       */
+        /*        3.AUTHOR         S02LBU                                    */
+        /*        4.FUNCTION      客戶暫收款餘額核對清單                   */
+        /*        5.DATE-WRITTEN   95/03/29                                  */
+        /*        6.DATE-MODIFY                                              */
+        /*                        102/04/15 S00WCJ (0204A)                   */
+        /*                                                                   */
+        /*********************************************************************/
+             PGM
+             DCLF     FILE(ARR124S)
+             DCL      VAR(&TYPE)   TYPE(*CHAR) LEN(1)
+             DCL      VAR(&S#DEVN) TYPE(*CHAR) LEN(10)
+             DCL      VAR(&S#USER) TYPE(*CHAR) LEN(10)
+             DCL      VAR(&C#CUNS) TYPE(*CHAR) LEN(6)
+             DCL      VAR(&C#CUNE) TYPE(*CHAR) LEN(6)
+             DCL      VAR(&C#ORNS) TYPE(*CHAR) LEN(6)
+             DCL      VAR(&C#ORNE) TYPE(*CHAR) LEN(6)
+
+             RTVJOBA  JOB(&S#DEVN) USER(&S#USER) TYPE(&TYPE)
+             IF       COND(&TYPE *EQ '0') THEN(GOTO BATCH)
+
+  START:     SNDRCVF  RCDFMT(ARR124F)
+
+             IF       COND(&IN03 *EQ '1') THEN(RETURN)
+             IF       COND(&IN12 *EQ '1') THEN(RETURN)
+             CHGVAR   VAR(&S#ERR)     VALUE('                   ')
+
+             CHGDTAARA  DTAARA(*LDA  (301   6)) VALUE(&S#CUNO)
+             CHGDTAARA  DTAARA(*LDA  (307   6)) VALUE(&S#ORNO)
+             CHGDTAARA  DTAARA(*LDA  (1011 10)) VALUE(&S#DEVN)
+
+             SBMJOB     CMD(CALL PGM(ARR124P)) JOB(ARR124P) +
+                        JOBD(ARJOBD)
+             SNDBRKMSG  MSG('<<客戶暫收款餘額核對清單已開始處理+
+                         ,請稍待.........>>') +
+                       TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (301   6)) RTNVAR(&S#CUNO)
+             RTVDTAARA  DTAARA(*LDA (307   6)) RTNVAR(&S#ORNO)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVN)
+
+ /*客戶代號如為空白，則顯示全部*/
+             IF         COND(&S#CUNO *EQ '      ') THEN(DO)
+             CHGVAR     VAR(&C#CUNS) VALUE('A     ')
+             CHGVAR     VAR(&C#CUNE) VALUE('999999')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&C#CUNS) VALUE(&S#CUNO)
+             CHGVAR     VAR(&C#CUNE) VALUE(&S#CUNO)
+             ENDDO
+
+ /*訂單編號如為空白，則顯示全部*/
+             IF         COND(&S#ORNO *EQ '      ') THEN(DO)
+             CHGVAR     VAR(&C#ORNS) VALUE('A     ')
+             CHGVAR     VAR(&C#ORNE) VALUE('999999')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&C#ORNS) VALUE(&S#ORNO)
+             CHGVAR     VAR(&C#ORNE) VALUE(&S#ORNO)
+             ENDDO
+
+             CHGDTAARA  DTAARA(*LDA  (313  6))  VALUE(&C#CUNS)
+             CHGDTAARA  DTAARA(*LDA  (319  6))  VALUE(&C#CUNE)
+             CHGDTAARA  DTAARA(*LDA  (325  6))  VALUE(&C#ORNS)
+             CHGDTAARA  DTAARA(*LDA  (331  6))  VALUE(&C#ORNE)
+
+    /* STEP 1:重新合計AR2159X (財會) */
+             CLRPFM     DALIB/AR2159X
+             MONMSG     MSGID(CPF0000)
+
+             OVRDBF     FILE(ACDYBL) TOFILE(DALIB/ACDYBL) SHARE(*YES)
+ /*0204A*/   OPNQRYF    FILE(ACDYBL) QRYSLT('                       +
+                           ((ACNO *EQ "2159") *OR                   +
+                            (ACNO *EQ "211301"))               *AND +
+                            (RLNO *GE "' || &C#ORNS || '")     *AND +
+                            (RLNO *LE "' || &C#ORNE || '")')        +
+                        MAPFLD((RLNO   '%SST(ACRLNO 1 6)' *CHAR 8)) +
+                        KEYFLD((ACRLNO))
+             CALL       PGM(ARR124R1)
+             CLOF       OPNID(ACDYBL)
+             DLTOVR     FILE(*ALL)
+
+    /* STEP 2:以AR2159X比對AR2159D將金額不同及LOSS資料寫入*/
+             CLRPFM     ARLIB/ARR124F
+             MONMSG     MSGID(CPF0000)
+
+             OVRDBF     FILE(AR2159X) TOFILE(DALIB/AR2159X) SHARE(*YES)
+             OPNQRYF    FILE(AR2159X) QRYSLT(' +
+                            (AXCUNO *GE "' || &C#CUNS || '")  *AND +
+                            (AXCUNO *LE "' || &C#CUNE || '")')     +
+                        KEYFLD((AXCUNO)(AXORNO))
+             CALL       PGM(ARR124R2)
+             CLOF       OPNID(AR2159X)
+             DLTOVR     FILE(*ALL)
+
+    /* STEP 3:以AR2159D比對AR2159X將LOSS資料寫入暫存*/
+             OVRDBF     FILE(AR2159D) TOFILE(DALIB/AR2159D) SHARE(*YES)
+             OPNQRYF    FILE(AR2159D) QRYSLT(' +
+                            (ADCUNO *GE "' || &C#CUNS || '")  *AND +
+                            (ADCUNO *LE "' || &C#CUNE || '")  *AND +
+                            (ADORNO *GE "' || &C#ORNS || '")  *AND +
+                            (ADORNO *LE "' || &C#ORNE || '")')     +
+                        KEYFLD((ADCUNO)(ADAREA)(ADORNO))
+             CALL       PGM(ARR124R3)
+             CLOF       OPNID(AR2159D)
+             DLTOVR     FILE(*ALL)
+
+    /* STEP 4:將財會與營業彙整之金額不同或LOSS資料出表*/
+             OVRPRTF    FILE(ARR124T) TOFILE(ARR124T) PAGESIZE(*N 132)  +
+                        CPI(10) HOLD(*YES)  USRDTA('餘核清單')
+             OVRDBF     FILE(ARR124F) TOFILE(ARLIB/ARR124F) SHARE(*YES)
+             OPNQRYF    FILE(ARR124F) +
+                        KEYFLD((W1CUNO)(W1ORNO))
+             CALL       PGM(ARR124R4)
+             CLOF       OPNID(ARR124F)
+             DLTOVR     FILE(*ALL)
+
+             SNDBRKMSG  MSG('<<客戶暫收款餘額核對清單已完成+
+                        ,請列印.........>>') +
+                      TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+
+             ENDPGM
+

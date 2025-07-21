@@ -1,0 +1,71 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR146P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCJ                                  */
+     /*     4.FUNCTION     出貨日報與磅單檢核表                   */
+     /*     5.DATE-WRITTEN  111/04/07 2022AR00020                   */
+     /*     6.UPDATE  DATE                                          */
+     /*                                                             */
+     /***************************************************************/
+
+         PGM
+          DCL        VAR(&INT) TYPE(*CHAR) LEN(1)
+          DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+          DCL        VAR(&DSPID)   TYPE(*CHAR)  LEN(10)
+          DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+          DCL        VAR(&S#DATS) TYPE(*DEC) LEN(8 0)
+          DCL        VAR(&S#DATE) TYPE(*DEC) LEN(8 0)
+          DCL        VAR(&W#DATS) TYPE(*CHAR) LEN(8)
+          DCL        VAR(&W#DATE) TYPE(*CHAR) LEN(8)
+          DCL        VAR(&AREA)   TYPE(*CHAR) LEN(1)
+
+          RTVJOBA     JOB(&DSPID)  OUTQ(&OUTQ) TYPE(&INT)
+           IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARR146RS) PARM(&IN03 &S#DATS &S#DATE)
+
+           IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+               CHGVAR     VAR(&W#DATS)  VALUE(&S#DATS)
+               CHGVAR     VAR(&W#DATE)  VALUE(&S#DATE)
+
+               CHGDTAARA   DTAARA(*LDA (1 8)) VALUE(&W#DATS)
+               CHGDTAARA   DTAARA(*LDA (11 8)) VALUE(&W#DATE)
+               CHGDTAARA   DTAARA(*LDA (21 10)) VALUE(&DSPID)
+
+             SBMJOB     JOB(ARR146P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                          RQSDTA('CALL ARR146P')
+             RETURN
+           ENDDO
+
+           RTVDTAARA    DTAARA(*LDA (1  8))   RTNVAR(&W#DATS)
+           RTVDTAARA    DTAARA(*LDA (11 8))   RTNVAR(&W#DATE)
+           RTVDTAARA    DTAARA(*LDA (21 10))  RTNVAR(&DSPID)
+           RTVDTAARA    DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+
+           OVRDBF     FILE(TRNDTL) TOFILE(TRNDTL) SHARE(*YES)
+
+           OVRPRTF    FILE(ARR146T) TOFILE(ARR146T) PAGESIZE(*N +
+                           80) CPI(10) HOLD(*YES) USRDTA('出磅檢核')
+
+           OPNQRYF    FILE((TRNDTL)) OPTION(*ALL) +
+                      QRYSLT(' TXTXAR  *EQ "' || &AREA || '"  *AND +
+                               TXFLAG  *NE "D"  *AND +
+                               TXACDT *EQ %RANGE(' || &W#DATS || ' +
+                                          ' || &W#DATE || ')   *AND  +
+                               CUNO    *NE "E" *AND +
+                               TXCODE *EQ "SA04"') +
+                          KEYFLD((TXACDT) (TXNO) (TXACNT) (TXORNO)) +
+                          MAPFLD((CUNO '%SST(TXCUNO 1 1)'))
+
+     /*   CPYFRMQRYF    FROMOPNID(TRNDTL) TOFILE(S00WCJ/TRN1) +
+              MBROPT(*REPLACE)  CRTFILE(*YES)  */
+             CALL       PGM(ARR146R)
+             CLOF       OPNID(TRNDTL)
+             DLTOVR     FILE(*ALL)
+             SNDBRKMSG  MSG('<<出貨日報與磅單檢核表處理完畢，請列印...>>') +
+                          TOMSGQ(&DSPID) MSGTYPE(*INFO)
+    ENDPGM
+

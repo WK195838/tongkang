@@ -1,0 +1,268 @@
+     H*****************************************************************
+     H*
+     H*            *****   PROGRAM INTRODUCTION   *****
+     H*
+     H*            1.PROGRAM-ID    ARE059R
+     H*            2.PROGRAM-TYPE  RPG/400
+     H*            3.AUTHOR        S00WCJ
+     H*            4.FUNCTION     折讓單發票整批轉出作業
+     H*            5.DATE-WRITTEN  103/04/18  2014AR822
+     H*                            103/05/26  S00WCJ (0305A)
+     H*                             修改DTAARA位置，避免BUG
+     H*                            104/01/28  S00WCJ (0401A)
+     H*                            107/12/26 2018AR00042 S00WCJ (0712A)
+     H*                             增加折讓單號代入
+     H*                            111/11/28 S00WCJ (1111A)
+     H*                             增加是否帶入資料判斷碼，避免
+     H*                              DTAARA重覆而帶入錯誤資料
+     H*
+     H*****************************************************************
+     H            Y
+     FARE059S CF  E                    WORKSTN
+     F                                        RRN   KSFILE AR59F1
+     FTRNDTLLCIF  E           K        DISK
+     E                    SCR     2   2 10               *螢幕代號
+     E                    ERR     1  12 70               *錯誤訊息
+     ILDA        UDS
+     I                                      401 410 W#INNO
+0712AI                                      411 418 W#TRNO
+1111AI                                      419 419 W#CHYN
+     I                                      951 985 S#COMP
+     I                                      986 9910S#SYSD
+     I                                     10111020 S#DEVN
+     I                                     10211021 D#AREA
+     C*****************************************************************
+     C*          Parameter List
+     C*****************************************************************
+     C*
+     C*
+     C*****************************************************************
+     C*          Main      Program
+     C*****************************************************************
+     C*
+     C*SR0000 => Initialize Screen Number
+     C*SR1000 => Screen Number = '01' Process
+     C*SR2000 => Screen Number = '01' Process Read Subfile Screen
+     C*SR3000 => Screen Number = '02' Process
+     C*
+     C                     EXSR SR0000
+     C           PRCID     DOUEQ'00'
+     C           PRCID     CASEQ'01'      SR1000
+     C           PRCID     CASEQ'02'      SR2000
+     C                     ENDCS
+     C                     ENDDO
+     C                     IN   LDA
+     C                     MOVEL*BLANKS   W#INNO
+     C                     OUT  LDA
+     C                     MOVE *ON       *INLR
+     C*****************************************************************
+     C           SR0000    BEGSR
+     C*****************************************************************
+     C*
+     C*Initialize Screen Number
+     C*
+     C                     CLEARAR59F1CL
+     C                     Z-ADD1         S#NBR
+     C                     MOVEL*LOVAL    W#TXNO  8
+     C                     MOVEL*BLANKS   W#INNO 10
+     C                     MOVEL*BLANKS   UPDSCR
+     C                     MOVE '01'      PRCID   2
+     C                     MOVEL*ON       *IN98
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1000    BEGSR
+     C*****************************************************************
+     C*
+     C*Screen Number = '02' Process
+     C*
+     C                     MOVEASCR,1     S#SCRN
+     C           UPDSCR    IFEQ 'Y'
+     C                     EXSR SR1100
+     C                     ENDIF
+     C           PRCID     DOWEQ'01'
+     C*
+     C*Check Write Subfile Record Found ?
+     C*
+     C           RRN       COMP *ZEROS                   72*SFLDSP OFF
+     C   72      S#ERR     IFEQ *BLANKS
+     C                     MOVEAERR,2     S#ERR
+     C                     ENDIF
+     C*
+     C                     WRITEHEAD
+     C                     WRITEAR59F1MG
+     C                     EXFMTAR59F1CL
+     C                     MOVE *BLANK    S#ERR
+     C                     MOVEL*OFF      *IN25
+     C*
+     C                     Z-ADDS#CSR     S#NBR          50*EQ
+     C   50                Z-ADDW#LRRN    S#NBR          50*EQ
+     C   50                Z-ADD1         S#NBR
+     C*
+     C*PF3=Exit,PF12=Cancel
+     C*
+     C           *IN03     IFEQ *ON
+     C           *IN12     OREQ *ON
+     C                     MOVE '00'      PRCID
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C*Check Screen Filed
+     C*
+     C                     EXSR SR1200
+     C           S#ERR     IFNE *BLANKS
+     C                     MOVEL*LOVAL    W#TXNO
+     C                     ITER
+     C                     ENDIF
+     C*
+     C*PF6=新增
+     C*
+     C*          *IN06     IFEQ *ON                        *PF6=ADD
+     C*                    Z-ADD1         W#OPT
+     C*                    EXSR SR2100
+     C*                    MOVE '03'      PRCID
+     C*                    LEAVE
+     C*                    ENDIF
+     C*
+     C*PF7=印表
+     C*
+     C*          *IN07     IFEQ *ON
+     C*                    CALL 'WBE001PA'
+     C*                    PARM           S#TKCS
+     C*                    PARM           S#TKCE
+     C*                    MOVEAERR,6     S#ERR
+     C*                    ITER
+     C*                    ENDIF
+     C*
+     C           S#TXNO    IFNE W#TXNO
+     C                     MOVELS#TXNO    W#TXNO
+     C                     MOVEL'Y'       UPDSCR
+     C                     MOVE '01'      PRCID
+     C                     MOVEL*ON       *IN98
+     C                     LEAVE
+     C                     ENDIF
+     C*
+     C                     MOVE '02'      PRCID
+     C                     LEAVE
+     C                     ENDDO
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1100    BEGSR
+     C*****************************************************************
+     C*
+     C*Initialize Subfile Screen => WB01F1
+     C*
+     C                     MOVE *BLANKS   UPDSCR  1
+     C                     Z-ADD*ZEROS    W#LRRN  40       *Last RRN
+     C                     MOVE *ON       *IN73            *SFLCLR
+     C                     WRITEAR59F1CL
+     C                     MOVE *OFF      *IN73            *SFLCLR
+     C                     Z-ADD*ZEROS    RRN     40
+     C*
+     C           S#TXNO    SETLLTXREC
+     C                     MOVE *OFF      *IN52
+     C           *IN52     DOWEQ*OFF
+     C           S#TXNO    READETXREC               N    52*EOF
+     C   52                LEAVE
+     C*
+0712AC           TXFLAG    IFEQ 'D'
+0712AC                     LEAVE
+0712AC                     ENDIF
+     C*
+     C                     CLEARAR59F1
+     C   98                MOVEL'Y'       S#OPT
+     C                     MOVEL*ON       *IN70
+     C                     MOVELTXIVNO    S#INNO
+     C                     MOVELTXPDNM    S#PDNM
+     C                     Z-ADDTXAMT     S#AMT
+     C                     Z-ADDTXTAX     S#TAX
+     C           TXAMT     ADD  TXTAX     S#TTAL
+     C*
+     C                     ADD  1         RRN
+     C                     WRITEAR59F1
+     C                     ENDDO
+     C                     Z-ADDRRN       W#LRRN
+     C*
+     C           S#NBR     IFGT RRN
+     C           RRN       ANDNE*ZEROS
+     C                     Z-ADDRRN       S#NBR
+     C                     ENDIF
+     C                     ENDSR
+     C*****************************************************************
+     C           SR1200    BEGSR
+     C*****************************************************************
+     C*
+     C           S#TXNO    IFEQ *BLANKS
+     C                     MOVEL*ON       *IN25
+     C                     MOVELERR,3     S#ERR
+     C                     GOTO END120
+     C                     ENDIF
+     C*
+     C           S#TXNO    IFNE *BLANKS
+     C           S#TXNO    CHAINTXREC                51
+     C   51                MOVEL*ON       *IN25
+     C   51                MOVELERR,2     S#ERR
+     C  N51      TXFL01    IFNE 'Y'
+     C  N51                MOVEL*ON       *IN25
+     C  N51                MOVELERR,5     S#ERR
+     C                     ENDIF
+     C  N51                MOVELTXNO      W#TXN1  1
+     C  N51      W#TXN1    IFNE D#AREA
+     C                     MOVEL*ON       *IN25
+     C                     MOVELERR,7     S#ERR
+     C                     ENDIF
+     C                     ENDIF
+     C*
+     C           END120    ENDSR
+     C*****************************************************************
+     C           SR2000    BEGSR
+     C*****************************************************************
+     C*
+     C*Screen Number = '01' Process Read Subfile Screen
+     C*
+     C           PRCID     DOWEQ'02'
+     C                     READCAR59F1                 5353*ER*EOF
+     C   53                MOVE '01'      PRCID
+     C   53                LEAVE
+     C*
+     C*
+     C                     MOVEL*OFF      *IN70            SFLNXTCHG
+     C                     MOVEL*OFF      *IN98
+     C*
+     C           S#ERR     IFEQ *BLANKS
+     C           S#OPT     ANDNE*BLANKS
+     C           *NAMVAR   DEFN *LDA      LDA
+     C                     IN   LDA
+     C                     MOVE S#INNO    W#INNO
+0712AC                     MOVELS#TXNO    W#TRNO
+1111AC                     MOVEL'Y'       W#CHYN
+     C                     OUT  LDA
+     C                     MOVE S#OPT     W#OPT   10
+     C                     CALL 'ARE025R'
+     C                     MOVEL*BLANKS   S#OPT
+1111AC                     IN   LDA
+1111AC                     MOVEL*BLANKS   W#CHYN
+1111AC                     OUT  LDA
+     C                     ENDIF
+     C*
+     C                     UPDATAR59F1
+     C                     Z-ADDRRN       S#NBR
+     C                     MOVEL'01'      PRCID
+     C                     LEAVE
+     C                     ENDDO
+     C                     ENDSR
+**  SCR
+ARE059S-1 ARE059S-2
+**  ERR
+01-資料已存在！
+02-資料不存在！
+03-欄位不可空白！
+04-請按＜執行鍵＞確認刪除。
+05-折讓單尚未確認，無法做發票轉出!!
+06-印表作業完成，請稍候!!
+07-此張折讓單非屬本廠區，不可做發票轉出。
+08-對不起!你無權力使用修改作業功能。
+09-對不起!你無權力使用複製作業功能。
+10-對不起!你無權力使用刪除作業功能。
+11-對不起!你無權力使用查詢作業功能。
+12-對不起!你無權力使用列印作業功能。
+

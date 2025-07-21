@@ -1,0 +1,111 @@
+     /****************************************************************/
+     /*                                                              */
+     /*            *****   PROGRAM INTRODUCTION   *****              */
+     /*                                                              */
+     /*            1.PROGRAM-ID    APP009P                           */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S02SWJ                            */
+     /*            4.FUNCTION     驗收物料付款製票代開             */
+     /*            5.DATE-WRITTEN  83/04/01                          */
+     /*                            84/03/26   S02SWJ                 */
+     /*                            97/06/18 2008MT229 S00TPC(9706A)  */
+     /*                            98/09/14 2009MT363 S00TPC(9809A)  */
+     /*                           101/12/10 2012MT635 S00TPC(0112A)  */
+     /*                           102/11/14 2013MT673 S00TPC(0211A)  */
+     /****************************************************************/
+             PGM
+/*0112A*/    DCL        VAR(&IFRSYMD) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#KIND) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&W#RULE) TYPE(*CHAR) LEN(12)
+             DCL        VAR(&W#BLK)  TYPE(*CHAR) LEN(7) VALUE(' ')
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+/*9706A*/    DCL        VAR(&YMD)  TYPE(*CHAR) LEN(8)
+/*9809A*/    DCL        VAR(&YMDD)  TYPE(*CHAR) LEN(8)
+/*9706A*/    DCL        VAR(&ACYMD)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&BKNO)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&Y)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&M)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DTARA) TYPE(*CHAR) LEN(11)
+             DCL        VAR(&DTAR)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&NTNO1) TYPE(*DEC)  LEN(7 0)
+             DCL        VAR(&NTNO2) TYPE(*DEC)  LEN(7 0)
+             DCL        VAR(&NTNO3) TYPE(*DEC)  LEN(7 0)
+             DCL        VAR(&NTNO4) TYPE(*DEC)  LEN(7 0)
+             DCL        VAR(&NTNO5) TYPE(*DEC)  LEN(7 0)
+             DCL        VAR(&NTNO6) TYPE(*DEC)  LEN(7 0)
+             DCL        VAR(&NTNO)   TYPE(*CHAR) LEN(7)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&DTARA) VALUE('ACCTLDTA' *CAT &AREA)
+/*9706A*/    RTVDTAARA  DTAARA(&DTARA (1 8)) RTNVAR(&ACYMD)
+             IF         COND(&INT *EQ '1') THEN(DO)
+/*0112A*/    RTVDTAARA  DTAARA(AMIFRSCTL (1 8)) RTNVAR(&IFRSYMD)
+             CALL       PGM(APP009RS) PARM(&IN03 &YMD &ACYMD &BKNO +
+                            &NTNO1 &NTNO2 &NTNO3 &NTNO4 &NTNO5 &NTNO6)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+/*9706A*/    CHGDTAARA  DTAARA(*LDA (61 8)) VALUE(&YMD)
+             CHGVAR     VAR(&NTNO)   VALUE(&NTNO1)
+             CHGDTAARA  DTAARA(*LDA (7 07)) VALUE(&NTNO)
+             CHGVAR     VAR(&NTNO)   VALUE(&NTNO2)
+             CHGDTAARA  DTAARA(*LDA (14 07)) VALUE(&NTNO)
+             CHGVAR     VAR(&NTNO)   VALUE(&NTNO3)
+             CHGDTAARA  DTAARA(*LDA (21 07)) VALUE(&NTNO)
+             CHGVAR     VAR(&NTNO)   VALUE(&NTNO4)
+             CHGDTAARA  DTAARA(*LDA (28 07)) VALUE(&NTNO)
+             CHGVAR     VAR(&NTNO)   VALUE(&NTNO5)
+             CHGDTAARA  DTAARA(*LDA (35 07)) VALUE(&NTNO)
+             CHGVAR     VAR(&NTNO)   VALUE(&NTNO6)
+             CHGDTAARA  DTAARA(*LDA (42 07)) VALUE(&NTNO)
+             CHGDTAARA  DTAARA(*LDA (51 10)) VALUE(&BKNO)
+/*0112A*/    CHGDTAARA  DTAARA(*LDA (472 8)) VALUE(&IFRSYMD)
+         /*  SBMJOB     JOB(APP009P) JOBD(MTJOBD) OUTQ(&OUTQ) +  */
+         /*               RQSDTA('CALL APP009P')                 */
+         /*  RETURN                                              */
+             ENDDO
+/*9706A*/    RTVDTAARA  DTAARA(*LDA (61 8)) RTNVAR(&YMD)
+/*9809A*/    RTVDTAARA  DTAARA(*LDA (61 8)) RTNVAR(&YMDD)
+/*9706A*/    RTVDTAARA  DTAARA(*LDA (63 2)) RTNVAR(&Y)
+/*9706A*/    RTVDTAARA  DTAARA(*LDA (65 2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (51 10)) RTNVAR(&BKNO)
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             /* Check File => MTNEXT(單據編號控制檔)*/
+             CHGVAR     VAR(&W#RULE) VALUE(&AREA *CAT &Y *CAT +
+                          &M *CAT &W#BLK)
+             CHGVAR     VAR(&W#KIND) VALUE('MI24')    /*調整單*/
+             CALL       PGM(MTS002R) PARM(&W#KIND &W#RULE)
+             CHGVAR     VAR(&W#KIND) VALUE('MI25')    /*交運單*/
+             CALL       PGM(MTS002R) PARM(&W#KIND &W#RULE)
+             CHGDTAARA  DTAARA(*LDA (101 12)) VALUE(&W#RULE)
+             /***  PROCESS START   ***/
+             OVRDBF     FILE(MTPMST) TOFILE(MTPMST) SHARE(*YES)
+/*0211A*/    OPNQRYF    FILE((MTPMST)) OPTION(*ALL) QRYSLT('   +
+                          PMGLDT *EQ   ' || &YMDD || '          +
+                          *AND  PMCLFG *EQ  "1"                +
+                          *AND  PMACD  *NE  "D"')              +
+                          KEYFLD((PMVNTR) (PMDUDT) (PMPYNO))
+         /*  OPNQRYF    FILE((MTPMST)) OPTION(*ALL) QRYSLT('   +
+                          PMGLDT *EQ   ' || &YMD || '          +
+                          *AND  PMCLFG *EQ  "1"                +
+                          *AND  PMACD  *NE  "D" *and pmbkno *eq "' +
+                          || &BKNO || '"         ') KEYFLD((PMVNTR) +
+                          (PMPYNO))                            */
+/*9706A*/    OVRDBF     FILE(GLTRAN) TOFILE(('GL' || &AREA || 'R'))
+/*9706A*/    OVRDBF     FILE(GLSEQ)  TOFILE(GLSEQ)
+             OVRDBF     FILE(MTTRNS) TOFILE(MTTRNS)     +
+                                LVLCHK(*NO)
+             OVRDBF     FILE(MTTRNH) TOFILE(MTTRNH)     +
+                                LVLCHK(*NO)
+             OVRDBF     FILE(MTNEXT) TOFILE(MTNEXT)     +
+                                LVLCHK(*NO)
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 132) +
+                          CPI(10) USRDTA('付款代開')
+             OVRPRTF    FILE(QPRINT1) TOFILE(QPRINT) PAGESIZE(*N 132) +
+                          CPI(10) USRDTA('調整代開')
+             CALL       PGM(APP009R)
+             CLOF       OPNID(MTPMST)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

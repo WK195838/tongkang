@@ -1,0 +1,75 @@
+     /****************************************************************/
+     /*                                                              */
+     /*            *****   PROGRAM INTRODUCTION   *****              */
+     /*                                                              */
+     /*            1.PROGRAM-ID    ARE006P                           */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S00WCJ                            */
+     /*            4.FUNCTION     折讓退回維護作業                 */
+     /*                           (讀取台北折讓單發票資料)         */
+     /*            5.DATE-WRITTEN  107/11/27 2018AR00030             */
+     /*            6.UPDATE  DATE  111/09/23 S00WCJ (1109A)          */
+     /*                             增加DDMF連線檢核             */
+     /*                            113/11/29 S00WCJ (1311A)          */
+     /*                             更改維護者帳號為S00CCH         */
+     /*                                                              */
+     /****************************************************************/
+             PGM
+             DCL        VAR(&W#RNAME) TYPE(*CHAR) LEN(20)
+             DCL        VAR(&P#LOC)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&P#IVNO)  TYPE(*CHAR) LEN(10)
+/*1109A*/    DCL        VAR(&RMTFLG) TYPE(*CHAR) LEN(1) /*遠端通訊碼*/
+/*1109A*/    DCL        VAR(&W#USER) TYPE(*CHAR) LEN(10)
+/*1109A*/    DCL        VAR(&W#CNT)  TYPE(*DEC)  LEN(1 0) VALUE(0)
+/*1109A*/    DCL        VAR(&W#CNTC) TYPE(*CHAR) LEN(1)
+/*1109A*/    DCL        VAR(&W#CNTN) TYPE(*CHAR) LEN(1) VALUE('2') /*PING次*/
+
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&P#LOC)
+
+             IF         COND(&P#LOC *EQ 'U') THEN(DO)
+/*1109A P廠遠端通訊檢核*/
+/*1109A*/    RTVJOBA    USER(&W#USER)
+/*1109A*/    CHGVAR     VAR(&RMTFLG) VALUE('0')    /*遠端通訊正常*/
+
+ PING:       CHGVAR     VAR(&W#CNT)  VALUE(&W#CNT + 1)    /*1109A*/
+/*1109A*/    CHGVAR     VAR(&W#CNTC) VALUE(&W#CNT)
+/*1109A*/    PING       RMTSYS(P02) MSGMODE(*QUIET *ESCAPE) +
+                          PKTLEN(512) NBRPKT(1) WAITTIME(1)
+/*1109A*/    MONMSG     MSGID(TCP0000) EXEC(DO)
+/*1109A*/    IF         COND(&W#CNTC *EQ &W#CNTN) THEN(CHGVAR +
+                          VAR(&RMTFLG) VALUE('1')) /*遠端通訊異常*/
+/*1109A*/    SNDUSRMSG  MSG('P02主機斷線，請待連線正常再操作一次+
+                          ，謝謝！') +
+                          MSGTYPE(*INFO) TOUSR(S00CCH)
+/*1109A*/    IF         COND(&W#CNTC *NE &W#CNTN) THEN(GOTO CMDLBL(PING))
+/*1109A*/    ENDDO
+
+/*1109A*/    IF         COND(&RMTFLG *EQ '1') THEN(DO)  /*遠端通訊異常*/
+             SNDUSRMSG  MSG('P02主機斷線，請待連線正常再操作一次+
+                          ，謝謝！') +
+                          MSGTYPE(*INFO) TOUSR(S00CCH)
+/*1109A*/    SNDUSRMSG  MSG('P02主機斷線，請待連線正常再操作一次+
+                          ，謝謝！') +
+                          MSGTYPE(*INFO) TOUSR(&W#USER)
+/*1109A*/    GOTO       CMDLBL(END)
+/*1109A*/    ENDDO
+ /* P02-P廠遠端通訊檢核END */
+               CHGVAR       VAR(&W#RNAME) VALUE('P02')
+/*1109A*/
+/*1109A*/
+               DLTF       FILE(QTEMP/INVDTPL3)
+               MONMSG     MSGID(CPF0000)
+    /*         CRTDDMF    FILE(QTEMP/INVDTPL3) RMTFILE(S00WCJ/INVDTLL3) +
+                          RMTLOCNAME(&W#RNAME *SNA)   */
+               CRTDDMF    FILE(QTEMP/INVDTPL3) RMTFILE(DALIB/INVDTLL3)  +
+                          RMTLOCNAME(&W#RNAME *SNA)
+
+               OVRDBF     FILE(INVDTPL3) TOFILE(QTEMP/INVDTPL3) +
+                             SECURE(*YES)
+             ENDDO
+
+             CALL       PGM(ARE006R)
+             DLTOVR     FILE(*ALL)
+  END:
+             ENDPGM
+

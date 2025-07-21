@@ -1,0 +1,163 @@
+     /****************************************************************/
+     /*                                                              */
+     /*            1.PROGRAM-ID    MIP602P                           */
+     /*            2.PROGRAM-TYPE  CLP                               */
+     /*            3.AUTHOR        S00TPC                            */
+     /*            4.FUNCTION     物料出售成本調整數計算表傳票代開 */
+     /*            5.DATE-WRITTEN  111/11/15 2022MT00025 S00TPC      */
+     /*                                                              */
+     /****************************************************************/
+             PGM
+             DCL        VAR(&W#MON1)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&W#DAT1)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#DAT2)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#YYMM)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&W#DDS)   TYPE(*CHAR) LEN(2) VALUE('01')
+             DCL        VAR(&W#DDE)   TYPE(*CHAR) LEN(2) VALUE('31')
+             DCL        VAR(&P#RUN)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&P#PRC)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&P#YYMM)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&P#CODE)  TYPE(*CHAR) LEN(1)
+
+             DCLF       FILE(MIP602S)
+
+             CHGJOB     LOGCLPGM(*YES)
+
+             RTVDTAARA  DTAARA(MIMONDTA (1 6)) RTNVAR(&W#MON1) +
+                          /*本次結帳月份*/
+             CHGVAR     VAR(&W#YYMM) VALUE(&W#MON1)
+             CHGVAR     VAR(&S#YYMM) VALUE(&W#YYMM)
+             RTVDTAARA  DTAARA(*LDA (951 35))  RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVN)
+             RTVDTAARA  DTAARA(*LDA (1021 1))  RTNVAR(&S#AREA)
+ START:      SNDRCVF
+             CHGVAR     VAR(&IN25) VALUE('0')
+
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+         /* F5=修改處理年月*/
+             IF         COND(&IN05 *EQ '1') THEN(DO)
+               CHGVAR     VAR(&IN26) VALUE('1')
+               GOTO       CMDLBL(START)
+             ENDDO
+
+         /* Check處理年月*/
+             IF         COND(&S#YYMM *EQ 0) THEN(DO)
+               CHGVAR     VAR(&S#ERR) VALUE('請輸入處理年月！')
+               CHGVAR     VAR(&IN25)  VALUE('1')
+               GOTO       CMDLBL(START)
+             ENDDO
+             IF         COND(&S#YYMM *LT 11111) THEN(DO)
+               CHGVAR     VAR(&S#ERR) VALUE('處理年月不可小於11111')
+               CHGVAR     VAR(&IN25)  VALUE('1')
+               GOTO       CMDLBL(START)
+             ENDDO
+             /* Check總帳是否關帳*/
+             CHGVAR     VAR(&P#YYMM) VALUE(&S#YYMM)
+             CALL    PGM(ACP101R) PARM(&P#YYMM &P#CODE)
+             IF         COND(&P#CODE *EQ '1') THEN(DO)
+               CHGVAR     VAR(&S#ERR) VALUE('總帳已關帳，請與財會人員聯絡！')
+               GOTO       CMDLBL(START)
+             ENDDO
+
+         /* 確認執行  */
+             IF         COND((&IN10 *EQ '0') *AND (&IN22 *EQ '0')) THEN(DO)
+              CHGVAR     VAR(&S#ERR) VALUE('按<PF10>確認執行！')
+              GOTO       CMDLBL(START)
+             ENDDO
+
+             /*  */
+             CHGVAR     VAR(&W#YYMM) VALUE(&S#YYMM)
+             CHGDTAARA  DTAARA(*LDA (17 1)) VALUE(&S#AREA)
+             CHGDTAARA  DTAARA(*LDA (18 6)) VALUE(&W#YYMM)
+             CHGDTAARA  DTAARA(*LDA (24 2)) VALUE(&W#DDS)
+             CHGDTAARA  DTAARA(*LDA (26 6)) VALUE(&W#YYMM)
+             CHGDTAARA  DTAARA(*LDA (32 2)) VALUE(&W#DDE)
+
+             /*  */
+             RTVDTAARA  DTAARA(*LDA (17 1)) RTNVAR(&S#AREA)
+             RTVDTAARA  DTAARA(*LDA (18 6)) RTNVAR(&W#YYMM)
+             RTVDTAARA  DTAARA(*LDA (18 8)) RTNVAR(&W#DAT1)
+             RTVDTAARA  DTAARA(*LDA (26 8)) RTNVAR(&W#DAT2)
+
+         /* 還原執行  */
+             IF         COND(&IN22 *EQ '1') THEN(DO)
+             OVRPRTF    FILE(MIP602T) TOFILE(MIP602T) PAGESIZE(*N +
+                          198) CPI(15) HOLD(*YES) USRDTA('代開還原')
+             OVRDBF     FILE(MTMSCA) TOFILE(MTMSCA) SHARE(*YES)
+             OPNQRYF    FILE((MTMSCA)) OPTION(*ALL) QRYSLT(' +
+                         (M2ACD *NE "D") *AND (M2VRNO *NE " ") *AND +
+                         (M2LOCA *EQ ''' || &S#AREA || ''') *AND +
+                         (CHAR6 *EQ ''' *CAT &W#YYMM *CAT ''')') +
+                         KEYFLD((M2LOCA) (M2YYMM) (M2OTCD) +
+                                (M2DTTP *DESCEND) (M2MLNO)) +
+                         MAPFLD((CHAR6 M2YYMM *CHAR 6))
+             OVRDBF     FILE(ACVOUR) TOFILE(('AC' || &S#AREA || 'R'))
+             CHGVAR     VAR(&P#RUN) VALUE('R')
+             CHGVAR     VAR(&P#PRC) VALUE(' ')
+             CALL       PGM(MIP602RA) PARM(&P#RUN &P#PRC)
+             CLOF       OPNID(MTMSCA)
+             DLTOVR     FILE(*ALL)
+
+             IF         COND(&P#PRC *EQ 'Y') THEN(CHGVAR VAR(&S#ERR) +
+                          VALUE('處理年月傳票代開還原已完成！'))
+             IF         COND(&P#PRC *EQ ' ') THEN(CHGVAR VAR(&S#ERR) +
+                          VALUE('處理年月傳票代開還原無資料，請檢核+
+                          ！'))
+              GOTO       CMDLBL(START)
+             ENDDO
+
+             /*檢核處理年月傳票是否已代開*/
+             OVRDBF     FILE(MTMSCA) TOFILE(MTMSCA) SHARE(*YES)
+             OPNQRYF    FILE((MTMSCA)) OPTION(*INP) QRYSLT(' +
+                         (M2ACD *NE "D") *AND (M2VRNO *NE " ") *AND +
+                         (M2LOCA *EQ ''' || &S#AREA || ''') *AND +
+                         (CHAR6 *EQ ''' *CAT &W#YYMM *CAT ''')') +
+                         KEYFLD((M2LOCA) (M2YYMM) (M2OTCD) +
+                                (M2DTTP *DESCEND) (M2MLNO)) +
+                         MAPFLD((CHAR6 M2YYMM *CHAR 6))
+             CHGVAR     VAR(&P#RUN) VALUE('C')
+             CHGVAR     VAR(&P#PRC) VALUE(' ')
+             CALL       PGM(MIP601RA) PARM(&P#RUN &P#PRC)
+             CLOF       OPNID(MTMSCA)
+             DLTOVR     FILE(*ALL)
+
+             IF         COND(&P#PRC *EQ 'N') THEN(DO)
+               CHGVAR     VAR(&S#ERR) +
+                          VALUE('處理年月傳票已代開無法再處理，請查+
+                          核！')
+               GOTO       CMDLBL(START)
+             ENDDO
+
+             /* Process Start */
+             /* MTMSCA->ACxR */
+             OVRPRTF    FILE(MIP602T) TOFILE(MIP602T) PAGESIZE(*N +
+                          198) CPI(15) HOLD(*YES) USRDTA('代開入帳')
+             OVRDBF     FILE(MTMSCA) TOFILE(MTMSCA) SHARE(*YES)
+             OPNQRYF    FILE((MTMSCA)) OPTION(*ALL) QRYSLT(' +
+                         (M2ACD *NE "D") *AND (M2VRNO *EQ " ") *AND +
+                         (M2LOCA *EQ ''' || &S#AREA || ''') *AND +
+                         (CHAR6 *EQ ''' *CAT &W#YYMM *CAT ''')') +
+                         KEYFLD((M2LOCA) (M2YYMM) (M2OTCD) +
+                                (M2DTTP *DESCEND) (M2MLNO)) +
+                         MAPFLD((CHAR6 M2YYMM *CHAR 6))
+             OVRDBF     FILE(ACVOUR) TOFILE(('AC' || &S#AREA || 'R'))
+             CHGVAR     VAR(&P#RUN) VALUE('P')
+             CHGVAR     VAR(&P#PRC) VALUE(' ')
+             CALL       PGM(MIP602R) PARM(&P#RUN &P#PRC)
+             CLOF       OPNID(MTMSCA)
+             DLTOVR     FILE(*ALL)
+
+             IF         COND(&P#PRC *EQ 'Y') THEN(CHGVAR VAR(&S#ERR) +
+                          VALUE('處理年月已代開完成！'))
+             IF         COND(&P#PRC *EQ 'N') THEN(CHGVAR VAR(&S#ERR) +
+                          VALUE('處理年月有錯誤，請檢核！'))
+             IF         COND(&P#PRC *EQ ' ') THEN(CHGVAR VAR(&S#ERR) +
+                          VALUE('處理年月無資料，請檢核！'))
+             /* Process End */
+
+             GOTO       CMDLBL(START)
+
+             RETURN
+             ENDPGM
+

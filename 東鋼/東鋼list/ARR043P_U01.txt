@@ -1,0 +1,210 @@
+    /****************************************************************/
+    /*                                                              */
+    /*             UPDATE  DATE  101/11/06  2012AR698 S00WCJ (0111A)*/
+    /*                         101/11/05  2012AR698 S00WCJ (0111A)  */
+    /*                           增加訂單編號及請款日期區間為篩選 */
+    /*                           條件                             */
+    /*                           103/08/04  2014AR857 S00WCJ (038A) */
+    /*                           發票AS73522926無法完全沖帳，於 */
+    /*                           此報表排除                       */
+    /*                         103/08/22 2014AR864 S00WCJ (0308B)   */
+    /*                           發票ZC73519717.ZX73522533無法完*/
+    /*                           全沖帳，於此表排除               */
+    /*                         103/09/22 2014AR873 S00WCJ (0309A)   */
+    /*                           發票AS73522686無法完全沖帳，於 */
+    /*                           此報表排除                       */
+    /*                         105/08/16 2016AR1003 S00WCJ (0508A)  */
+    /*                           發票BW49428622，因無法完全沖帳 */
+    /*                           於此報表排除                     */
+    /*                         105/08/16 2016AR1004 S00WCJ (0508B)  */
+    /*                           發票CG73521785，因無法完全沖帳 */
+    /*                           於此報表排除                     */
+    /*                         107/03/02 2017AR1134 S00WCJ (0703A)  */
+    /*                           排除列呆帳之資料                 */
+    /*                         111/09/23 S00WCJ (1109A)             */
+    /*                          增加DDMF連線檢核                */
+    /*                         113/11/29 S00WCJ                     */
+    /*                          更改維護者帳號為S00CCH            */
+    /*                                                              */
+    /****************************************************************/
+             PGM
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&S)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&E)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ST)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&EN)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&SYSN) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&CUNO) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&CUNS) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&CUNE) TYPE(*CHAR) LEN(6)
+/*0111A*/    DCL        VAR(&W#ORNO) TYPE(*CHAR) LEN(6)
+/*0111A*/    DCL        VAR(&W#ORNS) TYPE(*CHAR) LEN(6)
+/*0111A*/    DCL        VAR(&W#ORNE) TYPE(*CHAR) LEN(6)
+/*0111A*/    DCL        VAR(&W#DATS) TYPE(*CHAR) LEN(8)
+/*0111A*/    DCL        VAR(&W#DATE) TYPE(*CHAR) LEN(8)
+/*1109A*/    DCL        VAR(&RMTFLG) TYPE(*CHAR) LEN(1) /*遠端通訊碼*/
+/*1109A*/    DCL        VAR(&W#USER) TYPE(*CHAR) LEN(10)
+/*1109A*/    DCL        VAR(&W#CNT)  TYPE(*DEC)  LEN(1 0) VALUE(0)
+/*1109A*/    DCL        VAR(&W#CNTC) TYPE(*CHAR) LEN(1)
+/*1109A*/    DCL        VAR(&W#CNTN) TYPE(*CHAR) LEN(1) VALUE('2') /*PING次*/
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             RTVNETA    SYSNAME(&SYSN)
+
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(ARR043RS) PARM(&IN03 &S &E &AREA &CUNO)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+
+             CHGDTAARA  DTAARA(*LDA (1 1)) VALUE(&S)
+             CHGDTAARA  DTAARA(*LDA (2 1)) VALUE(' ')
+             CHGDTAARA  DTAARA(*LDA (3 1)) VALUE(&E)
+             CHGDTAARA  DTAARA(*LDA (4 1)) VALUE(' ')
+             CHGDTAARA  DTAARA(*LDA (5 1)) VALUE(&AREA)
+             CHGDTAARA  DTAARA(*LDA (6 6)) VALUE(&CUNO)
+
+             SBMJOB     JOB(ARR043P) JOBD(CCJOBD)            +
+                          OUTQ(&OUTQ) RQSDTA('CALL ARR043P')
+             RETURN
+             ENDDO
+BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 2))   RTNVAR(&ST)
+             RTVDTAARA  DTAARA(*LDA (3 2))   RTNVAR(&EN)
+             RTVDTAARA  DTAARA(*LDA (5 1))   RTNVAR(&AREA)
+             RTVDTAARA  DTAARA(*LDA (6 6))   RTNVAR(&CUNO)
+             RTVDTAARA  DTAARA(*LDA (21 6)) RTNVAR(&W#ORNO)
+             RTVDTAARA  DTAARA(*LDA (31 8)) RTNVAR(&W#DATS)
+             RTVDTAARA  DTAARA(*LDA (41 8)) RTNVAR(&W#DATE)
+
+ /*客戶代號如為空白，則顯示全部*/
+             IF         COND(&CUNO *EQ '      ') THEN(DO)
+             CHGVAR     VAR(&CUNS) VALUE('      ')
+             CHGVAR     VAR(&CUNE) VALUE('999999')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&CUNS) VALUE(&CUNO)
+             CHGVAR     VAR(&CUNE) VALUE(&CUNO)
+             ENDDO
+
+ /*0111A*訂單編號空白，顯示全部*/
+ /*0111A*/   IF         COND(&W#ORNO *EQ '      ') THEN(DO)
+ /*0111A*/      CHGVAR     VAR(&W#ORNS) VALUE('      ')
+ /*0111A*/      CHGVAR     VAR(&W#ORNE) VALUE('999999')
+ /*0111A*/   ENDDO
+ /*0111A*/   ELSE (DO)
+ /*0111A*/      CHGVAR     VAR(&W#ORNS) VALUE(&W#ORNO)
+ /*0111A*/      CHGVAR     VAR(&W#ORNE) VALUE(&W#ORNO)
+ /*0111A*/   ENDDO
+
+ /*1109A 遠端通訊檢核*/
+
+/*1109A*/    RTVJOBA    USER(&W#USER)
+/*1109A*/    CHGVAR     VAR(&RMTFLG) VALUE('0')    /*遠端通訊正常*/
+
+ PING:       CHGVAR     VAR(&W#CNT)  VALUE(&W#CNT + 1) /*1109A*/
+/*1109A*/    CHGVAR     VAR(&W#CNTC) VALUE(&W#CNT)
+/*1109A*/    PING       RMTSYS(P02) MSGMODE(*QUIET *ESCAPE) +
+                          PKTLEN(512) NBRPKT(1) WAITTIME(1)
+/*1109A*/    MONMSG     MSGID(TCP0000) EXEC(DO)
+/*1109A*/    IF         COND(&W#CNTC *EQ &W#CNTN) THEN(CHGVAR +
+                          VAR(&RMTFLG) VALUE('1')) /*遠端通訊異常*/
+/*1109A*/    SNDUSRMSG  MSG('P02主機斷線，請待連線正常再操作一次+
+                          ，謝謝！') +
+                          MSGTYPE(*INFO) TOUSR(S00CCH)
+/*1109A*/    IF         COND(&W#CNTC *NE &W#CNTN) THEN(GOTO CMDLBL(PING))
+/*1109A*/    ENDDO
+
+/*1109A*/    IF         COND(&RMTFLG *EQ '1') THEN(DO)  /*遠端通訊異常*/
+/*1109A*/    SNDUSRMSG  MSG('P02主機斷線，請待連線正常再操作一次+
+                          ，謝謝！') +
+                          MSGTYPE(*INFO) TOUSR(S00CCH)
+/*1109A*/    SNDUSRMSG  MSG('P02主機斷線，請待連線正常再操作一次+
+                          ，謝謝！') +
+                          MSGTYPE(*INFO) TOUSR(&W#USER)
+/*1109A*/    GOTO       CMDLBL(END)
+             ENDDO
+ /* P02-P廠遠端通訊檢核END */
+
+ /*1109A*/
+ /*0703A*/   DLTF       FILE(QTEMP/BSYSDTL2)
+ /*0703A*/   MONMSG     MSGID(CPF0000)
+ /*0703A*/   CRTDDMF    FILE(QTEMP/BSYSDTL2) RMTFILE(DALIB/BSYSDTL2) +
+                          RMTLOCNAME('P02'  *SNA)
+ /*0703A*/   OVRDBF     FILE(BSYSDTL2) TOFILE(QTEMP/BSYSDTL2) +
+                          SECURE(*YES)
+
+             OVRPRTF    FILE(QPRINT) PAGESIZE(*N 176) CPI(13.3)
+             OVRDBF     FILE(INVMST) TOFILE(INVMST) SHARE(*YES)
+
+             /*排除發票MW38881554 (因畸零尾差造成負1 ) */
+             /*排除發票AS73522926                        */
+             /*排除發票ZC73519717.ZX73522533             */
+             /*排除發票BW49428622                        0508A*/
+             /*排除發票DB73519214                        0401A*/
+             /*排除發票QW60003001                        0502A*/
+             /*排除發票CG73521785                        0508B*/
+
+
+                     /* 不依請款單分類（台北） */
+             IF         COND(&SYSN *EQ 'P02') THEN(DO)
+ /*0309A*/   OPNQRYF    FILE(INVMST)                           +
+                        QRYSLT('INRVID *GE "' || &ST   || '"   +
+                           *AND INRVID *LE "' || &EN   || '"   +
+                           *AND INCUNO *GE "' || &CUNS || '"   +
+                           *AND INCUNO *LE "' || &CUNE || '"   +
+                           *AND INORNO *GE "' || &W#ORNS || '" +
+                           *AND INORNO *LE "' || &W#ORNE || '" +
+                           *AND APDT   *GE "' || &W#DATS || '" +
+                           *AND APDT   *LE "' || &W#DATE || '" +
+                           *AND INTYPE *NE "9"                 +
+                           *AND INNO   *NE "MW38881554"        +
+                           *AND INNO   *NE "AS73522926"        +
+                           *AND INNO   *NE "ZC73519717"        +
+                           *AND INNO   *NE "ZX73522533"        +
+                           *AND INNO   *NE "AS73522686"        +
+                           *AND INNO   *NE "BW49428622"        +
+                           *AND INNO   *NE "DB73519214"        +
+                           *AND INNO   *NE "QW60003001"        +
+                           *AND INNO   *NE "CG73521785"        +
+                           *AND INDECD *EQ " "')               +
+                        MAPFLD((APDT INAPDT *CHAR 8))          +
+                        KEYFLD((INRVID) (INCUNM) (INCUNO)      +
+                                        (ININDT) (INNO))
+             CALL       PGM(ARR043R1)
+             ENDDO
+
+                     /* 依請款單分類（高雄） */
+             ELSE       DO
+/*0508B*/    OPNQRYF    FILE(INVMST)                           +
+                        QRYSLT('INRVID *GE "' || &ST || '"     +
+                           *AND INRVID *LE "' || &EN || '"     +
+                           *AND INCUNO *GE "' || &CUNS || '"   +
+                           *AND INCUNO *LE "' || &CUNE || '"   +
+                           *AND INORNO *GE "' || &W#ORNS || '" +
+                           *AND INORNO *LE "' || &W#ORNE || '" +
+                           *AND APDT   *GE "' || &W#DATS || '" +
+                           *AND APDT   *LE "' || &W#DATE || '" +
+                           *AND INTYPE *NE "9"                 +
+                           *AND INNO   *NE "MW38881554"        +
+                           *AND INNO   *NE "AS73522926"        +
+                           *AND INNO   *NE "ZC73519717"        +
+                           *AND INNO   *NE "ZX73522533"        +
+                           *AND INNO   *NE "AS73522686"        +
+                           *AND INNO   *NE "BW49428622"        +
+                           *AND INNO   *NE "DB73519214"        +
+                           *AND INNO   *NE "QW60003001"        +
+                           *AND INNO   *NE "CG73521785"        +
+                           *AND INDECD *EQ " "')               +
+                        MAPFLD((APDT INAPDT *CHAR 8))          +
+                        KEYFLD((INRVID) (INCUNM) (INCUNO)      +
+                               (INAPNO) (ININDT) (INNO))
+             CALL       PGM(ARR043R2)
+             ENDDO
+
+             CLOF       OPNID(INVMST)
+             DLTOVR     FILE(*ALL)
+  END:
+             ENDPGM
+

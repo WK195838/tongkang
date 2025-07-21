@@ -1,0 +1,92 @@
+    /****************************************************************/
+    /*                                                              */
+    /*        >>   PROGRAM INTRODUCTION  <<                         */
+    /*        1.PROGRAM-ID     ARP141P                              */
+    /*        2.PROGRAM-TYPE   CLP                                  */
+    /*        3.AUTHOR         S00WCJ                               */
+    /*        4.FUNCTION      PC上送開立其他類發票處理作業      */
+    /*        5.DATE-WRITTEN   105/08/26 2016AR1005                 */
+    /*        6.DATE-MODIFY    106/02/02 S00WCJ (0602A)             */
+    /*                         106/03/08 2017AR1056 S00WCJ (0603A)  */
+    /*                          增加CALL ARP141RS供USER指定   */
+    /*                          發票開立日                        */
+    /*                         106/07/11 2017AR1083 S00WCJ (0607A)  */
+    /*                          增加查詢及篩選之資料才開立發票    */
+    /*                                                              */
+    /****************************************************************/
+
+     PGM
+             DCL        VAR(&AR#P)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&JOB)     TYPE(*CHAR) LEN(10)
+             DCL        VAR(&USER)    TYPE(*CHAR) LEN(10)
+             DCL        VAR(&NBR)     TYPE(*CHAR) LEN(6)
+             DCL        VAR(&CURUSER) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TUSER)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TADDR)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TEMAIL)  TYPE(*CHAR) LEN(50)
+             DCL        VAR(&W#ER)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&SYQD)     TYPE(*CHAR) LEN(6)
+             DCL        VAR(&SYQD1)    TYPE(*CHAR) LEN(8)
+ /*0505A*/   DCL        VAR(&FILE)     TYPE(*CHAR) LEN(7)
+ /*0603A*/   DCL        VAR(&IN03)     TYPE(*LGL)  LEN(1)
+
+             CHGJOB     LOGCLPGM(*YES)
+
+
+             RTVJOBA    JOB(&JOB) USER(&USER) NBR(&NBR) +
+                          CURUSER(&CURUSER)
+
+/*            因K02 *DATE及UDATE都會抓到QSYSWRK的開機日期*/
+/*            改抓QDATE使用P/U/K同步                       */
+
+            RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&SYQD)
+            CHGVAR     VAR(&SYQD1) VALUE('01' *CAT &SYQD)
+            CHGDTAARA  DTAARA(*LDA (801 8)) VALUE(&SYQD1)
+
+
+             ADDLIBLE   LIB(DALIB)
+             MONMSG   MSGID(CPF2103)
+             ADDLIBLE   LIB(ARLIB)
+             MONMSG   MSGID(CPF2103)
+
+             CHGVAR     VAR(&AR#P)  VALUE(' ')
+             CHGDTAARA  DTAARA(*LDA (1  1)) VALUE(&AR#P)
+             CHGDTAARA  DTAARA(*LDA (2 10)) VALUE(&CURUSER)
+             CHGVAR     VAR(&W#ER)  VALUE(' ')
+             CHGDTAARA  DTAARA(*LDA (12 1)) VALUE(&W#ER)
+             CHGDTAARA  DTAARA(*LDA (13 10)) VALUE(&USER)
+
+ DISPLY:    CALL        PGM(ARP141RS)    PARM(&IN03)  /*0603A*/
+
+            IF         COND(&IN03 *EQ '1')  THEN(RETURN) /*0603A*/
+
+ /*0603A    RETURN    */
+
+               OVRPRTF    FILE(ARP141T1) PAGESIZE(*N 198) +
+                          CPI(15) HOLD(*YES) USRDTA('開立清單') +
+                          IGCDTA(*YES)
+
+               OVRPRTF    FILE(ARP141T) PAGESIZE(*N 198) +
+                          CPI(15) HOLD(*YES) USRDTA('錯誤清單') +
+                          IGCDTA(*YES)
+
+               OVRDBF     FILE(INVMPC)  TOFILE(INVMPC) SHARE(*YES)
+               OVRDBF     FILE(INVMST) TOFILE(INVMST)
+
+/*篩選MCSTRL執行碼為空*/
+             OPNQRYF    FILE((INVMPC)) OPTION(*ALL) QRYSLT('MCCTRL +
+                          *EQ " "                       +
+                          *AND  %SST(MCMARK 9 1) *EQ "Y" +
+                            ')  +
+                          KEYFLD(*FILE)
+
+               OVRDBF     FILE(INVDPC)  TOFILE(INVDPC) SHARE(*YES)
+               OVRDBF     FILE(INVDTL) TOFILE(INVDTL)
+
+
+               CALL       PGM(ARP141R)
+               CLOF       OPNID(INVMPC)
+               DLTOVR   FILE(*ALL)
+
+ENDCLPGM:    ENDPGM
+

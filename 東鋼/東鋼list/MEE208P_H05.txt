@@ -1,0 +1,91 @@
+             PGM
+             DCL        VAR(&W#KIND) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&W#RULE) TYPE(*CHAR) LEN(5) VALUE(' ')
+             DCL        VAR(&W#DATE) TYPE(*CHAR) LEN(7)
+             DCL        VAR(&AREA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&Y)    TYPE(*CHAR) LEN(4)
+             DCL        VAR(&M)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN03) TYPE(*LGL)  LEN(1)
+             DCL        VAR(&YMD)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&ACYMD)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&BKNO)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&DTARA) TYPE(*CHAR) LEN(11)
+             DCL        VAR(&DTAR)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&NTNO1) TYPE(*DEC)  LEN(7 0)
+             DCL        VAR(&NTNO2) TYPE(*DEC)  LEN(7 0)
+             DCL        VAR(&NTNO3) TYPE(*DEC)  LEN(7 0)
+             DCL        VAR(&NTNO4) TYPE(*DEC)  LEN(7 0)
+             DCL        VAR(&NTNO5) TYPE(*DEC)  LEN(7 0)
+             DCL        VAR(&NTNO6) TYPE(*DEC)  LEN(7 0)
+             DCL        VAR(&NTNO)   TYPE(*CHAR) LEN(7)
+             DCL        VAR(&SNAM)   TYPE(*CHAR) LEN(10)
+
+             RTVNETA    SYSNAME(&SNAM)
+             CHGDTAARA  DTAARA(*LDA (401 10)) VALUE(&SNAM)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             RTVDTAARA  DTAARA(*LDA (1021  1)) RTNVAR(&AREA)
+             CHGVAR     VAR(&DTARA) VALUE('ACCTLDTA' *CAT &AREA)
+             RTVDTAARA  DTAARA(DALIB/&DTARA (1 8)) RTNVAR(&ACYMD)
+             IF         COND(&INT *EQ '1') THEN(DO)
+             CALL       PGM(MEE208RS) PARM(&IN03 &YMD &ACYMD &BKNO +
+                          &NTNO1 &NTNO2 &NTNO3 &NTNO4 &NTNO5 &NTNO6)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+             CHGDTAARA  DTAARA(*LDA (61 8)) VALUE(&YMD)
+             CHGVAR     VAR(&NTNO)   VALUE(&NTNO1)
+             CHGDTAARA  DTAARA(*LDA (7 07)) VALUE(&NTNO)
+             CHGVAR     VAR(&NTNO)   VALUE(&NTNO2)
+             CHGDTAARA  DTAARA(*LDA (14 07)) VALUE(&NTNO)
+             CHGVAR     VAR(&NTNO)   VALUE(&NTNO3)
+             CHGDTAARA  DTAARA(*LDA (21 07)) VALUE(&NTNO)
+             CHGVAR     VAR(&NTNO)   VALUE(&NTNO4)
+             CHGDTAARA  DTAARA(*LDA (28 07)) VALUE(&NTNO)
+             CHGVAR     VAR(&NTNO)   VALUE(&NTNO5)
+             CHGDTAARA  DTAARA(*LDA (35 07)) VALUE(&NTNO)
+             CHGVAR     VAR(&NTNO)   VALUE(&NTNO6)
+             CHGDTAARA  DTAARA(*LDA (42 07)) VALUE(&NTNO)
+             CHGDTAARA  DTAARA(*LDA (51 10)) VALUE(&BKNO)
+         /*  SBMJOB     JOB(MEE208P) JOBD(MTJOBD) OUTQ(&OUTQ) +  */
+         /*               RQSDTA('CALL MEE208P')                 */
+         /*  RETURN                                              */
+             ENDDO
+             RTVDTAARA  DTAARA(*LDA (61   8)) RTNVAR(&YMD)
+             RTVDTAARA  DTAARA(*LDA (61   4)) RTNVAR(&Y)
+             RTVDTAARA  DTAARA(*LDA (65   2)) RTNVAR(&M)
+             RTVDTAARA  DTAARA(*LDA (401  1)) RTNVAR(&AREA)
+             /* Check File => MEGNR(單據編號控制檔)*/
+             CHGVAR VAR(&W#DATE) VALUE(&AREA *CAT &Y *CAT &M)
+             CHGVAR VAR(&W#KIND) VALUE('ME24')    /*調整單*/
+             CALL   PGM(MELIB/MES001R) PARM(&W#KIND &W#DATE &W#RULE)
+             CHGVAR VAR(&W#KIND) VALUE('ME25')    /*交運單*/
+             CALL   PGM(MELIB/MES001R) PARM(&W#KIND &W#DATE &W#RULE)
+             CHGDTAARA  DTAARA(*LDA (101 5)) VALUE(&W#RULE)
+             /***  PROCESS START   ***/
+             OVRDBF     FILE(MEPMST) TOFILE(MEPMST) SHARE(*YES)
+             OPNQRYF    FILE((MEPMST)) OPTION(*ALL) QRYSLT('   +
+                          PMGLDT *EQ   ' || &YMD || '          +
+                          *AND  PMCLFG *EQ  "1"                +
+                          *AND  PMACD  *NE  "D"                +
+                          *AND  CHAR1  *EQ  "H"')              +
+                          KEYFLD((PMVNTR) (PMPYNO))            +
+                     MAPFLD((CHAR1 '%SST(PMRESV 1 1)' *CHAR 1))
+             OVRDBF     FILE(GLTRAN) TOFILE(('GL' || &AREA || 'R')) +
+                              LVLCHK(*NO)
+
+      /* 100/12/28 IFRS */
+  /*         OVRDBF     FILE(GLTRAI) TOFILE(ACLIBN/('GL' || &AREA || + */
+  /*                      'R')) LVLCHK(*NO)                            */
+             OVRDBF     FILE(GLSEQ) TOFILE(GLSEQ) LVLCHK(*NO)
+             OVRDBF     FILE(MEGNR)  TOFILE(MEGNR) LVLCHK(*NO)
+
+             OVRPRTF    FILE(QPRINT) TOFILE(QPRINT) PAGESIZE(*N 132) +
+                          CPI(10) USRDTA('付款代開')
+             OVRPRTF    FILE(QPRINT1) TOFILE(QPRINT) PAGESIZE(*N 132) +
+                          CPI(10) USRDTA('調整代開')
+             CALL       PGM(MEE208R)
+             CLOF       OPNID(MEPMST)
+             DLTOVR     FILE(*ALL)
+             ENDPGM
+

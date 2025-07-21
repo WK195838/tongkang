@@ -1,0 +1,59 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR068P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     訂單別繳款明細表                       */
+     /*     5.DATE-WRITTEN  86/07/29                                */
+     /*                                                             */
+     /***************************************************************/
+             DCL        VAR(&ORNO) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DAT1) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DAT2) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&INT)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ) TYPE(*CHAR) LEN(10)
+
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+             CALL       ARLIB/ARR068RS
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1  6)) RTNVAR(&ORNO)
+             RTVDTAARA  DTAARA(*LDA (7  8)) RTNVAR(&DAT1)
+             RTVDTAARA  DTAARA(*LDA (15 8)) RTNVAR(&DAT2)
+
+             IF         COND(&DAT2  *EQ '00000000') THEN(DO)
+             CHGVAR     VAR(&DAT2)     VALUE('99999999')
+             ENDDO
+
+
+             OVRDBF   FILE(INVDTL)  TOFILE(DALIB/INVDTLL1) SHARE(*YES)
+             OVRDBF   FILE(RCVDTL)  TOFILE(DALIB/RCVDTL) SHARE(*YES)
+             OVRDBF   FILE(INVMST)  TOFILE(DALIB/INVMST) SHARE(*YES)
+
+             OPNQRYF  FILE(INVDTL)  +
+                      QRYSLT(+
+                         '%SST(IVORNO 1 6) *EQ "' || &ORNO || '" *AND +
+                          IVACNT *EQ "6" *AND                         +
+                          IVFLAG *NE "D" *AND                         +
+                          IVDECD *NE "D" *AND                         +
+                          ACDT   *GE "' || &DAT1 || '"           *AND +
+                          ACDT   *LE "' || &DAT2 || '"           *AND +
+                          %SST(IVAPNO 6 1) *NE " "')                  +
+                      KEYFLD((IVAPNO) (IVNO))                         +
+                      MAPFLD((ACDT   IVACDT   *CHAR 8))
+
+             OVRPRTF  FILE(ARR068T) TOFILE(ARLIB/ARR068T) +
+                      HOLD(*YES) USRDTA('繳款明細')
+
+             CALL     PGM(ARR068R) PARM(&ORNO &DAT1 &DAT2)
+
+             CLOF     OPNID(INVDTL)
+             DLTOVR   FILE(*ALL)
+             ENDPGM
+

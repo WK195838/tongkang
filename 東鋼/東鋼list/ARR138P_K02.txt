@@ -1,0 +1,139 @@
+    /****************************************************************/
+    /*                                                               */
+    /*             *****   PROGRAM INTRODUCTION   *****              */
+    /*                                                               */
+    /*             1.PROGRAM-ID    ARR138P                           */
+    /*             2.PROGRAM-TYPE  CLS                               */
+    /*             3.AUTHOR        S00WCJ                            */
+    /*             4.FUNCTION     營業發票作廢彙總表           */
+    /*             5.DATE-WRITTEN  102/03/01  2013AR731              */
+    /*             6.UPDATE  DATE  103/01/02  S00WCJ (0301A)        */
+    /*                                                              */
+    /*                                                              */
+    /****************************************************************/
+
+             PGM
+
+    /*       DCL        VAR(&DSPID)   TYPE(*CHAR)  LEN(10)   */
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)  LEN(10)
+             DCL        VAR(&INT)     TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&W#ERR)   TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&W#DAT1)  TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&W#DAT2)  TYPE(*CHAR)  LEN(8)
+             DCL        VAR(&S#ARE1)  TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&AREAS)   TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&AREAE)   TYPE(*CHAR)  LEN(1)
+             DCL        VAR(&S#SALE)  TYPE(*CHAR)  LEN(1)
+
+             DCLF       FILE(ARR138S)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+    /*       RTVDTAARA  DTAARA(*LDA (1021  1)) RTNVAR(&S#AREA)    */
+
+  START:
+             SNDRCVF    RCDFMT(AR138F1)
+
+             IF         COND(&IN03 *EQ '1')   THEN(RETURN)
+             IF         COND(&IN12 *EQ '1')   THEN(RETURN)
+
+             CHGVAR     VAR(&IN30)    VALUE('0')
+             CHGVAR     VAR(&IN31)    VALUE('0')
+             CHGVAR     VAR(&S#ERR)   VALUE(' ')
+
+                 IF      COND(&S#DAT1 *EQ 0) THEN(DO)
+                      CHGVAR   VAR(&S#ERR)  VALUE('訊息-日期欄位+
+                             不可空白!')
+                      CHGVAR   VAR(&IN30)   VALUE('1')
+                      GOTO     CMDLBL(START)
+                 ENDDO
+
+             IF       COND(&S#DAT1 *NE 0) THEN(DO)
+                  CALL     PGM(C018) PARM(&S#DAT1 &W#ERR)
+               IF       COND(&W#ERR *EQ '1') THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-輸入日期錯誤!')
+                   CHGVAR  VAR(&IN30)  VALUE('1')
+                   GOTO     CMDLBL(START)
+               ENDDO
+             ENDDO
+
+             IF       COND(&S#DAT2 *NE 0) THEN(DO)
+                  CALL     PGM(C018) PARM(&S#DAT2 &W#ERR)
+               IF       COND(&W#ERR *EQ '1') THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-輸入日期錯誤!')
+                   CHGVAR  VAR(&IN31)  VALUE('1')
+                   GOTO     CMDLBL(START)
+               ENDDO
+             ENDDO
+
+             IF      COND(&S#DAT1 *NE 0  *AND &S#DAT2 *EQ 0) THEN(DO   )
+                   CHGVAR  VAR(&S#DAT2)  VALUE(&S#DAT1)
+             ENDDO
+
+
+             IF       COND(&S#DAT1 *GT &S#DAT2) THEN(DO)
+                   CHGVAR  VAR(&S#ERR) VALUE('訊息-日期區間錯誤!')
+                   CHGVAR  VAR(&IN30)  VALUE('1')
+                   CHGVAR  VAR(&IN31)  VALUE('1')
+                   GOTO     CMDLBL(START)
+             ENDDO
+
+       /* 紀錄輸入值 */
+             CHGVAR     VAR(&W#DAT1)    VALUE(&S#DAT1)
+             CHGVAR     VAR(&W#DAT2)    VALUE(&S#DAT2)
+             CHGDTAARA  DTAARA(*LDA (501 1))  VALUE(&S#ARE1)
+             CHGDTAARA  DTAARA(*LDA (502 1))  VALUE(&S#SALE)
+             CHGDTAARA  DTAARA(*LDA (511 8))  VALUE(&W#DAT1)
+             CHGDTAARA  DTAARA(*LDA (521 8))  VALUE(&W#DAT2)
+
+             SBMJOB     CMD(CALL PGM(ARR138P)) JOB(ARR138P) +
+                        JOBD(ARJOBD)
+             SNDBRKMSG  MSG('<<營業發票作發彙總表，開始處理，請稍待...>>') +
+                          TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             RETURN     /* INTERACTIVE JOB   */
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (501 1))  RTNVAR(&S#ARE1)
+             RTVDTAARA  DTAARA(*LDA (502 1))  RTNVAR(&S#SALE)
+             RTVDTAARA  DTAARA(*LDA (511 8))  RTNVAR(&W#DAT1)
+             RTVDTAARA  DTAARA(*LDA (521 8))  RTNVAR(&W#DAT2)
+
+             IF         COND(&S#ARE1 *EQ ' ') THEN(DO)
+             CHGVAR     VAR(&AREAS)   VALUE(' ')
+             CHGVAR     VAR(&AREAE)   VALUE('9')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&AREAS)   VALUE(&S#ARE1)
+             CHGVAR     VAR(&AREAE)   VALUE(&S#ARE1)
+             ENDDO
+
+
+             OVRPRTF    FILE(ARR138T) TOFILE(ARR138T) PAGESIZE(*N +
+                          120) CPI(15) COPIES(2) HOLD(*YES) +
+                          USRDTA('發票作彙')
+
+             OVRDBF     FILE(DELMST)  TOFILE(DELMST) SHARE(*YES)
+             OPNQRYF    FILE(DELMST) QRYSLT(' +
+                        (DMFLAG *NE "D" ) *AND +
+                        (DLNO   *GE "' || &AREAS || '") *AND +
+                        (DLNO   *LE "' || &AREAE || '") *AND +
+                        (DATE   *GE "' || &W#DAT1 || '") *AND +
+                        (DATE   *LE "' || &W#DAT2 || '")')    +
+                        KEYFLD((DMCUN1) (DMORN1) (DMAREA) (DMINDT)  +
+                               (DMINNO)) +
+                        MAPFLD((DLNO   '%SST(DMDLNO 1 1)') +
+                               (DATE  DMAPDT *CHAR 8))
+
+   /*     CPYFRMQRYF    FROMOPNID(DELMST) TOFILE(S00WCJ/DE1) +
+              MBROPT(*REPLACE)  CRTFILE(*YES)     */
+
+             CALL       PGM(ARR138R)
+             CLOF       OPNID(DELMST)
+             DLTOVR     FILE(*ALL)
+
+             SNDBRKMSG  MSG('<<營業發票作廢彙總表處理完畢，請列印...>>') +
+                          TOMSGQ(%SST(*LDA 1011 10)) MSGTYPE(*INFO)
+             ENDPGM
+

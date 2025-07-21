@@ -1,0 +1,106 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR080P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S02CLJ                                  */
+     /*     4.FUNCTION     發票與銷貨金額差異表                   */
+     /*     5.DATE-WRITTEN  88/07/27                                */
+     /*     6.UPDATE  DATE  99/05/06  2010AR476 S00WCJ (9905A)      */
+     /*                                                             */
+     /*  <說明:>                                                  */
+     /*            由於銷貨收入及銷貨調整代開傳票作業採銷貨明細   */
+     /*            作為來源，但銷貨明細過入發票後營業的應收帳款   */
+     /*            採發票作為來源；發票合計時可能造成金額上的差   */
+     /*            異。本表可供財會作為尾差調整的參考。           */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&OUTQ)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&USER)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&W#YYMM) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&W#STRD) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#ENDD) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&W#ARES) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&W#AREE) TYPE(*CHAR) LEN(1)
+
+             DCLF       FILE(ARR080S)
+
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+
+             RTVDTAARA  DTAARA(*LDA ( 951 35)) RTNVAR(&S#COMP)
+             RTVDTAARA  DTAARA(*LDA (1011 10)) RTNVAR(&S#DEVI)
+             RTVDTAARA  DTAARA(*LDA (1021  1)) RTNVAR(&S#AREA)
+ INPUT:
+             SNDRCVF
+             IF         COND(&IN03 *EQ '1' *OR &IN12 *EQ '1') +
+                        THEN(RETURN)
+
+             CHGDTAARA  DTAARA(*LDA (1 1)) VALUE(&S#AREA)
+             CHGVAR     VAR(&W#YYMM) VALUE(&S#YYMM)
+             CHGDTAARA  DTAARA(*LDA (2 6)) VALUE(&W#YYMM)
+
+             SBMJOB     JOB(ARR080P) JOBD(ARJOBD) OUTQ(&OUTQ)  +
+                        RQSDTA('CALL ARR080P')
+    /*9905A  START */
+        /*   CHGDTAARA  DTAARA(*LDA (801 70)) +
+             VALUE('發票與銷貨金額差異表已匯入佇列中。')  */
+             CHGDTAARA  DTAARA(*LDA (601 70)) +
+             VALUE('發票與銷貨金額差異表已匯入佇列中。')
+    /*9905A  END */
+             RETURN
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1 1)) RTNVAR(&S#AREA)
+             RTVDTAARA  DTAARA(*LDA (2 6)) RTNVAR(&W#YYMM)
+
+             CHGVAR     VAR(&W#STRD) VALUE(&W#YYMM || '01')
+             CHGVAR     VAR(&W#ENDD) VALUE(&W#YYMM || '31')
+
+             IF         COND(&S#AREA *EQ ' ') THEN(DO)
+             CHGVAR     VAR(&W#ARES)   VALUE(' ')
+             CHGVAR     VAR(&W#AREE)   VALUE('9')
+             ENDDO
+             ELSE (DO)
+             CHGVAR     VAR(&W#ARES)   VALUE(&S#AREA)
+             CHGVAR     VAR(&W#AREE)   VALUE(&S#AREA)
+             ENDDO
+
+STEP1:       /* 先前處理 */
+             CLRPFM     ARR080F
+             OVRDBF     FILE(INVMST) TOFILE(INVMST) SHARE(*YES)
+             OPNQRYF    FILE(INVMST) OPTION(*ALL) +
+                        QRYSLT('+
+                              (INDT   *GE "' || &W#STRD || '") *AND +
+                              (INDT   *LE "' || &W#ENDD || '") *AND +
+                              (INAREA *GE "' || &W#ARES || '") *AND +
+                              (INAREA *LE "' || &W#AREE || '") *AND +
+                              (INNO   *NE "DX04489346"       ) *AND +
+                              (INNO   *NE "DX04489347"       ) *AND +
+                              (INNO   *NE "DX04489350"       ) *AND +
+                              (INNO   *NE "DX04489354"       ) *AND +
+                              (INNO   *NE "DX04489353"       ) *AND +
+                              (INNO   *NE "DX04489338"       ) *AND +
+                              (INDECD *NE "D")') +
+                        MAPFLD((INDT ININDT *CHAR 8))
+
+             CALL       PGM(ARR080R1)
+             CLOF       OPNID(INVMST)
+             DLTOVR     *ALL
+
+STEP2:       /* 出　　表*/   /*------------------*/
+
+             OVRPRTF    FILE(ARR080T) USRDTA('發銷明細') HOLD(*YES)
+             OVRDBF     FILE(ARR080F) TOFILE(ARR080F) SHARE(*YES)
+             OPNQRYF    FILE(ARR080F) +
+                        KEYFLD((A1ORNO) (A1IVNO) (A1PDNM))
+             CALL       PGM(ARR080R)
+             CLOF       OPNID(ARR080F)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

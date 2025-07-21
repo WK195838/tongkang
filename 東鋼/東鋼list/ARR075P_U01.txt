@@ -1,0 +1,326 @@
+     /***************************************************************/
+     /*                                                             */
+     /*               >>   PROGRAM INTRODUCTION   <<                */
+     /*                                                             */
+     /*     1.PROGRAM-ID    ARR075P                                 */
+     /*     2.PROGRAM-TYPE  CLP/400                                 */
+     /*     3.AUTHOR        S00WCJ                                  */
+     /*     4.FUNCTION     新版發票列印程式─列印廠區             */
+     /*     5.DATE-WRITTEN  107/11/11 2018AR00029                   */
+     /*     6.UPDATE  DATE  107/12/14 2018AR00038 S00WCJ (0712A)    */
+     /*                      CALL PC程式增加營業單位參數          */
+     /*                     107/12/18 S00WCJ (0712B)                */
+     /*                      CALL PC程式增加USER參數            */
+     /*                     107/12/28 S00WCJ (0712C)                */
+     /*                      增加判斷若無本廠列印資料，則不CALL   */
+     /*                       PC端程式                            */
+     /*                     112/09/22 2023AR00042 S00WCJ (1209A)    */
+     /*                      配合請款單列印發票需求，CALL PC端程*/
+     /*                      式增加請款單號參數                   */
+     /*                                                             */
+     /*  說明：本作業取代原列印方式（先分類、再依日期或號碼區間） */
+     /*        改成執行一次本程式即可。                           */
+     /*        呼叫原依日期列印程式來印ARR007R                    */
+     /*                                                             */
+     /*     107/11~~ 配合電子發票上線，發票列印改為CALL PC端程式*/
+     /*        列印，由發票開立廠區將發票內容寫入介面檔，再由各發 */
+     /*        列印廠區之USER自行跨廠區執行列印作業             */
+     /*                                                             */
+     /*   *LDA:    1 --> 起始日期  （空白不採日期）             */
+     /*           11 --> 終止日期                                 */
+     /*           21 --> 起始號碼  （空白不採號碼）             */
+     /*           31 --> 終止號碼                                 */
+     /*                                                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&INT)     TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&OUTQ)    TYPE(*CHAR)   LEN(10)
+             DCL        VAR(&USER)    TYPE(*CHAR)   LEN(10)
+             DCL        VAR(&AREA)    TYPE(*CHAR)   LEN(1)
+             DCL        VAR(&IN03)    TYPE(*CHAR)   LEN(1)
+
+             DCL        VAR(&W#FRDT)  TYPE(*CHAR)   LEN(8)
+             DCL        VAR(&W#TODT)  TYPE(*CHAR)   LEN(8)
+             DCL        VAR(&W#FRNO)  TYPE(*CHAR)   LEN(10)
+             DCL        VAR(&W#TONO)  TYPE(*CHAR)   LEN(10)
+/*0712A*/    DCL        VAR(&D#DATS)  TYPE(*DEC)    LEN(8 0)
+/*0712A*/    DCL        VAR(&D#DATE)  TYPE(*DEC)    LEN(8 0)
+/*0711A*/    DCL        VAR(&W1FRDT)  TYPE(*CHAR)   LEN(8)
+/*0711A*/    DCL        VAR(&W1TODT)  TYPE(*CHAR)   LEN(8)
+/*0711A*/    DCL        VAR(&W1FRNO)  TYPE(*CHAR)   LEN(10)
+/*0711A*/    DCL        VAR(&W1TONO)  TYPE(*CHAR)   LEN(10)
+/*0711A*/    DCL        VAR(&W#AREA)  TYPE(*CHAR)   LEN(1)  /*列印廠區*/
+/*0711A*/    DCL        VAR(&W#PTMD)  TYPE(*CHAR)   LEN(1)  /*列印模式*/
+/*0712A*/    DCL        VAR(&W#BUMD)  TYPE(*CHAR)   LEN(1)  /*營業單位*/
+/*0711A*/    DCL        VAR(&PATH1)   TYPE(*CHAR)   LEN(16)
+/*0711A*/    DCL        VAR(&CMD)     TYPE(*CHAR)   LEN(26)
+/*0711A*/    DCL        VAR(&CMD1)    TYPE(*CHAR)   LEN(43)
+/*0711A*/    DCL        VAR(&CMD2)    TYPE(*CHAR)   LEN(45)
+/*0711A*/    DCL        VAR(&CMD3)    TYPE(*CHAR)   LEN(54)
+/*0711A*/    DCL        VAR(&CMD4)    TYPE(*CHAR)   LEN(63)
+/*0711A*/    DCL        VAR(&CMD5)    TYPE(*CHAR)   LEN(74)
+/*0711A*/    DCL        VAR(&CMD6)    TYPE(*CHAR)   LEN(85)
+/*0711A*/    DCL        VAR(&CMD7)    TYPE(*CHAR)   LEN(87)
+/*0712A*/    DCL        VAR(&CMD8)    TYPE(*CHAR)   LEN(89)
+/*0712B*/    DCL        VAR(&CMD9)    TYPE(*CHAR)   LEN(100)
+/*0712C*/    DCL        VAR(&W#PTYN)  TYPE(*CHAR)   LEN(1)
+/*1209A*/    DCL        VAR(&W#APNO)  TYPE(*CHAR)   LEN(6)
+/*1209A*/    DCL        VAR(&CMDA)    TYPE(*CHAR)   LEN(107)
+
+
+             RTVDTAARA  DTAARA(*LDA (1021 1)) RTNVAR(&AREA)
+             RTVJOBA    OUTQ(&OUTQ) TYPE(&INT) USER(&USER)
+
+
+             IF         COND(&INT *EQ '0') THEN(GOTO BATCH)
+
+ INPUT:
+             CALL       PGM(ARR075RS) PARM(&IN03 &W#PTMD)
+             IF         COND(&IN03 *EQ '1') THEN(RETURN)
+/*0711A      SBMJOB     JOB(ARR075P) JOBD(ARJOBD) OUTQ(&OUTQ) +
+                        RQSDTA('CALL ARR075P')      */
+/*0711A      RETURN       */
+
+ BATCH:
+             RTVDTAARA  DTAARA(*LDA (1   8)) RTNVAR(&W#FRDT)
+             RTVDTAARA  DTAARA(*LDA (11  8)) RTNVAR(&W#TODT)
+             RTVDTAARA  DTAARA(*LDA (21 10)) RTNVAR(&W#FRNO)
+             RTVDTAARA  DTAARA(*LDA (31 10)) RTNVAR(&W#TONO)
+/*0711A*/    RTVDTAARA  DTAARA(*LDA (41  1)) RTNVAR(&W#AREA)
+/*0712A*/    RTVDTAARA  DTAARA(*LDA (42  1)) RTNVAR(&W#BUMD)
+
+/*0711A*/    IF         COND(&W#AREA *NE  &AREA)  THEN(GOTO  INEPRT)
+/*0711A*/    IF         COND(&W#AREA  *EQ &AREA) THEN(DO)
+/*0711A*/          IF      COND(&W#PTMD *EQ '2')  THEN(GOTO INEPRT)
+/*0711A*/          IF      COND(&W#PTMD *EQ '3')  THEN(GOTO INEPRT)
+/*0711A*/    ENDDO
+
+             CRTDUPOBJ  OBJ(INVCUT) FROMLIB(DALIB) OBJTYPE(*FILE) +
+                        TOLIB(QTEMP)
+
+             MONMSG     MSGID(CPF0000)
+
+ BYDATE:     /* 依日期區間分類 */
+             IF         COND(&W#FRDT *EQ ' ') THEN(GOTO BYNUMBER)
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT)
+             CALL       PGM(ARR075R1)
+             DLTOVR     FILE(*ALL)
+
+
+ BYNUMBER:   /* 依號碼區間分類 */
+             IF         COND(&W#FRNO *EQ ' ') THEN(GOTO PRINTING)
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT)
+             CALL       PGM(ARR075R2)
+             DLTOVR     FILE(*ALL)
+
+
+ PRINTING:   /* 列印發票(CALL ARR007R) */
+
+    /* 台中 */
+             OVRDBF     FILE(INVDTY) TOFILE(INVDTL)
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT) SHARE(*YES)
+             OPNQRYF    FILE(INVCUT) +
+                        QRYSLT('CUAREA *EQ "M"') +
+                        KEYFLD((CUINDT) (CUNO))
+             OVRPRTF    FILE(QPRINT) PAGESIZE(33 80) LPI(6) CPI(10) +
+                        OVRFLW(33) FORMTYPE('發票') HOLD(*YES) +
+                        USRDTA('台中發票')
+             CALL       PGM(ARR007R)
+             CLOF       OPNID(INVCUT)
+             DLTOVR     FILE(*ALL)
+
+
+    /* 台北 */
+             OVRDBF     FILE(INVDTY) TOFILE(INVDTL)
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT) SHARE(*YES)
+             OPNQRYF    FILE(INVCUT) +
+                        QRYSLT('CUAREA *EQ "P"') +
+                        KEYFLD((CUINDT) (CUNO))
+             OVRPRTF    FILE(QPRINT) PAGESIZE(33 80) LPI(6) CPI(10) +
+                        OVRFLW(33) FORMTYPE('發票') HOLD(*YES) +
+                        USRDTA('台北發票')
+             CALL       PGM(ARR007R)
+             CLOF       OPNID(INVCUT)
+             DLTOVR     FILE(*ALL)
+
+
+    /* 桃園 */
+             OVRDBF     FILE(INVDTY) TOFILE(INVDTL)
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT) SHARE(*YES)
+             OPNQRYF    FILE(INVCUT) +
+                        QRYSLT('CUAREA *EQ "T"') +
+                        KEYFLD((CUINDT) (CUNO))
+             OVRPRTF    FILE(QPRINT) PAGESIZE(33 80) LPI(6) CPI(10) +
+                        OVRFLW(33) FORMTYPE('發票') HOLD(*YES) +
+                        USRDTA('桃園發票')
+             CALL       PGM(ARR007R)
+             CLOF       OPNID(INVCUT)
+             DLTOVR     FILE(*ALL)
+
+    /*9901A  START */
+    /* 新桃 */
+             OVRDBF     FILE(INVDTY) TOFILE(INVDTL)
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT) SHARE(*YES)
+             OPNQRYF    FILE(INVCUT) +
+                        QRYSLT('CUAREA *EQ "U"') +
+                        KEYFLD((CUINDT) (CUNO))
+             OVRPRTF    FILE(QPRINT) PAGESIZE(33 80) LPI(6) CPI(10) +
+                        OVRFLW(33) FORMTYPE('發票') HOLD(*YES) +
+                        USRDTA('新桃發票')
+             CALL       PGM(ARR007R)
+             CLOF       OPNID(INVCUT)
+             DLTOVR     FILE(*ALL)
+    /*9901A  END  */
+
+
+    /* 高雄 */
+             OVRDBF     FILE(INVDTY) TOFILE(INVDTL)
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT) SHARE(*YES)
+             OPNQRYF    FILE(INVCUT) +
+                        QRYSLT('CUAREA *EQ "K"') +
+                        KEYFLD((CUINDT) (CUNO))
+             OVRPRTF    FILE(QPRINT) DEV(PRT18) PAGESIZE(33 80) +
+                        HOLD(*YES) SAVE(*YES) +
+                        OVRFLW(33) FORMTYPE('發票') +
+                        USRDTA('高雄發票')
+             CALL       PGM(ARR007R)
+             CLOF       OPNID(INVCUT)
+             DLTOVR     FILE(*ALL)
+
+
+    /* 型鋼 */
+             OVRDBF     FILE(INVDTY) TOFILE(INVDTL)
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT) SHARE(*YES)
+             OPNQRYF    FILE(INVCUT) +
+                        QRYSLT('CUAREA *EQ "H"') +
+                        KEYFLD((CUINDT) (CUNO))
+             OVRPRTF    FILE(QPRINT) PAGESIZE(33 80) LPI(6) CPI(10) +
+                        OVRFLW(33) FORMTYPE('發票') HOLD(*YES) +
+                        USRDTA('型鋼發票')
+             CALL       PGM(ARR007R)
+             CLOF       OPNID(INVCUT)
+             DLTOVR     FILE(*ALL)
+
+
+ /*0612A寫入電子發票介面檔 */
+
+ /*0612A*/   OVRDBF     FILE(INVDTY) TOFILE(INVDTL)
+ /*0612A*/   OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT) SHARE(*YES)
+ /*0612A*/   CALL       PGM(ARR007R1)
+ /*0612A*/   DLTOVR     FILE(*ALL)
+
+ ERRLIST:    /* 錯誤清單 */
+
+             OVRDBF     FILE(INVCUT) TOFILE(QTEMP/INVCUT) SHARE(*YES)
+             OPNQRYF    FILE(INVCUT) +
+                        QRYSLT('CUAREA *EQ "*"') +
+                        KEYFLD((CUINDT) (CUNO))
+             OVRPRTF    FILE(ARR075T) TOFILE(ARR075T) +
+                        USRDTA('錯誤清單') HOLD(*YES)
+             CALL       PGM(ARR075R3)
+             CLOF       OPNID(INVCUT)
+             DLTOVR     FILE(*ALL)
+
+/*0711A*/
+ INEPRT:     /*電子發票列印*/
+
+/*0712C*/    RTVDTAARA  DTAARA(*LDA (43  1)) RTNVAR(&W#PTYN)
+
+/*0904A發票第一次未印出再重新列印使用*/
+/*0904A        CHGVAR      VAR(&W#PTYN)   VALUE('Y')   */
+
+/*0711A*/    IF         COND(&W#AREA *NE  &AREA)  THEN(DO)
+/*0712A*/   IF      COND(&W#FRDT *EQ ' ') THEN(DO)
+/*0712A*/         CHGVAR    VAR(&W1FRDT) VALUE('20110101')
+/*0712A*/         CHGVAR    VAR(&W1TODT) VALUE('21101231')
+/*0712A*/   ENDDO
+/*0712A*/   IF      COND(&W#FRDT *NE ' ') THEN(DO)
+/*0712A*/         CHGVAR    VAR(&D#DATS)   VALUE(&W#FRDT)
+/*0712A*/         CHGVAR    VAR(&D#DATS)   VALUE(&D#DATS + 19110000)
+/*0712A*/         CHGVAR    VAR(&D#DATE)   VALUE(&W#TODT)
+/*0712A*/         CHGVAR    VAR(&D#DATE)   VALUE(&D#DATE + 19110000)
+/*0712A*/         CHGVAR    VAR(&W1FRDT)   VALUE(&D#DATS)
+/*0712A*/         CHGVAR    VAR(&W1TODT)   VALUE(&D#DATE)
+/*0712A*/   ENDDO
+
+/*0712A*/      IF     COND(&W#FRNO *EQ ' ') THEN(DO)
+/*0712A*/          CHGVAR   VAR(&W1FRNO)  VALUE('          ')
+/*0712A*/          CHGVAR   VAR(&W1TONO)  VALUE('9999999999')
+/*0712A*/      ENDDO
+/*0712A*/      IF     COND(&W#FRNO *NE ' ') THEN(DO)
+/*0712A*/          CHGVAR   VAR(&W1FRNO)  VALUE(&W#FRNO)
+/*0712A*/          CHGVAR   VAR(&W1TONO)  VALUE(&W#TONO)
+/*0712A*/      ENDDO
+
+/*0711A*/    OVRDBF     FILE(INEMST)  TOFILE(INEMST)  SHARE(*YES)
+
+/*0712A*/    OPNQRYF    FILE(INEMST)  OPTION(*ALL) +
+                        QRYSLT('EMPTAR *EQ "' || &W#AREA || '" *AND +
+                                EMBUMD *EQ "' || &W#BUMD || '" *AND +
+                                EMNO   *GE "' || &W1FRNO || '" *AND +
+                                EMNO   *LE "' || &W1TONO || '" *AND +
+                                EMINDT *GE "' || &W1FRDT || '" *AND +
+                                EMINDT *LE "' || &W1TODT || '" *AND +
+                                EMPTMD *EQ " "') +
+                        KEYFLD((EMNO))
+/*0711A*/    CALL      PGM(ARR007R2)
+/*0711A*/    CLOF       OPNID(INEMST)
+/*0711A*/    DLTOVR     FILE(*ALL)
+/*0711A*/    ENDDO
+
+/*0711A*/   IF       COND(&W#PTMD *NE '0') THEN(DO)
+/*0712C*/       IF     COND(&W#PTMD *EQ '1' *AND &W#PTYN *NE 'Y') THEN(DO)
+/*0712C*/              GOTO    CMDLBL(SHOWMSG)
+/*0712C*/       ENDDO
+
+/*0711A*/    CHGVAR     VAR(&PATH1)  VALUE('PRINTINVOICE.EXE')
+/*1209A*/    CHGVAR     VAR(&W#APNO) VALUE('000000')
+
+/*0711A*/   IF      COND(&W#FRDT *EQ ' ') THEN(DO)
+/*0711A*/         CHGVAR    VAR(&W1FRDT) VALUE('01000101')
+/*0711A*/         CHGVAR    VAR(&W1TODT) VALUE('01991231')
+/*0711A*/   ENDDO
+/*0711A*/   IF      COND(&W#FRDT *NE ' ') THEN(DO)
+/*0711A*/         CHGVAR    VAR(&W1FRDT)   VALUE(&W#FRDT)
+/*0711A*/         CHGVAR    VAR(&W1TODT)   VALUE(&W#TODT)
+/*0711A*/   ENDDO
+
+/*0711A*/   IF      COND(&W#FRNO *EQ ' ') THEN(DO)
+/*0711A*/         CHGVAR    VAR(&W1FRNO) VALUE('0000000000')
+/*0711A*/         CHGVAR    VAR(&W1TONO) VALUE('ZZZZZZZZZZ')
+/*0711A*/   ENDDO
+/*0711A*/   IF      COND(&W#FRNO *NE ' ') THEN(DO)
+/*0711A*/         CHGVAR    VAR(&W1FRNO)   VALUE(&W#FRNO)
+/*0711A*/         CHGVAR    VAR(&W1TONO)   VALUE(&W#TONO)
+/*0711A*/   ENDDO
+
+/*0711A*/    STRPCO     PCTA(*NO)
+/*0711A*/    MONMSG     CPF0000
+
+/*0711A*/    CHGVAR   VAR(&CMD)  VALUE('C:\E-INVOICE\PRINTINVOICE\')
+/*0711A*/    CHGVAR   VAR(&CMD1) VALUE(&CMD || &PATH1 || ' ')
+/*0711A*/    CHGVAR   VAR(&CMD2) VALUE(&CMD1 || &W#AREA || ' ')
+/*0711A*/    CHGVAR   VAR(&CMD3) VALUE(&CMD2 || &W1FRDT || ' ')
+/*0711A*/    CHGVAR   VAR(&CMD4) VALUE(&CMD3 || &W1TODT || ' ')
+/*0711A*/    CHGVAR   VAR(&CMD5) VALUE(&CMD4 || &W1FRNO || ' ')
+/*0711A*/    CHGVAR   VAR(&CMD6) VALUE(&CMD5 || &W1TONO || ' ')
+/*0711A*/    CHGVAR   VAR(&CMD7) VALUE(&CMD6 || &W#PTMD || ' ')
+/*0712A*/    CHGVAR   VAR(&CMD8) VALUE(&CMD7 || &W#BUMD || ' ')
+/*0712B*/    CHGVAR   VAR(&CMD9) VALUE(&CMD8 || &USER || ' ')
+/*1209A*/    CHGVAR   VAR(&CMDA) VALUE(&CMD9 || &W#APNO || ' ')
+
+/*1209A*/    STRPCCMD   PCCMD(&CMDA) PAUSE(*NO)
+
+/*0711A*/   ENDDO
+
+
+ SHOWMSG:    /* 結束訊息 */
+
+             SNDMSG     TOUSR(&USER) +
+                        MSG('發票列印作業執行完畢。選擇區間：日期' +
+                            || &W#FRDT || '至' || &W#TODT || '，'+
+                            || '號碼' || &W#FRNO || '至'         +
+                            || &W#TONO)
+
+             ENDPGM
+
